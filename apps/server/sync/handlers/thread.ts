@@ -1,4 +1,4 @@
-import { db, outbox, SEED_TS, syncMeta, threads, type StoredSessionState, type Thread } from '../../db.ts';
+import { db, outbox, SEED_TS, syncMeta, threads, transitions, type StoredSessionState, type Thread } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
 import { ownerOf } from '../../ownership.ts';
 import { claim, registerHandler } from '../apply.ts';
@@ -15,8 +15,9 @@ import { logRefused } from '../verify.ts';
 // change files the thread (handlers/folder.ts). A change from an older build carries no folder_id: this Mac's stays,
 // unless the thread moved channel. pinned_at and done_at travel the same way: a change without them keeps this Mac's, and so does
 // owner (the person accountable) and auto_reason, which an older build does not send, sessions and handover (the run
-// switch, runner/switch-plan.ts), the queued run (runner/switch.ts), continued_from (a continued thread's source,
-// apps/server/continue.ts), and a quick ask's quick, workspace and promoted_to (packages/shared/quick-ask.ts).
+// switch, runner/switch-plan.ts), the queued run (runner/switch.ts, merged by its own edit time), continued_from (a
+// continued thread's source, apps/server/continue.ts), and a quick ask's quick, workspace and promoted_to
+// (packages/shared/quick-ask.ts).
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
@@ -163,7 +164,11 @@ registerHandler('thread', {
       const s = merged.row as Partial<StoredSessionState>;
       setSessionState.run(s.sessions ? JSON.stringify(s.sessions) : null, s.handover ? JSON.stringify(s.handover) : null, change.entity_id);
     }
-    if (took('queued_harness')) setQueuedRun.run(t.queued_harness ?? null, t.queued_model ?? null, t.queued_effort ?? null, change.entity_id);
+    if (took('queued_harness')) {
+      setQueuedRun.run(t.queued_harness ?? null, t.queued_model ?? null, t.queued_effort ?? null, change.entity_id);
+      // A pick made here for a turn another machine ran is over once that machine applied it, or it was dropped there.
+      if (!t.queued_harness) transitions.settleQueued(change.entity_id, { harness: t.harness, model: t.model ?? '', effort: t.effort ?? '' });
+    }
     if (took('continued_from')) setContinuedFrom.run(t.continued_from ?? null, change.entity_id);
     if (took('quick') || took('workspace') || took('promoted_to')) setQuickAsk.run(Number(t.quick ?? 0), t.workspace ?? null, t.promoted_to ?? null, change.entity_id);
     if (data.edited) setEdits.run(JSON.stringify(merged.edited), change.entity_id);

@@ -7,6 +7,10 @@
 // - Session fields (SESSION: session id, sessions, handover) move as a group when their last write is the later one,
 //   from any machine: a run switch Ben makes on the hub writes them there. A rename or pin never writes them, so a
 //   stale copy riding on one never replaces them.
+// - The queued run (QUEUED: the run Ben picked for after the turn) moves as a group when its last write is the later
+//   one, from any machine: Ben picks on the hub while the other machine runs the turn, and that machine applies the
+//   pick when the turn ends, clearing it. The owner's own writes during the turn never touch it, so they never drop
+//   the pick, and the hub's copy of the row never brings back a pick the owner has applied.
 // - Metadata (META) merges field by field: each field carries the time it was last edited (`edited`), and the later
 //   edit wins, whichever row it came in on. A change from an older build carries no `edited` and keeps today's
 //   behavior for them.
@@ -19,12 +23,14 @@
 export const EXEC = ['status', 'run_machine', 'has_run', 'last_text'] as const;
 /** Fields that move as a group by their `session` edit time, from whichever machine wrote them last. */
 export const SESSION = ['session_id', 'sessions', 'handover'] as const;
+/** The run picked for after the turn, which moves as a group by its `queued` edit time, from whichever machine wrote it last. */
+export const QUEUED = ['queued_harness', 'queued_model', 'queued_effort'] as const;
 /** Fields that merge by their own edit time. */
 export const META = ['title', 'archived', 'folder_id', 'pinned_at', 'done_at', 'owner'] as const;
 
 export type MetaField = (typeof META)[number];
-/** When each metadata field was last edited, and `exec` and `session` when those groups were last written, as ISO times. */
-export type FieldEdits = Partial<Record<MetaField | 'exec' | 'session', string>>;
+/** When each metadata field was last edited, and `exec`, `session` and `queued` when those groups were last written, as ISO times. */
+export type FieldEdits = Partial<Record<MetaField | 'exec' | 'session' | 'queued', string>>;
 
 /** A row as the merge sees it: any columns, plus `edited`. */
 export type MergeRow = Record<string, unknown> & { edited?: FieldEdits | null };
@@ -61,7 +67,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
 const validEdits = (e: unknown): FieldEdits | null => {
   if (!e || typeof e !== 'object') return null;
   const out: FieldEdits = {};
-  for (const f of [...META, 'exec', 'session'] as const) {
+  for (const f of [...META, 'exec', 'session', 'queued'] as const) {
     const v = (e as Record<string, unknown>)[f];
     if (typeof v === 'string' && v) out[f] = v;
   }
@@ -85,10 +91,10 @@ export function mergeThread({ here, incoming, newer, from, owner, self }: MergeI
     taken.add(k);
   };
 
-  const ownerFields = new Set<string>([...EXEC, ...SESSION]);
+  const grouped = new Set<string>([...EXEC, ...SESSION, ...QUEUED]);
   const metaFields = new Set<string>(META);
   for (const k of Object.keys(incoming)) {
-    if (k === 'edited' || k === 'id' || ownerFields.has(k) || metaFields.has(k)) continue;
+    if (k === 'edited' || k === 'id' || grouped.has(k) || metaFields.has(k)) continue;
     if (newer) take(k);
   }
 
@@ -112,6 +118,14 @@ export function mergeThread({ here, incoming, newer, from, owner, self }: MergeI
   const sessionLater = theirSession ? !ourSession || theirSession > ourSession : newer && fromOwner;
   for (const k of SESSION) if (has(incoming, k) && sessionLater) take(k);
   if (sessionLater && theirSession) edited.session = theirSession;
+
+  // With no edit time on either side (rows from before edit times for it), the queued run follows the newer row, as
+  // before. A row without one never replaces a pick written here with one: that is the owner's turn writing the row.
+  const theirQueued = inEdits?.queued;
+  const ourQueued = hereEdits.queued;
+  const queuedLater = theirQueued ? !ourQueued || theirQueued > ourQueued : newer && !ourQueued;
+  for (const k of QUEUED) if (has(incoming, k) && queuedLater) take(k);
+  if (queuedLater && theirQueued) edited.queued = theirQueued;
 
   // Metadata: the later edit of each field wins. Without edit times (an older build), the newer row wins, as before.
   for (const f of META) {

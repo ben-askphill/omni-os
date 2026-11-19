@@ -80,6 +80,18 @@ export function turnBlocked(t: Thread, here = false, taking = false): string | n
 }
 
 /**
+ * Why this machine cannot switch the thread's run now, or null; `elsewhere` when another machine runs its turn. A pick
+ * then waits for that turn, as one made there would: this machine queues it, sync carries the queued run to the
+ * machine that runs the thread (sync/thread-merge.ts), and that machine applies it when the turn ends (runner/switch.ts
+ * applyQueued). A thread on its way between machines is refused as turnBlocked refuses it, and so is anything else.
+ */
+export function switchBlocked(t: Thread, here = false): { blocked: string | null; elsewhere: boolean } {
+  if (here || !busyElsewhere(t)) return { blocked: turnBlocked(t, here), elsewhere: false };
+  const moving = handoffBlock(t);
+  return { blocked: moving, elsewhere: !moving };
+}
+
+/**
  * Why a wake of Omni's own (a PR watch, a crew report, a limit resume) may not start a turn here, or null. Everything
  * turnBlocked refuses, and a thread another machine holds between turns: a wake never moves a thread, only Ben's
  * reply or Take over does, so it waits here for Resume (docs/adr/0005-one-execution-owner.md).

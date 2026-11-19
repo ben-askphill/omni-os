@@ -48,6 +48,28 @@ describe('mergeThread', () => {
     expect(merge({ session_id: 'sess-old', edited: { session: T1 } }).row.session_id).toBe('sess-new');
   });
 
+  it('takes the run Ben queued on the hub, and keeps it through the owner turn writes', () => {
+    const picked = { queued_harness: 'claude-code', queued_model: 'opus', queued_effort: 'low' };
+    // On the owner: the hub's pick is a later write of the queued run, even on a row older than the owner's last write.
+    const onOwner = merge({ ...picked, edited: { queued: T2 } }, { newer: false });
+    expect(onOwner.row).toMatchObject(picked);
+    expect(onOwner.edited.queued).toBe(T2);
+    // On the hub: the owner's turn writes the row without touching the queued run, so the pick stays.
+    const hub = { ...here, ...picked, edited: { ...here.edited, queued: T2 } };
+    const turn = mergeThread({ here: hub, incoming: { queued_harness: null, queued_model: null, queued_effort: null, edited: { exec: T2 } }, newer: true, from: 'mac-b', owner: 'mac-b', self: 'mac-a' });
+    expect(turn.row).toMatchObject(picked);
+    // The owner applied it: a later write of the queued run clears it on the hub.
+    const applied = mergeThread({ here: hub, incoming: { queued_harness: null, queued_model: null, queued_effort: null, model: 'opus', edited: { queued: '2030-03-01T12:00:02.000Z' } }, newer: true, from: 'mac-b', owner: 'mac-b', self: 'mac-a' });
+    expect(applied.row).toMatchObject({ queued_harness: null, queued_effort: null });
+    // A stale copy of the hub's row never brings an applied pick back.
+    expect(mergeThread({ here: { ...here, queued_harness: null, edited: { queued: T2 } }, incoming: { ...picked, edited: { queued: T1 } }, newer: true, from: 'mac-a', owner: 'mac-b', self: 'mac-b' }).row.queued_harness).toBeNull();
+  });
+
+  it('lets the queued run follow the newer row when neither side has its edit time, as before', () => {
+    expect(merge({ queued_harness: 'codex', queued_model: '', queued_effort: '' }).row.queued_harness).toBe('codex');
+    expect(merge({ queued_harness: 'codex', queued_model: '', queued_effort: '' }, { newer: false }).taken.has('queued_harness')).toBe(false);
+  });
+
   it('takes execution fields from the owner', () => {
     const r = merge({ session_id: 'sess-b', last_text: 'b reply', edited: { exec: T2, session: T2 } }, { owner: 'mac-b' });
     expect(r.row).toMatchObject({ session_id: 'sess-b', last_text: 'b reply' });

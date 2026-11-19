@@ -54,6 +54,7 @@ The model and effort pickers in a thread's reply box move it to another model, e
 - Between turns the switch applies at once.
 - While a turn or its background tasks run, the switch waits. The pills show the pick with "Next turn" until the turn ends, however it ends (done, failed or stopped), and its background tasks finish. Then the switch applies. A later pick replaces it; picking the current model and effort again, or the pill's clear button, drops it. Anything you send meanwhile waits for the turn too and runs on the new pick, instead of steering the running turn.
 
+- A thread another synced machine runs switches the same way: a pick made while it runs a turn there waits for that turn, and that machine applies it ([Sync](sync.md#run-a-thread-on-another-machine)).
 - Stop keeps the queued switch; clear Next turn to cancel it. If the pick is no longer available when it applies, Omni drops it with an error row and keeps the current run.
 - Same harness: its session carries on with the new model or effort.
 - Another harness: your next message starts a session there with a handover ahead of it. Omni builds it from the thread's transcript: title, folder, artifacts, open todos, then the messages, replies and tool calls, the newest kept whole when it runs past 32K characters. The transcript shows "Handing over from ... to ...", then how much the new session read. A message that starts with a command, like `/review`, runs first, and the handover goes with your next message.

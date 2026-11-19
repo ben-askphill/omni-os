@@ -12,7 +12,7 @@ import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { HARNESS_META, isHarnessId, type HarnessId } from '../harness/types.ts';
 import { getCrew } from '../crew.ts';
 import { reviewerEffort } from '../harness/resolve.ts';
-import { turnBlocked } from '../sync/guard.ts';
+import { switchBlocked } from '../sync/guard.ts';
 import { buildHandover } from './handover.ts';
 import { closeLive } from './session.ts';
 import { planSwitch } from './switch-plan.ts';
@@ -73,10 +73,11 @@ export async function previewSwitch(threadId: string, to: Run): Promise<{ run: R
   const target = { ...to, harness: to.harness };
   let blocked = invalid(getCatalog(), target, t) && invalid(await freshCatalog(), target, t);
   const now = threads.get(threadId) ?? t;
-  blocked ||= turnBlocked(now, runsHere(threadId));
+  const gate = switchBlocked(now, runsHere(threadId));
+  blocked ||= gate.blocked;
   const p = plan(now, to, getCatalog());
   if (p.kind === 'reject') blocked ||= p.error;
-  return { run, blocked, mode: p.kind === 'reject' ? 'none' : p.kind, waits: now.status === 'running' || holdsTurn(lives.get(threadId)) };
+  return { run, blocked, mode: p.kind === 'reject' ? 'none' : p.kind, waits: gate.elsewhere || now.status === 'running' || holdsTurn(lives.get(threadId)) };
 }
 
 /** Drop the run Ben queued for after the turn, so the thread stays on its run. True when one was dropped. */
@@ -90,9 +91,10 @@ export function cancelQueued(threadId: string): boolean {
 }
 
 /**
- * Move a thread to another run. The same run again changes nothing, and drops a run queued since. While a turn runs
- * the pick is queued instead (`queued_*` on the thread): a later pick replaces it, and it applies once the thread is
- * quiet (`applyQueued`). A run the catalog does not offer, or a move to or from Hermes or Cursor Cloud, is refused at once.
+ * Move a thread to another run. The same run again changes nothing, and drops a run queued since. While a turn runs,
+ * here or on the machine that runs the thread, the pick is queued instead (`queued_*` on the thread): a later pick
+ * replaces it, and it applies once the thread is quiet (`applyQueued`), on the machine that runs it. A run the catalog
+ * does not offer, or a move to or from Hermes or Cursor Cloud, is refused at once.
  */
 export async function switchRun(threadId: string, to: Run): Promise<Thread> {
   const t = threads.get(threadId);
@@ -113,13 +115,14 @@ export async function switchRun(threadId: string, to: Run): Promise<Thread> {
     if (error) throw refusal(error, 400);
   }
   const now = threads.get(threadId)!;
-  const why = turnBlocked(now, runsHere(threadId));
+  const { blocked: why, elsewhere } = switchBlocked(now, runsHere(threadId));
   if (why) throw refusal(why, 409);
   const p = plan(now, to, getCatalog());
   if (p.kind === 'reject') throw refusal(p.error, 400);
 
-  // A turn spans one run: the pick waits for it to end. A lead still waiting on its team counts as running.
-  if (now.status === 'running' || holdsTurn(lives.get(threadId))) {
+  // A turn spans one run: the pick waits for it to end. A lead still waiting on its team counts as running. A turn
+  // another machine runs counts too: sync carries the queued run there, and that machine applies it.
+  if (elsewhere || now.status === 'running' || holdsTurn(lives.get(threadId))) {
     const q = queuedRun(now);
     if (q && sameRun(q, to)) return now;
     threads.update(threadId, { queued_harness: to.harness, queued_model: to.model, queued_effort: to.effort });

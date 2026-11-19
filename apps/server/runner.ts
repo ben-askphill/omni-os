@@ -35,7 +35,7 @@ export { ALREADY_SENT, cancelRequests, editRequest, reorderRequests, steerReques
 export { fenceStale, interruptThread, releaseForHandoff, shutdownAll, stopThread } from './runner/session.ts';
 export { retrySetup } from './runner/setup.ts';
 export { retryResume, startFresh } from './runner/fresh-context.ts';
-export { switchRun } from './runner/switch.ts';
+export { applyQueued, switchRun } from './runner/switch.ts';
 export { cancelLimitResume, clearLimit, fireDue, limitClock, resumeLimitNow, scheduleLimitResume, startLimits } from './runner/limits.ts';
 export { reportToParent, saveOwn, settleTeam, wake } from './runner/queue.ts';
 export { buildSystemPrompt } from './runner/prompts.ts';

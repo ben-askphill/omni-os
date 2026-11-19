@@ -1,4 +1,5 @@
 // Who runs next: deliver a message, take a free slot, start the turn.
+import { sameRun } from '@omni/shared/run-switch.ts';
 import { resolveDelivery } from '../delivery.ts';
 import { events, messageRequests, outbox, reportFollowUps, requestFingerprint, threads, tx, type MessageRequest } from '../db.ts';
 import { getCrew } from '../crew.ts';
@@ -114,10 +115,12 @@ export function pump() {
       i++;
       continue;
     }
-    const harness = threads.get(id)?.harness ?? 'claude-code';
-    // Switched on another machine (a thread that runs here for it, run-on.ts): the warm process is the old harness's.
+    const t = threads.get(id);
+    const harness = t?.harness ?? 'claude-code';
+    // Switched on another machine (a thread that runs here for it, run-on.ts): the warm process runs the old harness,
+    // model or effort, which it took as it started.
     const warm = lives.get(id);
-    if (warm && !warm.turn && warm.harness && warm.harness !== harness) {
+    if (warm && !warm.turn && t && !sameRun(warm, { harness, model: t.model ?? '', effort: t.effort ?? '' })) {
       closeLive(warm);
       i++;
       continue;

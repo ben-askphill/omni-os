@@ -19,7 +19,7 @@ A transition has one of three kinds:
 
 | Kind | What changes | Done by | Its id | Its states |
 | --- | --- | --- | --- | --- |
-| `reconfigure` | The run: harness, model or effort. The thread stays where it is | `runner/switch.ts` (`switch-plan.ts` decides what happens to the sessions) | its own | `applied` at once between turns; `queued` during a turn, then `applied` when the turn ends, or `cancelled` once another pick replaced it, Ben cancelled it or the catalog no longer offered it |
+| `reconfigure` | The run: harness, model or effort. The thread stays where it is | `runner/switch.ts` (`switch-plan.ts` decides what happens to the sessions) | its own | `applied` at once between turns; `queued` during a turn, then `applied` when the turn ends, or `cancelled` once another pick replaced it, Ben cancelled it or the catalog no longer offered it. A turn another machine runs counts: the pick is queued here, the thread row carries it there (`queued_*` merge by their own edit time, `sync/thread-merge.ts`), and that machine applies it, at the turn's end or, when the pick lands after it, at its next sync (`run-on.ts applySyncedRuns`) |
 | `relocate` | The machine: a handoff from this one (`to: <machine id>`), or a Take over of one another machine holds (`to: "here"`) | `handoff.ts` | the handoff record it wrote: the offer for a handoff, the request for a Take over | the handoff's phases: `preparing`, `offered`, `accepted`, `failed`, `declined`, `cancelled`; a request's `requested`, `expired` |
 | `fork` | Nothing in the thread: a new thread continues it on another local run, with a Carryover (Continue) | `continue.ts` | the new thread's | `started`; from then on it is that thread |
 
@@ -49,7 +49,8 @@ or the desktop app), the Conductor and a machine on an older build keep working 
 | `POST /:id/handoff/cancel` | cancel of the thread's current `relocate` |
 
 A refusal is the same whichever route asks: the ownership check at the delivery boundary
-(`sync/guard.ts turnBlocked`), the handoff's refusals, Continue's `busy`, `changed` and `request_reused`.
+(`sync/guard.ts turnBlocked`, which `switchBlocked` relaxes for a reconfigure while another machine runs the turn),
+the handoff's refusals, Continue's `busy`, `changed` and `request_reused`.
 
 ## What each machine keeps
 

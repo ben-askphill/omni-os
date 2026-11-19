@@ -162,10 +162,10 @@ const GOAL_RESET =
 const json = (v: object | null) => (v ? JSON.stringify(v) : null);
 
 /**
- * Metadata fields a sync change merges one by one, by the time each was last edited, and `exec` and `session` for
- * the execution and session fields as groups (sync/thread-merge.ts).
+ * Metadata fields a sync change merges one by one, by the time each was last edited, and `exec`, `session` and
+ * `queued` for the execution fields, the session fields and the queued run as groups (sync/thread-merge.ts).
  */
-export type EditedField = 'title' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'owner' | 'exec' | 'session';
+export type EditedField = 'title' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'owner' | 'exec' | 'session' | 'queued';
 
 /**
  * Note that these fields of the thread were edited here now, so a sync change with an older edit of one of them
@@ -445,10 +445,12 @@ export const threads = {
       if (!db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) return;
       const exec = ['status', 'has_run', 'last_text'].some((k) => k in patch);
       const session = ['session_id', 'sessions', 'handover'].some((k) => k in patch);
+      const queued = ['queued_harness', 'queued_model', 'queued_effort'].some((k) => k in patch);
       stampEdits(id, [
         ...(['title', 'archived'] as const).filter((k) => k in patch),
         ...(exec ? (['exec'] as const) : []),
         ...(session ? (['session'] as const) : []),
+        ...(queued ? (['queued'] as const) : []),
       ]);
       record('thread', id);
       // A turn starting here makes this machine the thread's owner (the same machine again changes nothing).
