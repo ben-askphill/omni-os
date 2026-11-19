@@ -5,6 +5,7 @@ import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './au
 import { automationRefusal, callerOf, lineage, type AutomationWrite } from './automation-guard.ts';
 import { automationFields, createAutomation, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
 import { ownerOf } from './sync/owner.ts';
+import { shellAllowed } from './request-guard.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
 import { isPrTrigger } from './automation-events.ts';
 import { recentDeliveries } from './automation-deliveries.ts';
@@ -174,14 +175,15 @@ metaApi.get('/automations/:id/definition', (c) => {
   const d = definitionOf(c.req.param('id'));
   return d ? c.json(d) : c.json({ error: 'not found' }, 404);
 });
-// Save the editor's fields over the file, keeping its comments, or its raw text: { fields } or { yaml }.
+// Save the editor's fields over the file, keeping its comments, or its raw text: { fields } or { yaml }. Raw text
+// that adds or changes a precheck, a shell command, needs the install token or a session paired with it.
 const saveInput = z.union([z.object({ fields: automationFields }).strict(), z.object({ yaml: z.string().min(1).max(200_000) }).strict()]);
 metaApi.put('/automations/:id', async (c) => {
   const parsed = saveInput.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid automation' }, 400);
   const no = refusal(c, 'edit');
   if (no) return no;
-  return edit(c, () => saveAutomation(c.req.param('id'), parsed.data));
+  return edit(c, () => saveAutomation(c.req.param('id'), parsed.data, { shell: shellAllowed(c) }));
 });
 // A new automation in data/automations/<id>.yaml. `id` is optional: one is made from the name.
 metaApi.post('/automations', async (c) => {
@@ -209,7 +211,7 @@ function edit(c: Context, run: () => unknown, ok: 200 | 201 = 200) {
     return c.json(run() as object, ok);
   } catch (err) {
     const status = (err as { status?: number }).status;
-    if (status === 400 || status === 404 || status === 409) return c.json({ error: (err as Error).message }, status);
+    if (status === 400 || status === 403 || status === 404 || status === 409) return c.json({ error: (err as Error).message }, status);
     throw err;
   }
 }

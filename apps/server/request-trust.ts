@@ -12,6 +12,8 @@
 //   and runs, stopping a run and removing an action stay open to all of them.
 //   Retry setup reruns the channel's setup step, so it is a shell too, but only while the thread has one to rerun:
 //   that depends on the thread, not the path, so runner/setup.ts checks it with request-guard.ts shellAllowed.
+//   Saving an automation is a shell only when its YAML adds or changes a precheck, a command a login shell runs
+//   before each scheduled run, so automation-files.ts checks that the same way. A precheck already saved keeps running.
 // - No GET opens a shell or starts Chrome: the terminal and channel browser start on POST, and their streams only
 //   attach (terminal-api.ts, browser-api.ts), so an <img> in a PR body cannot do either. Reads that run git (the PR
 //   lookup's branch follow) stay GETs.
@@ -57,8 +59,8 @@ const no = (status: 401 | 403 | 415, reason: string): Decision => ({ ok: false, 
 /** The credentials that may reach a shell on this machine: the install's token, or a session paired with it. */
 export const mayUseShell = (c: Credential) => c === 'token' || c === 'session-token';
 
-/** Why a shell was refused. Retry setup (runner/setup.ts) says the same. */
-export const SHELL_REFUSAL = "a terminal or a channel action runs a shell on this machine, so it needs the install's token or a browser paired with it";
+/** Why a shell was refused. Retry setup (runner/setup.ts) and an automation save (automation-files.ts) say the same. */
+export const SHELL_REFUSAL = "a terminal, a channel action or an automation's precheck runs a shell on this machine, so it needs the install's token or a browser paired with it";
 
 export function decideRequest(f: RequestFacts): Decision {
   if (!f.hostAllowed) return no(403, 'host not allowed');

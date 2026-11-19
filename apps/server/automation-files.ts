@@ -2,6 +2,10 @@
 // shipped one in automations/ is copied there on its first change (same id wins, automations.ts), so an update of the
 // checkout never collides with an edit, and Reset drops the copy. Comments in the file survive an edit. With sync on,
 // the written file goes to the other machines too (sync/handlers/automation-file.ts), so both agree on `machine:`.
+// A `precheck:` is a command a login shell runs before each scheduled run, so only a caller that may reach a shell
+// (request-trust.ts mayUseShell) makes one run that did not: a new or changed command, or a schedule for a file whose
+// precheck never ran. The editor's fields never carry it; the raw YAML can. Removing one, or saving over a file whose
+// precheck already runs, stays open: neither puts a new command in a shell.
 
 import { existsSync, readFileSync } from 'node:fs';
 import YAML, { Document, isMap, isScalar, Scalar } from 'yaml';
@@ -16,9 +20,10 @@ import { getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { currentRecords, deviceRecords } from './sync/device-records.ts';
 import { resolveMachine } from './sync/owner.ts';
+import { SHELL_REFUSAL } from './request-trust.ts';
 import { userConfig } from './user-config.ts';
 
-const refused = (message: string, status: 400 | 404 | 409 = 400) => Object.assign(new Error(message), { status });
+const refused = (message: string, status: 400 | 403 | 404 | 409 = 400) => Object.assign(new Error(message), { status });
 
 const optText = (max: number) => z.string().trim().max(max).optional();
 
@@ -239,12 +244,34 @@ export function createAutomation(f: AutomationFields, id?: string): AutomationDe
   return definitionOf(want)!;
 }
 
-/** Save the editor's fields over an automation's file, or its raw YAML. A shipped one becomes the user's own copy. */
-export function saveAutomation(id: string, change: { fields: AutomationFields } | { yaml: string }): AutomationDefinition {
+/** What the caller of a save may do: `shell` when its request may reach a shell (request-guard.ts shellAllowed). */
+export interface AutomationWriteBy {
+  shell?: boolean;
+}
+
+/**
+ * The precheck a file would run on its next scheduled run, or null: none, or one that never runs because the file is
+ * an event automation or does not load. A missing Omni checkout is this machine's, not the file's (check below).
+ */
+function scheduledPrecheck(id: string, text: string): string | null {
+  const a = parseAutomation(id, text);
+  if ((a.error && !a.error.startsWith('needs an Omni checkout')) || a.on) return null;
+  return a.precheck?.command ?? null;
+}
+
+/**
+ * Save the editor's fields over an automation's file, or its raw YAML. A shipped one becomes the user's own copy. A
+ * precheck that would run where none ran before, or with another command, needs a caller that may reach a shell: so
+ * does turning an event automation, or one that did not load, that carries one into a scheduled one. One that already
+ * runs can stay.
+ */
+export function saveAutomation(id: string, change: { fields: AutomationFields } | { yaml: string }, by: AutomationWriteBy = {}): AutomationDefinition {
   const src = sourceOf(id);
   if (!src) throw refused('No automation with this id.', 404);
   const base = readFileSync(src.file, 'utf8');
   const text = 'yaml' in change ? keepChannelOverride(id, base, change.yaml) : render(base, change.fields);
+  const precheck = scheduledPrecheck(id, text);
+  if (!by.shell && precheck !== null && precheck !== scheduledPrecheck(id, base)) throw refused(`Forbidden: ${SHELL_REFUSAL}`, 403);
   check(id, text, 'fields' in change ? change.fields.channel : undefined);
   write(id, text);
   return definitionOf(id)!;
