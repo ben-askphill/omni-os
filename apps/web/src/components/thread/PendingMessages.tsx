@@ -5,12 +5,13 @@ import { requestIdFor } from '@omni/shared/request-id.ts';
 import { Attachments } from './Attachments.tsx';
 import { api, ApiError, errorText, type Attachment, type PendingMsg, type Thread } from '../../api.ts';
 import { plural } from '../../format.ts';
-import { Button, copyText, Icon, IconButton } from '../ui.tsx';
+import { Button, COPY_SAID, CopyStatus, Icon, IconButton, useCopy } from '../ui.tsx';
 import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf } from '../../requests.ts';
 import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
+import { isImeEnter } from '../../ime.ts';
 
 /** A message that waits for the thread's worktree (SetupCard). */
 
@@ -201,7 +202,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           disabled={saving}
           onChange={(e) => a.change(d.uuid, (x) => ({ ...x, prompt: e.target.value }))}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeEnter(e)) {
               e.preventDefault();
               void a.save(d);
             } else if (e.key === 'Escape') a.close(d.uuid);
@@ -261,7 +262,7 @@ function FileChip({ name, size, disabled, onRemove }: { name: string; size: numb
 function StaleEdit({ threadId, draft: d, onClose }: { threadId: string; draft: EditDraft; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const copier = useCopy();
   // One id for this text, so a retried send is answered as the same message.
   const [requestId] = useState(() => requestIdFor(null, d.uuid).id);
   const sendNew = async () => {
@@ -288,14 +289,12 @@ function StaleEdit({ threadId, draft: d, onClose }: { threadId: string; draft: E
         <Button
           size="sm"
           variant="ghost"
-          icon={copied ? 'check' : 'copy'}
-          onClick={() => {
-            void copyText(d.prompt);
-            setCopied(true);
-          }}
+          icon={copier.icon}
+          onClick={() => void copier.copy(d.prompt)}
         >
-          {copied ? 'Copied' : 'Copy'}
+          {copier.state === 'idle' ? 'Copy' : COPY_SAID[copier.state]}
         </Button>
+        <CopyStatus state={copier.state} />
         <Button size="sm" variant="secondary" icon="send" busy={busy} disabled={!d.prompt.trim()} onClick={() => void sendNew()}>
           Send as new
         </Button>
@@ -355,7 +354,7 @@ export function PendingBubble({
           <Icon name={icon} size={12} /> {label}
           {files.length && !threadId ? <span className="text-fg-3">· {plural(files.length, 'file')}</span> : null}
         </div>
-        {threadId && files.length ? <Attachments threadId={threadId} items={files} href={href} /> : null}
+        {threadId && files.length ? <Attachments threadId={threadId} items={files} href={href} lazy={false} /> : null}
         <ContextChips records={m.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
         {(m.text || !hasContext(m.context)) && (
           <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">

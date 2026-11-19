@@ -37,7 +37,7 @@ function useRowActions() {
   const { setPinned } = useApp();
   const markDone = useMarkDone();
   const run = (p: Promise<unknown>, ok: string) =>
-    void p.then((r) => r !== null && shell.toast(ok), (e: unknown) => shell.toast(errorText(e)));
+    void p.then((r) => r !== null && shell.toast(ok), (e: unknown) => shell.toast(errorText(e), 'error'));
   return {
     // A job with work still going under it asks first; cancelling it says nothing.
     done: (t: InboxThread) => run(markDone(t, true), 'Marked done'),

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import type { Thread } from '../api.ts';
 import { shownResult } from '../needs-you.ts';
-import { useApp, usePageVisible } from '../store.tsx';
+import { useApp } from '../store.tsx';
+import { usePageVisible } from '../visible.ts';
 import { useSeenUnlisted } from '../app/useSeenUnlisted.ts';
 
 /** What the app knows about the thread on screen: the sidebar lists it, and its newest result counts as read. */

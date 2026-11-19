@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { onApiBase } from '../api-base.ts';
 import { ExternalLink } from './LinkChip.tsx';
 import { MermaidDiagram } from './MermaidDiagram.tsx';
+import { useScrollRegion } from './ui/use-scroll-region.ts';
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g;
 const UUID_EXACT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -28,7 +29,46 @@ function linkThreadIds(md: string) {
     .join('');
 }
 
+type Hast = { type: string; tagName?: string; value?: string; children?: Hast[] };
+const hastText = (n: Hast | undefined): string => (n?.type === 'text' ? (n.value ?? '') : (n?.children ?? []).map(hastText).join(''));
+const hastChild = (n: Hast | undefined, tag: string) => n?.children?.find((c) => c.type === 'element' && c.tagName === tag);
+
+/** A table's name for its scroll region: its column headings, so a screen reader can tell two tables apart. */
+function tableLabel(node: Hast | undefined) {
+  const heads = hastChild(hastChild(node, 'thead'), 'tr')
+    ?.children?.filter((c) => c.tagName === 'th')
+    .map((c) => hastText(c).trim())
+    .filter(Boolean);
+  return heads?.length ? `Table: ${heads.join(', ')}` : 'Table';
+}
+
+/**
+ * A wide table scrolls in its own region, the table itself left as a table so screen readers read its rows and cells.
+ * The region takes a tab stop while it is wider than the column: Safari does not focus a scroller by itself.
+ */
+function TableScroll({ label, children }: { label: string; children: ReactNode }) {
+  const region = useScrollRegion<HTMLDivElement>(label);
+  return (
+    <div className="md-scroll" {...region}>
+      <table>{children}</table>
+    </div>
+  );
+}
+
+/** A code block scrolls sideways on its own; while it does it takes a tab stop and a name, as a table does. */
+function CodeBlock({ children }: { children: ReactNode }) {
+  const { ref, ...region } = useScrollRegion<HTMLPreElement>('Code');
+  return (
+    <pre ref={ref} {...(region.tabIndex === 0 ? region : {})}>
+      {children}
+    </pre>
+  );
+}
+
 const components: Components = {
+  table({ node, children }) {
+    return <TableScroll label={tableLabel(node as Hast | undefined)}>{children}</TableScroll>;
+  },
   pre({ node, children }) {
     const code = node?.children[0];
     if (code?.type === 'element' && code.tagName === 'code' &&
@@ -36,7 +76,7 @@ const components: Components = {
       const source = code.children.map((child) => child.type === 'text' ? child.value : '').join('');
       return <MermaidDiagram source={source} />;
     }
-    return <pre>{children}</pre>;
+    return <CodeBlock>{children}</CodeBlock>;
   },
   a({ href, children }) {
     const internal = href?.startsWith('#');

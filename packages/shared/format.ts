@@ -15,7 +15,9 @@ export function relTime(iso: string, now = Date.now()) {
   if (!Number.isFinite(t)) return '';
   const diff = now - t;
   if (diff < 45_000) return 'just now';
-  if (diff < 3_600_000) return `${Math.max(1, Math.round(diff / 60_000))}m ago`;
+  // Round to whole minutes before picking the unit, so 59m 50s reads "1h ago", not "60m ago".
+  const mins = Math.round(diff / 60_000);
+  if (mins < 60) return `${Math.max(1, mins)}m ago`;
   const d = toDate(iso);
   const today = startOfDay(new Date(now)).getTime();
   if (t >= today) return `${Math.round(diff / 3_600_000)}h ago`;

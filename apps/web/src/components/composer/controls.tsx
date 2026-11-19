@@ -1,24 +1,39 @@
 import { useCallback, useEffect, useLayoutEffect, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { takeComposerFocus } from '../../router.ts';
 import { Icon, Loader } from '../ui.tsx';
+import { isImeEnter } from '../../ime.ts';
 
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 export const MOD = isMac ? 'Cmd' : 'Ctrl';
 
-export function useAutosize(ref: RefObject<HTMLTextAreaElement | null>, value: string, max: number) {
+/**
+ * Whether a textarea with `field-sizing: content` (the `field-sizing-content` class) grows by itself: Chromium, so
+ * the desktop app, and Safari 26.2 on. Older iOS Safari and Firefox still need useAutosize's measuring.
+ */
+export const fieldSizes = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('field-sizing', 'content');
+
+/**
+ * A composer box that grows with its text, up to the textarea's own CSS `max-height`, which caps it in both paths.
+ * Give the textarea `field-sizing-content`: where that works this hook does nothing, since an inline height would
+ * override it. Elsewhere it measures `scrollHeight` on each change.
+ */
+export function useAutosize(ref: RefObject<HTMLTextAreaElement | null>, value: string) {
+  const measure = !fieldSizes();
   const fit = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
-  }, [ref, max]);
-  useLayoutEffect(fit, [fit, value]);
+    el.style.height = `${el.scrollHeight}px`;
+  }, [ref]);
+  useLayoutEffect(() => {
+    if (measure) fit();
+  }, [measure, fit, value]);
   // The placeholder counts toward scrollHeight, so a measurement taken before layout or font load
   // settles can come out far too tall. Refit when the width or the fonts change.
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !measure) return;
     void document.fonts?.ready.then(fit);
     if (typeof ResizeObserver === 'undefined') return;
     let w = el.clientWidth;
@@ -29,7 +44,7 @@ export function useAutosize(ref: RefObject<HTMLTextAreaElement | null>, value: s
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [ref, fit]);
+  }, [ref, fit, measure]);
 }
 
 export function useFocusRequests(ref: RefObject<HTMLTextAreaElement | null>, enabled: boolean) {
@@ -57,7 +72,7 @@ export function StopButton({ busy, onClick }: { busy: boolean; onClick: () => vo
       aria-label={label}
       aria-keyshortcuts="Escape"
       title="Stop the agent (Esc). Messages already sent still run."
-      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out active:scale-[.92] disabled:opacity-60"
+      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-opacity active:scale-[.92] disabled:opacity-60"
     >
       {busy ? <Loader size={16} /> : <Icon name="stop" size={16} strokeWidth={2} />}
     </button>
@@ -73,7 +88,7 @@ export function SendButton({ armed, busy, onClick, children }: { armed: boolean;
       data-armed={armed || undefined}
       aria-label={typeof children === 'string' ? children : undefined}
       title={typeof children === 'string' ? children : undefined}
-      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out active:scale-[.92] disabled:opacity-25"
+      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-opacity active:scale-[.92] disabled:opacity-25"
     >
       {busy ? <Loader size={16} /> : <Icon name="send" size={16} strokeWidth={2} />}
       <span className="sr-only">{children}</span>
@@ -90,7 +105,7 @@ export const withKeys = (text: string) => `${text.replace(/\.$/, '')} · / comma
  * which it doesn't flag as composing). Prevents the default for the keys it acts on.
  */
 export function enterKey(e: ReactKeyboardEvent<HTMLTextAreaElement>, text: string, onText: (text: string) => void): 'send' | 'interrupt' | null {
-  if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229 || e.altKey) return null;
+  if (e.key !== 'Enter' || isImeEnter(e) || e.altKey) return null;
   const mod = e.metaKey || e.ctrlKey;
   if (!mod && e.shiftKey) return null;
   e.preventDefault();

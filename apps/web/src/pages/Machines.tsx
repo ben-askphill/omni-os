@@ -4,7 +4,7 @@ import { HERE } from '@omni/shared/thread-machine.ts';
 import { useApi, type SetupState, type SyncStatus } from '../api.ts';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { RUN_ON_HINT, runOnOptions, useRunOnSetting } from '../components/RunOnPicker.tsx';
-import { ErrorNote, Picker, StatusDot } from '../components/ui.tsx';
+import { ErrorNote, fieldHintId, Picker, StatusDot } from '../components/ui.tsx';
 import { desktop } from '../desktop.ts';
 import { href } from '../router.ts';
 import { useApp, useHereName } from '../store.tsx';
@@ -77,6 +77,7 @@ export function RunOnCard({ state }: { state: SetupState | null }) {
       >
         <Picker
           id="run-on"
+          describedBy={fieldHintId('run-on')}
           size="field"
           label="Run new threads on"
           value={runOn.pick}

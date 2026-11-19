@@ -204,12 +204,20 @@ export interface CrewRole {
   effort?: string;
   channel?: string;
   mcp: string[];
+  /** full, no-edits (no file-edit tools, shell kept) or delegate-only. A server from before no-edits sends only delegateOnly. */
+  tools?: 'full' | 'no-edits' | 'delegate-only';
   /** Routes work only, without the tools that do it. */
   delegateOnly: boolean;
   /** The Conductor may delegate to it. False for the Conductor and usage-scan. */
   delegatable: boolean;
   /** A review role: held at high effort on GPT, and a delegation with `review_of` runs on the other model family. */
   review: boolean;
+  /** Whether its threads read its lessons and propose new ones. A server from before role memory sends none: read-write. */
+  memory?: 'off' | 'read' | 'read-write';
+  /** Whether a lesson its threads propose waits for the user. A server from before role memory sends none: review. */
+  memoryWrites?: 'review' | 'auto';
+  /** How many lessons its threads proposed wait for the user, when any do. */
+  memoryWaiting?: number;
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';
@@ -490,8 +498,11 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine: refetch GET /api/crew. */
   | { type: 'crew' }
-  /** A channel's Recent learnings changed, here or on another machine: refetch GET /api/memory?channel=<id>. */
-  | { type: 'memory'; channel_id: string | null }
+  /**
+   * A memory fact changed, here or on another machine: refetch a channel's Recent learnings (GET
+   * /api/memory?channel=<id>) when it has no role, else that role's memory (GET /api/crew/<role>/memory).
+   */
+  | { type: 'memory'; channel_id: string | null; role?: string | null }
   /** Show technical details or the Shopify add-on changed, here or on another machine: refetch GET /api/display. */
   | { type: 'display' }
   /** The update check or Update moved on: refetch GET /api/update. */
@@ -577,7 +588,10 @@ export async function pairBrowser(token: string): Promise<boolean> {
   return true;
 }
 
-async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+/** Fetch options a caller may add. `priority: 'low'` lets a background read give way to what Ben is waiting on. */
+type RequestExtras = Pick<RequestInit, 'signal' | 'priority'>;
+
+async function request<T>(method: string, path: string, body?: unknown, extras: RequestExtras = {}): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
   const form = body instanceof FormData;
   // A Blob goes up as it is, with its own type: a rendered image, not JSON.
@@ -588,7 +602,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
       method,
       headers: blob ? { 'Content-Type': body.type } : body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
       body: body === undefined ? undefined : form || blob ? body : JSON.stringify(body),
-      signal,
+      ...extras,
     });
   } catch {
     throw new ApiError('Cannot reach the Omni server. Is it running?', 0);
@@ -617,7 +631,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 }
 
 export const api = {
-  get: <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
+  get: <T>(path: string, extras?: RequestExtras) => request<T>('GET', path, undefined, extras),
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
   /** Same body as `post` (or `patch`), plus attachments. Falls back to plain JSON when there are none. */
   send: <T>(path: string, body: Record<string, unknown>, files: File[], method: 'POST' | 'PATCH' = 'POST') => {
@@ -638,8 +652,11 @@ export const api = {
  */
 export const listGate = createYieldGate();
 
-/** GET for a list the app reloads by itself: it waits while a thread's first page loads, and one cut off goes again after. */
-export const listGet = <T>(path: string) => listGate.run((signal) => api.get<T>(path, signal));
+/**
+ * GET for a list the app reloads by itself: it waits while a thread's first page loads, one cut off goes again after,
+ * and it goes out at low priority.
+ */
+export const listGet = <T>(path: string) => listGate.run((signal) => api.get<T>(path, { signal, priority: 'low' }));
 
 /** GET /harnesses as a channel sees them (Cursor Cloud needs its GitHub repo), or as a whole with no channel. */
 export const harnessesPath = (channel?: string | null) => (channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
@@ -661,7 +678,7 @@ export const uploadUrl = (threadId: string, a: Pick<Attachment, 'name'>, downloa
 
 /** GET /threads/:id/events/:eventId/output: the chunk of a tool_result's saved text that starts at `offset` (#225). */
 export const getToolOutput = (threadId: string, eventId: number, offset: number, signal: AbortSignal) =>
-  api.get<OutputChunk>(`/threads/${encodeURIComponent(threadId)}/events/${eventId}/output?${outputQuery(offset)}`, signal);
+  api.get<OutputChunk>(`/threads/${encodeURIComponent(threadId)}/events/${eventId}/output?${outputQuery(offset)}`, { signal });
 
 /** GET /threads/:id/tools/:toolUseId/tail: a running call's output. The stream ends with an `end` message, and the caller closes on it. */
 export const openToolTail = (threadId: string, toolUseId: string, onData: (data: unknown) => void) =>
@@ -679,8 +696,11 @@ export interface Async<T> {
   setData: (fn: T | ((prev: T | undefined) => T)) => void;
 }
 
-/** Fetch on mount and whenever the key changes. `reload` refetches without clearing data. */
-export function useApi<T>(path: string | null): Async<T> {
+/**
+ * Fetch on mount and whenever the key changes. `reload` refetches without clearing data. `background`: a read the
+ * page polls by itself, sent at low priority.
+ */
+export function useApi<T>(path: string | null, { background = false }: { background?: boolean } = {}): Async<T> {
   const [data, setDataState] = useState<T | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<number | null>(null);
@@ -700,7 +720,7 @@ export function useApi<T>(path: string | null): Async<T> {
     }
     setLoading(true);
     api
-      .get<T>(path)
+      .get<T>(path, background ? { priority: 'low' } : undefined)
       .then((d) => {
         if (!alive) return;
         setDataState(d);
@@ -716,7 +736,7 @@ export function useApi<T>(path: string | null): Async<T> {
     return () => {
       alive = false;
     };
-  }, [path, tick]);
+  }, [path, tick, background]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
   const setData = useCallback((fn: T | ((prev: T | undefined) => T)) => {

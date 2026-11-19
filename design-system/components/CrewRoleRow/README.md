@@ -8,13 +8,14 @@ CrewRoleRow is one crew role in Settings > Crew, on desktop web, phone web and t
 <Chip tone="outline">Hidden</Chip>        // per machine
 <Chip tone="default">Built-in charter changed</Chip>
 <Chip tone="needs">Can't run here</Chip>  // its run defaults name a harness or model this machine lacks
+<Chip tone="needs">2 lessons wait</Chip>  // its threads proposed lessons for its memory
 ```
 
 ## The row
 
-- 30px avatar, then the name (13px medium) with its chips, the description (12.5px, `fg-3`, two lines at most) and the run line (12px, `fg-3`): "Auto", or harness · model · effort, then the default channel, "routes only" for a delegate-only role and "reviews" for a review role.
+- 30px avatar, then the name (13px medium) with its chips, the description (12.5px, `fg-3`, two lines at most) and the run line (12px, `fg-3`): "Auto", or harness · model · effort, then the default channel, "routes only" for a delegate-only role, "no file edits" for a no-edits role and "reviews" for a review role.
 - The whole row is one button that opens the editor. A hidden role dims its avatar and name.
-- Source chips: **Built-in** (outlined, shipped with Omni), **Edited** (a built-in with your overlay), **Yours** (a file of your own). Then what needs a look: **Hidden**, **Built-in charter changed** and, the only one in vermilion because the role cannot start, **Can't run here**.
+- Source chips: **Built-in** (outlined, shipped with Omni), **Edited** (a built-in with your overlay), **Yours** (a file of your own). Then what needs a look: **Hidden**, **Built-in charter changed**, and in vermilion **Can't run here** (the role cannot start) and **N lessons wait** (its memory has proposals for you).
 
 ## The avatar
 
@@ -22,7 +23,7 @@ A role's `avatar` in its frontmatter is a shared icon (`icon:<name>`) or one emo
 
 ## The editor
 
-A roomy `Modal` (`sm:max-w-2xl`; a bottom sheet on the phone) with Form and Markdown tabs (`Segmented`), the role's chips and file path, and the actions as small ghost buttons that wrap: Duplicate, Compare with built-in, Hide or Show, Reset to built-in (`InlineConfirm`), Delete (`InlineConfirm`, danger). Form groups: Identity, Instructions (Add to built-in or Replace, with the built-in charter in a disclosure), Run (`ModelPicker` and `EffortPicker`), Where, Powers (`Toggle` rows: may be delegated to, conductor tools, only routes work, reviews work). Compare is a line diff in the diff tokens (`--diff-add-*`, `--diff-del-*`) with the three ways out of a changed built-in.
+A roomy `Modal` (`sm:max-w-2xl`; a bottom sheet on the phone) with Form, Markdown and Memory tabs (`Segmented`; Memory shows the role's lessons as `MemoryRow`s, with the waiting count as its badge), the role's chips and file path, and the actions as small ghost buttons that wrap: Duplicate, Compare with built-in, Hide or Show, Reset to built-in (`InlineConfirm`), Delete (`InlineConfirm`, danger). Form groups: Identity, Instructions (Add to built-in or Replace, with the built-in charter in a disclosure), Run (`ModelPicker` and `EffortPicker`), Where, Powers (`Toggle` rows: may be delegated to, conductor tools, only routes work, no file edits, reviews work). No file edits carries the per-harness note in its hint, says it is not read only, and is disabled with a `LockNote` while Only routes work is on. Compare is a line diff in the diff tokens (`--diff-add-*`, `--diff-del-*`) with the three ways out of a changed built-in.
 
 ## Locked fields and actions
 

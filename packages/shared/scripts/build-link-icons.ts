@@ -22,6 +22,8 @@ const SIMPLE: Record<string, string> = {
   prismic: 'siPrismic', datocms: 'siDatocms', contentful: 'siContentful', sanity: 'siSanity', storyblok: 'siStoryblok',
   hubspot: 'siHubspot', airtable: 'siAirtable', dropbox: 'siDropbox', supabase: 'siSupabase', postman: 'siPostman',
   algolia: 'siAlgolia', x: 'siX', openai: 'siOpenai', stripe: 'siStripe', zendesk: 'siZendesk', intercom: 'siIntercom',
+  atlassian: 'siAtlassian', spotify: 'siSpotify', todoist: 'siTodoist', excalidraw: 'siExcalidraw', box: 'siBox',
+  'google-analytics': 'siGoogleanalytics',
 };
 
 export interface IconLayer {

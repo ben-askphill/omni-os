@@ -7,9 +7,9 @@ import { Icon, Modal } from '../ui.tsx';
 /**
  * What Ben attached to a message: images as thumbnails that open full size, everything else as a download.
  * `href` stands in for the server's copy while a message is still on its way, and a file this window sent shows
- * from its own copy (sending.ts).
+ * from its own copy (sending.ts). `lazy` false loads the images at once: the newest turn's are on screen.
  */
-export function Attachments({ threadId, items, href }: { threadId: string; items: Attachment[]; href?: (a: Attachment) => string }) {
+export function Attachments({ threadId, items, href, lazy = true }: { threadId: string; items: Attachment[]; href?: (a: Attachment) => string; lazy?: boolean }) {
   const [open, setOpen] = useState<Attachment | null>(null);
   if (!items.length) return null;
   const src = (a: Attachment, download = false) => href?.(a) ?? localFile(a) ?? localUrl(threadId, a) ?? uploadUrl(threadId, a, download);
@@ -18,7 +18,8 @@ export function Attachments({ threadId, items, href }: { threadId: string; items
       {items.map((a) =>
         a.image ? (
           <button key={a.name} type="button" onClick={() => setOpen(a)} className="press overflow-hidden rounded-2xl bg-surface p-1" title={`${a.name} · ${bytes(a.size)}`}>
-            <img src={src(a)} alt={a.name} loading="lazy" className="max-h-44 w-auto max-w-[14rem] rounded-xl object-cover shadow-[inset_0_0_0_1px_var(--line)]" />
+            {/* A fixed height, so the row is its final size before the image arrives and nothing below it moves. */}
+            <img src={src(a)} alt={a.name} loading={lazy ? 'lazy' : undefined} className="h-44 w-auto min-w-24 max-w-[14rem] rounded-xl object-cover shadow-[inset_0_0_0_1px_var(--line)]" />
           </button>
         ) : (
           <a

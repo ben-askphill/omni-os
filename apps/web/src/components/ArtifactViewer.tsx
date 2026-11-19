@@ -42,17 +42,39 @@ function useText(a: Artifact, enabled: boolean) {
   return { text, error };
 }
 
-function CsvTable({ text }: { text: string }) {
+/** The widest a CSV column gets, in characters; a longer cell truncates and opens in full when clicked or focused. */
+const CSV_COLUMN_CH = 60;
+
+/**
+ * Each column's width in characters: its longest cell, between 4 and CSV_COLUMN_CH. A fixed table layout needs them,
+ * or a cell grows to its text and `truncate` never cuts it.
+ */
+export function csvColumns(rows: string[][]) {
+  const widths: number[] = [];
+  for (const r of rows) r.forEach((c, j) => (widths[j] = Math.min(CSV_COLUMN_CH, Math.max(widths[j] ?? 4, c.length))));
+  return widths;
+}
+
+export function CsvTable({ text }: { text: string }) {
   const { rows, truncated } = useMemo(() => parseCsv(text), [text]);
+  const widths = useMemo(() => csvColumns(rows), [rows]);
   if (!rows.length) return <div className="p-4 text-[13px] text-fg-3">Empty file</div>;
   const [head, ...body] = rows;
+  // A ch is the width of a 0, and capitals and wide letters run past it: 1.2ch a character, plus each cell's px-3.
+  const scaled = (ch: number) => Math.round(ch * 12) / 10;
+  const width = (ch: number) => `calc(${scaled(ch)}ch + 1.5rem)`;
   return (
     <div className="scroll-thin h-full overflow-auto">
-      <table className="min-w-full border-collapse text-[12px]">
+      <table className="min-w-full table-fixed border-collapse text-[12px]" style={{ width: `calc(${scaled(widths.reduce((a, b) => a + b, 0))}ch + ${widths.length * 1.5}rem)` }}>
+        <colgroup>
+          {widths.map((w, i) => (
+            <col key={i} style={{ width: width(w) }} />
+          ))}
+        </colgroup>
         <thead className="sticky top-0 bg-surface">
           <tr>
             {head.map((h, i) => (
-              <th key={i} className="border-b border-line px-3 py-2 text-left font-num text-[11px] font-medium whitespace-nowrap text-fg-3">
+              <th key={i} className="truncate border-b border-line px-3 py-2 text-left font-num text-[11px] font-medium text-fg-3" title={h}>
                 {h}
               </th>
             ))}
@@ -61,11 +83,18 @@ function CsvTable({ text }: { text: string }) {
         <tbody>
           {body.map((r, i) => (
             <tr key={i} className="hover:bg-surface">
-              {r.map((c, j) => (
-                <td key={j} className="max-w-[28rem] truncate border-b border-line px-3 py-1.5 align-top" title={c}>
-                  {c}
-                </td>
-              ))}
+              {r.map((c, j) =>
+                c.length > CSV_COLUMN_CH ? (
+                  // Cut to the column; a click or Tab shows it whole.
+                  <td key={j} tabIndex={0} className="cursor-pointer truncate border-b border-line px-3 py-1.5 align-top focus:cursor-auto focus:break-words focus:whitespace-pre-wrap" title={c}>
+                    {c}
+                  </td>
+                ) : (
+                  <td key={j} className="truncate border-b border-line px-3 py-1.5 align-top" title={c}>
+                    {c}
+                  </td>
+                ),
+              )}
             </tr>
           ))}
         </tbody>

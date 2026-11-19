@@ -1,5 +1,6 @@
 import { useState, type InputHTMLAttributes } from 'react';
 import { desktop } from '../../desktop.ts';
+import { IDENTIFIER } from './input-hints.ts';
 import { Button } from './primitives.tsx';
 
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>;
@@ -17,7 +18,7 @@ export function FolderInput({
   onPick,
   dialogTitle,
   compact,
-  className = '!text-[13px]',
+  className = '',
   wrapperClassName = '',
   ...input
 }: InputProps & {
@@ -45,7 +46,7 @@ export function FolderInput({
       setPicking(false);
     }
   };
-  const field = <input {...input} type="text" className={`field font-mono ${pickFolder ? 'min-w-0 flex-1' : ''} ${className}`} value={value} onChange={(e) => onChange(e.target.value)} />;
+  const field = <input {...IDENTIFIER} {...input} type="text" className={`field field-mono ${pickFolder ? 'min-w-0 flex-1' : ''} ${className}`} value={value} onChange={(e) => onChange(e.target.value)} />;
   if (!pickFolder) return field;
   return (
     <div className={`flex min-w-0 items-center gap-2 ${wrapperClassName}`}>

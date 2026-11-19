@@ -161,7 +161,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
           )}
           {ch.notes && isConductor && <span className="truncate px-1 text-[length:var(--fs-body)] text-fg-3">{ch.notes}</span>}
         </div>
-        <Tabs className="mt-4" tabs={tabs} value={tab} />
+        <Tabs className="mt-4" kind="nav" label="Channel" tabs={tabs} value={tab} />
       </div>
 
       {tab === 'threads' && <ThreadsTab id={id} isConductor={isConductor} />}

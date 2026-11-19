@@ -3,6 +3,7 @@ import { OWNER_MAX, ownerLabel } from '@omni/shared/thread-owner.ts';
 import { api, errorText, type Thread } from '../../api.ts';
 import { useUserName } from '../../store.tsx';
 import { ErrorNote } from '../ui.tsx';
+import { isImeEnter } from '../../ime.ts';
 
 /**
  * Who the thread is for (thread-owner.ts): "You", or the person named, with Change to type another name. An empty
@@ -40,7 +41,7 @@ export function OwnerField({ thread, className = '' }: { thread: Pick<Thread, 'i
   return (
     <span className={`flex min-w-0 flex-col gap-1 ${className}`}>
       <input
-        className="field h-8 w-full !text-[length:var(--fs-input)] sm:!text-[12.5px]"
+        className="field field-xs h-8 w-full max-sm:!text-[length:var(--fs-input)]"
         value={draft}
         maxLength={OWNER_MAX}
         placeholder="A name, or empty for you"
@@ -49,7 +50,7 @@ export function OwnerField({ thread, className = '' }: { thread: Pick<Thread, 'i
         disabled={busy}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.nativeEvent.isComposing) (e.preventDefault(), void save());
+          if (e.key === 'Enter' && !isImeEnter(e)) (e.preventDefault(), void save());
           if (e.key === 'Escape') (e.stopPropagation(), (dropped.current = true), setDraft(null));
         }}
         onBlur={() => void save()}

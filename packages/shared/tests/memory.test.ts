@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { learningsPrompt, MEMORY_MAX, parseMemoryText, PROMPT_LEARNINGS, sortLearnings, type Memory } from '../memory.ts';
+import { isRoleMemoryMode, learningsPrompt, MEMORY_MAX, parseMemoryText, PROMPT_LEARNINGS, PROMPT_ROLE_MEMORY, roleMemoryLines, sortLearnings, type Memory } from '../memory.ts';
 
 let n = 0;
 const fact = (over: Partial<Memory> = {}): Memory => {
@@ -41,5 +41,22 @@ describe('learningsPrompt', () => {
     expect(learningsPrompt(many).filter((l) => l.startsWith('- '))).toHaveLength(PROMPT_LEARNINGS.count);
     const big = Array.from({ length: 12 }, () => fact({ text: 'y'.repeat(MEMORY_MAX) }));
     expect(learningsPrompt(big).filter((l) => l.startsWith('- ')).length).toBe(Math.floor(PROMPT_LEARNINGS.chars / MEMORY_MAX));
+  });
+});
+
+describe('roleMemoryLines', () => {
+  it('lists approved lessons newest first, leaves waiting ones out, and caps the count and the text', () => {
+    const older = fact({ id: 'o', text: 'Older.', approved_at: '2026-11-01T00:00:00.000Z' });
+    const newer = fact({ id: 'n', text: 'Newer.', approved_at: '2026-11-02T00:00:00.000Z' });
+    expect(roleMemoryLines([older, newer, fact({ id: 'p', status: 'proposed', approved_at: null })])).toEqual(['- Newer.', '- Older.']);
+    const many = Array.from({ length: 30 }, (_, i) => fact({ id: `m${i}`, text: `Lesson ${i}.` }));
+    expect(roleMemoryLines(many)).toHaveLength(PROMPT_ROLE_MEMORY.count);
+    const big = Array.from({ length: 12 }, (_, i) => fact({ id: `b${i}`, text: 'x'.repeat(MEMORY_MAX) }));
+    expect(roleMemoryLines(big).length).toBe(Math.floor(PROMPT_ROLE_MEMORY.chars / MEMORY_MAX));
+  });
+
+  it('reads a role memory setting', () => {
+    expect(['off', 'read', 'read-write'].every(isRoleMemoryMode)).toBe(true);
+    expect(isRoleMemoryMode('write')).toBe(false);
   });
 });

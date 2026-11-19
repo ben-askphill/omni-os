@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anyRunning, liveRun, withRun, type ActionRun, type ChannelAction, type ThreadActions } from '../channel-actions.ts';
+import { actionInput, actionPortProblem, anyRunning, draftOf, liveRun, withRun, type ActionRun, type ChannelAction, type ThreadActions } from '../channel-actions.ts';
 
 const action = (over: Partial<ChannelAction> = {}): ChannelAction => ({
   id: 'a1',
@@ -69,3 +69,16 @@ describe('answers to Run, Stop and Retry', () => {
   });
 });
 
+
+describe('the editor\'s port', () => {
+  it('needs a number for a fixed port, which the editor shows at the port field', () => {
+    const d = { ...draftOf(), name: 'Preview', command: 'serve' };
+    expect(actionPortProblem({ ...d, portMode: 'fixed', port: '' })).toMatch(/number/);
+    expect(actionPortProblem({ ...d, portMode: 'fixed', port: '0' })).toMatch(/number/);
+    expect(actionPortProblem({ ...d, portMode: 'free', port: '' })).toBeNull();
+    expect(actionInput({ ...d, portMode: 'fixed', port: '' })).toEqual({ error: actionPortProblem({ ...d, portMode: 'fixed', port: '' }) });
+    expect(actionInput({ ...d, portMode: 'fixed', port: '9292' })).toMatchObject({ input: { port: 9292 } });
+    expect(actionInput({ ...d, portMode: 'free' })).toMatchObject({ input: { port: 0 } });
+    expect(actionInput({ ...d, portMode: 'none' })).toMatchObject({ input: { port: null } });
+  });
+});

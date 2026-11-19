@@ -1,9 +1,11 @@
 // The tool row over the screenshot an annotation is drawn on: select, pen, shapes, text, color and line width. It holds
 // no state of its own; BrowserAnnotate's Draw owns the tool and the style.
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { MARK_COLORS, MARK_STROKES, type MarkShape, type MarkTool } from '@omni/shared/message-context-marks.ts';
 import { Icon, IconButton, type IconName } from './ui.tsx';
-import { useDismissable } from './ui/use-dismissable.ts';
+import { useDismissLayer } from './ui/dismiss-stack.ts';
+import { useExit } from './ui/use-exit.ts';
+import { ROVING_ITEM, useRovingFocus } from './ui/use-roving-focus.ts';
 
 export type Tool = 'select' | MarkTool;
 
@@ -16,29 +18,81 @@ export const SHAPES: { shape: MarkShape; label: string; icon: IconName }[] = [
 const SHAPE_NAMES: string[] = SHAPES.map((s) => s.shape);
 export const isShape = (t: Tool): t is MarkShape => SHAPE_NAMES.includes(t);
 
-/** A button with a small menu under it. */
+/** The keys that walk a popup's items: it is a row, so Left and Right, and Up and Down too. */
+const STEP: Record<string, 1 | -1 | 'first' | 'last'> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 'first', End: 'last' };
+
+/**
+ * A button with a small menu under it. It opens on the checked item, the arrow keys, Home and End walk its items, Enter
+ * or Space picks, and Escape closes only it (the annotation view stays) and puts the focus back on the button. Tab
+ * closes it and moves on.
+ */
 function Menu({ label, face, active, children }: { label: string; face: ReactNode; active?: boolean; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  useDismissable(open, () => setOpen(false), { root });
+  const button = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const exit = useExit(open, list);
+  const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) button.current?.focus();
+  };
+  useDismissLayer(open, {
+    roots: () => [root.current],
+    escape: () => close(!!list.current?.contains(document.activeElement)),
+    outside: () => close(false),
+  });
+  useEffect(() => {
+    if (!open) return;
+    const all = items();
+    (all.find((el) => el.getAttribute('aria-checked') === 'true') ?? all[0])?.focus();
+  }, [open]);
+  const onKey = (e: ReactKeyboardEvent) => {
+    if (e.key === 'Tab') return close(false);
+    const step = STEP[e.key];
+    if (!step) return;
+    e.preventDefault();
+    // The toolbar's own arrow keys stay out of it.
+    e.stopPropagation();
+    const all = items();
+    const at = all.indexOf(document.activeElement as HTMLElement);
+    const to = step === 'first' ? 0 : step === 'last' ? all.length - 1 : (at + step + all.length) % all.length;
+    all[to]?.focus();
+  };
   return (
     <div ref={root} className="relative">
       <button
+        ref={button}
         type="button"
         aria-label={label}
         title={label}
         aria-haspopup="menu"
         aria-expanded={open}
         data-on={active || undefined}
+        {...ROVING_ITEM}
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (open || e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
         className="hov press inline-flex h-8 items-center gap-0.5 rounded-full pr-1.5 pl-2 text-fg-3 transition-colors hover:text-fg data-[on=true]:text-fg"
       >
         {face}
         <Icon name="chevronDown" size={11} />
       </button>
-      {open && (
-        <div role="menu" className="absolute top-full left-0 z-30 mt-1 flex gap-1 rounded-xl bg-surface-2 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.35),0_0_0_1px_var(--line)]">
-          {children(() => setOpen(false))}
+      {exit.shown && (
+        <div
+          ref={list}
+          role="menu"
+          aria-label={label}
+          aria-orientation="horizontal"
+          data-closing={exit.closing || undefined}
+          onKeyDown={onKey}
+          className="menu-pop pop-in absolute top-full left-0 z-30 mt-1 flex gap-1 rounded-xl bg-surface-2 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.35),0_0_0_1px_var(--line)]"
+        >
+          {children(() => close(true))}
         </div>
       )}
     </div>
@@ -73,11 +127,13 @@ export function MarkToolbar({
   onDelete: () => void;
 }) {
   const current = SHAPES.find((s) => s.shape === shape)!;
+  // One Tab stop: the arrow keys, Home and End move between the tools, and Tab comes back to the last one used.
+  const roving = useRovingFocus();
   return (
-    <div role="toolbar" aria-label="Annotation tools" className="flex shrink-0 flex-wrap items-center gap-0.5 px-2 pb-1">
-      <IconButton icon="pointer" label="Select" size={15} active={tool === 'select'} onClick={() => onTool('select')} />
-      <IconButton icon="pencil" label="Pen" size={15} active={tool === 'pen'} onClick={() => onTool('pen')} />
-      <Menu label="Shapes" active={isShape(tool)} face={<Icon name={current.icon} size={15} />}>
+    <div ref={roving.ref} onKeyDown={roving.onKeyDown} onFocus={roving.onFocus} role="toolbar" aria-label="Annotation tools" className="flex shrink-0 flex-wrap items-center gap-0.5 px-2 pb-1">
+      <IconButton {...ROVING_ITEM} icon="pointer" label="Select" size={15} pressed={tool === 'select'} onClick={() => onTool('select')} />
+      <IconButton {...ROVING_ITEM} icon="pencil" label="Pen" size={15} pressed={tool === 'pen'} onClick={() => onTool('pen')} />
+      <Menu label={isShape(tool) ? `Shapes, ${current.label} on` : 'Shapes'} active={isShape(tool)} face={<Icon name={current.icon} size={15} />}>
         {(close) =>
           SHAPES.map((s) => (
             <IconButton
@@ -85,6 +141,8 @@ export function MarkToolbar({
               icon={s.icon}
               label={s.label}
               size={15}
+              role="menuitemradio"
+              aria-checked={shape === s.shape}
               active={shape === s.shape}
               onClick={() => {
                 onShape(s.shape);
@@ -95,7 +153,7 @@ export function MarkToolbar({
           ))
         }
       </Menu>
-      <IconButton icon="type" label="Text" size={15} active={tool === 'text'} onClick={() => onTool('text')} />
+      <IconButton {...ROVING_ITEM} icon="type" label="Text" size={15} pressed={tool === 'text'} onClick={() => onTool('text')} />
       <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
       <Menu label="Color" face={<span className="h-4 w-4 rounded-full shadow-[0_0_0_1px_var(--line-strong)]" style={{ background: color }} />}>
         {(close) =>
@@ -141,8 +199,8 @@ export function MarkToolbar({
         }
       </Menu>
       <span className="flex-1" />
-      <IconButton icon="undo" label="Undo the last mark" size={15} disabled={!canUndo} onClick={onUndo} />
-      <IconButton icon="trash" label="Delete the selected mark" size={15} disabled={!canDelete} onClick={onDelete} />
+      <IconButton {...ROVING_ITEM} icon="undo" label="Undo the last mark" size={15} disabled={!canUndo} onClick={onUndo} />
+      <IconButton {...ROVING_ITEM} icon="trash" label="Delete the selected mark" size={15} disabled={!canDelete} onClick={onDelete} />
     </div>
   );
 }

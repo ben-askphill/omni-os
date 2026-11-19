@@ -23,17 +23,17 @@
     {
       "id": "table",
       "source": "| Name | Qty |\n| --- | ---: |\n| apple | 2 |",
-      "web": "<div class=\"md \"><table><thead><tr><th>Name</th><th style=\"text-align:right\">Qty</th></tr></thead><tbody><tr><td>apple</td><td style=\"text-align:right\">2</td></tr></tbody></table></div>"
+      "web": "<div class=\"md \"><div class=\"md-scroll\" role=\"region\" aria-label=\"Table: Name, Qty\" tabindex=\"0\"><table><thead><tr><th>Name</th><th style=\"text-align:right\">Qty</th></tr></thead><tbody><tr><td>apple</td><td style=\"text-align:right\">2</td></tr></tbody></table></div></div>"
     },
     {
       "id": "code-fence",
       "source": "```ts\nconst n = 1\n```",
-      "web": "<div class=\"md \"><pre><code class=\"language-ts\">const n = 1\n</code></pre></div>"
+      "web": "<div class=\"md \"><pre role=\"region\" aria-label=\"Code\" tabindex=\"0\"><code class=\"language-ts\">const n = 1\n</code></pre></div>"
     },
     {
       "id": "code-fence-leaves-urls-and-ids",
       "source": "```\nhttps://x.com\n0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\n```",
-      "web": "<div class=\"md \"><pre><code>https://x.com\n0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\n</code></pre></div>"
+      "web": "<div class=\"md \"><pre role=\"region\" aria-label=\"Code\" tabindex=\"0\"><code>https://x.com\n0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\n</code></pre></div>"
     },
     {
       "id": "link",

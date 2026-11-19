@@ -10,13 +10,16 @@ import { FolderDeleteDialog } from '../folders.tsx';
 import { useInboxKey } from '../inbox-key.ts';
 import { navigate, parseHash, useHash, type Route } from '../router.ts';
 import { usePageTitle, useSyncOnReturn } from '../store.tsx';
-import { MoToast } from './parts.tsx';
+import { MoToastRegion, type MoToastNote } from './parts.tsx';
 import { MoTabBar } from './MoTabBar.tsx';
 import { RENDER, SheetView } from './registry.tsx';
 import { placeEntry, rootTabOf, screenOf, specOf, stackOf, type NavDirection, type Tab } from './screens.ts';
-import { ShellCtx, ThreadScope, type MobileShellApi, type ShellSheet } from './shell.tsx';
+import { LayerShownCtx, SheetHostCtx, SheetStack } from './sheet-stack.ts';
+import { ShellCtx, TabShownCtx, ThreadScope, type MobileShellApi, type ShellSheet } from './shell.tsx';
+import { useStackTransitions } from './stack-transition.ts';
 
 const TAB_PATH: Record<Tab, string> = { activity: '/', channels: '/channels', library: '/artifacts', prs: '/prs' };
+// The push keyframe's length, where the browser has no view transition types.
 const PUSH_MS = 420;
 
 /** This entry's place in history, numbered the first time the app sees it, and which way the last move went. */
@@ -81,6 +84,12 @@ const atOf = (layers: Layer[]) => {
 
 // `isolate`: a layer's own z-indexes (its header, a segmented thumb) must not reach over the layer pushed above it.
 const layerCls = 'absolute inset-0 isolate flex flex-col overflow-hidden bg-bg';
+/**
+ * A layer no one can see: a tab in the background, or a screen under the top one once its push has played. Its
+ * content skips style, layout and paint and keeps its rendering state, scroll positions included, for when it shows
+ * again. Browsers without content-visibility draw it, under the opaque layers above it, as before.
+ */
+const SKIPPED: CSSProperties = { contentVisibility: 'hidden' };
 
 export function MobileShell() {
   const hash = useHash();
@@ -88,7 +97,7 @@ export function MobileShell() {
   const place = useHistoryPlace(hash);
   const spec = specOf(route);
   const [sheet, setSheet] = useState<ShellSheet | null>(null);
-  const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
+  const [toast, setToast] = useState<MoToastNote | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const height = useViewportHeight();
 
@@ -101,14 +110,19 @@ export function MobileShell() {
 
   const stack = useMemo(() => stackOf(route, hash), [route, hash]);
   const top = stack[stack.length - 1];
+  // A move a view transition played: the browser animates both screens, so none of the timed keyframes below run.
+  const played = useStackTransitions(place.index);
+  const viaTransition = played.current === hash;
 
   // Pushing a screen that is not the old top's child keeps the old top under it while the new one slides in.
   const prevTop = useRef<Layer | undefined>(undefined);
   const [underlay, setUnderlay] = useState<Layer | null>(null);
   useLayoutEffect(() => {
+    // The new hash renders once before its place in history is known: keep the old top until it is.
+    if (place.hash !== hash) return;
     const old = prevTop.current;
     prevTop.current = top;
-    if (place.hash !== hash || place.dir !== 'forward' || !old || !top || stack.some((l) => l.key === old.key)) return;
+    if (viaTransition || place.dir !== 'forward' || !old || !top || stack.some((l) => l.key === old.key)) return;
     setUnderlay(old);
     const t = setTimeout(() => setUnderlay(null), PUSH_MS + 40);
     return () => clearTimeout(t);
@@ -128,63 +142,97 @@ export function MobileShell() {
     else navigate(specOf(route).parent(route) ?? '/', { replace: true });
   }, [place.index, route]);
 
-  const showToast = useCallback((text: string) => {
+  // A note goes after a moment. An error stays until it is dismissed or another toast takes its place.
+  const showToast = useCallback((text: string, tone?: 'error') => {
     clearTimeout(toastTimer.current);
-    setToast({ text, key: Date.now() });
-    toastTimer.current = setTimeout(() => setToast(null), 2200);
+    setToast({ text, key: Date.now(), error: tone === 'error' });
+    if (tone !== 'error') toastTimer.current = setTimeout(() => setToast(null), 2200);
   }, []);
+  const dismissToast = useCallback(() => {
+    clearTimeout(toastTimer.current);
+    setToast(null);
+  }, []);
+
+  // Every sheet renders into one host over the screens and the tab bar, and makes what is behind it inert.
+  const [sheets] = useState(() => new SheetStack());
+  const [sheetEl, setSheetEl] = useState<HTMLElement | null>(null);
+  const sheetHost = useMemo(() => (sheetEl ? { el: sheetEl, stack: sheets } : null), [sheetEl, sheets]);
+  const onScreens = useCallback((el: HTMLElement | null) => sheets.base('screens', el), [sheets]);
+  const onTabBar = useCallback((el: HTMLElement | null) => sheets.base('tabs', el), [sheets]);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const api = useMemo<MobileShellApi>(() => ({ back, open: (to) => navigate(to), sheet: setSheet, toast: showToast }), [back, showToast]);
 
-  const pushedIn = place.hash === hash && place.dir === 'forward';
+  const pushedIn = !viaTransition && place.hash === hash && place.dir === 'forward';
+  // The top screen whose push is still playing: what it covers stays drawn under it until it lands.
+  const [pushing, setPushing] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (!pushedIn || !top) return;
+    setPushing(top.key);
+    const t = setTimeout(() => setPushing(null), PUSH_MS + 40);
+    return () => clearTimeout(t);
+  }, [top?.key, pushedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const landed = !top || pushing !== top.key;
   const layers: Layer[] = underlay && !stack.some((l) => l.key === underlay.key) ? [underlay, ...stack] : stack;
   const renderLayer = (l: Layer): ReactNode => {
     const isTop = l === top;
-    const style: CSSProperties = isTop && pushedIn ? { animation: `mo-push ${PUSH_MS}ms var(--ease-spring)` } : {};
+    const style: CSSProperties = isTop && pushedIn ? { animation: `mo-push ${PUSH_MS}ms var(--ease-spring)` } : !isTop && landed ? SKIPPED : {};
     return (
       <div key={l.key} className={layerCls} style={style} inert={!isTop || undefined} aria-hidden={!isTop || undefined}>
-        {RENDER[screenOf(l.route)](l.route)}
+        <LayerShownCtx.Provider value={isTop}>{RENDER[screenOf(l.route)](l.route)}</LayerShownCtx.Provider>
       </div>
     );
   };
 
   return (
     <ShellCtx.Provider value={api}>
-      <div className="mo-app fixed inset-x-0 top-0 overflow-hidden bg-bg text-fg" style={{ height: height ?? '100%' }}>
-        {visited.map((t) => {
-          const shown = t === tab;
-          const covered = !!top;
-          return (
-            <div
-              key={t}
-              className={layerCls}
-              style={{ visibility: shown ? 'visible' : 'hidden', animation: shown && !covered && place.dir !== 'none' ? 'mo-fade 220ms var(--ease-out)' : 'none' }}
-              inert={!shown || covered || undefined}
-              aria-hidden={!shown || covered || undefined}
-            >
-              {RENDER[t](parseHash(`#${TAB_PATH[t]}`))}
-            </div>
-          );
-        })}
-        {groupByThread(layers).map((g) =>
-          g.thread ? (
-            <ThreadScope key={`thread:${g.thread}`} id={g.thread} at={atOf(g.layers)}>
-              {g.layers.map(renderLayer)}
-            </ThreadScope>
-          ) : (
-            <Fragment key={`solo:${g.layers[0].key}`}>{g.layers.map(renderLayer)}</Fragment>
-          ),
-        )}
-        {!top && <MoTabBar tab={tab} onTab={(t) => t !== tab && navigate(TAB_PATH[t])} onNew={() => setSheet({ name: 'new' })} />}
-        {sheet && <SheetView sheet={sheet} />}
-        {toast && <MoToast key={toast.key} text={toast.text} />}
-      </div>
-      <Onboarding />
-      <ThreadNotifier />
-      <BrowserNotifier />
-      <ContextMenuHost />
-      <FolderDeleteDialog />
+      <SheetHostCtx.Provider value={sheetHost}>
+        <div className="mo-app fixed inset-x-0 top-0 overflow-hidden bg-bg text-fg" style={{ height: height ?? '100%' }}>
+          {/* The screens. An open sheet makes them inert (SheetStack), on this element. */}
+          <main ref={onScreens} id="main" tabIndex={-1} className="absolute inset-0 outline-none">
+            {visited.map((t) => {
+              const shown = t === tab;
+              const covered = !!top;
+              return (
+                <div
+                  key={t}
+                  className={layerCls}
+                  style={{
+                    visibility: shown ? 'visible' : 'hidden',
+                    animation: shown && !covered && place.dir !== 'none' && !viaTransition ? 'mo-fade 220ms var(--ease-out)' : 'none',
+                    // A tab in the background, or one a pushed screen has covered, skips layout and paint.
+                    ...(!shown || (covered && landed) ? SKIPPED : {}),
+                  }}
+                  inert={!shown || covered || undefined}
+                  aria-hidden={!shown || covered || undefined}
+                >
+                  <TabShownCtx.Provider value={shown && !covered}>
+                    <LayerShownCtx.Provider value={shown && !covered}>{RENDER[t](parseHash(`#${TAB_PATH[t]}`))}</LayerShownCtx.Provider>
+                  </TabShownCtx.Provider>
+                </div>
+              );
+            })}
+            {groupByThread(layers).map((g) =>
+              g.thread ? (
+                <ThreadScope key={`thread:${g.thread}`} id={g.thread} at={atOf(g.layers)}>
+                  {g.layers.map(renderLayer)}
+                </ThreadScope>
+              ) : (
+                <Fragment key={`solo:${g.layers[0].key}`}>{g.layers.map(renderLayer)}</Fragment>
+              ),
+            )}
+          </main>
+          <div ref={onTabBar}>{!top && <MoTabBar tab={tab} onTab={(t) => t !== tab && navigate(TAB_PATH[t])} onNew={() => setSheet({ name: 'new' })} />}</div>
+          {/* Every sheet shows here, the shell's own and a screen's (MoSheet portals into it). */}
+          <div ref={setSheetEl}>{sheet && <SheetView sheet={sheet} />}</div>
+          <MoToastRegion note={toast} onDismiss={dismissToast} />
+        </div>
+        <Onboarding />
+        <ThreadNotifier />
+        <BrowserNotifier />
+        <ContextMenuHost />
+        <FolderDeleteDialog />
+      </SheetHostCtx.Provider>
     </ShellCtx.Provider>
   );
 }

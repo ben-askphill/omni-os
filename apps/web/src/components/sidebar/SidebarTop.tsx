@@ -17,8 +17,11 @@ export function SidebarTop({
   onNavigate,
   onSearch,
   onClose,
+  panel,
 }: {
   view: SidebarView;
+  /** The id of the list under it, which the view tabs switch. */
+  panel: string;
   onView: (view: SidebarView) => void;
   channelCount: number;
   foldAll: 'collapse' | 'expand';
@@ -76,6 +79,8 @@ export function SidebarTop({
           <Icon name="plus" size={15} strokeWidth={2} /> New thread
         </button>
         <Segmented
+          kind="tabs"
+          panel={panel}
           label="Sidebar view"
           size="sm"
           className="w-full [&>.seg-item]:flex-1"

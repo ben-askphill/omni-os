@@ -1,13 +1,16 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
+import { useAutosize } from '../components/composer/controls.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { LivesOnNote, sendRefusal, type SendRefusal } from '../components/thread/LivesOn.tsx';
 import type { Takeover } from '@omni/shared/handoff.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
+import { machineMentions } from '../message-context/machine-mention.tsx';
+import { FileMenu, useFileMenu } from '../components/FileMenu.tsx';
 import { canSteer } from '../steer.ts';
 import { currentRun, pickedModelRun, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
@@ -15,7 +18,7 @@ import { useDictation, withPhrase } from './dictation.ts';
 import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
-import { MoDiff, MoRound } from './parts.tsx';
+import { bottomInset, MoDiff, MoRound } from './parts.tsx';
 
 export interface ComposerChip {
   label: string;
@@ -76,22 +79,22 @@ export function MoComposer({
   const send = useReplySend(thread.id);
   const ref = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
+  // The `@` menu: files, and in a thread that can delegate, the machines a task can be sent to.
+  const mentions = machineMentions(thread.id, setError);
   const update = (v: string) => {
     setText(v);
     drafts.set(thread.id, v);
+    mentions.edited(v);
   };
   const mic = useDictation((p) => update(withPhrase(ref.current?.value ?? '', p)));
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(thread.id)}`, onMachine: mentions.picked });
+  const { aria: menuAria, ...menuEvents } = fileMenu.textarea;
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
   useEffect(() => {
     if (!takeover) setAway((a) => (a?.livesOn ? null : a));
   }, [takeover]);
 
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
-  }, [text]);
+  useAutosize(ref, text);
 
   const busyThread = thread.status === 'running' || thread.status === 'queued';
   // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
@@ -160,7 +163,7 @@ export function MoComposer({
 
   return (
     // Not positioned, so the + sheet covers the screen rather than the composer.
-    <div className="shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) - 2px))' }}>
+    <div className="shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: bottomInset(2) }}>
       {(chips.length > 0 || next) && (
         <div className="mo-scroll flex gap-2 overflow-x-auto pt-0.5 pb-2.5">
           {next && (
@@ -202,7 +205,8 @@ export function MoComposer({
         />
       )}
       {(att.error || error) && <ErrorNote className="mb-2">{att.error ?? error}</ErrorNote>}
-      <div className="flex flex-col rounded-[26px] bg-surface">
+      <div className="relative flex flex-col rounded-[26px] bg-surface">
+        {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
         <ContextChips records={context} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
@@ -211,12 +215,18 @@ export function MoComposer({
             ref={ref}
             rows={1}
             value={text}
-            onChange={(e) => update(e.target.value)}
+            {...menuEvents}
+            {...(fileMenu.open ? menuAria : {})}
+            onChange={(e) => {
+              update(e.target.value);
+              menuEvents.onChange(e);
+            }}
+            onKeyDown={(e) => void fileMenu.onKey(e)}
             onPaste={att.onPaste}
             enterKeyHint="send"
             placeholder={hint}
             aria-label={hint}
-            className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
+            className="field-sizing-content max-h-[132px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />

@@ -11,7 +11,7 @@ import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
 import { saveDisplay, useDisplay } from '../display.ts';
-import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, fieldDescribedBy, FolderInput, IDENTIFIER, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot, useFieldErrors } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, useRoute, type SettingsSection } from '../router.ts';
 import { connectPageHash } from '@omni/shared/connect-agent.ts';
 import { setSettingsScope } from '../settings-scope.ts';
@@ -44,7 +44,6 @@ import {
   Origin,
   ResetButton,
   Row,
-  rowHintId,
   ScopeBar,
   ServerOptions,
   settingAnchor,
@@ -52,6 +51,8 @@ import {
   SwitchRow,
   useScopedChannel,
 } from './settings-parts.tsx';
+import { isImeEnter } from '../ime.ts';
+import { scrollBehavior } from '../motion.ts';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
 // the same sections in the same order as the phone's Settings screen. A scoped section shows the channel picker: This
@@ -163,7 +164,7 @@ function useFocus(section: string, focus: string | undefined) {
       const el = document.getElementById(settingAnchor(focus));
       if (el || ++tries > 20) clearInterval(t);
       if (!el) return;
-      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
       el.animate([{ boxShadow: '0 0 0 2px var(--live)' }, { boxShadow: '0 0 0 2px transparent' }], { duration: 1600, easing: 'ease-out' });
     }, 100);
     return () => clearInterval(t);
@@ -536,6 +537,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const problems = useFieldErrors(Object.fromEntries(editable.map((f) => [configFieldId(f), settingProblem(f, values[settingId(f)] ?? '', 'form')])));
 
   // Another window, a reset or `npm run setup` can change the file while this page is open. A field still as it was
   // saved follows the file; one being edited keeps its draft.
@@ -569,9 +571,12 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
 
   /** Saves one field as it stands, unless it is unchanged or refused. */
   const commit = (f: SettingField, raw = values[settingId(f)] ?? '') => {
+    // A problem shows at its field: on leaving it with something typed, or at once where nothing else would save it.
+    if (settingProblem(f, raw, 'form')) {
+      if (auto || raw.trim()) problems.touch(configFieldId(f));
+      return;
+    }
     if (!auto) return;
-    const problem = settingProblem(f, raw, 'form');
-    if (problem) return setError(problem);
     const next = raw.trim() || f.default;
     const now = (state.config[f.section] as Record<string, string | undefined>)[f.key] || f.default;
     if (next === now) return setError(null);
@@ -581,8 +586,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
   const saveAll = async (e: FormEvent) => {
     e.preventDefault();
     if (auto) return;
-    const problem = editable.map((f) => settingProblem(f, values[settingId(f)] ?? '', 'form')).find(Boolean);
-    if (problem) return setError(problem);
+    if (problems.submit()) return setError(null);
     await put('form', patch);
   };
 
@@ -601,6 +605,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
         value={values[id] ?? ''}
         fixed={fixed ? { env: o.env, shown: o.env ? (RESOLVED[id] ? state.resolved[RESOLVED[id]] : null) : (values[id] ?? '') } : null}
         fallbacks={state.fallbacks}
+        error={problems.error(configFieldId(f))}
         onChange={(v) => (setValues((cur) => ({ ...cur, [id]: v })), setSaved(false))}
         onCommit={(v) => commit(f, v)}
         origin={<Origin of={o.of} />}
@@ -630,7 +635,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
           ))}
       </Card>
       {advanced.length > 0 && (
-        <Advanced summary={page.advanced?.summary}>
+        <Advanced summary={page.advanced?.summary} open={advanced.some((f) => !!problems.error(configFieldId(f)))}>
           {page.advanced?.note && <p className="text-[12.5px] text-fg-3">{page.advanced.note}</p>}
           {rows(advanced)}
         </Advanced>
@@ -652,6 +657,7 @@ function formPatch(fields: readonly SettingField[], values: Record<string, strin
   return patch;
 }
 
+/** Fields that hold an identifier: the mono face, and no capitals, autocorrect or spellcheck. */
 const MONO = new Set<SettingField['input']>(['folder', 'url', 'owner']);
 
 /**
@@ -667,9 +673,12 @@ function ConfigField({
   onCommit,
   origin,
   action,
+  error,
 }: {
   field: SettingField;
   value: string;
+  /** Its problem, once it shows (useFieldErrors). */
+  error?: string;
   /** `shown`: null where the server does not say what .env resolves to. */
   fixed: { env?: string; shown: string | null } | null;
   fallbacks: SetupState['fallbacks'];
@@ -678,9 +687,9 @@ function ConfigField({
   origin: ReactNode;
   action: ReactNode;
 }) {
-  const id = `set-${f.key}`;
+  const id = configFieldId(f);
   const hint = settingHint(f, fallbacks);
-  const describedBy = hint ? rowHintId(id) : undefined;
+  const describedBy = fieldDescribedBy(id, { hint, error });
   const pick = (v: string) => (onChange(v), onCommit(v));
   const input = fixed ? (
     <>
@@ -697,12 +706,13 @@ function ConfigField({
     <FolderInput
       id={id}
       aria-describedby={describedBy}
+      aria-invalid={error ? true : undefined}
       dialogTitle={f.label}
-      className="h-10 w-full !text-[13px]"
+      className="h-10 w-full"
       value={value}
       maxLength={f.max}
       placeholder={settingPlaceholder(f, fallbacks)}
-      spellCheck={false}
+      enterKeyHint="done"
       onChange={onChange}
       onPick={(v) => onCommit(v)}
       onKeyDown={commitOnEnter}
@@ -723,29 +733,35 @@ function ConfigField({
     <input
       id={id}
       aria-describedby={describedBy}
-      className={`field h-10 w-full${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
+      aria-invalid={error ? true : undefined}
+      {...(MONO.has(f.input) ? IDENTIFIER : {})}
+      className={`field h-10 w-full${MONO.has(f.input) ? ' field-mono' : ''}`}
+      // Not type="url": the form would then refuse a URL with the browser's own bubble before settingProblem's message.
       type={f.input === 'email' ? 'email' : 'text'}
+      inputMode={f.input === 'url' ? 'url' : undefined}
+      enterKeyHint="done"
       value={value}
       maxLength={f.max}
       autoComplete={f.autoComplete}
       placeholder={settingPlaceholder(f, fallbacks)}
-      spellCheck={MONO.has(f.input) ? false : undefined}
-      autoCapitalize={f.input === 'owner' ? 'off' : undefined}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={commitOnEnter}
       onBlur={() => onCommit()}
     />
   );
   return (
-    <Row label={f.label} htmlFor={id} hint={hint} origin={origin} action={action}>
+    <Row label={f.label} htmlFor={id} hint={hint} origin={origin} action={action} error={error}>
       {input}
     </Row>
   );
 }
 
+/** The id of a config field's control, which its problem is keyed by. */
+const configFieldId = (f: SettingField) => `set-${f.key}`;
+
 /** Return saves a field that saves as you go; on a form with Save changes, Return submits it. */
 const commitOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
-  if (e.key === 'Enter' && !e.currentTarget.form?.querySelector('[type=submit]')) e.currentTarget.blur();
+  if (e.key === 'Enter' && !isImeEnter(e) && !e.currentTarget.form?.querySelector('[type=submit]')) e.currentTarget.blur();
 };
 
 const SERVER_TZ = '';
@@ -799,7 +815,7 @@ function PronounsField({
         }}
         options={[...PRONOUNS.map((p) => ({ value: p, label: p, avatar: false as const })), { value: OTHER, label: 'Other…', avatar: false as const }]}
       />
-      {other && <input aria-label="Your pronouns" className="field h-10 min-w-0 flex-1" value={value} placeholder="xe/xem" onChange={(e) => onChange(e.target.value)} onKeyDown={commitOnEnter} onBlur={onCommit} />}
+      {other && <input aria-label="Your pronouns" className="field h-10 min-w-0 flex-1" value={value} placeholder="xe/xem" enterKeyHint="done" onChange={(e) => onChange(e.target.value)} onKeyDown={commitOnEnter} onBlur={onCommit} />}
     </div>
   );
 }
@@ -842,7 +858,6 @@ function AppearanceCard() {
           hint="Follows your system, or stays light or dark."
           control={
             <Segmented
-              radio
               label="Theme"
               value={theme}
               onChange={setTheme}

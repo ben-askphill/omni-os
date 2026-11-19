@@ -61,8 +61,10 @@ export function untilLabel(unixSecs: number, now = Date.now()) {
   const ms = unixSecs * 1000 - now;
   const d = new Date(unixSecs * 1000);
   if (ms <= 0) return 'now';
-  if (ms < 3_600_000) return `in ${Math.max(1, Math.round(ms / 60_000))}m`;
-  if (ms < DAY) return `in ${Math.floor(ms / 3_600_000)}h ${Math.round((ms % 3_600_000) / 60_000)}m`;
+  // Whole minutes first, then split them: rounding the leftover on its own gave "in 2h 60m" at 2h 59m 45s.
+  const mins = Math.round(ms / 60_000);
+  if (mins < 60) return `in ${Math.max(1, mins)}m`;
+  if (mins < 24 * 60) return `in ${Math.floor(mins / 60)}h ${mins % 60}m`;
   return d.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 }
 

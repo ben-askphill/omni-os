@@ -6,14 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // The channel list and pins the app reloads by itself give way to a thread's first page (api.ts listGate): on a phone
 // they share a narrow link with it, and the list can be close to a megabyte.
 
-type Sent = { path: string; aborted: boolean; resolve: (v: unknown) => void };
+type Sent = { path: string; priority?: RequestPriority; aborted: boolean; resolve: (v: unknown) => void };
 const sent: Sent[] = [];
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
   actual.api.get = vi.fn(
-    (path: string, signal?: AbortSignal) =>
+    (path: string, { signal, priority }: { signal?: AbortSignal; priority?: RequestPriority } = {}) =>
       new Promise((resolve, reject) => {
-        const s: Sent = { path, aborted: false, resolve };
+        const s: Sent = { path, priority, aborted: false, resolve };
         sent.push(s);
         signal?.addEventListener('abort', () => {
           s.aborted = true;
@@ -52,6 +52,14 @@ describe('list reloads give way to an opening thread', () => {
     release();
     await flush();
     expect(sent.map((s) => s.path).sort()).toEqual(['/channels', '/pinned']);
+    await act(async () => sent.forEach((s) => s.resolve([])));
+  });
+
+  it('sends them at low priority, behind what Ben is waiting on', async () => {
+    act(() => void hook.reloadChannels());
+    await flush();
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((s) => s.priority === 'low')).toBe(true);
     await act(async () => sent.forEach((s) => s.resolve([])));
   });
 
