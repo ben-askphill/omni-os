@@ -77,6 +77,16 @@ Needs you holds unread results and threads waiting for you to act. A delegated t
 
 On desktop web and in the desktop app, use the check on a Needs you row or an Inbox card, the check in the thread header, or the thread's menu. The thread header keeps only the crew role the thread runs as (beside the channel crumb, left out on the Conductor's own threads), the channels its delegated threads work in, the context meter, Mark as done, the status, the thread menu (⋯) and the quick-card and panel toggle. Pin, Reference and Send to Grok Bot are in the menu. Hand off and Take over are on the reply box's Machine chip. On a phone, use the check on an Activity row or Thread options. The Conductor can use `mark_thread_done` when you ask it to.
 
+## Quick asks
+
+A quick ask is a question answered where you asked it, not a thread to manage. Ask from the desktop app's Quick Prompt (Return), or the phone web's and the iOS app's New screen with Ask picked (Task starts a thread as before).
+
+- It runs on Auto unless you pick a model, with read-only tools: it reads files in the channel's folder, searches and fetches the web and reads connectors, but cannot edit files, run commands, use a browser or delegate. Hermes and Cursor Cloud cannot run one (409), since Omni takes those tools away on this machine.
+- It gets no charter, worktree, folder or task id (its `workspace` is `read`, or `none` in a channel with no folder), and stays out of the sidebar, channel lists, the Inbox and notifications. Recent asks lists the last 7 days (`GET /api/threads/asks`).
+- Keep as thread lists it as an ordinary thread where it is, still with read-only tools. Make it a task starts a task thread in the same channel, with its own worktree and full tools, whose first message carries the questions and answers so far (`POST /api/threads/:id/promote` with `to: keep` or `task`).
+- When the agent finds the ask needs real work, it answers `TASK: <title>`. Omni shows "This needs a task" under the answer and highlights Make it a task, which then takes that title. Only you start the task: text the agent read (a page, a file) cannot start one by writing a TASK line.
+- Other code starts one through `startQuickAsk` (`apps/server/quick-ask.ts`), or `POST /api/threads` with `quick: true`.
+
 ## The composer
 
 - A new thread follows the channel and crew defaults until you pick a model or effort for that draft. When no default is set, Auto picks from the first prompt. The Conductor role's charter is Auto, and a saved #conductor channel default still wins. See [Harnesses](harnesses.md#auto).

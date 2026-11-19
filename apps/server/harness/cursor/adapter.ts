@@ -4,6 +4,7 @@
 // of the first message of the session only; the transcript shows only what Ben typed. Cursor
 // can't steer, so the runner queues a steer and stops the thread by ending the session, which
 // kills the running turn (the next message resumes the chat).
+import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { apiToken } from '../../api-token.ts';
@@ -62,12 +63,13 @@ export const cursorAdapter: HarnessAdapter = {
     }, ctx.secretEnv);
     // A delegate-only role (the Conductor) may not edit files or run commands. Ask mode is no help: under --force it
     // blocks nothing, and without --force it blocks the omni tools too. Deny rules hold under --force and leave MCP alone.
-    if (ctx.role?.delegateOnly) env.CURSOR_CONFIG_DIR = writeCursorDenyConfig(join(threadDir(thread.id), 'cursor-config'), cursorConfigDir(env));
+    // A quick ask only reads as well (apps/server/quick-ask.ts).
+    if (ctx.role?.delegateOnly || readsOnly(thread)) env.CURSOR_CONFIG_DIR = writeCursorDenyConfig(join(threadDir(thread.id), 'cursor-config'), cursorConfigDir(env));
     const resume = ctx.resume || thread.session_id !== thread.id;
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';
     // Omni's MCP servers load from a per-thread plugin folder; nothing touches the repo or ~/.cursor.
-    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl });
+    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl, quick: readsOnly(thread) });
 
     let ready = false;
     let firstTurn = true;
