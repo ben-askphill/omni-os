@@ -11,9 +11,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@omni/shared": "*",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@omni/test-fixtures": "*",
