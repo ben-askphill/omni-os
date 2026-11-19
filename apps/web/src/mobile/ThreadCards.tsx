@@ -265,7 +265,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
           <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
-          {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} /> : null}
+          {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} lazy={false} /> : null}
           <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (
             <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
@@ -313,7 +313,7 @@ export function Sending({ threadId, pending }: { threadId: string; pending: Pend
         return (
           <div key={m.request_id} ref={m.request_id === newest ? last : undefined} className="flex flex-col items-end gap-1.5 opacity-75">
             <span className="text-[12px] leading-[1.3] text-fg-3">Sending</span>
-            {m.files.length ? <Attachments threadId={threadId} items={m.files.map((f) => f.attachment)} href={(a) => urls.get(a.name) ?? ''} /> : null}
+            {m.files.length ? <Attachments threadId={threadId} items={m.files.map((f) => f.attachment)} href={(a) => urls.get(a.name) ?? ''} lazy={false} /> : null}
             {m.text && <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>}
           </div>
         );

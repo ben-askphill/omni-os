@@ -1070,6 +1070,23 @@
     overscroll-behavior: contain;
     -webkit-app-region: no-drag;
   }
+
+  /* ---- transcript rows ---- */
+  /*
+   * An older row out of view skips style, layout and paint (transcript/defer.ts picks the rows; the newest never get
+   * it). It keeps the height it last rendered at, and an estimate until it first renders, so the scrollbar holds and
+   * useScrollAnchor corrects for the difference as rows render. Desktop rows run about 6 lines, phone turns
+   * (.tx-turn) about 30.
+   */
+  .tx-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 6lh;
+    /* It also clips paint to the row: a focus ring or a card's shadow at its edge still shows. */
+    overflow-clip-margin: 8px;
+  }
+  .tx-turn {
+    contain-intrinsic-size: auto none auto 30lh;
+  }
 }
 
 /* Markdown rendered from agents. Kept compact and readable. */
