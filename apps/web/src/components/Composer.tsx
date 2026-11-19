@@ -235,7 +235,8 @@ export function NewThreadComposer({
   };
   return (
     <>
-      <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
+      {/* flow-root: the last note's or the answer's bottom margin stays inside the box, which has no padding to hold it. */}
+      <div className={shell('flow-root rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
         <DropHint over={att.over} />
         {/* Near the top of the page, so it opens downward. */}
         {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
@@ -293,8 +294,8 @@ export function NewThreadComposer({
           )}
           <div className="ml-auto flex items-center gap-2.5">
             {!toGrok && (
-              <Button size="sm" variant="secondary" disabled={!text.trim() || busy} onClick={() => void ask()} title="Answer here with read-only tools, without starting a thread">
-                Ask
+              <Button size="sm" variant="secondary" icon="zap" disabled={!text.trim() || busy} onClick={() => void ask()} title="Answer here with read-only tools, without starting a thread">
+                Quick ask
               </Button>
             )}
             <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
@@ -310,9 +311,9 @@ export function NewThreadComposer({
         {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
         {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
         {answering && (
-          <div className="mx-2 mb-2 rounded-[16px] bg-bg px-3.5 py-3 shadow-[var(--shadow-card)]">
+          <div className="mx-2 mb-2 flex flex-col gap-3 rounded-[16px] bg-bg p-3.5 shadow-[var(--shadow-card)]">
             <QuickAnswer key={answering} id={answering} onOpen={(id) => navigate(`/t/${id}`)} />
-            <button type="button" onClick={() => setAnswering(null)} className="press mt-2 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+            <button type="button" onClick={() => setAnswering(null)} className="press self-start text-[12.5px] font-medium text-fg-3 hover:text-fg">
               Close
             </button>
           </div>

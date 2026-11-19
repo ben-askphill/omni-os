@@ -98,7 +98,8 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
   const done = view.promoted || view.kept;
   return (
     <section aria-label="Answer" className="flex flex-col gap-3" aria-busy={view.busy || undefined}>
-      <div ref={list} className="flex max-h-[min(60vh,420px)] flex-col gap-3 overflow-y-auto">
+      {/* Padded out to the box's edges and pulled back by as much, so the Thinking mark's halo is not cut off by the scroll. */}
+      <div ref={list} className="-m-3 flex max-h-[min(60vh,420px)] flex-col gap-3 overflow-y-auto p-3">
         {!view.turns.length && (
           <div className="flex items-center gap-2 text-[12.5px] text-fg-3" aria-live="polite">
             <Loader size={13} />
