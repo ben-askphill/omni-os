@@ -141,9 +141,10 @@ function Shell() {
   return layout === 'rail' ? (
     // safe-x: a landscape iPhone gets this shell (844px and up), with the notch and the rounded corners at its sides.
     <div className="desktop-shell rail-shell safe-x flex h-full min-h-0 flex-row bg-bg">
+      <SkipLink />
       <ChannelRail selection={selection} />
       <ListPanel mode={listMode(selection)} onSearch={openPalette} />
-      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg">
+      <main id="main" tabIndex={-1} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg outline-none">
         <Page route={route} />
       </main>
 
@@ -157,12 +158,13 @@ function Shell() {
     </div>
   ) : (
     <div className="desktop-shell safe-x flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-[max(0.5rem,env(safe-area-inset-right))]">
+      <SkipLink />
       {/* Desktop sidebar */}
       <SidebarPane>
         <Sidebar onSearch={openPalette} />
       </SidebarPane>
 
-      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg md:rounded-[22px] md:pb-0 md:shadow-[var(--shadow-card),inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
+      <main id="main" tabIndex={-1} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg outline-none md:rounded-[22px] md:pb-0 md:shadow-[var(--shadow-card),inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
         <Page route={route} />
       </main>
 
@@ -174,6 +176,25 @@ function Shell() {
       <ContinueSheetHost />
       <FolderDeleteDialog />
     </div>
+  );
+}
+
+/**
+ * The first thing Tab reaches on desktop: past the rail or the sidebar, straight to the page. Hidden until it has the
+ * focus. The router owns the hash, so it moves the focus itself instead of following `#main`.
+ */
+function SkipLink() {
+  return (
+    <a
+      href="#main"
+      onClick={(e) => {
+        e.preventDefault();
+        document.getElementById('main')?.focus();
+      }}
+      className="sr-only rounded-full bg-fg text-[13px] font-medium text-on-ink shadow-[var(--shadow-menu)] focus:not-sr-only focus:fixed focus:top-3 focus:left-1/2 focus:z-[70] focus:-translate-x-1/2 focus:px-4 focus:py-2"
+    >
+      Skip to content
+    </a>
   );
 }
 

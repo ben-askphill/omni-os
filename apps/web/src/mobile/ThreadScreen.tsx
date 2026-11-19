@@ -83,7 +83,7 @@ export function ThreadScreen() {
     setHandoff(a.handoff);
   };
   // The Machine chip: where the thread runs, as a chip that opens the sheet a new thread picks its machine in.
-  const machine = useThreadMachine({ id: thread?.id ?? '', status: thread?.status }, { blocked: s.blocked, handoff, takeover, onChanged: handedOff }, (e) => e && shell.toast(e));
+  const machine = useThreadMachine({ id: thread?.id ?? '', status: thread?.status }, { blocked: s.blocked, handoff, takeover, onChanged: handedOff }, (e) => e && shell.toast(e, 'error'));
 
   if (notFound || (!thread && error)) {
     return (
@@ -118,7 +118,7 @@ export function ThreadScreen() {
       applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: prompts.open }), true);
       shell.toast(`Asked ${theirs} to open a PR`);
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     }
   };
   const report = latest?.artifacts.find((a) => a.kind === 'html' || a.kind === 'markdown' || a.kind === 'pdf') ?? latest?.artifacts[0];

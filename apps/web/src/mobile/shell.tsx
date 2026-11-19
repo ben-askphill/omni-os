@@ -16,7 +16,8 @@ export interface MobileShellApi {
   /** Open a route, as a path or an href. */
   open: (to: string) => void;
   sheet: (s: ShellSheet | null) => void;
-  toast: (text: string) => void;
+  /** A short note over the tab bar. An `error` one is read out at once and stays until it is dismissed. */
+  toast: (text: string, tone?: 'error') => void;
 }
 
 export const ShellCtx = createContext<MobileShellApi | null>(null);
