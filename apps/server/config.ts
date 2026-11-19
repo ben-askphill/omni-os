@@ -133,7 +133,7 @@ export const paths = {
     return configPath();
   },
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'apps', 'web', 'dist'),
-  /** The conductor's MCP server. ask, render and threads run on omni-mcp instead (native-mcp.ts). */
+  /** The conductor's MCP server. ask, render, steps and threads run on omni-mcp instead (native-mcp.ts). */
   mcpOmni: join(ROOT, 'apps', 'mcp', BUNDLED ? 'omni.mjs' : 'omni.ts'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
   mods: join(ROOT, 'mods'),

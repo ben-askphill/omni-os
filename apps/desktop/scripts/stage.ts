@@ -6,7 +6,7 @@
 //
 //   --host-glibc  ship this machine's node-pty build on Linux even when it needs a newer glibc than the floor
 //   --native      the Rust binaries (native.ts). required, the default, fails when one does not build. off leaves
-//                 them out, for an app whose threads go without ask, render and threads and that has no omni command
+//                 them out, for an app whose threads go without ask, render, steps and threads and that has no omni command
 //
 // Packages come from the repo's node_modules along package-lock.json's graph, at their locked versions.
 import { spawnSync } from 'node:child_process';

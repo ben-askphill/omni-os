@@ -36,7 +36,7 @@ The desktop app replaced both, and the repo no longer has them.
 | Need | Check | Fix |
 | --- | --- | --- |
 | Node 24+ and npm, to run from a checkout or build the app | `node -v` | `nvm install 24`, `mise use node@24`, or `brew install node` |
-| Rust, to run from a checkout (the threads' `ask_user_question`, `html_render` and `read_referenced_thread`, and `scripts/omni.sh`) or build the app | `cargo --version` | https://rustup.rs. The repo's `rust-toolchain.toml` pins the version. Building the app's `omni` command also needs a C compiler: Xcode's command line tools, or `musl-tools` on Linux |
+| Rust, to run from a checkout (the threads' `ask_user_question`, `html_render`, `set_steps` and `read_referenced_thread`, and `scripts/omni.sh`) or build the app | `cargo --version` | https://rustup.rs. The repo's `rust-toolchain.toml` pins the version. Building the app's `omni` command also needs a C compiler: Xcode's command line tools, or `musl-tools` on Linux |
 | Chromium on Linux, for the agents' browser | `command -v chromium` | Your distro's Chromium, Chrome or Brave. Omarchy already has one |
 | Claude Code, signed in | `claude --version` | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` |
 | `gh`, signed in (GitHub panel, PR automations) | `gh auth status` | `brew install gh && gh auth login` |
