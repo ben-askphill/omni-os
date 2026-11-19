@@ -842,7 +842,6 @@ function AppearanceCard() {
           hint="Follows your system, or stays light or dark."
           control={
             <Segmented
-              radio
               label="Theme"
               value={theme}
               onChange={setTheme}

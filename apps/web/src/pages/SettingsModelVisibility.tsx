@@ -129,7 +129,7 @@ export function ModelVisibilityCard() {
           <SettingRow
             label="Models nobody switched"
             hint={POLICY_HINT[policy]}
-            control={<Segmented radio size="sm" label="Models nobody switched" value={policy} onChange={(p) => void save(setNewModels(mine, current.models, p))} options={POLICY_OPTIONS} />}
+            control={<Segmented size="sm" label="Models nobody switched" value={policy} onChange={(p) => void save(setNewModels(mine, current.models, p))} options={POLICY_OPTIONS} />}
           />
           <div className="flex min-h-7 flex-wrap items-center gap-2 text-[12.5px] text-fg-3">
             <HarnessLogo harness={current.id} size={13} />

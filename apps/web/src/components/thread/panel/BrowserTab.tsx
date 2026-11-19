@@ -16,7 +16,7 @@ export function BrowserTab({ channelId, threadId, shots, crew }: { channelId: st
   const extra = (
     <>
       <span className="relative">
-        <IconButton icon="image" label={`Screenshots${count ? ` (${count})` : ''}`} size={15} active={view === 'shots'} onClick={() => setView((v) => (v === 'shots' ? 'live' : 'shots'))} />
+        <IconButton icon="image" label={`Screenshots${count ? ` (${count})` : ''}`} size={15} pressed={view === 'shots'} onClick={() => setView((v) => (v === 'shots' ? 'live' : 'shots'))} />
         {count > 0 && <span className="pointer-events-none absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-fg-3" />}
       </span>
       {view === 'live' && <IconButton icon="maximize" label="Expand" size={15} onClick={() => setExpanded(true)} />}

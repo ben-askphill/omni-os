@@ -105,6 +105,8 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 .om-seg-item{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;height:var(--h-seg);padding:0 14px;border:0;border-radius:var(--r-pill);background:transparent;font:400 var(--fs-ui)/1 var(--font-sans);color:var(--fg-3);white-space:nowrap;cursor:pointer;transition:color .26s var(--ease-stretch)}
 .om-seg-item:hover{color:var(--fg-2)}
 .om-seg-item[data-active="true"]{color:var(--fg)}
+/* Forced colors drops the thumb: outline the selected item so the choice still shows. */
+@media (forced-colors:active){.om-seg-item[data-active="true"],[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:-2px}}
 .om-seg[data-size="sm"] .om-seg-item{height:var(--h-seg-sm);padding:0 11px;font-size:var(--fs-small)}
 .om-seg[data-size="sm"][data-icons] .om-seg-item{padding:0 8px}
 .om-seg-item .om-count{font:400 var(--fs-meta)/1 var(--font-num);color:var(--fg-4)}

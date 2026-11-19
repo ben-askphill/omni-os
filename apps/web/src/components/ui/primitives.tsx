@@ -65,14 +65,24 @@ export function IconButton({
   className = '',
   size = 16,
   active,
+  pressed,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string; size?: number; active?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: IconName;
+  label: string;
+  size?: number;
+  /** Shown as on, with no state for assistive tech: a button whose popup is open says so with aria-expanded. */
+  active?: boolean;
+  /** A toggle that stays on or off (a tool, a view): shown as on and exposed as aria-pressed. */
+  pressed?: boolean;
+}) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
-      data-on={active || undefined}
+      aria-pressed={pressed}
+      data-on={active || pressed || undefined}
       {...rest}
       className={`hov press inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-fg-3 transition-colors hover:text-fg disabled:opacity-40 data-[on=true]:text-fg ${className}`}
     >

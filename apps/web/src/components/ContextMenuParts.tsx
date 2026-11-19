@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 import { api, type Thread, type ThreadDetail } from '../api.ts';
 import { draftKey, type useFolders } from '../folders.tsx';
+import { folderStep } from '../folder-edits.ts';
 import { navigate, href, openNewThread } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
 import { overlayRow, RowKeys } from './ui/overlay.tsx';
@@ -169,7 +170,7 @@ export function itemForKey(groups: { items: MenuItem[] }[], e: { key: string; me
   return groups.flatMap((g) => g.items).find((it) => !it.off && it.keys?.join('+') === pressed);
 }
 
-/** The folder menu (new thread here, rename, duplicate, delete) or the channel menu (new folder, settings). */
+/** The folder menu (new thread here, rename, duplicate, move up or down, delete) or the channel menu (new folder, settings). */
 export function containerItems(target: { kind: 'folder' | 'channel'; id: string }, folders: ReturnType<typeof useFolders>, onClose: () => void): MenuItem[] {
   if (target.kind === 'channel') {
     return [
@@ -179,10 +180,20 @@ export function containerItems(target: { kind: 'folder' | 'channel'; id: string 
   }
   const folder = folders.find(target.id);
   if (!folder) return [];
+  // Drag reorders by mouse; these are the keyboard's way. Only with another folder to pass.
+  const siblings = folders.inChannel(folder.channel_id);
+  const moves: MenuItem[] =
+    siblings.length > 1
+      ? [
+          { label: 'Move up', icon: 'arrowUp', off: folderStep(siblings, folder.id, -1) ? null : 'Already the first folder', run: () => (void folders.move(folder.id, -1), onClose()) },
+          { label: 'Move down', icon: 'arrowDown', off: folderStep(siblings, folder.id, 1) ? null : 'Already the last folder', run: () => (void folders.move(folder.id, 1), onClose()) },
+        ]
+      : [];
   return [
     { label: 'New thread here', icon: 'plus', run: () => (openNewThread({ channel: folder.channel_id, folder: { id: folder.id, name: folder.name } }), onClose()) },
     { label: 'Rename', icon: 'pencil', run: () => (folders.setEditing(folder.id), onClose()) },
     { label: 'Duplicate', icon: 'copy', run: () => (void folders.duplicate(folder.id), onClose()) },
+    ...moves,
     { label: 'Delete', icon: 'trash', run: () => (folders.askDelete(folder.id), onClose()) },
   ];
 }

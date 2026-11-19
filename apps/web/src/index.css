@@ -640,6 +640,26 @@
     padding: 0 10px;
     font-size: 12.5px;
   }
+  /* The selected item's underline. Transparent, so the wash above is all that shows, until forced colors removes the
+     wash and paints this border in the system color: the selection never rests on a background alone. */
+  .seg-item {
+    position: relative;
+  }
+  .seg-item[data-active="true"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 8px;
+    bottom: 2px;
+    border-bottom: 2px solid transparent;
+  }
+  /* Pressed tools and the browser's selected tab show by a wash too: outline them in forced colors. */
+  @media (forced-colors: active) {
+    [aria-pressed="true"],
+    [role="tab"][aria-selected="true"]:not(.seg-item) {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
 
   /* ---- liquid toggle ---- */
   .tgl {

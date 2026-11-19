@@ -435,7 +435,6 @@ function EditorBody({
                     <LockNote>{locked.charter_mode}</LockNote>
                   ) : (
                     <Segmented
-                      radio
                       label="Your text"
                       size="sm"
                       value={draft.charterMode}

@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useId, type ReactNode } from 'react';
 import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
@@ -9,7 +9,7 @@ import { useApp } from '../store.tsx';
 import { CONDUCTOR_CHANNEL, parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { useJobTree } from '../thread-tree.ts';
 import { OmniMark } from './brand.tsx';
-import { Avatar, ChannelMark, ErrorNote } from './ui.tsx';
+import { Avatar, ChannelMark, ErrorNote, tabPanelProps } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
 import { SidebarTop } from './sidebar/SidebarTop.tsx';
 import { InboxView } from './sidebar/InboxView.tsx';
@@ -40,6 +40,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   const { dropOn, ungroupDrop } = useUngroupDrop(folders);
   const { collapsed, setChannelOpen, foldAll, toggleAll } = useChannelFold(channels, folders);
   const [view, switchView] = useSidebarView(route.name);
+  const panel = useId();
 
   // Running and Pinned each fold on their own.
   const [runningClosed, toggleRunning] = useSectionFold('sidebar.runningCollapsed');
@@ -215,9 +216,9 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
 
   return (
     <nav className="flex h-full flex-col bg-sidebar" aria-label="Main">
-      <SidebarTop view={view} onView={switchView} channelCount={channels.length} foldAll={foldAll} onToggleAll={toggleAll} onNavigate={onNavigate} onSearch={onSearch} onClose={onClose} />
+      <SidebarTop view={view} onView={switchView} channelCount={channels.length} foldAll={foldAll} onToggleAll={toggleAll} onNavigate={onNavigate} onSearch={onSearch} onClose={onClose} panel={panel} />
 
-      <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4" {...tabPanelProps(panel, view)}>
         {view === 'inbox' ? (
           <InboxView onNavigate={onNavigate} />
         ) : (

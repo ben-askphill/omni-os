@@ -131,7 +131,6 @@ export function IosPairingSection() {
       ) : (
         <>
           <Segmented
-            radio
             size="sm"
             label="Pair"
             value={target}
