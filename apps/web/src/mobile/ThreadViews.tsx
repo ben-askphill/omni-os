@@ -23,7 +23,7 @@ import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { linkName } from '../components/ContinueLinks.tsx';
 import { fullDate, plural } from '../format.ts';
-import { runningSubagents, subagentKind } from '../subagents.ts';
+import { runningSubagents, subagentKind, subagentProgress } from '../subagents.ts';
 import { href, type Route } from '../router.ts';
 import { openOnGitHub } from '../pr-links.ts';
 import { RerunNote, useRerunFailedChecks } from '../components/RerunChecks.tsx';
@@ -459,7 +459,7 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
   }
   for (const l of links.into) rows.push({ key: `i${l.id}`, icon: <AgentGlyph harness={l.harness} status={l.status} />, label: linkName(l), sub: 'Continued in', go: () => open(l.id) });
   for (const c of running) rows.push({ key: `r${c.id}`, icon: <AgentGlyph harness={c.harness} status={c.status} />, label: c.title || 'Untitled', sub: 'Running', right: relTime(c.updated_at), go: () => open(c.id) });
-  for (const t of agents) rows.push({ key: `a${t.task_id}`, icon: <span className="grid size-[15px] place-items-center"><StatusDot status="running" size={8} /></span>, label: t.description, sub: subagentKind(t) ? `Subagent · ${subagentKind(t)}` : 'Subagent' });
+  for (const t of agents) rows.push({ key: `a${t.task_id}`, icon: <span className="grid size-[15px] place-items-center"><StatusDot status="running" size={8} /></span>, label: t.description, sub: ['Subagent', subagentKind(t), subagentProgress(t)].filter(Boolean).join(' · ') });
   if (previous.length) {
     rows.push({ key: 'prev', icon: 'delegate', label: 'Previous agents', right: <span className="flex items-center gap-1.5">{previous.length}<Icon name="chevronDown" size={14} className={showPrev ? '' : '-rotate-90'} /></span>, go: () => setShowPrev((v) => !v) });
     if (showPrev) for (const c of previous) rows.push({ key: `d${c.id}`, icon: <AgentGlyph harness={c.harness} status={c.status} />, label: c.title || 'Untitled', sub: statusLabel(c.status), right: relTime(c.updated_at), go: () => open(c.id) });

@@ -97,6 +97,14 @@ describe('ChannelRollup', () => {
     expect(html).toContain('width:14px;height:14px');
   });
 
+  it('writes the names out beside the discs on a phone row, where nothing hovers', () => {
+    const html = renderToStaticMarkup(createElement(ChannelRollup, { threads: [kid('conductor'), kid('acne'), kid('volero')], own: 'conductor', size: 16, named: true }));
+    expect(discs(html)).toEqual(['acne', 'volero']);
+    expect(html).toContain('>Delegated to 2 channels: #Acne Studios, #Volero</span>');
+    expect(html).not.toContain('title=');
+    expect(html).not.toContain('role="img"');
+  });
+
   it('caps at four discs on the card: its own channel, two more and a +N chip', () => {
     const html = roll(['acne', 'volero', 'pink', 'patta', 'omni-os'].map((c) => kid(c)), { lead: true });
     expect(discs(html)).toEqual(['conductor', 'acne', 'volero']);

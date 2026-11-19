@@ -1002,6 +1002,54 @@
     overflow: visible;
     color: inherit;
   }
+  /* A tooltip (components/ui/tooltip.tsx): a short tip on hover and keyboard focus, in the page's inverse. Fixed, so
+     the script fallback can place it; the anchored modes below let CSS place it beside its trigger. */
+  .tip {
+    position: fixed;
+    z-index: 70;
+    inset: auto;
+    max-width: min(320px, calc(100dvw - 16px));
+    margin: 0;
+    padding: 5px 9px;
+    border: 0;
+    border-radius: 9px;
+    overflow: visible;
+    background: var(--fg);
+    color: var(--bg);
+    box-shadow: var(--shadow-menu);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: left;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .tip:is(:popover-open, :not([popover], [hidden])) {
+    animation: tip-in 0.14s var(--ease-out);
+  }
+  @keyframes tip-in {
+    from {
+      opacity: 0;
+    }
+  }
+  /* The browser's own interest delays, close to the fallback's (OPEN_DELAY and CLOSE_DELAY in tooltip.tsx). */
+  [interestfor] {
+    interest-delay: 0.5s 0.12s;
+  }
+  @supports (position-area: block-end) {
+    .tip:is([data-mode="anchored"], [data-mode="interest"]) {
+      margin: 6px;
+      position-area: block-start;
+      position-try-fallbacks: flip-block;
+    }
+    .tip:is([data-mode="anchored"], [data-mode="interest"])[data-side="bottom"] {
+      position-area: block-end;
+    }
+    .tip:is([data-mode="anchored"], [data-mode="interest"])[data-side="right"] {
+      position-area: inline-end;
+      position-try-fallbacks: flip-inline;
+    }
+  }
   @supports (position-area: block-end) {
     .pik-card[popover] {
       min-width: anchor-size(width);
@@ -1349,6 +1397,12 @@
   }
   .md a.link-chip:hover > span:last-child {
     text-decoration-color: currentColor;
+  }
+  /* A source that needs a secret for its titles, said inline after the link (LinkChip.tsx). */
+  .md .link-needs {
+    margin-left: 0.4em;
+    color: var(--fg-3);
+    font-size: 0.86em;
   }
   .md a.link-chip > .link-ref {
     color: var(--fg-3);

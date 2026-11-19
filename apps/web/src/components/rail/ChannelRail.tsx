@@ -14,6 +14,7 @@ import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.ts
 import { focusFirstItem, isMenuMoveKey, MenuGroups, moveFocus, useMenuDismiss, useMenuPlacement, useMenuPopover, type MenuItem } from '../ContextMenuParts.tsx';
 import { supportsPopover } from '../ui/use-anchored-popover.ts';
 import { useExit } from '../ui/use-exit.ts';
+import { useTooltip } from '../ui/tooltip.tsx';
 import { MENU_SURFACE } from '../ui/overlay.tsx';
 import { useScrollFade } from './useScrollFade.ts';
 import { usePRsShown } from '../../display.ts';
@@ -222,29 +223,34 @@ function Hairline() {
 }
 
 /**
- * A 48px hit target holding a disc, with its badge top right and its name as the tooltip. `marked`: the channel of
+ * A 48px hit target holding a disc, with its badge top right and its name as a tooltip on hover and on keyboard focus
+ * (tooltip.tsx). The tip repeats the link's own name, so it does not describe it too. `marked`: the channel of
  * the thread on screen while the Inbox stays selected, drawn as a short bar at the rail's left edge.
  */
 function RailItem({ to, label, selected, marked, badge, children }: { to: string; label: string; selected: boolean; marked?: boolean; badge?: RailBadge; children: ReactNode }) {
   const state = badge === 'needs' ? `${label}, needs you` : badge === 'running' ? `${label}, running` : label;
   const what = marked ? `${state}, open thread's channel` : state;
+  const { triggerProps, tip } = useTooltip(what, { side: 'right', describes: false });
   return (
-    <a
-      href={to}
-      aria-label={what}
-      title={what}
-      aria-current={selected ? 'page' : undefined}
-      data-marked={marked || undefined}
-      className="rail-item press relative grid h-12 w-12 shrink-0 place-items-center"
-    >
-      {marked && <span aria-hidden className="rail-mark-bar absolute top-1/2 -left-2 h-4 w-1 -translate-y-1/2 rounded-full bg-fg-2" />}
-      {children}
-      {badge && (
-        <span aria-hidden className="absolute top-[5px] right-[5px] grid h-3.5 w-3.5 place-items-center rounded-full bg-[var(--chrome)]">
-          <StatusDot status={badge} size={8} />
-        </span>
-      )}
-    </a>
+    <>
+      <a
+        {...triggerProps}
+        href={to}
+        aria-label={what}
+        aria-current={selected ? 'page' : undefined}
+        data-marked={marked || undefined}
+        className="rail-item press relative grid h-12 w-12 shrink-0 place-items-center"
+      >
+        {marked && <span aria-hidden className="rail-mark-bar absolute top-1/2 -left-2 h-4 w-1 -translate-y-1/2 rounded-full bg-fg-2" />}
+        {children}
+        {badge && (
+          <span aria-hidden className="absolute top-[5px] right-[5px] grid h-3.5 w-3.5 place-items-center rounded-full bg-[var(--chrome)]">
+            <StatusDot status={badge} size={8} />
+          </span>
+        )}
+      </a>
+      {tip}
+    </>
   );
 }
 

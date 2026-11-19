@@ -38,6 +38,17 @@ describe('ChannelRail', () => {
     expect(disc(html, 'Plain')).toContain('bg-surface-2');
   });
 
+  it("shows each disc's name as a tooltip, on keyboard focus too, without describing the disc by its own name", () => {
+    state.channels = [{ id: 'volero', name: 'Volero', kind: 'client', icon: null, avatar_bg: null, running: 0 }];
+    const html = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'inbox' } }));
+    const at = html.indexOf('aria-label="Volero"');
+    const link = html.slice(html.lastIndexOf('<a', at), html.indexOf('</a>', at) + 4);
+    expect(link).not.toContain('title=');
+    expect(link).not.toContain('aria-describedby');
+    // The tip follows the link, holding its name.
+    expect(html.slice(html.indexOf('</a>', at), html.indexOf('</a>', at) + 120)).toMatch(/^<\/a><span[^>]*class="tip"[^>]*data-side="right"[^>]*>Volero<\/span>/);
+  });
+
   it('marks one item current: a channel named Inbox never shares the Inbox selection', () => {
     state.channels = [{ id: 'inbox', name: 'Inbox', kind: 'internal', icon: null, avatar_bg: null, running: 0 }];
     const current = (html: string) => html.match(/aria-current="page"/g)?.length ?? 0;

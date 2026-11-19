@@ -29,6 +29,12 @@ export type Layer = {
   request?: () => void;
   /** A modal `<dialog>`'s element. The stack keeps the modals' order too: `topDialog`. */
   dialog?: () => HTMLDialogElement | null;
+  /**
+   * A tooltip (tooltip.tsx): it takes Escape while on top, so one Escape closes the tip and not the menu or modal
+   * under it, but a press or the focus moving still belongs to the layer under it, and the page's own keys (`layerOpen`)
+   * do not wait for it.
+   */
+  hint?: boolean;
 };
 
 const stack: Layer[] = [];
@@ -61,6 +67,9 @@ export function topDialog(): HTMLDialogElement | null {
  */
 let press: { top: Layer | undefined; outside: boolean; state: 'idle' | 'wait' | 'done' } = { top: undefined, outside: false, state: 'idle' };
 
+/** The top layer that is not a tooltip: the one a press outside or the focus leaving is for. */
+const topSolid = () => stack.findLast((l) => !l.hint);
+
 const within = (layer: Layer, target: EventTarget | null) => target instanceof Node && layer.roots().some((r) => !!r && r.contains(target));
 
 function onKey(e: KeyboardEvent) {
@@ -73,14 +82,14 @@ function onKey(e: KeyboardEvent) {
 }
 
 const begin = (target: EventTarget | null) => {
-  const top = stack.at(-1);
+  const top = topSolid();
   return { top, outside: !!top && !within(top, target) };
 };
 
 function pressedOutside() {
   const { top, outside } = press;
   // Only if it is still on top: the press began on it.
-  if (outside && top && stack.at(-1) === top) top.outside?.();
+  if (outside && top && topSolid() === top) top.outside?.();
 }
 
 function onPointerDown(e: PointerEvent) {
@@ -101,7 +110,7 @@ function onMouseDown(e: MouseEvent) {
 }
 
 function onFocusIn(e: FocusEvent) {
-  const top = stack.at(-1);
+  const top = topSolid();
   if (top?.focusOut && !within(top, e.target)) top.focusOut();
 }
 
@@ -145,14 +154,14 @@ export function closeTopLayer() {
 export const wasTopAtPress = (layer: Layer) => press.top === layer;
 
 /**
- * Whether a layer is open, for the page's own keys (Esc to interrupt, I for the Inbox): a stacked layer, a modal or
- * popover the browser shows, a phone sheet (`aria-modal`, which keeps a stack of its own), or a composer menu, which
+ * Whether a layer is open, for the page's own keys (Esc to interrupt, I for the Inbox): a stacked layer other than a
+ * tooltip, a modal or popover the browser shows (a tooltip's `.tip` aside), a phone sheet (`aria-modal`, which keeps a stack of its own), or a composer menu, which
  * keeps its keys in the composer.
  */
 export function layerOpen(): boolean {
-  if (stack.length) return true;
+  if (stack.some((l) => !l.hint)) return true;
   try {
-    if (document.querySelector(':modal, :popover-open')) return true;
+    if (document.querySelector(':modal, :popover-open:not(.tip)')) return true;
   } catch {
     // An engine without these selectors has no top layer either.
   }
@@ -175,6 +184,7 @@ export function useDismissLayer(active: boolean, options: Layer): Layer {
     outside: () => opts.current.outside?.(),
     request: () => opts.current.request?.(),
     dialog: () => opts.current.dialog?.() ?? null,
+    hint: options.hint,
   };
   const l = layer.current;
   // Read off the layer itself, so they follow the options as they change: which keys it takes, whether it hears the

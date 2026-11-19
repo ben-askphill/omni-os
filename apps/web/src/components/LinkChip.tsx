@@ -1,6 +1,7 @@
 import { Children, isValidElement, type ReactNode } from 'react';
 import { LINK_ICONS } from '@omni/shared/link-icons.ts';
 import { useLinkPreview, type LinkPreview } from '../link-previews.ts';
+import { useTooltip } from './ui/tooltip.tsx';
 
 /** A source's mark, 24 by 24, drawn at the text's size. Marks too dark or light for both themes take the text colour. */
 export function LinkMark({ icon, className = '' }: { icon: string; className?: string }) {
@@ -33,38 +34,43 @@ export function isBare(href: string, text: string) {
   }
 }
 
+/** A link's preview for its tooltip: its source, its title and its address. */
 export function tooltip(p: LinkPreview) {
-  return [
-    [p.name, p.context, p.state].filter(Boolean).join(' · '),
-    p.resolved ? `${p.ref ? `${p.ref} ` : ''}${p.text}` : '',
-    p.url,
-    p.needs ? `Add the ${p.needs} secret to show titles from ${p.name}.` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return [[p.name, p.context, p.state].filter(Boolean).join(' · '), p.resolved ? `${p.ref ? `${p.ref} ` : ''}${p.text}` : '', p.url].filter(Boolean).join('\n');
 }
 
 /**
  * An outside link in a reply. A bare URL becomes its source's mark, its id and the title the source gives it; a link
  * with its own words keeps them and gains the mark. A page no source claims and no title was found for stays as written.
+ * Its preview shows as a tooltip on hover and keyboard focus; a source that needs a secret for titles says so inline,
+ * where touch and keyboard users see it too.
  */
 export function ExternalLink({ href, children }: { href: string; children?: ReactNode }) {
   const p = useLinkPreview(href);
   const bare = isBare(href, textOf(children));
   const plain = !p || (p.source === 'web' && (!bare || !p.resolved));
+  const { triggerProps, tip } = useTooltip(p ? tooltip(p) : null);
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" title={p ? tooltip(p) : undefined} className={plain ? undefined : 'link-chip'}>
-      {!plain && <LinkMark icon={p.icon} />}
-      {plain ? (
-        children
-      ) : !bare ? (
-        <span>{children}</span>
-      ) : (
-        <>
-          {p.ref && <span className="link-ref">{p.ref}</span>}
-          <span>{p.text}</span>
-        </>
+    <>
+      <a {...triggerProps} href={href} target="_blank" rel="noopener noreferrer" className={plain ? undefined : 'link-chip'}>
+        {!plain && <LinkMark icon={p.icon} />}
+        {plain ? (
+          children
+        ) : !bare ? (
+          <span>{children}</span>
+        ) : (
+          <>
+            {p.ref && <span className="link-ref">{p.ref}</span>}
+            <span>{p.text}</span>
+          </>
+        )}
+      </a>
+      {tip}
+      {p?.needs && (
+        <span className="link-needs">
+          Add the {p.needs} secret to show titles from {p.name}.
+        </span>
       )}
-    </a>
+    </>
   );
 }
