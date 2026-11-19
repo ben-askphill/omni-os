@@ -12,6 +12,8 @@ import { useFolders } from '../folders.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
+import { ContextDetails, ContextRing, contextPercentLabel, useContextView } from '../components/thread/ContextMeter.tsx';
+import { formatTokens } from '@omni/shared/context-meter.ts';
 import { AskSheet } from '../components/AskCard.tsx';
 import { threadTarget } from '../message-context/thread-picker.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
@@ -184,7 +186,32 @@ function MoveSheet({ thread, onClose }: { thread: Thread; onClose: () => void })
   );
 }
 
-type Mode = 'rename' | 'move' | 'reference' | 'ask';
+/**
+ * The thread's context window and Compact, the desktop meter's panel in a sheet. Open while the thread is idle too:
+ * the server keeps the level its last turn left, and Compact runs on a thread with no process.
+ */
+function ContextSheet({ thread, meter, onClose }: { thread: Thread; meter: ReturnType<typeof useContextView>; onClose: () => void }) {
+  const { applyThread } = useThread();
+  return (
+    <MoSheet onClose={onClose} label="Context window">
+      <div className={SHEET_TITLE}>Context</div>
+      <ContextDetails
+        sheet
+        thread={thread}
+        context={meter.context}
+        view={meter.view}
+        refreshing={meter.refreshing}
+        onRefresh={() => void meter.load(true)}
+        onCompacted={(t) => {
+          applyThread(t, true);
+          void meter.load();
+        }}
+      />
+    </MoSheet>
+  );
+}
+
+type Mode = 'rename' | 'move' | 'reference' | 'ask' | 'context';
 
 /**
  * `pr`: the branch PR's label and status line, null before it has one. Details leads and PR follows, the order of the
@@ -209,13 +236,16 @@ export function MenuSheet({
 }) {
   const shell = useShell();
   const { tasks, status } = useApp();
-  const { jumpTo } = useThread();
+  const { jumpTo, context: pushed } = useThread();
+  // The Context row's level: what the server kept from the last turn, or what the stream pushed since.
+  const meter = useContextView(thread, pushed);
   const agents = useMemo(() => runningSubagents(tasks, thread.id), [tasks, thread.id]);
   // The sheet this one has swapped itself for, if any.
   const [mode, setMode] = useState<Mode | null>(null);
   const { go, pin, done, sendGrok, archive, grokBusy, grokError } = useThreadActions(thread, onClose);
   if (mode === 'rename') return <RenameSheet thread={thread} onClose={onClose} />;
   if (mode === 'move') return <MoveSheet thread={thread} onClose={onClose} />;
+  if (mode === 'context') return <ContextSheet thread={thread} meter={meter} onClose={onClose} />;
   // The Ask sheet is the desktop one: its Modal is a bottom sheet at phone width.
   if (mode === 'ask') return <AskSheet thread={thread} open onClose={onClose} />;
   if (mode === 'reference') {
@@ -263,6 +293,27 @@ export function MenuSheet({
                 if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                 onClose();
                 onFind();
+              }}
+              last
+            />
+          </MoGroup>
+        )}
+        {meter.metered && (
+          <MoGroup>
+            <MoListRow
+              icon={<ContextRing percent={meter.percent} />}
+              label="Context"
+              sub={
+                meter.context
+                  ? meter.context.max
+                    ? `${formatTokens(meter.context.used)} of ${formatTokens(meter.context.max)} tokens`
+                    : `${formatTokens(meter.context.used)} tokens, window unknown`
+                  : 'No reading yet'
+              }
+              right={contextPercentLabel(meter.context) ?? undefined}
+              onClick={() => {
+                setMode('context');
+                void meter.load(true);
               }}
               last
             />

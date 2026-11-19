@@ -1,5 +1,5 @@
 import { db, threads } from '../../db.ts';
-import { publishFeed } from '../../bus.ts';
+import { publishFeed, publishThread } from '../../bus.ts';
 import { ASK_PREFIX, STATUS_PREFIX } from '@omni/shared/update-fleet.ts';
 import { ACCOUNTS_PREFIX, SEEN_PREFIX } from '@omni/shared/harness-accounts.ts';
 import { ACCOUNT_USAGE_PREFIX } from '@omni/shared/account-usage.ts';
@@ -12,6 +12,8 @@ import { DISPLAY_KEY } from '../../display.ts';
 // one Mac: they never go out, and one that arrives anyway is ignored.
 
 const local = (key: string) => key.startsWith('sync.');
+/** A thread's last context reading (context.ts lastKey). Spelled out: context.ts pulls in the Claude adapter. */
+const CONTEXT_PREFIX = 'context-last:';
 
 registerHandler('kv', {
   serialize(key) {
@@ -45,6 +47,9 @@ registerHandler('kv', {
       const usage = parseAccountUsage((change.data as { value?: unknown } | null)?.value);
       if (usage) publishFeed({ type: 'account_usage', usage });
     }
+    // A thread's last context reading from the machine that ran it (context.ts): an open meter here moves to it.
+    const read = change.op !== 'delete' && change.entity_id.startsWith(CONTEXT_PREFIX) ? (change.data as { value?: unknown } | null)?.value : undefined;
+    if (read) publishThread(change.entity_id.slice(CONTEXT_PREFIX.length), { kind: 'context', context: read });
     // Show technical details or the Shopify add-on changed on another machine (display.ts).
     if (change.entity_id === DISPLAY_KEY) publishFeed({ type: 'display' });
     // Another machine's CPU and memory, or its ask for this machine's while it shows the machine tiles (machine-stats.ts).

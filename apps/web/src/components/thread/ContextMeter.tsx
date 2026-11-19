@@ -89,6 +89,52 @@ const QUIET_FROM = 70;
 
 const costTip = (s: ThreadSpend | null | undefined) => (s?.cents != null ? ` Cost so far: ${formatCents(s.cents)}.` : '');
 
+/** Whether the thread's harness reports a context window, so a meter has something to show. */
+export const isMetered = (thread: Pick<Thread, 'harness'>) => METERED.has(thread.harness);
+
+/**
+ * The thread's context view (GET /threads/:id/context) and the newest reading: the server's, or the one its stream
+ * pushed. Loaded on open and whenever a turn ends, so an idle thread shows the level its last turn left, after a
+ * restart too (the server keeps it). The compact button's state and the biggest results move with it.
+ */
+export function useContextView(thread: Thread, pushed: ContextUsage | null) {
+  // Tagged with the thread it is for, so another thread's reading never shows while this one's loads.
+  const [loaded, setLoaded] = useState<{ id: string; view: ContextView } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const metered = isMetered(thread);
+  const busy = thread.status === 'running' || thread.status === 'queued';
+
+  const load = useCallback(
+    async (refresh = false) => {
+      if (!metered) return;
+      if (refresh) setRefreshing(true);
+      try {
+        const view = await api.get<ContextView>(`/threads/${encodeURIComponent(thread.id)}/context${refresh ? '?refresh=1' : ''}`);
+        setLoaded({ id: thread.id, view });
+      } catch {
+        // The ring keeps its last reading; the stream will bring the next one.
+      } finally {
+        if (refresh) setRefreshing(false);
+      }
+    },
+    [thread.id, metered],
+  );
+
+  useEffect(() => {
+    if (!busy) void load();
+  }, [load, busy]);
+
+  const view = loaded?.id === thread.id ? loaded.view : null;
+  const context = newest(view?.context, pushed);
+  return { metered, view, context, percent: context ? contextPercent(context.used, context.max) : null, refreshing, load };
+}
+
+/** "62%", "~31%" for an estimate, or null with no reading or no window to measure against. */
+export function contextPercentLabel(context: ContextUsage | null): string | null {
+  const percent = context ? contextPercent(context.used, context.max) : null;
+  return percent === null ? null : `${contextApprox(context) ? '~' : ''}${Math.round(percent)}%`;
+}
+
 /**
  * The context meter next to the send button: a ring that fills as the thread's window does, with used,
  * window and percent on hover. Clicking it opens what fills the window and a Compact action.
@@ -105,37 +151,12 @@ export function ContextMeter({
   /** Show technical details is off outside a repo channel: the ring shows only once the window is filling (QUIET_FROM). */
   quiet?: boolean;
 }) {
-  const [view, setView] = useState<ContextView | null>(null);
+  const { metered, view, context, percent, refreshing, load } = useContextView(thread, pushed);
   const [open, setOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  const metered = METERED.has(thread.harness);
-  const busy = thread.status === 'running' || thread.status === 'queued';
-
-  const load = useCallback(
-    async (refresh = false) => {
-      if (!metered) return;
-      if (refresh) setRefreshing(true);
-      try {
-        setView(await api.get<ContextView>(`/threads/${encodeURIComponent(thread.id)}/context${refresh ? '?refresh=1' : ''}`));
-      } catch {
-        // The ring keeps its last reading; the stream will bring the next one.
-      } finally {
-        if (refresh) setRefreshing(false);
-      }
-    },
-    [thread.id, metered],
-  );
-
-  // On open, and whenever a turn ends: the compact button's state and the biggest results move with it.
-  useEffect(() => {
-    if (!busy) void load();
-  }, [load, busy]);
   useDismissable(open, () => setOpen(false), { root: wrap });
 
   if (!metered) return null;
-  const context = newest(view?.context, pushed);
-  const percent = context ? contextPercent(context.used, context.max) : null;
   if (quiet && (percent == null || percent < QUIET_FROM)) return null;
   const level = contextLevel(percent);
   const approx = contextApprox(context) ? '~' : '';
@@ -182,21 +203,29 @@ export function ContextMeter({
   );
 }
 
-function ContextPanel({
-  thread,
-  context,
-  view,
-  refreshing,
-  onRefresh,
-  onCompacted,
-}: {
+interface DetailsProps {
   thread: Thread;
   context: ContextUsage | null;
   view: ContextView | null;
   refreshing: boolean;
   onRefresh: () => void;
   onCompacted: (t: Thread) => void;
-}) {
+}
+
+/** The desktop popover under the meter. */
+function ContextPanel(props: DetailsProps) {
+  return (
+    <div role="dialog" aria-label="Context window" style={{ transformOrigin: '100% 0' }} className="pik-card top-[calc(100%+8px)] right-0 w-[min(380px,calc(100vw-32px))] p-0">
+      <ContextDetails {...props} />
+    </div>
+  );
+}
+
+/**
+ * How full the window is, what fills it, and the Compact action: the desktop popover's body, and the phone's Context
+ * sheet (`sheet`), where it fills the sheet and scrolls inside it.
+ */
+export function ContextDetails({ thread, context, view, refreshing, onRefresh, onCompacted, sheet = false }: DetailsProps & { sheet?: boolean }) {
   const percent = context ? contextPercent(context.used, context.max) : null;
   const level = contextLevel(percent);
   const approx = contextApprox(context) ? '~' : '';
@@ -209,9 +238,9 @@ function ContextPanel({
   const scroller = useScrollFade();
 
   return (
-    <div role="dialog" aria-label="Context window" style={{ transformOrigin: '100% 0' }} className="pik-card top-[calc(100%+8px)] right-0 w-[min(380px,calc(100vw-32px))] p-0">
-      <div className="relative">
-        <div ref={scroller} className="scroll-thin scroll-fade max-h-[min(560px,70vh)] overflow-y-auto px-3.5 pt-3 pb-2">
+    <>
+      <div className={sheet ? 'relative flex min-h-0 flex-1 flex-col' : 'relative'}>
+        <div ref={scroller} className={`scroll-thin scroll-fade overflow-y-auto pt-3 pb-2 ${sheet ? 'min-h-0 flex-1 px-5' : 'max-h-[min(560px,70vh)] px-3.5'}`}>
           {/* headline */}
           <div className="flex items-start gap-3">
             <ContextRing percent={percent} size={40} />
@@ -307,9 +336,9 @@ function ContextPanel({
           )}
         </div>
       </div>
-      {/* Cursor has no compact command; the panel is the meter and the thread's spend. */}
-      {thread.harness !== 'cursor' && <CompactAction thread={thread} view={view} onCompacted={onCompacted} />}
-    </div>
+      {/* Cursor has no compact command: the action stays, off, with the reason (contextView's compact). */}
+      <CompactAction thread={thread} view={view} onCompacted={onCompacted} sheet={sheet} />
+    </>
   );
 }
 
@@ -375,7 +404,7 @@ function shortTool(name: string) {
 }
 
 /** Compact, with an optional focus line for Claude Code. Asks first; off with a reason while it can't run. */
-function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: ContextView | null; onCompacted: (t: Thread) => void }) {
+function CompactAction({ thread, view, onCompacted, sheet = false }: { thread: Thread; view: ContextView | null; onCompacted: (t: Thread) => void; sheet?: boolean }) {
   const [asking, setAsking] = useState(false);
   const [focus, setFocus] = useState('');
   const [sending, setSending] = useState(false);
@@ -408,7 +437,7 @@ function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: Co
   };
 
   return (
-    <div className="px-3.5 pt-2.5 pb-3 shadow-[inset_0_1px_0_var(--line)]">
+    <div className={`${sheet ? 'px-5' : 'px-3.5'} pt-2.5 pb-3 shadow-[inset_0_1px_0_var(--line)]`}>
       {started && busy ? (
         <div className="flex items-center gap-2 text-[12.5px] text-fg-2">
           <span className="pulse h-1.5 w-1.5 rounded-full bg-live" /> Compacting. The meter refreshes when it finishes.
