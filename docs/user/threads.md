@@ -244,6 +244,24 @@ An agent can stop and ask you one to four multiple-choice questions with Omni's 
 - A thread that runs on another machine takes the answer the same way, however it got there: sent there, delegated there by the Conductor, or moved there by a reply or Take over on that machine. While a turn runs there, the answer syncs to that machine and its waiting call returns. Between turns, Omni forwards the answer as a message to a thread that stays on that machine (one sent or delegated there, or a worktree thread); any other thread runs on your answer here, as it would on a reply. Answer on the hub, on the thread's card or the parent's. You do not need to open the other machine. If the other machine refuses the answer for a reason other than "already answered", the card shows that reason instead of waiting.
 - Sending a message instead (steer or interrupt) closes the card as not answered, and the agent reads your message. A message queued for after the turn leaves the card open.
 
+## Access levels
+
+Channel settings > Access sets how much a channel's agents may do before they ask you ([ADR 0015](../adr/0015-access-levels.md)).
+
+| Level | Runs without asking | Waits for your yes | Refused |
+| --- | --- | --- | --- |
+| Read only | Reading, searching, read-only commands | Nothing | Edits, other commands, account actions |
+| Ask first | The same, plus edits in the thread's folder | Other commands and edits, account actions that send or change things | Nothing |
+| Full access | Everything | Nothing | Nothing |
+
+- Each connector (Gmail, Google Calendar, Slack, Notion, Google Drive, Granola, the browser) can have its own level, or Off, where even its reading tools are refused. One left at Same as channel follows the channel.
+- A channel with no level runs at this computer's default: Full access on an install that already had threads, Ask first on a new one. The setting shows which.
+- Ask first shows an approval card in the thread, on the same rails as a question card: Needs you, the alert, the phone and the other machine. Allow runs it once, Allow in this thread stops asking for that tool in the thread, Always allow for <role> stops asking for that crew role in the channel, and Don't allow (or a typed note) stops it and tells the agent. Channel settings lists the Always allowed tools with Remove.
+- A crew role's file can set `access: read` or `access: ask` to run stricter than its channel ([Crew](crew.md)).
+- Per harness: Claude Code and Codex ask per call. Cursor Agent cannot ask, so Ask first runs as Read only there. Hermes and Cursor Cloud run elsewhere, so a channel below Full access refuses them. Connector levels other than the browser hold on Claude Code only: Codex and Cursor Agent run the MCP servers from your own Codex or Cursor config without asking Omni.
+- Ask first still asks before an edit to a file a tool runs code from, such as `.git/`, `.claude/` or `.mcp.json`.
+- Agents cannot change levels or grants: only you can, in Channel settings.
+
 ## What a thread gets
 
 - **Worktree**: in a repo channel, its own git worktree on branch `omni/<id>`. If the agent checks out a branch of its own there (`git checkout -b feat/x`), the thread takes that branch as its own when the turn ends, so the PRs tab, PR marks and the PR watch find the PR opened from it. The thread does not take a detached HEAD or the default branch. The next message stops at Setup failed, and Retry switches a clean worktree back. Omni removes the worktree once nothing in it can be lost ([Known limits](limits.md)). While Omni prepares it, the thread shows each step (checkout, the channel's setup action if it has one, then the agent) with the setup's output and a Stop button ([Configuration](configuration.md#channel-actions)). When the channel's repo is not on this machine, the first step clones the channel's GitHub repo with this machine's `gh` (or `git`) login. It clones to the channel's path when Omni can create it here, and otherwise to `~/<repo name>`, or under the Repos folder in Settings > Workspace if you have set one there (its `~/code` default is not used). This machine's path map then records where the repo went. Threads that start together wait for one clone. Stop ends the wait at once, and the clone finishes in the background for Retry. A clone that fails, a folder in the way that is not the repo, or a path whose drive is not connected stops at Setup failed with the reason. Omni never clones into a folder that has files in it.

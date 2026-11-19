@@ -7,14 +7,12 @@
 // This module is pure, so crew.ts can read a role's `connectors:` without loading more. Other
 // harnesses' state is unknown, and unknown never holds a job.
 
+import { ACCESS_CONNECTORS, type AccessConnector } from '@omni/shared/access.ts';
+
 export type SignInState = 'signed-in' | 'signed-out' | 'unknown';
 
-export interface Connector {
-  id: string;
-  /** What the user calls it. */
-  label: string;
-  /** The MCP server names that are this connector, as Claude Code lists them ("claude.ai Slack", "plugin:slack:slack"). */
-  server: RegExp;
+/** A connector the sign-in check knows: the shared catalog's (packages/shared/access.ts), with the brief cue. */
+export interface Connector extends AccessConnector {
   /** Words in a brief that mean the job reads or writes this account. Narrow on purpose: a false hit holds a job. */
   cue: RegExp;
 }
@@ -22,44 +20,17 @@ export interface Connector {
 /** The claude.ai page where a claude.ai connector is signed in to again. */
 export const CLAUDE_CONNECTORS_URL = 'https://claude.ai/settings/connectors';
 
-export const CONNECTORS: readonly Connector[] = [
-  {
-    id: 'gmail',
-    label: 'Gmail',
-    server: /\bgmail\b/i,
-    cue: /\bgmail\b|mail\.google\.com|\bmy (e-?mails?|mail|inbox)\b|\b(check|read|search|scan|triage|draft|reply to|go through)\s+(my\s+|the\s+)?(e-?mails?|mail|inbox)\b/i,
-  },
-  {
-    id: 'calendar',
-    label: 'Google Calendar',
-    server: /\bcalendar\b/i,
-    cue: /\bgoogle calendar\b|calendar\.google\.com|\bmy (calendar|meetings?|schedule)\b|\bcalendar (events?|invites?)\b|\b(check|read|scan|search|look at)\s+(my\s+|the\s+)?calendar\b/i,
-  },
-  {
-    id: 'slack',
-    label: 'Slack',
-    server: /\bslack\b/i,
-    cue: /\bslack\b(?!\s*(app|apps|api|bot|bots|sdk|webhook|webhooks|integration|cli|block kit|notification route)\b)|\b[\w-]+\.slack\.com\b/i,
-  },
-  {
-    id: 'notion',
-    label: 'Notion',
-    server: /\bnotion\b/i,
-    cue: /\bnotion\b(?!\s*(api|sdk|integration)\b)|\bnotion\.(so|site)\b/i,
-  },
-  {
-    id: 'drive',
-    label: 'Google Drive',
-    server: /\b(google )?drive\b/i,
-    cue: /\bgoogle (drive|docs?|sheets?|slides)\b|\b(docs|drive|sheets)\.google\.com\b/i,
-  },
-  {
-    id: 'granola',
-    label: 'Granola',
-    server: /\bgranola\b/i,
-    cue: /\bgranola\b/i,
-  },
-];
+const CUES: Record<string, RegExp> = {
+  gmail: /\bgmail\b|mail\.google\.com|\bmy (e-?mails?|mail|inbox)\b|\b(check|read|search|scan|triage|draft|reply to|go through)\s+(my\s+|the\s+)?(e-?mails?|mail|inbox)\b/i,
+  calendar: /\bgoogle calendar\b|calendar\.google\.com|\bmy (calendar|meetings?|schedule)\b|\bcalendar (events?|invites?)\b|\b(check|read|scan|search|look at)\s+(my\s+|the\s+)?calendar\b/i,
+  slack: /\bslack\b(?!\s*(app|apps|api|bot|bots|sdk|webhook|webhooks|integration|cli|block kit|notification route)\b)|\b[\w-]+\.slack\.com\b/i,
+  notion: /\bnotion\b(?!\s*(api|sdk|integration)\b)|\bnotion\.(so|site)\b/i,
+  drive: /\bgoogle (drive|docs?|sheets?|slides)\b|\b(docs|drive|sheets)\.google\.com\b/i,
+  granola: /\bgranola\b/i,
+};
+
+/** The accounts a sign-in can be checked for: every shared connector but the browser, which needs none. */
+export const CONNECTORS: readonly Connector[] = ACCESS_CONNECTORS.filter((c) => CUES[c.id]).map((c) => ({ ...c, cue: CUES[c.id] }));
 
 export const connectorById = (id: string) => CONNECTORS.find((c) => c.id === id);
 

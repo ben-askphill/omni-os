@@ -75,6 +75,20 @@ describe('channels', () => {
     b.db.kv.set('sync.path_map', {});
   });
 
+  it("a channel's access levels reach the other Mac, and its machine default and grants of a thread stay apart", async () => {
+    a.db.channels.update('volero', { access_level: 'ask', connector_access: JSON.stringify({ gmail: 'off', slack: 'read' }) });
+    a.db.kv.set('access-grants.role.volero.builder', ['Bash']);
+    a.db.kv.set('sync.access.default', 'ask');
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ access_level: 'ask', connector_access: JSON.stringify({ gmail: 'off', slack: 'read' }) });
+    // "Always allow for Builder" holds on both Macs; each Mac's own default for channels with no level never leaves it.
+    expect(b.db.kv.get('access-grants.role.volero.builder')).toEqual(['Bash']);
+    expect(relay.changes.some((c) => c.entity === 'kv' && c.entity_id === 'sync.access.default')).toBe(false);
+    a.db.channels.update('volero', { access_level: null, connector_access: null });
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ access_level: null, connector_access: null });
+  });
+
   it('archiving on one Mac archives on the other', async () => {
     b.db.channels.update('volero', { archived: 1 });
     await exchange();

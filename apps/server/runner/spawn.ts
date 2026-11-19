@@ -1,6 +1,8 @@
 // Start a thread's process, including its browser profile and MCP config.
 import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { config } from '../config.ts';
+import { gateFor } from './approvals.ts';
+import { channelAccess, harnessRefusal } from '../access.ts';
 import { channels, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
@@ -95,9 +97,24 @@ function blockResume(live: Live, outcome: Extract<ResumeOutcome, 'failed' | 'tim
   if (t?.parent_id) reportToParent(t.id, 'failed', `This thread did not resume: ${reason}`);
 }
 
+/**
+ * The channel's level went below full access after this thread started on a harness Omni cannot hold to it (Hermes,
+ * Cursor Cloud): nothing starts. Ben's messages wait, as for a blocked resume, and the thread says why. ADR 0015.
+ */
+function refuseUnenforced(live: Live, reason: string) {
+  live.removeMessages((m) => !(m.requestId && messageRequests.park(m.uuid)));
+  addEvent(live.threadId, 'error', { text: `${reason} Set the channel to Full access, or continue this thread on another harness.` });
+  abortStart(live, 'failed');
+  const t = threads.get(live.threadId);
+  if (t?.parent_id) reportToParent(t.id, 'failed', `This thread did not start: ${reason}`);
+}
+
 async function spawnLive(live: Live, thread: Thread) {
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
+  // Checked here as well as at start and switch: a channel's level can change under a thread that already exists.
+  const unenforced = harnessRefusal(thread.harness, channelAccess(channel, role?.access));
+  if (unenforced) return refuseUnenforced(live, unenforced);
 
   // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
   const remote = isProviderHarness(thread.harness);
@@ -156,6 +173,7 @@ async function spawnLive(live: Live, thread: Thread) {
 
   const run = takeHandover(live, thread);
   thread = run.thread;
+  const permission = gateFor(thread, channel, role, addEvent);
   const ctx: AdapterContext = {
     thread,
     channel,
@@ -168,6 +186,7 @@ async function spawnLive(live: Live, thread: Thread) {
     omniUrl: omniUrl(),
     resume: run.resume,
     handoverPending: !!threads.sessionState(thread.id).handover,
+    permission,
   };
   live.attach(
     adapterFor(thread.harness).spawn(ctx, {
@@ -197,7 +216,10 @@ async function spawnLive(live: Live, thread: Thread) {
         live.failedToSpawn();
         addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
       },
-      exit: (code, signal) => onExit(live, code, signal),
+      exit: (code, signal) => {
+        permission?.end();
+        onExit(live, code, signal);
+      },
     }),
   );
 

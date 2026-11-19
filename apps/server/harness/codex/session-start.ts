@@ -2,6 +2,7 @@
 // thread/start or thread/resume request with the per-thread config.
 import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { apiToken } from '../../api-token.ts';
+import { browserHeld, codexPolicy } from '../../access.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
 import { harnessEnv } from '../env-guard.ts';
@@ -66,15 +67,20 @@ export function sessionParams(ctx: AdapterContext) {
     browserBusy: ctx.browserBusy,
     cdpEndpoint: ctx.cdpEndpoint,
     omniUrl: ctx.omniUrl,
+    noBrowser: browserHeld(ctx.permission?.access),
     quick: readsOnly(thread),
   });
+  const policy = ctx.permission ? codexPolicy(ctx.permission.access) : null;
   return {
     model: thread.model || undefined,
     cwd: thread.cwd,
-    approvalPolicy: 'never',
+    // Below full access, the channel's level (apps/server/access.ts): read only is Codex's read-only sandbox, Ask first
+    // its workspace sandbox with every other action asked for and judged (codex/adapter.ts). A quick ask never asks:
+    // it only reads, and needing more is what turns it into a task.
+    approvalPolicy: readsOnly(thread) ? 'never' : (policy?.approvalPolicy ?? 'never'),
     // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask
-    // only reads too (apps/server/quick-ask.ts): needing more is what turns it into a task.
-    sandbox: ctx.role?.delegateOnly || readsOnly(thread) ? 'read-only' : 'danger-full-access',
+    // only reads too (apps/server/quick-ask.ts). Either lock holds whatever the channel's level.
+    sandbox: ctx.role?.delegateOnly || readsOnly(thread) ? 'read-only' : (policy?.sandbox ?? 'danger-full-access'),
     developerInstructions: ctx.systemPrompt,
     config: threadConfig(mcp.mcpServers),
   };

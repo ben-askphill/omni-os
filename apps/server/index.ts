@@ -53,6 +53,8 @@ const { onRestart, RESTART_EXIT_CODE, startUpdateCheck } = await import('./updat
 
 // An install from before data/omni.config.json keeps its old settings and skips onboarding.
 migrateLegacyConfig();
+// A channel with no access level of its own: full access on an install with history, Ask first on a fresh one.
+(await import('./access-default.ts')).settleInstallDefault();
 
 const onBindError = (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') console.error(`[omni] port ${config.port} on ${config.host} is in use. Stopped before touching any thread.`);

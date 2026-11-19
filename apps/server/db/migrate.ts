@@ -355,6 +355,10 @@ export function migrate() {
   for (const col of ['prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks']) ensureColumn('channels', col, 'TEXT');
   // 1 keeps the channel's threads out of usage scans (usage-scan/asks.ts): a client channel with data that should not reach a model.
   ensureColumn('channels', 'scan_opt_out', 'INTEGER NOT NULL DEFAULT 0');
+  // What the channel's agents may do without a yes, and its connectors' own levels (apps/server/access.ts, ADR 0015).
+  // Null is full access, so every channel made before levels runs as it did.
+  ensureColumn('channels', 'access_level', 'TEXT');
+  ensureColumn('channels', 'connector_access', 'TEXT');
   // The claude.ai page an artifact was published as (packages/shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');

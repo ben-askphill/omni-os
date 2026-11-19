@@ -1,5 +1,6 @@
 // /api/channels: channel CRUD, and the threads listed under one channel.
 import { Hono } from 'hono';
+import { revokeRoleGrant, roleGrants } from './runner/approvals.ts';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import { expandHome } from './user-config.ts';
@@ -14,6 +15,8 @@ import { validateDefaults } from './harness/resolve.ts';
 import { publishFeed } from './bus.ts';
 import { baseOptions } from './worktree-base.ts';
 import { storedList, worktreeListProblem } from '@omni/shared/worktree-lists.ts';
+import { ACCESS_CONNECTORS } from '@omni/shared/access.ts';
+import { CALLER_HEADER } from './automation-guard.ts';
 
 export const channelsApi = new Hono();
 
@@ -77,6 +80,26 @@ const stepPrompt = z
   .transform((s) => s || null)
   .nullish();
 
+/** A channel's access level (packages/shared/access.ts). Null clears it back to full access. */
+const accessLevel = z.enum(['read', 'ask', 'full']).nullish();
+
+/** Connector levels as a map of connector id (ACCESS_CONNECTORS) to level, stored as JSON. Empty clears them. */
+const connectorAccess = z
+  .record(
+    z.string().refine((k) => ACCESS_CONNECTORS.some((c) => c.id === k), `a connector: ${ACCESS_CONNECTORS.map((c) => c.id).join(', ')}`),
+    z.enum(['off', 'read', 'ask', 'full']),
+  )
+  .nullish()
+  .transform((m) => (m === undefined ? undefined : m && Object.keys(m).length ? JSON.stringify(m) : null));
+
+/**
+ * An agent thread never changes what agents may do: a call that names its thread (the Conductor's tools, or a
+ * thread's own curl) is refused when it sets a level. Ben sets them in Channel settings.
+ */
+const agentSetsAccess = (c: { req: { header: (h: string) => string | undefined } }, body: { access_level?: unknown; connector_access?: unknown }) =>
+  !!c.req.header(CALLER_HEADER) && (body.access_level !== undefined || body.connector_access !== undefined);
+const AGENT_ACCESS_REFUSAL = 'Agents cannot change access levels. Ask the user to set them in Channel settings.';
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -102,6 +125,8 @@ const channelSchema = z.object({
   prompt_fix_conflicts: stepPrompt,
   prompt_fix_checks: stepPrompt,
   scan_opt_out: z.coerce.number().int().min(0).max(1).optional(),
+  access_level: accessLevel,
+  connector_access: connectorAccess,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
@@ -249,12 +274,30 @@ channelsApi.post('/', async (c) => {
   const parsed = withSvgIcon(channelSchema.parse(await c.req.json()));
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
+  if (agentSetsAccess(c, body)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
   const runError = runDefaultsError(body) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
   if (body.repo_path && !existsSync(body.repo_path)) return c.json({ error: `repo path not found: ${body.repo_path}` }, 400);
   if (body.repo_path && !body.github_repo) body.github_repo = await detectRepo(body.repo_path);
   return c.json(publicChannel(channels.create(body as any)));
+});
+
+/** The tools "Always allow for <role>" lets run without asking in this channel, by role (runner/approvals.ts). */
+channelsApi.get('/:id/access-grants', (c) => {
+  const id = c.req.param('id');
+  if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
+  return c.json({ grants: roleGrants(id) });
+});
+
+/** Take a role's grant back: one tool (`?tool=`), or all of them. Agents cannot: it widens or narrows what they may do. */
+channelsApi.delete('/:id/access-grants/:role', (c) => {
+  const id = c.req.param('id');
+  if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
+  if (c.req.header(CALLER_HEADER)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
+  revokeRoleGrant(id, c.req.param('role'), c.req.query('tool') || undefined);
+  publishFeed({ type: 'channel', id });
+  return c.json({ grants: roleGrants(id) });
 });
 
 channelsApi.patch('/:id', async (c) => {
@@ -264,6 +307,7 @@ channelsApi.patch('/:id', async (c) => {
   const parsed = withSvgIcon(channelSchema.partial().extend({ archived: z.coerce.number().optional() }).parse(await c.req.json()));
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
+  if (agentSetsAccess(c, body)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
   delete (body as any).id;
   const runError = runDefaultsError(body, current) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);

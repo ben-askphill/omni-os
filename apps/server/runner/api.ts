@@ -1,5 +1,6 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
+import { channelAccess, harnessRefusal } from '../access.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource, type ThreadWorkspace } from '../db.ts';
 import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
@@ -198,6 +199,9 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const { harness, model } = picked;
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
   if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
+  // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
+  const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
+  if (unenforced) throw refusal(unenforced, 400);
   // Its tools are taken away on this machine (harness adapters), which Hermes and Cursor Cloud do not run on.
   if (input.quick && isProviderHarness(harness)) throw refusal(quickAskRemoteRefusal(providerWhere(harness)), 409);
 

@@ -2,7 +2,8 @@
 // this applies it; the next spawn hands the thread over when the harness changed (handover.ts). A switch picked during
 // a turn waits on the thread until the turn ends.
 import { sameRun, type Run, type RunName, type SwitchMode, type SwitchP } from '@omni/shared/run-switch.ts';
-import { artifacts, events, threads, transitions, type Thread } from '../db.ts';
+import { channelAccess, harnessRefusal } from '../access.ts';
+import { artifacts, channels, events, threads, transitions, type Thread } from '../db.ts';
 import { uploadsDir } from '../config.ts';
 import { forgetContext } from '../context.ts';
 import { userName } from '../profile.ts';
@@ -44,8 +45,11 @@ const NO_QUEUED = { queued_harness: null, queued_model: null, queued_effort: nul
 /** A turn holds the process: running, with messages written or held for after it, or background tasks still going. */
 const holdsTurn = (live: Live | undefined) => !!live && (live.turn || !!live.inflight.length || !!live.held.length || hasBackground(live));
 
-/** The catalog's objection to a run, or null. */
-export function invalid(cat: Catalog, to: Run & { harness: HarnessId }): string | null {
+/** The catalog's objection to a run, or the channel's access level's for the thread's channel, or null. */
+export function invalid(cat: Catalog, to: Run & { harness: HarnessId }, t?: Thread): string | null {
+  const ch = t ? channels.get(t.channel_id) : undefined;
+  const unenforced = ch ? harnessRefusal(to.harness, channelAccess(ch, getCrew(t!.role)?.access)) : null;
+  if (unenforced) return unenforced;
   const h = getHarness(cat, to.harness);
   if (!h) return `Unknown harness "${to.harness}".`;
   if (!h.available) return unavailableError(h.name, h.fix);
@@ -67,7 +71,7 @@ export async function previewSwitch(threadId: string, to: Run): Promise<{ run: R
   if (sameRun(runOf(t), to)) return { run, blocked: null, mode: 'none', waits: false };
   if (!isHarnessId(to.harness)) return { run, blocked: `Unknown harness "${to.harness}".`, mode: 'none', waits: false };
   const target = { ...to, harness: to.harness };
-  let blocked = invalid(getCatalog(), target) && invalid(await freshCatalog(), target);
+  let blocked = invalid(getCatalog(), target, t) && invalid(await freshCatalog(), target, t);
   const now = threads.get(threadId) ?? t;
   blocked ||= turnBlocked(now, runsHere(threadId));
   const p = plan(now, to, getCatalog());
@@ -104,8 +108,8 @@ export async function switchRun(threadId: string, to: Run): Promise<Thread> {
   if (!isHarnessId(to.harness)) throw refusal(`Unknown harness "${to.harness}".`, 400);
   const target = { ...to, harness: to.harness };
   // Ben may have just logged in to the harness: look again before refusing.
-  if (invalid(getCatalog(), target)) {
-    const error = invalid(await freshCatalog(), target);
+  if (invalid(getCatalog(), target, t)) {
+    const error = invalid(await freshCatalog(), target, t);
     if (error) throw refusal(error, 400);
   }
   const now = threads.get(threadId)!;
@@ -174,7 +178,7 @@ export function applyQueued(threadId: string): boolean {
   const to = queuedRun(t);
   if (!t || !to) return true;
   if (holdsTurn(lives.get(threadId))) return false;
-  const error = isHarnessId(to.harness) ? invalid(getCatalog(), { ...to, harness: to.harness }) : `Unknown harness "${to.harness}".`;
+  const error = isHarnessId(to.harness) ? invalid(getCatalog(), { ...to, harness: to.harness }, t) : `Unknown harness "${to.harness}".`;
   try {
     if (error) throw new Error(error);
     apply(t, to);
