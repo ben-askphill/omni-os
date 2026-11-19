@@ -204,7 +204,8 @@ Files more than one slice's WIP or scope touches, and who owns each.
 | `apps/server/db/migrate.ts` | A, D, E, F, G | Column adds are idempotent (`:287`); conflicts are textual, keep both |
 | `apps/server/runner/prompts.ts` | A, B, C, G | A owns the Conductor rule, B adds one step line, C gates `:147-148`, G renames; merge A1 first |
 | `apps/server/thread-routes-api.ts` | A, B, D, G | B deletes the plan route; others add fields |
-| `apps/server/runner/api.ts`, `runner/setup.ts` | A, D, F, G | D's hold in setup goes first, A's `workspace` after |
+| `apps/server/runner/api.ts`, `runner/setup.ts`, `thread-routes-api.ts` | A, D, F, G | D's hold in setup goes first, A's `workspace` after. Security PR #820 adds `shell` to `prepare()` and `retrySetup()`: keep it beside D's `skipSignIn` |
+| `harness/codex/session-start.ts`, `harness/cursor/adapter.ts`, `sandbox.ts` | A, D | A2's read-only quick-ask lock and D2's access level set the same sandbox, deny and browser lines. Combine them (read-only when either asks), never pick one side |
 | `packages/shared/settings-catalog.ts` | C, F, G | C1 (R7) lands first; F and G add to its groups |
 | `packages/shared/status.ts`, `apps/web/src/components/ui/status.tsx` | C, E, G | C owns the labels; G only renames strings |
 | `apps/web/src/components/Transcript.tsx` | B, C | B replaces PlanCard; C gates the result line. B2 before C3 |
