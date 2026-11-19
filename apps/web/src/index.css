@@ -1750,7 +1750,7 @@
   }
   /* A Loader still shows that something is happening: no halo, a slow fade in place instead. */
   .glyph[data-mark="loading"] > svg {
-    animation: omni-breathe 2.4s var(--ease-fluid) infinite !important;
+    animation: omni-breathe 2.4s var(--ease-fluid) infinite;
   }
   .shimmer-text {
     color: var(--fg-3);
