@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
-import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
+import { Button, Empty, ErrorNote, fieldDescribedBy, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, useFieldErrors, type PickerOption } from '../components/ui.tsx';
 import { channelAvatar } from '../components/composer/pickerOptions.tsx';
 import { href } from '../router.ts';
 import { scrollBehavior } from '../motion.ts';
@@ -53,14 +53,17 @@ export function SecretsSection() {
     return [...m.entries()].sort(([a], [b]) => (a === 'global' ? -1 : b === 'global' ? 1 : a.localeCompare(b)));
   }, [res.data]);
 
-  const nameValid = NAME_RE.test(name);
   const exists = (res.data ?? []).some((s) => s.scope === scope && s.name === name);
+  const problems = useFieldErrors({
+    'sec-name': !name ? 'Give the secret a name.' : !NAME_RE.test(name) ? 'Use UPPER_SNAKE_CASE: a capital letter, then capitals, digits or underscores.' : null,
+    'sec-value': !value ? 'Paste a value.' : /[\r\n]/.test(value) ? 'The value must be a single line.' : null,
+  });
+  const valueHint = exists ? 'A secret with this name exists in this scope. Saving replaces it.' : undefined;
 
+  // Submit stays on: an empty or bad field says what it needs and takes focus, rather than a button that won't press.
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    if (!nameValid) return setFormError('Use UPPER_SNAKE_CASE: a capital letter, then capitals, digits or underscores.');
-    if (!value) return setFormError('Paste a value.');
-    if (/[\r\n]/.test(value)) return setFormError('The value must be a single line.');
+    if (problems.submit()) return;
     setSaving(true);
     setFormError(null);
     setSavedMsg(null);
@@ -69,6 +72,7 @@ export function SecretsSection() {
       setValue('');
       setSavedMsg(`${exists ? 'Replaced' : 'Added'} ${name} (${scopeLabel(scope, channelName)})`);
       setName('');
+      problems.reset();
       res.reload();
       void reloadStatus();
     } catch (err) {
@@ -99,7 +103,7 @@ export function SecretsSection() {
 
   return (
     <>
-      <form onSubmit={save} autoComplete="off">
+      <form onSubmit={save} autoComplete="off" noValidate>
         <Card title="Add or replace" subtitle="A channel secret overrides a global one with the same name. Omni never shows a value again after you add it.">
           <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr]">
             <div>
@@ -107,9 +111,16 @@ export function SecretsSection() {
               <Picker id="sec-scope" label="Scope" size="field" value={scope} onChange={setScope} options={scopeOptions} searchable={scopeOptions.length > 7} />
             </div>
             <div>
-              <Label htmlFor="sec-name">Name</Label>
+              <Label htmlFor="sec-name" error={problems.error('sec-name')}>
+                Name
+              </Label>
               <input
                 id="sec-name"
+                required
+                pattern="[A-Z][A-Z0-9_]{0,63}"
+                aria-invalid={problems.invalid('sec-name')}
+                aria-describedby={fieldDescribedBy('sec-name', { error: problems.error('sec-name') })}
+                onBlur={problems.onBlur}
                 ref={nameInput}
                 className="field field-mono h-10"
                 value={name}
@@ -122,16 +133,19 @@ export function SecretsSection() {
                 autoCorrect="off"
                 autoCapitalize="characters"
                 autoComplete="off"
-                aria-invalid={!!name && !nameValid}
               />
             </div>
           </div>
           <div>
-            <Label htmlFor="sec-value" hint={exists ? 'A secret with this name exists in this scope. Saving replaces it.' : undefined}>
+            <Label htmlFor="sec-value" hint={valueHint} error={problems.error('sec-value')}>
               Value
             </Label>
             <input
               id="sec-value"
+              required
+              aria-invalid={problems.invalid('sec-value')}
+              aria-describedby={fieldDescribedBy('sec-value', { hint: valueHint, error: problems.error('sec-value') })}
+              onBlur={problems.onBlur}
               type="password"
               // A value to store, not a login: new-password keeps browsers from filling a saved password in (they ignore
               // autocomplete="off" on a password field), and data-1p-ignore and data-lpignore do the same for 1Password and LastPass.
@@ -150,7 +164,7 @@ export function SecretsSection() {
             <span className="min-w-0 flex-1 text-[12.5px] text-fg-3" role="status">
               {savedMsg ?? 'Saving the same name again replaces the value.'}
             </span>
-            <Button type="submit" variant="primary" size="sm" icon="key" busy={saving} disabled={!name || !value}>
+            <Button type="submit" variant="primary" size="sm" icon="key" busy={saving}>
               {exists ? 'Replace secret' : 'Add secret'}
             </Button>
           </div>

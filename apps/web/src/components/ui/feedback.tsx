@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Loader } from '../brand.tsx';
 import { Icon, type IconName } from './icons.tsx';
 import { Button } from './primitives.tsx';
@@ -37,7 +37,7 @@ export function Empty({ title, children, icon, action }: { title: string; childr
 
 export function Loading({ label = 'Loading' }: { label?: string }) {
   return (
-    <div className="flex items-center gap-2 px-1 py-6 text-[13px] text-fg-3">
+    <div aria-busy="true" className="flex items-center gap-2 px-1 py-6 text-[13px] text-fg-3">
       <Loader /> {label}
     </div>
   );
@@ -71,57 +71,106 @@ export function Ticks({ value, count = 24, height = 14, tone, label, responsive 
   );
 }
 
-/** One animated to-do row (Bencho "chk"): box fills, tick draws, the label gets struck through. */
-export function CheckItem({ state, children, onClick }: { state: 'pending' | 'in_progress' | 'completed' | string; children: ReactNode; onClick?: () => void }) {
+/** What a to-do row's box shows, said in words for a screen reader. */
+const CHECK_SAID: Record<string, string> = { pending: 'To do', in_progress: 'In progress', completed: 'Done' };
+
+/**
+ * One animated to-do row (Bencho "chk"): box fills, tick draws, the label gets struck through. A list item with its
+ * state in words; render it inside a <ul>. It is not a control.
+ */
+export function CheckItem({ state, children }: { state: 'pending' | 'in_progress' | 'completed' | string; children: ReactNode }) {
   return (
-    <div data-state={state} className="flex items-start gap-2.5 py-[3px] cursor-pointer" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick?.()}>
-      <span className="chk-box mt-[1px]">
+    <li data-state={state} className="flex items-start gap-2.5 py-[3px]">
+      <span className="chk-box mt-[1px]" aria-hidden="true">
         <span className="chk-fill" />
-        <svg viewBox="0 0 24 24" className="chk-tick" aria-hidden="true">
+        <svg viewBox="0 0 24 24" className="chk-tick">
           <path d="M5 12.5l4.5 4.5L19 7.5" />
         </svg>
         {state === 'in_progress' && <span className="pulse absolute h-[7px] w-[7px] rounded-full bg-live" />}
       </span>
       <span className={`min-w-0 text-[13.5px] leading-[1.4] ${state === 'in_progress' ? 'font-medium text-fg' : 'text-fg-2'}`}>
+        <span className="sr-only">{CHECK_SAID[state] ?? state}: </span>
         <span className="chk-say">{children}</span>
       </span>
-    </div>
+    </li>
   );
 }
 
 // ---------- misc ----------
 
-/** Clipboard write with a fallback for plain http (Tailscale), where the async API is unavailable. */
-export async function copyText(text: string) {
+/**
+ * Clipboard write with a fallback for plain http (Tailscale), where the async API is unavailable. True when the text
+ * reached the clipboard. The fallback field is readonly and 16px, so iOS raises no keyboard and does not zoom in.
+ */
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
+    const back = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
+    ta.readOnly = true;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
     document.body.appendChild(ta);
     ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
     try {
-      document.execCommand('copy');
+      ok = document.execCommand('copy');
     } catch {
-      /* ignore */
+      ok = false;
     }
     ta.remove();
+    back?.focus({ preventScroll: true });
+    return ok;
   }
 }
 
-export function CopyButton({ text, label = 'Copy', className = '' }: { text: string; label?: string; className?: string }) {
-  const [done, setDone] = useState(false);
-  const copy = async () => {
-    await copyText(text);
-    setDone(true);
-    setTimeout(() => setDone(false), 1400);
-  };
+export type CopyState = 'idle' | 'copied' | 'failed';
+
+/** What a copy control says once it has tried. */
+export const COPY_SAID: Record<Exclude<CopyState, 'idle'>, string> = { copied: 'Copied', failed: "Couldn't copy" };
+
+/** A copy control's outcome: Copied or Couldn't copy for a moment (a failure stays twice as long), then idle again. */
+export function useCopy(ms = 1400) {
+  const [state, setState] = useState<CopyState>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = useCallback(
+    async (text: string) => {
+      const ok = await copyText(text);
+      clearTimeout(timer.current);
+      setState(ok ? 'copied' : 'failed');
+      timer.current = setTimeout(() => setState('idle'), ok ? ms : ms * 2);
+      return ok;
+    },
+    [ms],
+  );
+  return { state, copy, icon: (state === 'copied' ? 'check' : state === 'failed' ? 'alert' : 'copy') as IconName };
+}
+
+/**
+ * The live region a copy control announces its outcome through. It sits outside the button and is always mounted, so
+ * a screen reader hears Copied or Couldn't copy once, without the button's name changing under focus.
+ */
+export function CopyStatus({ state }: { state: CopyState }) {
   return (
-    <Button size="sm" variant="secondary" icon={done ? 'check' : 'copy'} onClick={copy} className={className}>
-      {done ? 'Copied' : label}
-    </Button>
+    <span role="status" className="sr-only">
+      {state === 'idle' ? '' : COPY_SAID[state]}
+    </span>
+  );
+}
+
+export function CopyButton({ text, label = 'Copy', className = '' }: { text: string; label?: string; className?: string }) {
+  const { state, copy, icon } = useCopy();
+  return (
+    <>
+      <Button size="sm" variant="secondary" icon={icon} onClick={() => void copy(text)} className={className}>
+        {state === 'idle' ? label : COPY_SAID[state]}
+      </Button>
+      <CopyStatus state={state} />
+    </>
   );
 }
 
@@ -201,12 +250,50 @@ export function RefreshButton({ onClick, busy, status, label = 'Refresh' }: { on
   return <Button variant="ghost" icon="refresh" aria-label={title} title={title} onClick={onClick} busy={busy} className="h-8 w-8 px-0" />;
 }
 
-export function Label({ children, hint, htmlFor }: { children: ReactNode; hint?: ReactNode; htmlFor?: string }) {
+/** The ids a Label or Row gives its hint and its error. */
+export const fieldHintId = (id: string) => `${id}-hint`;
+export const fieldErrorId = (id: string) => `${id}-error`;
+
+/** aria-describedby for the control under a Label or Row: its hint and its error, whichever it shows. */
+export const fieldDescribedBy = (id: string, { hint, error }: { hint?: unknown; error?: unknown }) => [hint ? fieldHintId(id) : '', error ? fieldErrorId(id) : ''].filter(Boolean).join(' ') || undefined;
+
+/**
+ * A field's problem, under its label: the needs dot and the message in ink, as the design system's Input shows it (the
+ * field itself takes the vermilion edge). The control points at it with aria-describedby and carries aria-invalid.
+ */
+export function FieldError({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block">
-      <span className="text-[12.5px] font-medium text-fg-2">{children}</span>
-      {hint && <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">{hint}</span>}
-    </label>
+    <p id={id} className="mt-1 flex items-start gap-2 text-[12.5px] leading-[18px] text-fg">
+      <StatusDot status="needs" size={8} className="mt-[5px]" />
+      <span className="min-w-0">{children}</span>
+    </p>
+  );
+}
+
+/**
+ * A field's label, with its hint and its error under it. Only the label text is in <label>, so it alone names the
+ * control; the hint and the error describe it, by the ids fieldHintId and fieldErrorId give `htmlFor`. The control
+ * takes aria-describedby={fieldDescribedBy(id, { hint, error })}. Without `htmlFor` there is no control to name (a group whose
+ * control names itself), so the label text is plain text.
+ */
+export function Label({ children, hint, htmlFor, error }: { children: ReactNode; hint?: ReactNode; htmlFor?: string; error?: ReactNode }) {
+  const text = <span className="text-[12.5px] font-medium text-fg-2">{children}</span>;
+  return (
+    <div className="mb-1.5">
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className="block">
+          {text}
+        </label>
+      ) : (
+        <div>{text}</div>
+      )}
+      {hint && (
+        <span id={htmlFor && fieldHintId(htmlFor)} className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">
+          {hint}
+        </span>
+      )}
+      {error && htmlFor && <FieldError id={fieldErrorId(htmlFor)}>{error}</FieldError>}
+    </div>
   );
 }
 

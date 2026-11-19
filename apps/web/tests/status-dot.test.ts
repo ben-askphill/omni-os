@@ -96,8 +96,13 @@ describe("a thread row's mark", () => {
 describe('loading', () => {
   it('is the same dot in the text color, not a spinner', () => {
     const html = renderToStaticMarkup(createElement(Loader, { size: 12 }));
-    expect(html).toContain('role="status" aria-label="Loading" data-s="running" data-mark="loading"');
+    expect(html).toContain('aria-hidden="true" data-s="running" data-mark="loading"');
     expect(html).toContain('class="ping"');
+  });
+
+  it('is never a live region, and is an image only when it stands alone with a label', () => {
+    expect(renderToStaticMarkup(createElement(Loader, {}))).not.toContain('role=');
+    expect(renderToStaticMarkup(createElement(Loader, { label: 'Loading' }))).toContain('role="img" aria-label="Loading"');
   });
 });
 

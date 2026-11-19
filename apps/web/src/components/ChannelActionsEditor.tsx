@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
+import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput, actionPortProblem, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { href } from '../router.ts';
 import { ActionLine } from './thread/panel/ActionsTab.tsx';
-import { Button, Chip, ErrorNote, IDENTIFIER, InlineConfirm, Label, Loading, Segmented } from './ui.tsx';
+import { Button, Chip, ErrorNote, FieldError, fieldErrorId, fieldHintId, IDENTIFIER, InlineConfirm, Label, Loading, Segmented, useFieldErrors } from './ui.tsx';
 
 /** Editing a new action rather than one in the list. */
 const NEW = '';
@@ -84,9 +84,13 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof ActionDraft>(k: K, v: ActionDraft[K]) => setD((prev) => ({ ...prev, [k]: v }));
   const id = action?.id ?? 'new';
+  const portId = `act-port-${id}`;
+  const problems = useFieldErrors({ [portId]: actionPortProblem(d) });
+  const portError = problems.error(portId);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (problems.submit()) return;
     const parsed = actionInput(d);
     if ('error' in parsed) return setError(parsed.error);
     setBusy(true);
@@ -115,7 +119,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           Command
         </Label>
         <textarea
-          id={`act-cmd-${id}`}
+          id={`act-cmd-${id}`} aria-describedby={fieldHintId(`act-cmd-${id}`)}
           {...IDENTIFIER}
           className="field field-mono min-h-[84px] resize-y"
           value={d.command}
@@ -139,7 +143,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           Secrets
         </Label>
         <input
-          id={`act-secrets-${id}`}
+          id={`act-secrets-${id}`} aria-describedby={fieldHintId(`act-secrets-${id}`)}
           {...IDENTIFIER}
           className="field field-mono"
           value={d.secrets}
@@ -163,7 +167,11 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           />
           {d.portMode === 'fixed' && (
             <input
+              id={portId}
               aria-label="Fixed port"
+              aria-invalid={problems.invalid(portId)}
+              aria-describedby={portError ? fieldErrorId(portId) : undefined}
+              onBlur={problems.onBlur}
               className="field field-mono w-28"
               inputMode="numeric"
               value={d.port}
@@ -172,6 +180,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
             />
           )}
         </div>
+        {portError && <FieldError id={fieldErrorId(portId)}>{portError}</FieldError>}
       </div>
       <div>
         <Label hint={ACTION_SETUP_HINT[d.setup ?? 'off']}>Run in new worktrees</Label>

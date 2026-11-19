@@ -121,7 +121,7 @@ function ScanCard({ scan, summary, cleaning, onChange }: { scan: WorktreeScan | 
 
 function Progress({ pct }: { pct: number }) {
   return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+    <div className="h-1.5 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-label="Scan progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
       <div className="h-full rounded-full bg-fg transition-[width] duration-300" style={{ width: `${pct}%` }} />
     </div>
   );

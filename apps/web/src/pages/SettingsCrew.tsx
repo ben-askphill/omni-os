@@ -19,7 +19,7 @@ import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { CrewAvatar } from '../components/CrewAvatar.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
-import { Button, Chip, ErrorNote, IDENTIFIER, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
+import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
@@ -397,7 +397,7 @@ function EditorBody({
           <RoleMemory role={role} />
         ) : mode === 'markdown' ? (
           <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole role: frontmatter and charter. Saved as written.'}>
-            <textarea id="crew-md" className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
+            <textarea id="crew-md" aria-describedby={fieldHintId('crew-md')} className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
           </Field>
         ) : (
           <>
@@ -407,11 +407,11 @@ function EditorBody({
               </Field>
               {!id && (
                 <Field id="crew-id" label="Id" hint="The file's name and what threads store. It never changes.">
-                  <input id="crew-id" {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
+                  <input id="crew-id" aria-describedby={fieldHintId('crew-id')} {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
                 </Field>
               )}
               <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick a role for a task.">
-                <textarea id="crew-desc" className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
+                <textarea id="crew-desc" aria-describedby={fieldHintId('crew-desc')} className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
               </Field>
               <Field label="Avatar" hint={builtIn ? 'Without one, the built-in mark.' : 'Without one, its initials.'}>
                 <IconPicker
@@ -463,7 +463,7 @@ function EditorBody({
                       : '{{user}} and the other placeholders are filled in when a thread starts.'
                 }
               >
-                <textarea id="crew-charter" className="field field-mono field-xs min-h-[200px] resize-y leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
+                <textarea id="crew-charter" aria-describedby={fieldHintId('crew-charter')} className="field field-mono field-xs min-h-[200px] resize-y leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
               </Field>
             </Section>
 

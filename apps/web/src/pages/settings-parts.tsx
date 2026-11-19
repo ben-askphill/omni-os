@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { PROVENANCE_LABEL, resettable, type Provenance } from '@omni/shared/settings-catalog.ts';
 import type { ServerOption, ServerOptionsState } from '@omni/shared/settings.ts';
 import { useApi } from '../api.ts';
-import { Button, ErrorNote, Icon, Picker, Toggle } from '../components/ui.tsx';
+import { Button, ErrorNote, FieldError, fieldErrorId, fieldHintId, Icon, Picker, Toggle } from '../components/ui.tsx';
 import { setSettingsScope, useSettingsScope } from '../settings-scope.ts';
 import { useApp } from '../store.tsx';
 
@@ -56,14 +56,12 @@ export function Card({ title, subtitle, entry, actions, children }: { title: Rea
   );
 }
 
-/** The id of a Row's hint, for the control's aria-describedby. */
-export const rowHintId = (htmlFor: string) => `${htmlFor}-hint`;
-
 /**
- * A labelled field, stacked: the label with its provenance chip, Reset on the right, the hint under them, then the
- * control at the row's full width. The label line is a button tall with or without Reset, so rows keep one rhythm.
+ * A labelled field, stacked: the label with its provenance chip, Reset on the right, the hint and the error under them,
+ * then the control at the row's full width. The label line is a button tall with or without Reset, so rows keep one
+ * rhythm. The control takes aria-describedby={fieldDescribedBy(htmlFor, { hint, error })}, as under a Label.
  */
-export function Row({ label, hint, htmlFor, origin, action, children }: { label: string; hint?: ReactNode; htmlFor: string; origin?: ReactNode; action?: ReactNode; children: ReactNode }) {
+export function Row({ label, hint, htmlFor, origin, action, error, children }: { label: string; hint?: ReactNode; htmlFor: string; origin?: ReactNode; action?: ReactNode; error?: ReactNode; children: ReactNode }) {
   return (
     <div>
       <div className="mb-1.5">
@@ -76,10 +74,11 @@ export function Row({ label, hint, htmlFor, origin, action, children }: { label:
           {action}
         </div>
         {hint && (
-          <p id={rowHintId(htmlFor)} className="mt-0.5 text-[12.5px] leading-[18px] text-fg-3">
+          <p id={fieldHintId(htmlFor)} className="mt-0.5 text-[12.5px] leading-[18px] text-fg-3">
             {hint}
           </p>
         )}
+        {error && <FieldError id={fieldErrorId(htmlFor)}>{error}</FieldError>}
       </div>
       {children}
     </div>

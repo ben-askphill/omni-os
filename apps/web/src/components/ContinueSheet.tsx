@@ -30,7 +30,7 @@ import { href, navigate } from '../router.ts';
 import { MachineChip } from './composer/MachineChip.tsx';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
 import { useForkMachine } from './RunOnPicker.tsx';
-import { Button, Chip, ErrorNote, Icon, IconButton, Label, Loading, Modal, Toggle, useUnsavedChanges, type ChipTone } from './ui.tsx';
+import { Button, Chip, ErrorNote, fieldHintId, Icon, IconButton, Label, Loading, Modal, Toggle, useUnsavedChanges, type ChipTone } from './ui.tsx';
 import { ModalFooter } from './ui/modal.tsx';
 import { MOD_KEY } from './ui/overlay.tsx';
 import { isImeEnter } from '../ime.ts';
@@ -219,6 +219,7 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
             </Label>
             <textarea
               id="continue-message"
+              aria-describedby={fieldHintId('continue-message')}
               autoFocus
               rows={6}
               value={s.text}

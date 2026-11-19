@@ -12,7 +12,7 @@ import { PRWakeList } from './thread/PRWatch.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
-import { copyText, Icon, Loader, StatusDot, StatusPill } from './ui.tsx';
+import { COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, useCopy } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
@@ -92,22 +92,22 @@ function CommandPill({ label, cmd, open, onToggle }: { label: string; cmd: Slash
 
 /** A small Copy control under a message, shown on hover or keyboard focus (always on touch). Copies the source text. */
 function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'end' }) {
-  const [done, setDone] = useState(false);
+  const { state, copy, icon } = useCopy();
   if (!text.trim()) return null;
   return (
-    <button
-      type="button"
-      aria-label="Copy message"
-      title="Copy message"
-      onClick={async () => {
-        await copyText(text);
-        setDone(true);
-        setTimeout(() => setDone(false), 1400);
-      }}
-      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-3 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
-    >
-      <Icon name={done ? 'check' : 'copy'} size={12} /> {done ? 'Copied' : 'Copy'}
-    </button>
+    <>
+      <button
+        type="button"
+        aria-label="Copy message"
+        title="Copy message"
+        onClick={() => void copy(text)}
+        className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-3 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 data-[copy=failed]:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
+        data-copy={state}
+      >
+        <Icon name={icon} size={12} /> {state === 'idle' ? 'Copy' : COPY_SAID[state]}
+      </button>
+      <CopyStatus state={state} />
+    </>
   );
 }
 

@@ -254,6 +254,8 @@ export function NewThreadComposer({
             if (enterKey(e, text, update)) void submit();
           }}
           rows={big ? 3 : 2}
+          // Named, not left to the placeholder: that changes with the target and carries key hints.
+          aria-label="Message"
           placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
           className={`block field-sizing-content max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
         />
@@ -555,6 +557,7 @@ export function ReplyComposer({
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
+        aria-label="Message"
         placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? (technical ? 'Steer the agent. It reads this at its next step' : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')}
         className="block field-sizing-content max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none placeholder:text-fg-3"
       />

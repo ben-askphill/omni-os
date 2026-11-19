@@ -7,7 +7,7 @@ import { blankDraft, CRON_PRESETS, draftOf, draftProblem, EVENTS, fieldsOf, isPr
 import { describeEvent } from '../format.ts';
 import { useApp, useHereName } from '../store.tsx';
 import { scrollBehavior } from '../motion.ts';
-import { Button, ChipSet, ErrorNote, IDENTIFIER, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from './ui.tsx';
+import { Button, ChipSet, ErrorNote, fieldHintId, IDENTIFIER, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from './ui.tsx';
 import { TimezoneInput } from './onboarding-parts.tsx';
 
 // The Automations page's editor: every field of an automation's YAML, and the YAML itself. Saving writes the file
@@ -178,7 +178,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
 
         {mode === 'yaml' ? (
           <Field id="auto-yaml" label="YAML" hint="Saved as written. Unsaved changes in the form are dropped.">
-            <textarea id="auto-yaml" className="field field-mono field-xs min-h-[320px] resize-y leading-relaxed" value={yaml} onChange={(e) => setYaml(e.target.value)} spellCheck={false} />
+            <textarea id="auto-yaml" aria-describedby={fieldHintId('auto-yaml')} className="field field-mono field-xs min-h-[320px] resize-y leading-relaxed" value={yaml} onChange={(e) => setYaml(e.target.value)} spellCheck={false} />
           </Field>
         ) : (
           <>
@@ -192,7 +192,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
               {draft.trigger === 'schedule' ? (
                 <>
                   <Field id="auto-cron" label="Cron" hint={cronWords ? cronWords : 'Minute, hour, day of month, month, day of week.'}>
-                    <input id="auto-cron" {...IDENTIFIER} className="field field-mono" value={draft.cron} onChange={(e) => set('cron', e.target.value)} placeholder="0 8 * * 1-5" />
+                    <input id="auto-cron" aria-describedby={fieldHintId('auto-cron')} {...IDENTIFIER} className="field field-mono" value={draft.cron} onChange={(e) => set('cron', e.target.value)} placeholder="0 8 * * 1-5" />
                   </Field>
                   <div className="flex flex-wrap gap-1.5">
                     {CRON_PRESETS.map((p) => (
@@ -202,7 +202,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
                     ))}
                   </div>
                   <Field id="auto-tz" label="Timezone" hint={`Leave empty for yours (${tz}).`}>
-                    <TimezoneInput id="auto-tz" value={draft.timezone} onChange={(v) => set('timezone', v)} placeholder={tz} />
+                    <TimezoneInput id="auto-tz" describedBy={fieldHintId('auto-tz')} value={draft.timezone} onChange={(v) => set('timezone', v)} placeholder={tz} />
                   </Field>
                   <SwitchRow label="Catch up" hint="Run a missed slot once Omni is back, when the machine slept through it." checked={draft.catchup} onChange={(v) => set('catchup', v)} />
                 </>
@@ -213,7 +213,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
                   </Field>
                   {(isPrEvent(draft.event) || draft.event === 'github_webhook') && (
                     <Field id="auto-repo" label="Repo" hint={draft.event === 'github_webhook' ? 'The only repo whose events it takes.' : "Leave empty to watch the channel's GitHub repo."}>
-                      <input id="auto-repo" {...IDENTIFIER} className="field field-mono" value={draft.repo} onChange={(e) => set('repo', e.target.value)} placeholder="owner/name" />
+                      <input id="auto-repo" aria-describedby={fieldHintId('auto-repo')} {...IDENTIFIER} className="field field-mono" value={draft.repo} onChange={(e) => set('repo', e.target.value)} placeholder="owner/name" />
                     </Field>
                   )}
                   {isPrEvent(draft.event) && <SwitchRow label="Draft PRs too" checked={draft.drafts} onChange={(v) => set('drafts', v)} />}
@@ -236,10 +236,10 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
                   {!isPrEvent(draft.event) && (
                     <div className="grid grid-cols-2 gap-3">
                       <Field id="auto-age" label="Max age" hint="Like 15m, 6h, 2d. Empty: a day.">
-                        <input id="auto-age" {...IDENTIFIER} className="field field-mono" value={draft.maxAge} onChange={(e) => set('maxAge', e.target.value)} placeholder="1d" />
+                        <input id="auto-age" aria-describedby={fieldHintId('auto-age')} {...IDENTIFIER} className="field field-mono" value={draft.maxAge} onChange={(e) => set('maxAge', e.target.value)} placeholder="1d" />
                       </Field>
                       <Field id="auto-conc" label="At once" hint="Runs going together, 1 to 8. Empty: 2.">
-                        <input id="auto-conc" className="field field-mono" inputMode="numeric" value={draft.concurrency} onChange={(e) => set('concurrency', e.target.value.replace(/\D/g, ''))} placeholder="2" />
+                        <input id="auto-conc" aria-describedby={fieldHintId('auto-conc')} className="field field-mono" inputMode="numeric" value={draft.concurrency} onChange={(e) => set('concurrency', e.target.value.replace(/\D/g, ''))} placeholder="2" />
                       </Field>
                     </div>
                   )}
@@ -271,7 +271,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
               </Field>
             </div>
             <Field id="auto-prompt" label="Prompt" hint="{{user}}, {{omniRoot}} and the other placeholders are filled in when it runs.">
-              <textarea id="auto-prompt" className="field field-mono field-xs min-h-[160px] resize-y leading-relaxed" value={draft.prompt} onChange={(e) => set('prompt', e.target.value)} placeholder="Sum up what changed on my open PRs since yesterday." spellCheck={false} />
+              <textarea id="auto-prompt" aria-describedby={fieldHintId('auto-prompt')} className="field field-mono field-xs min-h-[160px] resize-y leading-relaxed" value={draft.prompt} onChange={(e) => set('prompt', e.target.value)} placeholder="Sum up what changed on my open PRs since yesterday." spellCheck={false} />
             </Field>
             <div className="space-y-3 rounded-[18px] p-4 shadow-[inset_0_0_0_1px_var(--line)]" data-run-rules>
               <SwitchRow label="Quiet when empty" hint="A run with nothing to report posts nothing and files itself as done, with no alert." checked={draft.quiet} onChange={(v) => set('quiet', v)} />
@@ -283,7 +283,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
               />
               {draft.approve && (
                 <Field id="auto-expires" label="Draft expires after" hint="Like 8h or 2d. An unanswered draft is then skipped. Empty: it waits for you.">
-                  <input id="auto-expires" {...IDENTIFIER} className="field field-mono" value={draft.expires} onChange={(e) => set('expires', e.target.value)} placeholder="8h" />
+                  <input id="auto-expires" aria-describedby={fieldHintId('auto-expires')} {...IDENTIFIER} className="field field-mono" value={draft.expires} onChange={(e) => set('expires', e.target.value)} placeholder="8h" />
                 </Field>
               )}
             </div>

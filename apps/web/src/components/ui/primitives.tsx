@@ -43,13 +43,17 @@ export function Button({
   children,
   className = '',
   busy,
+  onClick,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; icon?: IconName; busy?: boolean }) {
+  // Busy is aria-disabled, not disabled: a disabled button drops focus to the page, and the request it started usually
+  // ends with focus wanted right there. So a busy button still gets clicks (and a form's Enter); it ignores them.
   return (
     <button
       type="button"
       {...rest}
-      disabled={rest.disabled || busy}
+      onClick={busy ? (e) => e.preventDefault() : onClick}
+      aria-disabled={busy || undefined}
       aria-busy={busy || undefined}
       className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${busy ? 'cursor-progress' : DISABLED[variant]} ${className}`}
     >

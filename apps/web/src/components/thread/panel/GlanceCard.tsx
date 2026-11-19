@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { CrewPR, PRSummary, Thread } from '../../../api.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import { plural } from '../../../format.ts';
 import { mergeBlock, prBadge, prLine, STEP_WORKING, stepParkedText, type PRNext, type PRStep } from '@omni/shared/thread-glance.ts';
-import { Chip, copyText, ErrorNote, Icon, IconButton, StatusDot, type IconName } from '../../ui.tsx';
+import { Chip, CopyStatus, ErrorNote, Icon, IconButton, StatusDot, useCopy, type IconName } from '../../ui.tsx';
 import { MergeConfirm, MergeTrigger, StepButton, useMerge, type ThreadPRs } from './PRsTab.tsx';
 import { CARD_PAD, ROW } from './inset.ts';
 
@@ -41,20 +41,12 @@ function GlanceRow({ icon, children, onClick, label, action }: { icon: IconName;
 }
 
 function CopyBranch({ name }: { name: string }) {
-  const [done, setDone] = useState(false);
+  const { state, copy, icon } = useCopy();
   return (
-    <IconButton
-      icon={done ? 'check' : 'copy'}
-      label={done ? 'Copied' : 'Copy the branch name'}
-      size={13}
-      className="-mr-[var(--sp-2)] h-6 w-6"
-      onClick={() => {
-        void copyText(name).then(() => {
-          setDone(true);
-          setTimeout(() => setDone(false), 1400);
-        });
-      }}
-    />
+    <>
+      <IconButton icon={icon} label="Copy the branch name" size={13} className="-mr-[var(--sp-2)] h-6 w-6" onClick={() => void copy(name)} />
+      <CopyStatus state={state} />
+    </>
   );
 }
 

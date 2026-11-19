@@ -270,7 +270,7 @@ function usePaint(b: Browser, box: RefObject<HTMLDivElement | null>, canvas: Ref
 
 function Favicon({ tab, loading }: { tab: BrowserTabInfo; loading?: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
-  if (loading) return <Loader size={12} className="shrink-0 text-fg-3" />;
+  if (loading) return <Loader size={12} label="Loading" className="shrink-0 text-fg-3" />;
   if (!tab.favicon || failed === tab.favicon) return <Icon name="globe" size={13} className="shrink-0 text-fg-3" />;
   return <img src={tab.favicon} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setFailed(tab.favicon!)} className="h-4 w-4 shrink-0 rounded-[3px] object-contain" />;
 }
