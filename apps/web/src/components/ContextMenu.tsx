@@ -6,6 +6,7 @@ import { canMarkDone } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { openContinue } from './ContinueSheet.tsx';
+import { openAsk } from './AskCard.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
 import { ThreadReferencePanel } from './ThreadReference.tsx';
 import { threadTarget } from '../message-context/thread-picker.ts';
@@ -106,6 +107,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     archive: () => void toggleArchive(),
     fork: () => (row && openContinue(row), onClose()),
     reference: () => setReferencing(true),
+    ask: () => (row && openAsk(row), onClose()),
     grok: () => void sendGrok(),
   };
   // The desktop app opens a thread in a window of its own.

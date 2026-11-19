@@ -19,6 +19,7 @@ import { isRenderPath } from '@omni/shared/html-render.ts';
 import { HtmlRender } from '../components/HtmlRender.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
+import { askCaption } from '@omni/shared/ask.ts';
 import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
@@ -61,11 +62,32 @@ export type TurnCtx = {
   turn: TurnPhase | null;
 };
 
+/** Who a turn's Asks went to, when each thread it started came from one: one role by name, several by count. */
+function askedOf(t: TurnView): { name: string; remote: string | null } | undefined {
+  const asks = new Map(t.asks.map((a) => [a.thread_id, a]));
+  if (!t.children.length || !t.children.every((k) => asks.has(k.id))) return undefined;
+  const sent = t.children.map((k) => asks.get(k.id)!);
+  const names = new Set(sent.map((a) => a.name));
+  if (names.size > 1) return { name: `${names.size} roles`, remote: null };
+  return { name: sent[0].name, remote: sent[0].remote ? sent[0].harness_name : null };
+}
+
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
   const { conductor, conductorChannel, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
-    const delegated = t.children.length > 0 && <Delegation kids={t.children} answers={t.answers} />;
+    // Ben's Asks go above the card that shows the threads they started (packages/shared/ask.ts).
+    const asked = t.asks.map((a) => (
+      <MoBubble key={`ask${a.thread_id}`} caption={askCaption(a)}>
+        {a.question}
+      </MoBubble>
+    ));
+    const delegated = (asked.length > 0 || t.children.length > 0) && (
+      <>
+        {asked}
+        {t.children.length > 0 && <Delegation kids={t.children} answers={t.answers} asked={askedOf(t)} />}
+      </>
+    );
     if (last && (t.status === 'running' || t.status === 'queued')) {
       return (
         <>
@@ -154,7 +176,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
       );
     })}
     {t.reports.map((r, k) => (
-      <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} />
+      <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} remote={r.remote ? (r.harness_name ?? r.harness ?? '') : undefined} />
     ))}
     {t.questions.map((q) => (
       <QuestionCard key={q.id} threadId={thread.id} q={q} touch />

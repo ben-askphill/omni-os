@@ -1,5 +1,6 @@
 // The composer's `@` menu as pure functions: the file being typed at the caret, and what picking a
-// row does to the text. Which files exist is the server's to say (apps/server/mentions.ts).
+// row does to the text. Which files exist is the server's to say (apps/server/mentions.ts). At the start of a message
+// the menu also lists the crew roles Ben can ask (ask.ts): picking one makes the message an Ask.
 
 /** The `@name` being typed, with the caret in it. `end` is where the name ends. */
 export interface FileQuery {
@@ -17,8 +18,14 @@ export interface FileMention {
   name: string;
   /** Where it lives, shown quiet: the thread, or the folder inside the repo. */
   detail: string;
-  kind: 'artifact' | 'file';
+  /** `role`: a crew role to ask, listed by the client (ask.ts roleRows), never by the server. */
+  kind: 'artifact' | 'file' | 'role';
+  /** A role on a server outside Omni. */
+  remote?: boolean;
 }
+
+/** Whether the `@` being typed starts the message, where a role can be asked (ask.ts askOf). */
+export const startsMessage = (text: string, at: FileQuery) => !text.slice(0, at.start).trim();
 
 const TYPING = /(?<![\w@/.-])@([A-Za-z0-9._\-/]*)$/;
 const NAME_REST = /^[A-Za-z0-9._\-/]*/;

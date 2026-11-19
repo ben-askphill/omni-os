@@ -17,6 +17,8 @@ import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { SlashMenu, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
+import { askOf } from '@omni/shared/ask.ts';
+import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from './AskCard.tsx';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
@@ -440,13 +442,36 @@ export function ReplyComposer({
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
   const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'reply' });
-  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}` });
+  // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts): the role answers, not this thread's agent.
+  const askRoles = useAskRoles(thread);
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}`, roles: askRoles });
   const menus = joinMenus(slashMenu, fileMenu);
+  const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
+  const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
-  const canSend = !!text.trim() || context.length > 0;
+  const canSend = ask ? !!ask.question : !!text.trim() || context.length > 0;
+  /** Send the Ask the message is. Files and context stay in the box: an Ask carries only the question and the excerpt. */
+  const submitAsk = async () => {
+    if (!ask?.question || busy) return;
+    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @role.');
+    const raw = text;
+    setBusy(true);
+    setError(null);
+    drafts.delete(key);
+    setText('');
+    try {
+      await postAsk(threadId, ask.role.id, ask.question, askOptions);
+    } catch (e) {
+      if (!latest.current || latest.current === raw) update(raw);
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
   const submit = async (mode?: SendMode, sendThere = false) => {
+    if (ask) return void submitAsk();
     const raw = text;
     const prompt = raw.trim();
     if (!canSend || busy) return;
@@ -531,6 +556,7 @@ export function ReplyComposer({
       <DropHint over={att.over} />
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
+      {ask && <AskChip threadId={threadId} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
       <ContextChips records={context} onRemove={(id) => removeDraftContext(threadId, id)} className="px-3 pt-3 pb-0.5" />
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
@@ -569,6 +595,10 @@ export function ReplyComposer({
           {omni ? (
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
               {slash.label ?? 'Send'}
+            </SendButton>
+          ) : ask ? (
+            <SendButton armed={canSend} busy={busy} onClick={() => void submitAsk()}>
+              Ask
             </SendButton>
           ) : replying ? (
             <SendButton armed={canSend} busy={busy} onClick={() => void submit('steer')}>

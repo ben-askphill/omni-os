@@ -108,11 +108,16 @@ export function DelegationCard({
   agents = [],
   reports,
   answers,
+  label,
+  mark,
 }: {
   branches?: Branch[];
   lead?: Branch;
   team?: boolean;
   agents?: ReactNode[];
+  /** The header's words and mark, in place of "Delegated 1 task" and the Conductor's: an Ask names the role asked. */
+  label?: ReactNode;
+  mark?: ReactNode;
   /** Crew reports the thread has not read yet, by the thread that reported: shown on that thread's row. */
   reports?: Map<string, string>;
   /** Reports shown in place, by the thread that sent them: each shows under its row, a lead's under the card. */
@@ -124,10 +129,10 @@ export function DelegationCard({
   const combining = lead?.status === 'running' && n > 0 && branches.every((b) => b.status !== 'running' && b.status !== 'queued');
   const what = lead || team ? `Team of ${n}` : `Delegated ${n === 1 ? '1 task' : `${n} tasks`}`;
   return (
-    <section aria-label={what} className="rounded-[20px] px-3.5 pt-3.5 pb-3 shadow-[inset_0_0_0_1px_var(--line)]">
+    <section aria-label={typeof label === 'string' ? label : what} className="rounded-[20px] px-3.5 pt-3.5 pb-3 shadow-[inset_0_0_0_1px_var(--line)]">
       <header className="mb-2 flex min-w-0 items-center gap-2.5 px-1 text-[13.5px]">
-        <CrewMark role="conductor" size={16} className="text-fg" />
-        <span className="shrink-0 font-medium text-fg">{what}</span>
+        {mark ?? <CrewMark role="conductor" size={16} className="text-fg" />}
+        <span className="inline-flex shrink-0 items-center gap-2 font-medium text-fg">{label ?? what}</span>
         {lead && (
           <a href={href.thread(lead.id)} className="min-w-0 truncate text-fg-3 hover:text-fg" title="Open the lead thread">
             {lead.title}

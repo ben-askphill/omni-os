@@ -13,9 +13,13 @@ import type { TurnView } from '../src/mobile/ThreadCards.tsx';
 vi.mock('../src/store.tsx', () => ({
   useApp: () => ({ channels: [], channel: () => undefined, needsYou: null, profile: null, tasks: [] }),
   useNow: () => Date.parse('2026-01-05T12:00:00.000Z'),
+  useNeedOf: () => null,
   readPref: (_key: string, fallback: unknown) => fallback,
   writePref: () => {},
 }));
+
+// The delegation card opens a thread through the phone shell.
+vi.mock('../src/mobile/shell.tsx', async (load) => ({ ...(await load<object>()), useShell: () => ({ open: () => {}, back: () => {} }) }));
 
 import { Turn, type TurnCtx } from '../src/mobile/ThreadTurn.tsx';
 
@@ -27,7 +31,7 @@ const conductor = (over: Partial<Channel> = {}) => ({ id: 'conductor', name: 'Co
 
 const turn: TurnView = {
   key: 1, at: '2026-01-05T11:58:00.000Z', prompts: [], steps: 0, progress: null, failed: 0, texts: ['All three PRs are open.'], prose: 'All three PRs are open.',
-  proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done',
+  proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done',
   items: [], switches: [], harness: 'claude-code',
 };
 
@@ -80,5 +84,24 @@ describe("the Conductor's name over its answer on the phone", () => {
     const line = label(ctx({ thread: { ...thread, channel_id: 'acme' }, ch: { ...conductor(), id: 'acme', name: 'acme', icon: '🛍️' }, conductorChannel: conductor() }));
     expect(line).toContain(OMNI_MARK);
     expect(line).not.toContain('🛍️');
+  });
+});
+
+describe("an Ask's thread on the phone", () => {
+  const kid = (id: string) => ({ ...thread, id, channel_id: 'conductor', role: 'hermes-box', parent_id: 'lead', status: 'done', task_id: 'T-1' }) as Thread;
+  const ask = { thread_id: 'asked', role: 'hermes-box', name: 'Hermes on box', harness: 'custom:hermes-box', harness_name: 'Hermes on box', remote: true, question: 'Check it', excerpt: null, wake: true, title: 'Ask: Check it', channel: 'conductor' };
+  const card = (t: TurnView) => renderToStaticMarkup(createElement(Turn, { t, first: true, last: true, c: ctx() }));
+
+  it('names the role the Ask went to, and that it is remote, as the desktop card does', () => {
+    const markup = card({ ...turn, children: [kid('asked')], asks: [ask] });
+    expect(markup).toContain('Asked Hermes on box');
+    expect(markup).toContain('Remote');
+    expect(markup).not.toContain('Delegated 1 task');
+  });
+
+  it('keeps Delegated for a turn whose threads did not all come from an Ask', () => {
+    const markup = card({ ...turn, children: [kid('asked'), kid('other')], asks: [ask] });
+    expect(markup).toContain('Delegated 2 tasks');
+    expect(markup).not.toContain('Asked Hermes on box</');
   });
 });

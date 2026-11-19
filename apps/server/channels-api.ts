@@ -99,6 +99,9 @@ const connectorAccess = z
 const agentSetsAccess = (c: Context, body: { access_level?: unknown; connector_access?: unknown }) =>
   !!callerOf(c) && (body.access_level !== undefined || body.connector_access !== undefined);
 const AGENT_ACCESS_REFUSAL = 'Agents cannot change access levels. Ask the user to set them in Channel settings.';
+/** Whether thread excerpts may reach remote agents (ask.ts) is Ben's to say: no agent thread sets it, either way. */
+const agentSetsExcerpts = (c: Context, body: { remote_excerpts_off?: unknown }) => !!callerOf(c) && body.remote_excerpts_off !== undefined;
+const AGENT_EXCERPTS_REFUSAL = 'Agents cannot change whether thread excerpts reach remote agents. Ask the user to set it in Channel settings.';
 
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
@@ -125,6 +128,7 @@ const channelSchema = z.object({
   prompt_fix_conflicts: stepPrompt,
   prompt_fix_checks: stepPrompt,
   scan_opt_out: z.coerce.number().int().min(0).max(1).optional(),
+  remote_excerpts_off: z.coerce.number().int().min(0).max(1).optional(),
   access_level: accessLevel,
   connector_access: connectorAccess,
 });
@@ -275,6 +279,7 @@ channelsApi.post('/', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (agentSetsAccess(c, body)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
+  if (agentSetsExcerpts(c, body)) return c.json({ error: AGENT_EXCERPTS_REFUSAL }, 403);
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
   const runError = runDefaultsError(body) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
@@ -308,6 +313,7 @@ channelsApi.patch('/:id', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (agentSetsAccess(c, body)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
+  if (agentSetsExcerpts(c, body)) return c.json({ error: AGENT_EXCERPTS_REFUSAL }, 403);
   delete (body as any).id;
   const runError = runDefaultsError(body, current) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);

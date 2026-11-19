@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { askLabel, askOf } from '@omni/shared/ask.ts';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
@@ -16,6 +17,8 @@ import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { MoDiff, MoRound } from './parts.tsx';
+import { FileMenu, useFileMenu } from '../components/FileMenu.tsx';
+import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from '../components/AskCard.tsx';
 
 export interface ComposerChip {
   label: string;
@@ -93,13 +96,38 @@ export function MoComposer({
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
   }, [text]);
 
+  // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts), as in the desktop reply box.
+  const askRoles = useAskRoles(thread);
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(thread.id)}`, roles: askRoles });
+  const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
+  const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
+  const submitAsk = async () => {
+    if (!ask?.question || busy) return;
+    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @role.');
+    const raw = text;
+    setBusy(true);
+    setError(null);
+    setText('');
+    drafts.delete(thread.id);
+    try {
+      await postAsk(thread.id, ask.role.id, ask.question, askOptions);
+    } catch (e) {
+      const now = ref.current?.value ?? '';
+      if (!now || now === raw) update(raw);
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const busyThread = thread.status === 'running' || thread.status === 'queued';
   // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
   const steers = canSteer(thread.harness, harnesses) && !thread.queued_harness;
   const hint = typeof placeholder === 'function' ? placeholder(steers) : placeholder;
-  const canSend = !!text.trim() || context.length > 0;
+  const canSend = ask ? !!ask.question : !!text.trim() || context.length > 0;
   /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
   const submit = async (sendThere = false) => {
+    if (ask) return void submitAsk();
     const prompt = text.trim();
     if (!canSend || busy) return;
     const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
@@ -202,7 +230,9 @@ export function MoComposer({
         />
       )}
       {(att.error || error) && <ErrorNote className="mb-2">{att.error ?? error}</ErrorNote>}
-      <div className="flex flex-col rounded-[26px] bg-surface">
+      <div className="relative flex flex-col rounded-[26px] bg-surface">
+        {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
+        {ask && <AskChip threadId={thread.id} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
         <ContextChips records={context} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
@@ -211,7 +241,15 @@ export function MoComposer({
             ref={ref}
             rows={1}
             value={text}
-            onChange={(e) => update(e.target.value)}
+            onChange={(e) => {
+              update(e.target.value);
+              fileMenu.textarea.onChange(e);
+            }}
+            onSelect={fileMenu.textarea.onSelect}
+            onFocus={fileMenu.textarea.onFocus}
+            onBlur={fileMenu.textarea.onBlur}
+            onKeyDown={(e) => void fileMenu.onKey(e)}
+            {...fileMenu.textarea.aria}
             onPaste={att.onPaste}
             enterKeyHint="send"
             placeholder={hint}
@@ -220,8 +258,8 @@ export function MoComposer({
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />
-          ) : canSend || !mic.supported ? (
-            <MoRound ink icon="send" label={!busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
+          ) : canSend || !mic.supported || ask ? (
+            <MoRound ink icon="send" label={ask ? askLabel(ask.role) : !busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
           ) : (
             <MoRound quiet={!mic.on} ink={mic.on} icon={mic.on ? 'stop' : 'mic'} label={mic.on ? 'Stop dictating' : 'Dictate'} onClick={mic.toggle} />
           )}

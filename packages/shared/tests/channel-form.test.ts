@@ -46,6 +46,7 @@ describe('channel form', () => {
       prompt_fix_conflicts: null,
       prompt_fix_checks: null,
       scan_opt_out: 0,
+      remote_excerpts_off: 0,
       connector_access: {},
     });
   });
@@ -65,6 +66,12 @@ describe('channel form', () => {
     expect(channelForm({ ...acme, scan_opt_out: 1 }).scanOptOut).toBe(true);
     expect(channelBody(channelForm({ ...acme, scan_opt_out: 1 }), { system: false, github: false }).scan_opt_out).toBe(1);
     expect(channelForm(acme).scanOptOut).toBe(false);
+  });
+
+  it('keeps thread excerpts away from remote agents once a channel says so, and reads an older server as sending them', () => {
+    expect(channelForm({ ...acme, remote_excerpts_off: 1 }).remoteExcerptsOff).toBe(true);
+    expect(channelBody(channelForm({ ...acme, remote_excerpts_off: 1 }), { system: false, github: false }).remote_excerpts_off).toBe(1);
+    expect(channelForm(acme).remoteExcerptsOff).toBe(false);
   });
 
   it('sends a blank step prompt as null, which goes back to the built-in one', () => {
