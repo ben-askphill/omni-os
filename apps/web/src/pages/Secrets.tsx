@@ -110,7 +110,7 @@ export function SecretsSection() {
               <input
                 id="sec-name"
                 ref={nameInput}
-                className="field h-10 font-mono !text-[13px]"
+                className="field field-mono h-10"
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'));
@@ -118,6 +118,7 @@ export function SecretsSection() {
                 }}
                 placeholder="SHOPIFY_ADMIN_TOKEN"
                 spellCheck={false}
+                autoCorrect="off"
                 autoCapitalize="characters"
                 autoComplete="off"
                 aria-invalid={!!name && !nameValid}
@@ -131,8 +132,10 @@ export function SecretsSection() {
             <input
               id="sec-value"
               type="password"
+              // A value to store, not a login: new-password keeps browsers from filling a saved password in (they ignore
+              // autocomplete="off" on a password field), and data-1p-ignore and data-lpignore do the same for 1Password and LastPass.
               autoComplete="new-password"
-              className="field h-10 font-mono !text-[13px]"
+              className="field field-mono h-10"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Paste the value"

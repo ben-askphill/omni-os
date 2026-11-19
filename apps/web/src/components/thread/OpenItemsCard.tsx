@@ -121,7 +121,7 @@ export function OpenItemsCard({
                 </div>
               )}
               <input
-                className={`field mt-2 !py-[7px] ${mobile ? '!text-[length:var(--fs-input)]' : '!text-[13px]'}`}
+                className={`field mt-2 !py-[7px] ${mobile ? '!text-[length:var(--fs-input)]' : 'field-sm'}`}
                 placeholder={item.kind === 'blocker' ? 'Note, e.g. done' : item.options ? 'Or write your own answer' : 'Your answer'}
                 aria-label={`Answer: ${item.text}`}
                 value={value}

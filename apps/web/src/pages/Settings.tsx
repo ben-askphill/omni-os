@@ -11,7 +11,7 @@ import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
 import { saveDisplay, useDisplay } from '../display.ts';
-import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, FolderInput, IDENTIFIER, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
@@ -648,6 +648,7 @@ function formPatch(fields: readonly SettingField[], values: Record<string, strin
   return patch;
 }
 
+/** Fields that hold an identifier: the mono face, and no capitals, autocorrect or spellcheck. */
 const MONO = new Set<SettingField['input']>(['folder', 'url', 'owner']);
 
 /**
@@ -694,11 +695,11 @@ function ConfigField({
       id={id}
       aria-describedby={describedBy}
       dialogTitle={f.label}
-      className="h-10 w-full !text-[13px]"
+      className="h-10 w-full"
       value={value}
       maxLength={f.max}
       placeholder={settingPlaceholder(f, fallbacks)}
-      spellCheck={false}
+      enterKeyHint="done"
       onChange={onChange}
       onPick={(v) => onCommit(v)}
       onKeyDown={commitOnEnter}
@@ -719,14 +720,16 @@ function ConfigField({
     <input
       id={id}
       aria-describedby={describedBy}
-      className={`field h-10 w-full${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
+      {...(MONO.has(f.input) ? IDENTIFIER : {})}
+      className={`field h-10 w-full${MONO.has(f.input) ? ' field-mono' : ''}`}
+      // Not type="url": the form would then refuse a URL with the browser's own bubble before settingProblem's message.
       type={f.input === 'email' ? 'email' : 'text'}
+      inputMode={f.input === 'url' ? 'url' : undefined}
+      enterKeyHint="done"
       value={value}
       maxLength={f.max}
       autoComplete={f.autoComplete}
       placeholder={settingPlaceholder(f, fallbacks)}
-      spellCheck={MONO.has(f.input) ? false : undefined}
-      autoCapitalize={f.input === 'owner' ? 'off' : undefined}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={commitOnEnter}
       onBlur={() => onCommit()}
@@ -795,7 +798,7 @@ function PronounsField({
         }}
         options={[...PRONOUNS.map((p) => ({ value: p, label: p, avatar: false as const })), { value: OTHER, label: 'Other…', avatar: false as const }]}
       />
-      {other && <input aria-label="Your pronouns" className="field h-10 min-w-0 flex-1" value={value} placeholder="xe/xem" onChange={(e) => onChange(e.target.value)} onKeyDown={commitOnEnter} onBlur={onCommit} />}
+      {other && <input aria-label="Your pronouns" className="field h-10 min-w-0 flex-1" value={value} placeholder="xe/xem" enterKeyHint="done" onChange={(e) => onChange(e.target.value)} onKeyDown={commitOnEnter} onBlur={onCommit} />}
     </div>
   );
 }

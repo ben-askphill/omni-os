@@ -40,7 +40,7 @@ export function OwnerField({ thread, className = '' }: { thread: Pick<Thread, 'i
   return (
     <span className={`flex min-w-0 flex-col gap-1 ${className}`}>
       <input
-        className="field h-8 w-full !text-[length:var(--fs-input)] sm:!text-[12.5px]"
+        className="field field-xs h-8 w-full max-sm:!text-[length:var(--fs-input)]"
         value={draft}
         maxLength={OWNER_MAX}
         placeholder="A name, or empty for you"

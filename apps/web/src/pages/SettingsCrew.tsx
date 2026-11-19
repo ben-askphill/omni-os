@@ -19,7 +19,7 @@ import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { CrewAvatar } from '../components/CrewAvatar.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
-import { Button, Chip, ErrorNote, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
+import { Button, Chip, ErrorNote, IDENTIFIER, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, LockNote } from './settings-parts.tsx';
@@ -388,7 +388,7 @@ function EditorBody({
           <RoleMemory role={role} />
         ) : mode === 'markdown' ? (
           <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole role: frontmatter and charter. Saved as written.'}>
-            <textarea id="crew-md" className="field min-h-[360px] resize-y font-mono !text-[12.5px] leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
+            <textarea id="crew-md" className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
           </Field>
         ) : (
           <>
@@ -398,7 +398,7 @@ function EditorBody({
               </Field>
               {!id && (
                 <Field id="crew-id" label="Id" hint="The file's name and what threads store. It never changes.">
-                  <input id="crew-id" className="field font-mono !text-[13px]" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" spellCheck={false} />
+                  <input id="crew-id" {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
                 </Field>
               )}
               <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick a role for a task.">
@@ -455,7 +455,7 @@ function EditorBody({
                       : '{{user}} and the other placeholders are filled in when a thread starts.'
                 }
               >
-                <textarea id="crew-charter" className="field min-h-[200px] resize-y font-mono !text-[12.5px] leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
+                <textarea id="crew-charter" className="field field-mono field-xs min-h-[200px] resize-y leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
               </Field>
             </Section>
 
@@ -607,7 +607,7 @@ function DuplicateView({ from, busy, error, onBack, onDuplicate }: { from: CrewR
           <input id="dup-name" className="field" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </Field>
         <Field id="dup-id" label="Id">
-          <input id="dup-id" className="field font-mono !text-[13px]" value={theId} onChange={(e) => setId(e.target.value)} spellCheck={false} />
+          <input id="dup-id" {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setId(e.target.value)} />
         </Field>
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
