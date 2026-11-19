@@ -42,7 +42,7 @@ export function personalCrewProblems(crewDir: string): string[] {
         .split('\n')
         .flatMap((line, i) => {
           const hit = line.match(term);
-          return hit ? [`${name}/${f}:${i + 1}: ${hit[1]}`] : [];
+          return hit ? [`crew/${f}:${i + 1}: ${hit[1]}`] : [];
         }),
     );
 }
