@@ -1213,7 +1213,8 @@ server.registerTool(
     description:
       `Start one of a channel's actions in a thread's checkout, by action id or name, only when ${USER} asks or the thread's work needs it (a preview to share, say). ` +
       'It runs in the background through the login shell; the result is the started run. Read its state later with list_channel_actions and thread_id (include_output: true for its output). ' +
-      'Refused with the reason while the worktree is being prepared, for a thread that runs off this machine, or when its fixed port is taken.',
+      'Refused with the reason while the worktree is being prepared, for a thread that runs off this machine, or when its fixed port is taken. ' +
+      `An action runs a shell, so it needs the install token: called from an Omni thread, whose own token cannot, it is refused, and ${USER} starts it from the thread's Actions menu.`,
     inputSchema: {
       thread_id: z.string().describe('The thread whose checkout it runs in.'),
       action: z.string().min(1).describe('Action id or name (any case) from list_channel_actions.'),

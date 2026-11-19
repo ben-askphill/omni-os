@@ -100,7 +100,7 @@ export const atOrBelow = (id: string, ancestor: string): boolean => ancestry(db,
  * Why the thread whose token this request carries may not start a thread that comes from `from` (its parent, or the
  * thread it continues), or null when it may. A thread files what it starts under itself, so it cannot shed the
  * automation above it. `strict`: the caller picks the parent (create, team), and anything outside its own lineage is
- * refused. Otherwise the parent is the thread the call acts on (continue, a fork, review notes), and only an
+ * refused. Otherwise the parent is the thread the call acts on (continue, a fork, review notes, a message), and only an
  * unattended thread is held, to threads under the same automation and usage scan as itself, so the Conductor still
  * continues any thread Ben names and a run's thread may continue the run.
  */

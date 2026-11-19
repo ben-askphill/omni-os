@@ -151,6 +151,16 @@ describe('a thread under an automation, with no header', () => {
     const own = await call('POST', `/threads/${root.id}/continue`, { token: child.token, body: { harness: 'codex', text: 'go on', request_id: 'r3', revision: 'x' } });
     expect(own.status).not.toBe(403);
   });
+  it('cannot message a thread outside its own lineage, which an interactive thread still may', async () => {
+    const elsewhere = await spawned();
+    const run = await spawned();
+    underAutomation(run.id);
+    expect((await call('POST', `/threads/${elsewhere.id}/messages`, { token: run.token, body: { prompt: 'do this instead', mode: 'queue' } })).status).toBe(403);
+    const child = await spawned({ parent_id: run.id, source: 'conductor' });
+    expect((await call('POST', `/threads/${child.id}/messages`, { token: run.token, body: { prompt: 'and this', mode: 'queue' } })).status).toBe(200);
+    const interactive = await spawned();
+    expect((await call('POST', `/threads/${elsewhere.id}/messages`, { token: interactive.token, body: { prompt: 'a note', mode: 'queue' } })).status).toBe(200);
+  });
 });
 
 describe('any thread token', () => {
@@ -197,6 +207,38 @@ describe('any thread token', () => {
     expect((await call('POST', '/auth/app-pairings', { token, body: {} })).status).toBe(403);
     expect((await call('POST', '/auth/desktop-nonce', { token })).status).toBe(403);
     expect((await call('DELETE', '/auth/google', { token })).status).toBe(403);
+  });
+
+  it('only proposes a learning, and cannot approve, edit or delete one', async () => {
+    const { token } = await spawned();
+    const proposed = await call('POST', '/memory', { token, body: { channel: 'scratch', text: 'Run the theme check first.' } });
+    expect(proposed.status).toBe(201);
+    expect(proposed.body.status).toBe('proposed');
+    const id = proposed.body.id;
+    expect((await call('PATCH', `/memory/${id}`, { token, body: { approve: true } })).status).toBe(403);
+    expect((await call('PATCH', `/memory/${id}`, { token, body: { text: 'Skip the theme check.' } })).status).toBe(403);
+    expect((await call('DELETE', `/memory/${id}`, { token })).status).toBe(403);
+    expect((await call('PATCH', `/memory/${id}`, { body: { approve: true } })).status).toBe(200);
+  });
+
+  it("cannot change a channel's access levels or take back a grant", async () => {
+    const { token } = await spawned();
+    expect((await call('PATCH', '/channels/scratch', { token, body: { access_level: 'full' } })).status).toBe(403);
+    expect((await call('PATCH', '/channels/scratch', { token, body: { connector_access: { gmail: 'full' } } })).status).toBe(403);
+    expect((await call('POST', '/channels', { token, body: { id: 'from-a-thread', name: 'From a thread', access_level: 'full' } })).status).toBe(403);
+    expect((await call('DELETE', '/channels/scratch/access-grants/builder', { token })).status).toBe(403);
+  });
+
+  it('cannot add, change or run a channel action, which runs a shell (as #820 holds sessions to)', async () => {
+    const { id, token } = await spawned();
+    const add = await call('POST', '/channels/scratch/actions', { token, body: { name: 'Preview', command: 'echo hi' } });
+    expect(add.status).toBe(403);
+    expect(add.body.error).toMatch(/runs a shell/);
+    const made = await call('POST', '/channels/scratch/actions', { body: { name: 'Preview', command: 'echo hi' } });
+    expect(made.status).toBeLessThan(300);
+    const action = made.body.id ?? made.body.action?.id;
+    expect((await call('PATCH', `/channels/scratch/actions/${action}`, { token, body: { command: 'echo bye' } })).status).toBe(403);
+    expect((await call('POST', `/threads/${id}/actions/${action}/run`, { token })).status).toBe(403);
   });
 
   it('keeps working when Ben rotates the install token', async () => {

@@ -1,15 +1,13 @@
 // Memory facts over the API (db/repos/memories.ts): a channel's Recent learnings. GET lists a channel's, POST adds one,
-// PATCH edits or approves one, DELETE drops one. An agent thread names itself on every call (CALLER_HEADER): it may
-// only propose, never approve, edit or delete, because an approved fact is a prompt every later thread in the channel
-// runs with. A thread other than the Conductor proposes only for its own channel, so what it saw in one client's work
-// cannot land in another's. Text is masked for secrets before it is saved. Its own app so tests call it directly.
-// The header holds the path agents are told to use (the Conductor's tools), not a determined one, as automation-guard.ts
-// says of its own rules: every thread can read the install token (sandbox.ts), so a shell call without the header reads
-// as the user's and can approve. Closing that needs tokens scoped to one thread, for this route, crew files and
-// automations alike.
+// PATCH edits or approves one, DELETE drops one. An agent thread is known by its own token, or the thread an
+// install-token caller names (automation-guard.ts callerOf): it may only propose, never approve, edit or delete,
+// because an approved fact is a prompt every later thread in the channel runs with. A thread other than the Conductor
+// proposes only for its own channel, so what it saw in one client's work cannot land in another's. Text is masked for
+// secrets before it is saved. Its own app so tests call it directly. A thread that reads data/api-token from disk on
+// purpose still passes as the user, as automation-guard.ts says of its own rules (finding 12, part 3).
 import { Hono } from 'hono';
 import { parseMemoryText, sortLearnings } from '@omni/shared/memory.ts';
-import { CALLER_HEADER } from './automation-guard.ts';
+import { callerOf } from './automation-guard.ts';
 import { publishFeed } from './bus.ts';
 import { channels, memories, threads } from './db.ts';
 import { secretValues } from './secrets.ts';
@@ -32,7 +30,7 @@ memoryApi.post('/', async (c) => {
   if (!channel) return c.json({ error: 'channel not found' }, 404);
   const parsed = parseMemoryText(body?.text);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-  const caller = c.req.header(CALLER_HEADER);
+  const caller = callerOf(c);
   const from = caller ? threads.get(caller) : undefined;
   if (caller && !from) return c.json({ error: 'unknown thread' }, 403);
   if (from && from.role !== 'conductor' && from.channel_id !== channel.id) {
@@ -51,7 +49,7 @@ memoryApi.post('/', async (c) => {
 });
 
 memoryApi.patch('/:id', async (c) => {
-  if (c.req.header(CALLER_HEADER)) return c.json({ error: AGENT_WRITE }, 403);
+  if (callerOf(c)) return c.json({ error: AGENT_WRITE }, 403);
   const body = (await c.req.json().catch(() => null)) as { text?: unknown; approve?: unknown } | null;
   let text: string | undefined;
   if (body?.text !== undefined) {
@@ -67,7 +65,7 @@ memoryApi.patch('/:id', async (c) => {
 });
 
 memoryApi.delete('/:id', (c) => {
-  if (c.req.header(CALLER_HEADER)) return c.json({ error: AGENT_WRITE }, 403);
+  if (callerOf(c)) return c.json({ error: AGENT_WRITE }, 403);
   const fact = memories.get(c.req.param('id'));
   if (!fact || !memories.remove(fact.id)) return c.json({ error: 'not found' }, 404);
   publishFeed({ type: 'memory', channel_id: fact.channel_id });

@@ -330,6 +330,8 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const from = sender(c, asked);
   const target = threads.get(id);
   if (!target) return c.json({ error: 'not found' }, 404);
+  // Under an automation or a usage scan, a thread steers only threads in its own lineage, as with review notes.
+  if (lineageRefusal(c, id, false)) return c.json({ error: 'A thread under an automation or a usage scan messages only threads under the same one.' }, 403);
   if (from === 'conductor' && !wake_cold) {
     const warmth = sessionWarmth(target);
     if (!warmth.warm) return c.json({ error: coldRefusal(target, warmth), session: warmth }, 409);

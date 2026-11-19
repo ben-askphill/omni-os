@@ -88,7 +88,7 @@ A channel's settings list its named actions: a name, a command, the secrets it n
 
 Adding, editing, running and retrying an action take the install token or a session paired with it (the desktop app, or a browser paired with the token), the same as the thread terminal: a Google, Omni Connect or iOS app session gets 403 ([Remote access](remote-access.md)). So does Retry setup on a thread whose setup step failed, since it runs that step again. Any signed-in device can read actions and runs, stop a run and remove an action.
 
-The Conductor reads a channel's actions, or a thread's actions and runs, with `list_channel_actions` (run output only with `include_output: true`), and starts one in a thread with `run_channel_action` (by id or name). Adding, editing and stopping actions stay in the UI.
+The Conductor reads a channel's actions, or a thread's actions and runs, with `list_channel_actions` (run output only with `include_output: true`), and starts one in a thread with `run_channel_action` (by id or name) when it runs with the install token, as an external MCP client on this machine does. From an Omni thread it is refused: a thread's own token cannot run a shell ([ADR 0016](../adr/0016-thread-bound-credentials.md)), so you start the action from the thread's Actions menu. Adding, editing and stopping actions stay in the UI.
 
 ## Worktree files
 
