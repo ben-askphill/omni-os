@@ -1,3 +1,5 @@
+// First, before anything that could start a child: takes the desktop app's pairing secret out of process.env.
+import './desktop-pairing.ts';
 import { spawn } from 'node:child_process';
 import type { Server } from 'node:http';
 import { serve } from '@hono/node-server';

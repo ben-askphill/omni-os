@@ -111,10 +111,13 @@ authApi.post('/pair', (c) => {
 /**
  * The desktop app's main process, before each window load: a one-time nonce for desktop-pair (desktop-pairing.ts).
  * Takes the secret the app started this server with, or the install's token (an app attached to a server it did not
- * start). requestGuard has checked the request is straight from this machine.
+ * start), never a thread's token. requestGuard has checked the request is straight from this machine.
  */
 authApi.post('/desktop-nonce', (c) => {
-  if (!secretMatches(c.req.header(DESKTOP_SECRET_HEADER)) && c.get('omniAuth')?.via !== 'token') {
+  const via = c.get('omniAuth')?.via;
+  // A thread's own token is a thread asking, whatever else it sends: the window session would count as Ben.
+  if (via === 'thread') return c.json({ error: 'Forbidden: a thread cannot pair the desktop app' }, 403);
+  if (!secretMatches(c.req.header(DESKTOP_SECRET_HEADER)) && via !== 'token') {
     return c.json({ error: "Forbidden: send the desktop app's secret or this install's token" }, 403);
   }
   return c.json(mintNonce());

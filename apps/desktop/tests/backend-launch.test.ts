@@ -53,7 +53,7 @@ describe('server env', () => {
         OMNI_DESKTOP_PAIR_SECRET: 'the app\'s own',
         PATH: '/bad',
       },
-      { path: '/home/me/.local/bin:/usr/bin', port: 4747, dataDir: '/data', pairSecret: 'f'.repeat(64) },
+      { path: '/home/me/.local/bin:/usr/bin', port: 4747, dataDir: '/data' },
     );
     expect(env.HOME).toBe('/home/me');
     expect(env.WAYLAND_DISPLAY).toBe('wayland-1');
@@ -63,7 +63,9 @@ describe('server env', () => {
     expect(env.OMNI_DATA_DIR).toBe('/data');
     expect(env.OMNI_SUPERVISOR).toBe('desktop');
     expect(env.ELECTRON_RUN_AS_NODE).toBe('1');
-    expect(env.OMNI_DESKTOP_PAIR_SECRET).toBe('f'.repeat(64));
+    // The pairing secret goes on a pipe (spawnServer). The env only says which descriptor, and drops the app's own.
+    expect(env.OMNI_DESKTOP_PAIR_SECRET).toBeUndefined();
+    expect(env.OMNI_DESKTOP_PAIR_FD).toBe('3');
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(env.OPENAI_API_KEY).toBeUndefined();
     expect(env.OMNI_TOKEN).toBeUndefined();

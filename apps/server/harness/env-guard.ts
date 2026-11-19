@@ -1,8 +1,8 @@
 // Builds each harness's process environment from Omni's own environment plus the
 // channel and global secrets, then strips the variables that would switch that
 // harness off its subscription onto API billing. The guard wins: a secret whose
-// name is on the strip list never reaches that harness. The Grok Bot webhook is
-// stripped for every harness too. Pure, so it is testable.
+// name is on the strip list never reaches that harness. The Grok Bot webhook and the
+// desktop app's pairing secret are stripped for every harness too. Pure, so it is testable.
 import type { HarnessId } from './types.ts';
 
 /**
@@ -25,7 +25,14 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
 /** The Grok Bot webhook. The server reads these. A harness process and a thread's terminal do not. */
 export const GROKBOT_WEBHOOK_URL = 'GROKBOT_WEBHOOK_URL';
 export const GROKBOT_WEBHOOK_AUTH = 'GROKBOT_WEBHOOK_AUTH';
-export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH] as const;
+/**
+ * The desktop app's pairing secret, as an app from before the pipe passed it, and the descriptor the app now hands it
+ * on (desktop-pairing.ts). The server deletes both from its own environment when it starts. Listed here too, so a
+ * secret or an `extra` of either name never reaches a thread.
+ */
+export const DESKTOP_PAIR_SECRET = 'OMNI_DESKTOP_PAIR_SECRET';
+export const DESKTOP_PAIR_FD = 'OMNI_DESKTOP_PAIR_FD';
+export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH, DESKTOP_PAIR_SECRET, DESKTOP_PAIR_FD] as const;
 
 /**
  * The server's own credentials, when its environment sets them (a QA stack, a test, a script): the install token, the

@@ -69,6 +69,8 @@ function log(method, extra) {
       thread_id: process.env.OMNI_THREAD_ID ?? null,
       omni_token: process.env.OMNI_TOKEN ?? null,
       omni_token_file: process.env.OMNI_TOKEN_FILE ?? null,
+      // Whether the desktop app's pairing secret reached this process (only that, never its value).
+      pair_secret: 'OMNI_DESKTOP_PAIR_SECRET' in process.env,
       cursor_auth: AUTH_VARS.filter((k) => k in process.env),
       env_probe: Object.keys(process.env).filter((k) => k.startsWith('PROBE_')),
       cursor_config_dir: process.env.CURSOR_CONFIG_DIR ?? null,
