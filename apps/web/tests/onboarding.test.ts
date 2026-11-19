@@ -89,7 +89,7 @@ describe('Harnesses step', () => {
     expect(text(own)).toContain('Your own agent');
     const button = [...own.querySelectorAll('button')].find((b) => b.textContent === 'Connect an agent')!;
     await act(async () => button.click());
-    expect(text(document.querySelector('[role="dialog"]'))).toContain('Agent address, link or code');
+    expect(text(document.querySelector('dialog'))).toContain('Agent address, link or code');
   });
 
   it('signed out, missing and a reason each read as what they are', async () => {
