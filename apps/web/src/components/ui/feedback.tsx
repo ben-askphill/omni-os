@@ -155,7 +155,7 @@ export function PageHeader({ title, subtitle, actions, children, eyebrow, width 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           {eyebrow && <div className="caption mb-1.5">{eyebrow}</div>}
-          <h1 className="truncate font-display text-[length:var(--fs-title)] leading-[1.1] md:text-[length:var(--fs-title-lg)]">{title}</h1>
+          <h1 className="font-display text-[length:var(--fs-title)] leading-[1.1] text-balance md:text-[length:var(--fs-title-lg)]">{title}</h1>
           {subtitle && <div className="mt-2 max-w-2xl text-[length:var(--fs-body)] leading-[1.45] text-fg-3">{subtitle}</div>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

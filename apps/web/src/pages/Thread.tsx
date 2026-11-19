@@ -26,6 +26,7 @@ import { useShowsCode } from '../display.ts';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
 import { ThreadQuickCard, useThreadConnectors } from '../components/thread/ThreadQuickCard.tsx';
+import { COMPOSER_CLEARS_CARD, QUICK_CARD_SLOT, THREAD_COLUMN } from '../components/thread/quick-card-layout.ts';
 import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCard.tsx';
 import type { PanelTab } from './useThreadSession.ts';
 import { AGENTS_CARD_ID } from '../components/thread/panel/AgentsSection.tsx';
@@ -207,7 +208,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
 
   return (
     <div ref={panel.rootRef} className="flex h-full min-h-0">
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={THREAD_COLUMN}>
         <ThreadHeader
           thread={thread}
           channel={channel}
@@ -248,7 +249,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
         <div className="relative flex min-h-0 flex-1">
           <div className="relative min-h-0 min-w-0 flex-1">
             <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
-              <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
+              {/* A size container too: the reply bubbles widen to 80% by the transcript's width (Transcript.tsx, @lg). */}
+              <div ref={contentRef} className="@container mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
                 {/* Queued means waiting for a slot: nothing is working yet. */}
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
@@ -320,7 +322,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             )}
           </div>
           {surface === 'card' && (
-            <div className="absolute top-2 right-2 z-20 flex max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] flex-col gap-[var(--sp-4)] overflow-y-auto md:static md:max-h-full md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pb-2 md:pl-1">
+            <div className={QUICK_CARD_SLOT}>
               <ThreadQuickCard
                 thread={thread}
                 code={code}
@@ -349,7 +351,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
         </div>
 
         {/* composer, keeping clear of the quick card's column so it centres under the transcript */}
-        <div className={`relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4 ${surface === 'card' ? 'md:pr-[19.5rem]' : ''}`}>
+        <div className={`relative shrink-0 bg-bg px-3 pt-1 safe-b-3 md:px-6 md:pb-4 ${surface === 'card' ? COMPOSER_CLEARS_CARD : ''}`}>
           <div className="mx-auto max-w-4xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {/* The setup card above says why while the worktree is not ready. */}

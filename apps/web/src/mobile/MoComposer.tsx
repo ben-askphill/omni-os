@@ -16,7 +16,7 @@ import { useDictation, withPhrase } from './dictation.ts';
 import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
-import { MoDiff, MoRound } from './parts.tsx';
+import { bottomInset, MoDiff, MoRound } from './parts.tsx';
 
 export interface ComposerChip {
   label: string;
@@ -156,7 +156,7 @@ export function MoComposer({
 
   return (
     // Not positioned, so the + sheet covers the screen rather than the composer.
-    <div className="shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) - 2px))' }}>
+    <div className="shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: bottomInset(2) }}>
       {(chips.length > 0 || next) && (
         <div className="mo-scroll flex gap-2 overflow-x-auto pt-0.5 pb-2.5">
           {next && (

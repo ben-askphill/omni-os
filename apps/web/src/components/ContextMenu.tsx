@@ -151,7 +151,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
       aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : referencing ? 'Reference a thread' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
-      className={`pop-in fixed z-[60] ${MENU_SURFACE} ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto' : 'min-w-[220px] max-w-[280px]'}`}
+      className={`pop-in fixed z-[60] ${MENU_SURFACE} ${referencing ? 'max-h-[calc(100dvh-1rem)] w-[min(23rem,calc(100%-1rem))] overflow-y-auto' : 'min-w-[220px] max-w-[280px]'}`}
     >
       <div className={referencing ? '' : 'p-1.5'}>
         {title && <MenuCaption>{title}</MenuCaption>}

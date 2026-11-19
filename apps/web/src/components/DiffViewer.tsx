@@ -130,8 +130,10 @@ export const DiffFile = memo(function DiffFile({
       </div>
     );
   };
+  // overflow-clip rounds the corners without making the card a scroll container, so its sticky header sticks to the
+  // Changes tab's scroller as the file scrolls past (overflow-hidden made it stick to a box that never scrolls).
   return (
-    <div className="overflow-hidden rounded-[18px] shadow-[inset_0_0_0_1px_var(--line)]">
+    <div className="overflow-clip rounded-[18px] shadow-[inset_0_0_0_1px_var(--line)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

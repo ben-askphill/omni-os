@@ -156,8 +156,8 @@ describe('no spinner says that something runs', () => {
     // The mark rules set color only: the halo and the breath are the two animations, each one class.
     const marks = css.slice(css.indexOf('/* ---- status marks'), css.indexOf('/* Status pill'));
     expect(marks).not.toMatch(/animation|transition|@keyframes/);
-    expect(css).toMatch(/\n\.ping \{\s*animation: omni-ping var\(--dur-ping\)/);
-    expect(css).toMatch(/\n\.breathe \{\s*animation: omni-breathe /);
+    expect(css).toMatch(/\n\s*\.ping \{\s*animation: omni-ping var\(--dur-ping\)/);
+    expect(css).toMatch(/\n\s*\.breathe \{\s*animation: omni-breathe /);
     const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toMatch(/\.ping,\s*\.breathe[^{]*\{\s*animation: none !important/);
     // Still, the halo is not drawn at all: no disc sits behind a hollow mark.

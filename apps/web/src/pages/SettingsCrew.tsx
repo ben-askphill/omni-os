@@ -20,6 +20,7 @@ import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { CrewAvatar } from '../components/CrewAvatar.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, IDENTIFIER, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
+import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, LockNote } from './settings-parts.tsx';
@@ -545,6 +546,7 @@ function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDeta
   const rows = lineDiff(detail.charters.builtIn ?? '', detail.charters.effective);
   const own = detail.charters.own ?? '';
   const changes = rows.filter((r) => r.kind !== 'same').length;
+  const region = useScrollRegion<HTMLDivElement>('Built-in and your charter, line by line', 'both');
   return (
     <div>
       <div className="space-y-3 px-6 pb-5">
@@ -555,15 +557,18 @@ function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDeta
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--diff-del-bg)] shadow-[inset_0_0_0_1px_var(--diff-del-fg)]" />Only in the built-in</span>
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--diff-add-bg)] shadow-[inset_0_0_0_1px_var(--diff-add-fg)]" />Only in yours</span>
         </div>
-        <div className="max-h-[50vh] overflow-auto rounded-[14px] bg-surface py-2 font-mono text-[11.5px] leading-[18px]" role="table" aria-label="Built-in and your charter, line by line">
+        {/* A scroll region the keyboard can scroll, its lines plain text: a screen reader hears which side a changed line is on. */}
+        <div className="max-h-[50dvh] overflow-auto rounded-[14px] bg-surface py-2 font-mono text-[11.5px] leading-[18px]" {...region}>
           {rows.map((r, i) => (
             <div
               key={i}
-              role="row"
               className={`flex gap-2 px-3 whitespace-pre-wrap ${r.kind === 'add' ? 'bg-[var(--diff-add-bg)] text-[var(--diff-add-fg)]' : r.kind === 'del' ? 'bg-[var(--diff-del-bg)] text-[var(--diff-del-fg)]' : 'text-fg-2'}`}
             >
               <span aria-hidden="true" className="w-3 shrink-0 select-none">{r.kind === 'add' ? '+' : r.kind === 'del' ? '−' : ''}</span>
-              <span className="min-w-0 break-words">{r.text || ' '}</span>
+              <span className="min-w-0 break-words">
+                {r.kind !== 'same' && <span className="sr-only">{r.kind === 'add' ? 'Only in yours: ' : 'Only in the built-in: '}</span>}
+                {r.text || ' '}
+              </span>
             </div>
           ))}
         </div>

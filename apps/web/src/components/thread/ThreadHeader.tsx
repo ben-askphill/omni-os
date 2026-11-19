@@ -96,7 +96,7 @@ export function ThreadHeader({
           <AccountChip ran={account} />
           <ContinueCrumbs links={links} />
         </div>
-        <h1 className="mt-0.5 truncate font-display text-[length:var(--fs-heading)] leading-snug" title={thread.title}>
+        <h1 className="mt-0.5 line-clamp-2 font-display text-[length:var(--fs-heading)] leading-snug text-balance" title={thread.title}>
           {thread.title}
         </h1>
         {modLines.length > 0 && <ModStatusLines lines={modLines} />}
