@@ -54,8 +54,29 @@ export interface CustomHarness {
   /** How many of its threads run at once. */
   cap: number;
   capabilities: HarnessCapabilities;
+  /** How Connect an agent paired it (agent-connect.ts), when it did. */
+  pairing?: HarnessPairing;
   /** Why it cannot run as written. Set means unavailable, whatever the probe would say. */
   error?: string;
+}
+
+/** A paired harness's `pairing:` block: what Remove can undo at the agent and here. Never the key itself. */
+export interface HarnessPairing {
+  /** The id of the key the agent handed over, for POST /v1/omni/revoke. */
+  keyId: string;
+  /** The pairing address, which minted the key and revokes it. */
+  at: string;
+  /** Every machine that pairs gets this same key (Hermes): it cannot be revoked for one machine alone. */
+  sharedKey: boolean;
+  /** The agent serves POST /v1/omni/revoke. */
+  revoke: boolean;
+  /** Omni made the secret the key is in, so Remove deletes it too. */
+  secretMade: boolean;
+  /**
+   * The secret the paired key went into. Remove revokes and deletes only while the file still names this one: an edit
+   * that changes the secret or the URL drops the block (custom-store.ts), and a hand edit that leaves it stale is ignored.
+   */
+  secret: string;
 }
 
 /** What the file's frontmatter may hold. Everything is optional here so a broken file still loads with its error. */
@@ -68,6 +89,7 @@ interface RawFile {
   family?: unknown;
   cap?: unknown;
   capabilities?: { steer?: unknown; interrupt?: unknown } | null;
+  pairing?: { key_id?: unknown; at?: unknown; shared_key?: unknown; revoke?: unknown; secret_made?: unknown; secret?: unknown } | null;
 }
 
 export const DEFAULT_BILLS = 'Bills the account set up on its own server, not your Claude, ChatGPT or Cursor plan';
@@ -84,7 +106,7 @@ const plain = (v: unknown, max: number) =>
     : '';
 
 /** A host on this machine: localhost, a loopback address. */
-function loopback(host: string): boolean {
+export function loopback(host: string): boolean {
   const h = host.replace(/^\[|\]$/g, '').toLowerCase();
   if (h === 'localhost' || h.endsWith('.localhost')) return true;
   if (isIP(h) === 4) return h.startsWith('127.');
@@ -92,7 +114,7 @@ function loopback(host: string): boolean {
 }
 
 /** A host on the tailnet: Tailscale's 100.64.0.0/10 addresses, its fd7a:115c:a1e0::/48 IPv6 range, or a MagicDNS name. */
-function tailnet(host: string): boolean {
+export function tailnet(host: string): boolean {
   const h = host.replace(/^\[|\]$/g, '').toLowerCase();
   if (isIP(h) === 4) {
     const [a, b] = h.split('.').map(Number);
@@ -157,6 +179,17 @@ export function parseHarnessFile(slug: string, text: string): CustomHarness {
     secret: typeof raw.auth?.secret === 'string' ? raw.auth.secret.trim() : '',
     bills: plain(raw.bills, 160) || DEFAULT_BILLS,
     family: plain(raw.family, 40) || null,
+    ...(raw.pairing &&
+      typeof raw.pairing === 'object' && {
+        pairing: {
+          keyId: plain(raw.pairing.key_id, 200),
+          at: plain(raw.pairing.at, 500),
+          sharedKey: raw.pairing.shared_key === true,
+          revoke: raw.pairing.revoke === true,
+          secretMade: raw.pairing.secret_made === true,
+          secret: plain(raw.pairing.secret, 64),
+        },
+      }),
   };
   try {
     h.host = h.url ? new URL(h.url).host : '';

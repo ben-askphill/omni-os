@@ -316,6 +316,15 @@ export const CHANGED_CHARTER_ACTIONS = {
   addMine: (own: string): Pick<CrewSaveBody, 'charter' | 'charter_mode'> => ({ charter: own, charter_mode: 'append' }),
 } as const;
 
+/**
+ * What a role gives up on a remote harness (Hermes, Cursor Cloud, a custom harness), for the role editor
+ * (Addendum A.4 of docs/plans/2026-11-18-user-defined-crew.md): it runs its own tools on its own server.
+ */
+export function remoteRoleNote(harness: string): string {
+  const where = harness === 'cursor-cloud' ? 'a Cursor cloud agent' : 'a server outside Omni';
+  return `This role runs on ${where}, with its own tools and secrets. Omni cannot hold it to Only routes work, so that is refused; a review on it is only what its charter asks. It gets none of this machine's secrets, no browser, no worktree and no Omni tools, and its replies come back as data, not instructions.`;
+}
+
 /** The choices for a role's memory, as Settings > Crew offers them. */
 export const ROLE_MEMORY_CHOICES: readonly { id: RoleMemoryMode; label: string; hint: string }[] = [
   { id: 'read-write', label: 'Reads and proposes', hint: 'Its threads get the lessons you approved, and propose new ones with remember.' },

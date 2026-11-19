@@ -41,7 +41,13 @@ const post = async (path: string, body: unknown) => {
   const queue = postAnswers[path];
   return queue && queue.length > 1 ? queue.shift() : (queue?.[0] ?? {});
 };
-vi.mock('../src/api.ts', () => ({ api: { get: routes, post, put: async () => ({}) }, errorText: String, ApiError: class extends Error {} }));
+vi.mock('../src/api.ts', () => ({
+  api: { get: routes, post, put: async () => ({}) },
+  errorText: String,
+  ApiError: class extends Error {},
+  // The Connect an agent sheet's helper command.
+  useApi: (path: string | null) => ({ data: path === '/harnesses/connect/helper' ? { command: 'curl -fsSL … | sh' } : undefined, error: null, reload: () => {} }),
+}));
 afterEach(() => {
   accounts = { machines: [], synced: false };
   github = undefined;
@@ -76,6 +82,16 @@ const labels = (row: Element) => [...row.querySelectorAll('span.w-12')].map((s) 
 const row = (el: HTMLElement, id: string) => el.querySelector(`[data-harness="${id}"]`)!;
 
 describe('Harnesses step', () => {
+  it('offers to connect your own agent, which opens the Connect an agent sheet', async () => {
+    harnesses = [{ id: 'claude-code', name: 'Claude Code', plan: 'Claude plan', available: true, models: [], running: 0, cap: 4 }];
+    const el = await render(createElement(HarnessScreen));
+    const own = el.querySelector('[data-connect-agent]')!;
+    expect(text(own)).toContain('Your own agent');
+    const button = [...own.querySelectorAll('button')].find((b) => b.textContent === 'Connect an agent')!;
+    await act(async () => button.click());
+    expect(text(document.querySelector('dialog'))).toContain('Agent address, link or code');
+  });
+
   it('signed out, missing and a reason each read as what they are', async () => {
     const noCodex = 'Omni found no codex on its PATH. Install Codex or set OMNI_CODEX_BIN to its path';
     harnesses = [

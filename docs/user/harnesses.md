@@ -122,7 +122,21 @@ The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of t
 
 ## Custom harnesses
 
-A custom harness is another agent on a server of your own, such as a second Hermes or an agent you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Agents > Harnesses lists each one as "Custom harness on <host>" with the secret its key is in. An add form comes later; for now write the file, or `POST /api/harnesses/custom/<slug>` with `{ name, url, secret, bills?, family?, cap?, capabilities? }` (`PUT` to change it, `DELETE` to remove it).
+A custom harness is another agent on a server of your own, such as a second Hermes or an agent you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Models > Harnesses lists each one with a Remote mark, its host and the secret its key is in, and Test connection, Edit and Remove under it.
+
+### Connect an agent
+
+**Connect an agent** on the Harnesses card (and on the Harnesses step of setup) adds one without pasting its key. The same sheet runs on desktop web, the phone layout and the desktop app.
+
+1. **On a Hermes server**, run the pairing helper the sheet shows, pinned to this build: `curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh`. It prints an `omni://connect-agent` link, a QR code when `qrencode` is installed, and an address and code to type. It makes `API_SERVER_KEY` in Hermes's `.env` when there is none (restart Hermes after), and answers one pairing for at most 10 minutes.
+2. **Find.** Click the link (the desktop app opens it), or paste it, a bare address, or the helper's address and code into the sheet. Omni looks at the address without a key and shows what it found: its name and host, whether it is on this machine, the tailnet or https, and chips for what a thread on it can and cannot do. Plain `http://` off the tailnet, an address this machine cannot reach, and A2A or eve agents (later versions) say why they cannot connect.
+3. **Sign in.** With a code, **Pair** redeems it server to server: the key goes into this machine's server and never reaches the page. Without one, pick the secret in Secrets that holds the key, or add it there from the sheet.
+4. **Test.** One short turn on its own session ("Reply with one line: your name and the model you run on"), with the reply, the model, the time it took and its tokens, or which step failed and what came back.
+5. **Connect** saves only after the test passed: a paired key as the global secret `AGENT_<SLUG>_KEY`, the harness file, and with **Make a crew role for it** (on by default) a role of the same id bound to it, delegatable and with no powers. A failure at any step undoes the steps before it.
+
+A link never reaches out to anything by itself: it fills the sheet in, you press Find to look the agent up, and Connect once its test turn passed. `#/settings/models?connect=<link>` opens the same sheet on a phone or in a browser. **Remove** revokes the key at the agent when it offers that, deletes the secret Connect made for it (a secret you picked yourself stays), and deletes the file here and on your other machines. Editing its address or secret first makes Remove skip the revoke and leave every secret alone, since the paired key may not be the one the file names any more. Hermes gives every machine the same key, so to cut one machine off, change `API_SERVER_KEY` on the server. Agent threads cannot connect, change, test or remove one (403); the Conductor hands you the page instead.
+
+You can still write the file by hand, or `POST /api/harnesses/custom/<slug>` with `{ name, url, secret, bills?, family?, cap?, capabilities? }` (`PUT` to change it, `DELETE` to remove it).
 
 ```yaml
 name: Hermes on Hetzner

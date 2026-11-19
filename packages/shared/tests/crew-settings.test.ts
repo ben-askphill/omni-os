@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankCrewDraft, CHANGED_CHARTER_ACTIONS, crewChips, crewDraftOf, crewDraftProblem, crewIdFrom, crewMarkdownOf, crewRunLine, crewSaveBody, crewTools, lineDiff, memoryScope, type CrewDetailView, type CrewListed } from '../crew-settings.ts';
+import { blankCrewDraft, CHANGED_CHARTER_ACTIONS, crewChips, crewDraftOf, crewDraftProblem, crewIdFrom, crewMarkdownOf, crewRunLine, crewSaveBody, crewTools, lineDiff, memoryScope, remoteRoleNote, type CrewDetailView, type CrewListed } from '../crew-settings.ts';
 
 const role = (over: Partial<CrewListed> = {}): CrewListed => ({ id: 'builder', name: 'Builder', description: 'Writes code.', model: 'auto', mcp: [], delegateOnly: false, delegatable: true, review: false, kind: 'shipped', hidden: false, ...over });
 
@@ -160,5 +160,13 @@ describe('Compare', () => {
     expect(CHANGED_CHARTER_ACTIONS.keep('Mine.')).toEqual({ charter: 'Mine.', charter_mode: 'replace' });
     expect(CHANGED_CHARTER_ACTIONS.takeBuiltIn()).toEqual({ charter: '', charter_mode: 'append' });
     expect(CHANGED_CHARTER_ACTIONS.addMine('Mine.')).toEqual({ charter: 'Mine.', charter_mode: 'append' });
+  });
+});
+
+describe('remoteRoleNote', () => {
+  it('says what a role on a remote harness gives up, naming where it runs', () => {
+    expect(remoteRoleNote('custom:hermes-box')).toMatch(/^This role runs on a server outside Omni, with its own tools and secrets\./);
+    expect(remoteRoleNote('custom:hermes-box')).toMatch(/Only routes work, so that is refused/);
+    expect(remoteRoleNote('cursor-cloud')).toMatch(/^This role runs on a Cursor cloud agent/);
   });
 });

@@ -15,6 +15,7 @@ import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
 import { Button, ChipSet, CopyButton, ErrorNote, fieldHintId, FolderInput, Icon, IDENTIFIER, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
 import { isImeEnter } from '../ime.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { ConnectAgentSheet } from './ConnectAgent.tsx';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
 export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Routines', 'Done'] as const;
@@ -191,6 +192,7 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
     void load().catch(() => {});
   };
   const signedIn = list?.some((h) => accountOf(h.id));
+  const [connecting, setConnecting] = useState(false);
   return (
     <Screen
       caption="Harnesses"
@@ -221,8 +223,24 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
             action={github.state === 'signed-out' ? <GithubConnect onDone={connected} /> : undefined}
           />
         )}
+        {list && (
+          <li className="rounded-[16px] bg-surface p-3.5" data-connect-agent>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg-3">
+                <Icon name="plus" size={13} />
+              </span>
+              <span className="text-[13.5px] font-medium">Your own agent</span>
+              <span className="text-[12px] text-fg-3">Optional</span>
+              <Button size="sm" className="ml-auto" onClick={() => setConnecting(true)}>
+                Connect an agent
+              </Button>
+            </div>
+            <p className="mt-2.5 pl-[34px] text-[12px] leading-relaxed text-fg-3">Hermes, or another agent on a server of yours. Threads run on it like a harness; it bills its own account.</p>
+          </li>
+        )}
         {!list && <li className="py-6 text-center text-[13px] text-fg-3">Checking…</li>}
       </ul>
+      <ConnectAgentSheet open={connecting} onClose={() => setConnecting(false)} onConnected={() => void load().catch(() => {})} />
       {signedIn && <p className="text-[12px] leading-relaxed text-fg-3">Wrong account? Sign in to the right one in a terminal, then Check again. Settings {'>'} Accounts lists them later, for each of your machines.</p>}
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-[12px] text-fg-3">
