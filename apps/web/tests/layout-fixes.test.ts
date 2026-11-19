@@ -51,8 +51,9 @@ describe('M9: Markdown CSS sits under the utilities', () => {
     for (const helper of ['.pulse {', '.fade-in {', '.pop-in {', '.flash {', '.shimmer-text {', '.link-mark {']) {
       expect(enclosing(css.indexOf(`  ${helper}`))[0], helper).toBe('@layer components');
     }
-    // An !important in a layer beats an unlayered one, so the reduced motion overrides must stay unlayered.
-    expect(enclosing(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'))).toEqual([]);
+    // The main reduced motion block overrides keyframes and helpers that sit in layers, so it stays unlayered. (The
+    // transition-utility one sits in @layer utilities on purpose: reduced-motion-css.test.ts.)
+    expect(enclosing(css.indexOf('@media (prefers-reduced-motion: reduce)', css.indexOf('/* ---- reduced motion ----')))).toEqual([]);
   });
 
   it('lets the phone reply set its own size and leading', () => {

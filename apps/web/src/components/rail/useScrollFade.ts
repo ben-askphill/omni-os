@@ -1,27 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
-/** A scroll area's mask: it fades at an edge only while content hides past it. Set `fade` as maskImage. */
+/** Whether CSS drives the fade from the scroll position itself (scroll-driven animations: Chrome 115, Safari 26). */
+const cssFades = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('animation-timeline: scroll()');
+
+/**
+ * A scroll area that fades at an edge only while content hides past it: put the ref and the `scroll-fade` class
+ * (index.css) on it. Where CSS has scroll-driven animations the class does it all. Elsewhere this marks the edges
+ * with content past them (`data-fade-start`, `data-fade-end`) as it scrolls or resizes.
+ */
 export function useScrollFade<T extends HTMLElement = HTMLDivElement>() {
   const ref = useRef<T>(null);
-  const [edges, setEdges] = useState({ top: false, bottom: false });
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const top = el.scrollTop > 1;
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    setEdges((e) => (e.top === top && e.bottom === bottom ? e : { top, bottom }));
-  }, []);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || cssFades()) return;
+    const measure = () => {
+      el.toggleAttribute('data-fade-start', el.scrollTop > 1);
+      el.toggleAttribute('data-fade-end', el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+    };
     measure();
     el.addEventListener('scroll', measure, { passive: true });
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     ro?.observe(el);
-    if (el.firstElementChild) ro?.observe(el.firstElementChild);
+    for (const child of el.children) ro?.observe(child);
     return () => (el.removeEventListener('scroll', measure), ro?.disconnect());
-  }, [measure]);
-  const top = edges.top ? 'transparent 0, black 28px' : 'black 0';
-  const bottom = edges.bottom ? 'black calc(100% - 28px), transparent 100%' : 'black 100%';
-  return { ref, fade: `linear-gradient(to bottom, ${top}, ${bottom})` };
+  }, []);
+  return ref;
 }

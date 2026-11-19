@@ -20,7 +20,7 @@ const SEND_OPTIONS: { mode: SendMode; label: Term; hint: string; icon: IconName;
   { mode: 'interrupt', label: 'interrupt', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
 ];
 
-const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out select-none active:scale-[.92] disabled:opacity-25';
+const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out select-none motion-reduce:transition-opacity active:scale-[.92] disabled:opacity-25';
 
 /** Split button for a busy thread: Steer (or Queue when the harness can't steer), plus a menu. */
 export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: boolean; busy: boolean; canSteer?: boolean; onSend: (mode: SendMode) => void }) {

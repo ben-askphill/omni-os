@@ -61,9 +61,9 @@ function PanelHeader({ title, lead, right }: { title: ReactNode; lead?: ReactNod
 
 /** The panel's scrolling list, fading at an edge while rows hide past it, as the rail does. */
 function PanelScroll({ children }: { children: ReactNode }) {
-  const { ref, fade } = useScrollFade();
+  const ref = useScrollFade();
   return (
-    <div ref={ref} className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4" style={{ maskImage: fade, WebkitMaskImage: fade }}>
+    <div ref={ref} className="scroll-thin scroll-fade mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
       {children}
     </div>
   );

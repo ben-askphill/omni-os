@@ -39,7 +39,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
       <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : (marks.get(c.id) ?? monogram(c.name))}</Disc>
     </RailItem>
   );
-  const { ref, fade } = useScrollFade();
+  const ref = useScrollFade();
   // "i" opens the Inbox, the page the Inbox disc opens.
   useInboxKey(() => navigate(href.inbox()));
   const color = useRailColor();
@@ -70,8 +70,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
       <Hairline />
       <div
         ref={ref}
-        className="rail-scroll min-h-0 w-full flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ maskImage: fade, WebkitMaskImage: fade }}
+        className="rail-scroll scroll-fade min-h-0 w-full flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="flex flex-col items-center gap-1 py-1.5">
           {clients.map(disc)}

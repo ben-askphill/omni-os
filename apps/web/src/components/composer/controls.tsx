@@ -72,7 +72,7 @@ export function StopButton({ busy, onClick }: { busy: boolean; onClick: () => vo
       aria-label={label}
       aria-keyshortcuts="Escape"
       title="Stop the agent (Esc). Messages already sent still run."
-      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out active:scale-[.92] disabled:opacity-60"
+      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-opacity active:scale-[.92] disabled:opacity-60"
     >
       {busy ? <Loader size={16} /> : <Icon name="stop" size={16} strokeWidth={2} />}
     </button>
@@ -88,7 +88,7 @@ export function SendButton({ armed, busy, onClick, children }: { armed: boolean;
       data-armed={armed || undefined}
       aria-label={typeof children === 'string' ? children : undefined}
       title={typeof children === 'string' ? children : undefined}
-      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out active:scale-[.92] disabled:opacity-25"
+      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-opacity active:scale-[.92] disabled:opacity-25"
     >
       {busy ? <Loader size={16} /> : <Icon name="send" size={16} strokeWidth={2} />}
       <span className="sr-only">{children}</span>

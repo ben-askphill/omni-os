@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { scrollBehavior } from '../motion.ts';
 import { useScrollAnchor } from './useScrollAnchor.ts';
 
 /** How close to the bottom counts as at it, for fractional scroll positions and zoom. */
@@ -48,7 +49,7 @@ export function useTranscriptScroll(tailId: number, content: unknown, active: bo
   };
   const jump = () => {
     const el = scrollRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: scrollBehavior() });
     nearBottom.current = true;
     setShowJump(false);
   };
