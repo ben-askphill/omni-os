@@ -1,6 +1,8 @@
 // A worktree thread's preparation: its worktree is made and checked before any harness runs, and a failure waits
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
-import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { channelActions, channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { isProviderHarness } from '../harness/types.ts';
+import { SHELL_REFUSAL } from '../request-trust.ts';
 import { ensureRepo } from '../repo-clone.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { followBranch } from '../branch-follow.ts';
@@ -8,6 +10,7 @@ import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
 import { channelExtras } from '../worktree-include.ts';
+import { userName } from '../user-config.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
@@ -56,9 +59,10 @@ export const bindResume = (fn: (threadId: string) => Promise<unknown>) => {
 /**
  * Make the thread's worktree and check it, then send what waited for it. Marks the thread preparing before it
  * returns. On failure the thread shows why and its first prompt waits, recovered, for Retry; a child reports the
- * failure to its parent. Never runs twice at once for one thread.
+ * failure to its parent. Never runs twice at once for one thread. `retry` is Ben's Retry setup and who pressed it:
+ * the setup step is looked up again after the checkout, so a caller without a shell is held there too.
  */
-export function setUpThread(threadId: string): Promise<Thread | undefined> {
+export function setUpThread(threadId: string, retry?: SetupRetryBy): Promise<Thread | undefined> {
   const running = preparing.get(threadId);
   if (running) return running;
   const t = threads.get(threadId);
@@ -67,7 +71,7 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   threads.update(threadId, { setup: 'preparing', setup_error: null, status, updated_at: t.updated_at });
   beginAttempt(threadId);
   emitThread(threadId);
-  const job = prepare(t)
+  const job = prepare(t, !retry || !!retry.shell)
     .catch((err) => {
       console.error(`[setup] ${threadId}:`, err);
       return threads.get(threadId);
@@ -80,7 +84,7 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   return job;
 }
 
-async function prepare(t: Thread): Promise<Thread | undefined> {
+async function prepare(t: Thread, shell: boolean): Promise<Thread | undefined> {
   // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
   // switched back (sandbox.ts prepareWorktree).
   if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
@@ -107,7 +111,7 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
     return threads.get(t.id);
   }
   // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.
-  const held = await runSetupAction(t);
+  const held = await runSetupAction(t, shell);
   if (held) {
     failSetup(t.id, held.reason, held.stopped);
     return threads.get(t.id);
@@ -143,17 +147,26 @@ export function failSetup(threadId: string, reason: string, stopped = false) {
   emitThread(threadId);
   const t = threads.get(threadId);
   if (!t?.parent_id) return;
-  if (stopped) reportToParent(threadId, 'stopped', `Ben stopped this thread while its worktree was being prepared, so it has not run.`);
+  if (stopped) reportToParent(threadId, 'stopped', `${userName().replace(/^the user/, 'The user')} stopped this thread while its worktree was being prepared, so it has not run.`);
   else reportToParent(threadId, 'failed', `Omni could not prepare this thread's worktree, so it has not run: ${reason}`);
+}
+
+/** What the caller of Retry setup may do: `shell` when its request may reach a shell (request-guard.ts shellAllowed). */
+export interface SetupRetryBy {
+  shell?: boolean;
 }
 
 /**
  * Ben's Retry. Idempotent: a thread that is ready is left as it is, one being prepared keeps that preparation, and
- * the same thread, branch and session are used again, so a retry never makes a second of either.
+ * the same thread, branch and session are used again, so a retry never makes a second of either. A failed thread
+ * whose channel has a setup step reruns that command in a login shell, so only a caller that may reach a shell
+ * retries it (request-trust.ts); without one the retry only checks the branch out again, which anyone may.
  */
-export function retrySetup(threadId: string): Thread {
+export function retrySetup(threadId: string, by: SetupRetryBy = {}): Thread {
   const t = threads.get(threadId);
   if (!t) throw refusal('thread not found', 404);
-  if (t.setup === 'failed') void setUpThread(threadId);
+  if (t.setup !== 'failed') return t;
+  if (!by.shell && !isProviderHarness(t.harness) && channelActions.setupFor(t.channel_id)) throw refusal(`Forbidden: ${SHELL_REFUSAL}`, 403);
+  void setUpThread(threadId, by);
   return threads.get(threadId)!;
 }

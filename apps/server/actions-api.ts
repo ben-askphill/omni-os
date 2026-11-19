@@ -9,6 +9,11 @@
 // POST   /threads/:id/actions/:action/run       start one in the thread's checkout
 // POST   /threads/:id/action-runs/:run/stop     stop a run
 // POST   /threads/:id/action-runs/:run/retry    run its action again
+//
+// Adding, changing, running and retrying put a command in a login shell, so requestGuard lets only the install's
+// token or a session paired with it through to them, as for the terminal (request-trust.ts). A new route here that
+// does too goes in its ACTION_SHELL_ROUTES; tests/actions-credentials.test.ts fails until it is in that list or named
+// as open there.
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { ChannelActionInput } from '@omni/shared/channel-actions.ts';

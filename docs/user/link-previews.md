@@ -12,7 +12,7 @@ A link in a reply shows as its tool's mark, its id and the title the tool gives 
 | Jira, Confluence | `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN` |
 | Productive | `PRODUCTIVE_API_KEY` |
 | Shopify admin links | `SHOPIFY_ACCESS_TOKEN` |
-| Notion | `NOTION_TOKEN` |
+| Notion | `OMNI_NOTION_TOKEN` ([Notion](notion.md)), or `NOTION_TOKEN` |
 | Linear | `LINEAR_API_KEY` |
 | Figma | `FIGMA_TOKEN` |
 | Slack | `SLACK_BOT_TOKEN` |

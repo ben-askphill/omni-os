@@ -6,14 +6,14 @@ const base: RequestFacts = { method: 'GET', route: 'read', hostAllowed: true, ho
 const decide = (over: Partial<RequestFacts>) => decideRequest({ ...base, ...over });
 const SITES = [undefined, 'none', 'same-origin', 'same-site', 'cross-site'] as const;
 const CREDS: Credential[] = ['token', 'session-token', 'session', 'nonce', 'none'];
-const ROUTES: RouteClass[] = ['read', 'act', 'terminal', 'pairing'];
+const ROUTES: RouteClass[] = ['read', 'act', 'shell', 'pairing'];
 
 /** The rule, written out once more as a table key, to check every combination against. */
 function expected(route: RouteClass, site: (typeof SITES)[number], cred: Credential): boolean {
   if (site === 'same-site' || site === 'cross-site') return false;
   if (route === 'pairing') return (site === undefined || site === 'none') && (cred === 'nonce' || cred === 'token');
   if (cred === 'none') return false;
-  if (route === 'terminal') return cred === 'token' || cred === 'session-token';
+  if (route === 'shell') return cred === 'token' || cred === 'session-token';
   return true;
 }
 

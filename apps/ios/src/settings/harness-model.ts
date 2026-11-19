@@ -10,7 +10,7 @@ export interface HarnessRow {
   fix: string | null;
 }
 
-/** Settings, Harnesses & models: each harness with whether it can run, its models and its cap, as the Web UI lists them. */
+/** Settings, Models: each harness with whether it can run, its models and its cap, as the Web UI lists them. */
 export function harnessRows(list: readonly HarnessInfo[]): HarnessRow[] {
   return list.map((h) => {
     const def = h.models.find((m) => m.default) ?? h.models[0];

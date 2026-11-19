@@ -15,6 +15,8 @@ import type { Attachment } from '../../uploads.ts';
  * read), `discarded` (Ben chose not to send a recovered one), `cancelled` (Ben removed it from the queue before it
  * was sent; the row stays as the record, and the transcript never shows it). After a restart: `recovered` (it never reached a
  * harness, so it waits for Resume) and `uncertain` (it may have reached one, so it is never sent again on its own).
+ * `shown`: a crew report in its delegate-only parent's transcript that started no turn; the harness reads it with the
+ * parent's next message, which makes it `delivered` (apps/server/runner/queue.ts).
  */
 export type DeliveryState =
   | 'accepted'
@@ -26,7 +28,8 @@ export type DeliveryState =
   | 'discarded'
   | 'cancelled'
   | 'recovered'
-  | 'uncertain';
+  | 'uncertain'
+  | 'shown';
 
 /** Waiting on Ben after a restart. */
 export const PARKED: readonly DeliveryState[] = ['recovered', 'uncertain'];
@@ -116,9 +119,11 @@ export const messageRequests = {
   get: (id: string) => parse(db.prepare('SELECT * FROM message_requests WHERE id = ?').get(id) as Row | undefined),
   byRequestId: (threadId: string, requestId: string) =>
     parse(db.prepare('SELECT * FROM message_requests WHERE thread_id = ? AND request_id = ?').get(threadId, requestId) as Row | undefined),
-  /** A thread's requests waiting on Ben after a restart, in the order they arrived. */
+  /** A thread's requests waiting on the user after a restart, in the order they arrived. */
   parked: (threadId: string) =>
     list(`SELECT * FROM message_requests WHERE thread_id = ? AND state IN (${marks(PARKED)}) ORDER BY pos, seq`, threadId),
+  /** A thread's crew reports shown in its transcript that its harness has not read yet, oldest first. */
+  shown: (threadId: string) => list(`SELECT * FROM message_requests WHERE thread_id = ? AND state = 'shown' ORDER BY pos, seq`, threadId),
   /** A thread's requests saved but not handed to the runner yet: a worktree thread's first prompt while it is prepared. */
   unstarted: (threadId: string) => list(`SELECT * FROM message_requests WHERE thread_id = ? AND state = 'accepted' ORDER BY pos, seq`, threadId),
   /** A thread's requests, newest first: the record of what was sent, dropped, discarded or cancelled. */
@@ -156,7 +161,7 @@ export const messageRequests = {
     );
   },
   /**
-   * Ben edited a request that has not been sent. Only while it is still editable, so a request the runner has
+   * The user edited a request that has not been sent. Only while it is still editable, so a request the runner has
    * started cannot change after it did. The fingerprint stays the first send's, so a late retry of that send is
    * still answered as a duplicate.
    */
@@ -167,7 +172,7 @@ export const messageRequests = {
         .run(r.prompt, r.attachments?.length ? JSON.stringify(r.attachments) : null, now(), id).changes > 0
     );
   },
-  /** Ben sent a held request now instead of after the turn: it goes out as a steer. Only while it is still editable. */
+  /** The user sent a held request now instead of after the turn: it goes out as a steer. Only while it is still editable. */
   steer: (id: string) =>
     db.prepare(`UPDATE message_requests SET mode = 'steer', updated_at = ? WHERE id = ? AND state IN (${marks(EDITABLE)})`).run(now(), id).changes > 0,
   /** New queue positions, as `id -> pos`. Only for requests still editable; returns false, changing nothing, otherwise. */

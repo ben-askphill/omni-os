@@ -15,8 +15,8 @@
 #                                           with TOOL:600000 keeps the turn running for ten minutes (fake-claude.mjs)
 #
 # QA_HANDOFF_PORT sets the relay's port (default 47300); A is that +1 and B +2. QA_HANDOFF_DIR moves the rig's dir
-# (default $TMPDIR/omni-qa-handoff). The channel "qa-shared" (folder $QA_HANDOFF_DIR/shared on both) is made on A and
-# syncs to B. Bash 3.2 and macOS safe.
+# (default $TMPDIR/omni-qa-handoff, mode 0700, checked like qa-stack.sh's). The channel "qa-shared" (folder
+# $QA_HANDOFF_DIR/shared on both) is made on A and syncs to B. Bash 3.2 and macOS safe.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -32,6 +32,16 @@ die() { echo "qa-handoff-stack: $*" >&2; exit 1; }
 # A failed up tears the rig down, unless QA_HANDOFF_KEEP=1 leaves it to read the logs.
 abort() { [ "${QA_HANDOFF_KEEP:-0}" = 1 ] || down >/dev/null 2>&1; die "$*"; }
 [ "$BASE" -ge 47300 ] && [ "$BASE" -le 47397 ] || die "QA_HANDOFF_PORT must be in 47300-47397, got $BASE"
+# The rig's dir holds the relay token, the PID files and both servers' state dirs. Checked as qa-stack.sh checks its
+# own (scripts/qa-private-dir.mjs): DIR becomes the real path checked, and 1 means it does not exist.
+private_dir() {
+  local rc=0 path
+  path="$(node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR")" || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || exit 1
+  [ -n "$path" ] || { echo "qa state dir: the check printed no path for $DIR" >&2; exit 1; }
+  DIR="$path"
+  [ "$rc" = 0 ]
+}
 
 lower() { echo "$1" | tr 'A-Z' 'a-z'; }
 side() { case "$1" in A | a) echo a ;; B | b) echo b ;; *) die "name a server: A or B (got '${1:-}')" ;; esac; }
@@ -165,6 +175,14 @@ flip() { # <server> <online: true|false>
   done
   die "$other_side still does not show QA Mac $(upper "$(side "$s")") $want after 20s"
 }
+
+# Before anything in the rig's dir is read: up makes and checks it first, and every other command stops when it is not
+# there, so a dir made in the meantime is never read.
+case "${1:-}" in
+  up) private_dir --create || die "could not make $DIR" ;;
+  down | status) private_dir || { echo "nothing at $DIR"; exit 0; } ;;
+  logs | env | offline | online | thread) private_dir || die "nothing at $DIR; start the rig with up" ;;
+esac
 
 case "${1:-}" in
   up) up ;;

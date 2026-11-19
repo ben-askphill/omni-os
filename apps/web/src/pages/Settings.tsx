@@ -10,7 +10,7 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
-import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
@@ -21,7 +21,7 @@ import { ConnectSection } from './Connect.tsx';
 import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
-import { AppServerRows, DesktopSection, ZoomRow } from './SettingsDesktop.tsx';
+import { AppServerRows, DesktopSection, WisprFlowCard, ZoomRow } from './SettingsDesktop.tsx';
 import { NotificationsCard } from './SettingsNotifications.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { CrewSection } from './SettingsCrew.tsx';
@@ -105,7 +105,7 @@ function SectionBody({ section }: { section: SettingsSection }) {
     case 'notifications':
       return <NotificationsCard scoped={channel?.id} />;
     case 'models':
-      return <ModelsSection hermes={<ConfigSection part="models" />} />;
+      return <ModelsSection />;
     case 'crew':
       return <CrewSection />;
     case 'accounts':
@@ -139,6 +139,8 @@ function SectionBody({ section }: { section: SettingsSection }) {
       );
     case 'desktop':
       return desktop ? <DesktopSection bridge={desktop} /> : null;
+    case 'extras':
+      return <ExtrasSection />;
     case 'about':
       return <AboutSection />;
   }
@@ -201,13 +203,57 @@ function ConfigSection({ part, children }: { part: SettingPage; children?: React
       {error && <ErrorNote>{error}</ErrorNote>}
       {state ? <ConfigForm part={part} state={state} onSaved={setState} /> : !error && <Loading />}
       {children}
-      {part !== 'access' && part !== 'models' && <ConfigNote path={state?.path} />}
+      {part !== 'access' && <ConfigNote path={state?.path} />}
     </>
   );
 }
 
 function WorkspaceSection() {
-  return <ConfigSection part="workspace" />;
+  return (
+    <ConfigSection part="workspace">
+      <LinkLine href={href.settingsSection('extras', 'brain')}>The notes folder is in Extras</LinkLine>
+    </ConfigSection>
+  );
+}
+
+/** The optional add-ons, each off until set up: Wispr Flow, Grok Bot, then Hermes and the notes folder's form. */
+function ExtrasSection() {
+  return (
+    <>
+      {desktop?.platform === 'darwin' ? (
+        <WisprFlowCard bridge={desktop} />
+      ) : (
+        <Card entry="wispr-flow" title="Wispr Flow" subtitle="Say what you need instead of typing it: Wispr Flow dictates into the Quick Prompt. Its switch is here in Omni's Mac app." />
+      )}
+      <GrokBotCard />
+      <ConfigSection part="extras" />
+    </>
+  );
+}
+
+/** Send to Grok Bot: on once this server has the webhook's secrets (apps/server/grokbot.ts). */
+function GrokBotCard() {
+  const { status } = useApp();
+  const on = !!status?.grokBot;
+  return (
+    <Card
+      entry="grok-bot"
+      title="Grok Bot"
+      subtitle="Hands a thread or a request to your Grok Bot: Send to Grok Bot in a thread's menu, or Grok Bot in the new thread's machine picker."
+      actions={
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
+          <StatusDot status={on ? 'done' : 'idle'} size={7} />
+          {on ? 'On' : 'Off'}
+        </span>
+      }
+    >
+      <FootNote>
+        {on ? 'It posts to the webhook in the global secret ' : 'To turn it on, add the global secrets '}
+        <code>GROKBOT_WEBHOOK_URL</code> and <code>GROKBOT_WEBHOOK_AUTH</code>.
+      </FootNote>
+      <LinkLine href={href.settingsSection('secrets')}>Secrets</LinkLine>
+    </Card>
+  );
 }
 
 function WorktreesSection() {
@@ -499,7 +545,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
   return (
     <form onSubmit={saveAll} className="space-y-5">
       <Card entry={FORM_ENTRY[part]} title={page.title} subtitle={page.note}>
-        {part === 'workspace' && <span id={settingAnchor('brain')} className="block scroll-mt-6" />}
+        {part === 'extras' && <span id={settingAnchor('brain')} className="block scroll-mt-6" />}
         {rows(fields.filter((f) => !f.advanced))}
         {error && <ErrorNote>{error}</ErrorNote>}
         {editable.length > 0 &&
@@ -525,7 +571,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
 }
 
 /** The search entry each form answers to. */
-const FORM_ENTRY: Record<SettingPage, string> = { general: 'you', workspace: 'folders', models: 'hermes', access: 'network' };
+const FORM_ENTRY: Record<SettingPage, string> = { general: 'you', workspace: 'folders', extras: 'hermes', access: 'network' };
 
 const formValues = (fields: readonly SettingField[], c: UserConfig): Record<string, string> =>
   Object.fromEntries(fields.map((f) => [settingId(f), (c[f.section] as Record<string, string | undefined>)[f.key] ?? f.default]));

@@ -39,8 +39,8 @@ async function checkFolder(channel: string, name: string, create?: boolean) {
   if (hit || create) return hit ?? null;
   const have = (ch.folders ?? []).map((f: any) => `"${f.name}"`).join(', ') || 'none yet';
   throw new Error(
-    `#${channel} has no folder "${name}" (folders: ${have}). Suggest the new folder to ${USER} and leave the thread unfiled for now; ` +
-      `once ${USER} agrees, call file_thread with create: true. Pass create_folder: true on delegate only when ${USER} already asked for the folder.`,
+    `#${channel} has no folder "${name}" (folders: ${have}). Delegate without a folder; do not ask ${USER} about one. ` +
+      `Pass create_folder: true on delegate only when ${USER} named the folder.`,
   );
 }
 
@@ -173,7 +173,8 @@ server.registerTool(
   {
     description:
       'Hand a task to a crew role in a channel. Creates a new thread that runs in the background. ' +
-      'Its final reply is reported back to you automatically as a [crew report] message; do not poll for it. ' +
+      `Its final reply is reported back to you automatically as a [crew report] message; do not poll for it. A delegate-only thread (the Conductor) gets it shown in its transcript for ${USER}, and is woken by it only with follow_up. ` +
+      'Only for real work: answer a quick question yourself. ' +
       'Without a harness/model/effort it uses the role\'s defaults, and with none set anywhere, Auto: Omni reads the brief and ' +
       'picks the harness, model and effort for it, and the result says why in auto_reason. Use list_harnesses for valid ids.',
     inputSchema: {
@@ -204,6 +205,13 @@ server.registerTool(
         ),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
+      follow_up: z
+        .boolean()
+        .optional()
+        .describe(
+          `true when you will act on the report yourself: the next step of a chain ${USER} asked for, combining several reports, sending findings back. ` +
+            `Then the report wakes you. Left off, ${USER} sees the report in your thread as it lands and you read it with ${USER}'s next message.`,
+        ),
       base: z
         .string()
         .optional()
@@ -220,11 +228,11 @@ server.registerTool(
         ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, base, device }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
   },
@@ -517,9 +525,9 @@ server.registerTool(
   'crew_questions',
   {
     description:
-      'The questions the threads you delegated to (at any depth, team members included) asked Ben with ask_user_question ' +
-      'and still wait on: the thread and task id that asked, and the questions. Ben answers them on your thread, where ' +
-      'their cards show; you cannot answer for him. A thread waiting here is blocked on Ben, not stuck. thread_id ' +
+      `The questions the threads you delegated to (at any depth, team members included) asked ${USER} with ask_user_question ` +
+      `and still wait on: the thread and task id that asked, and the questions. ${USER} answers them on your thread, where ` +
+      `their cards show; you cannot answer for them. A thread waiting here is blocked on ${USER}, not stuck. thread_id ` +
       'defaults to your own thread.',
     inputSchema: { thread_id: z.string().optional() },
   },
@@ -1166,7 +1174,7 @@ server.registerTool('disk_space', {
 }, async () => text(await call('/disk')));
 
 server.registerTool('worktree_storage', {
-  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. slim: the idle worktrees whose caches (node_modules, build output) stripping would delete while keeping the worktree, its schedule on this machine and the last strip runs; cacheBytes on each item is that part of its size. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees or strips caches, in Settings > Worktrees.',
+  description: `Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. slim: the idle worktrees whose caches (node_modules, build output) stripping would delete while keeping the worktree, its schedule on this machine and the last strip runs; cacheBytes on each item is that part of its size. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only ${USER} removes worktrees or strips caches, in Settings > Worktrees.`,
   inputSchema: { scan: z.boolean().optional() },
 }, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
 

@@ -147,7 +147,7 @@ describe('Stop while a worktree is prepared', () => {
     await until('the setup to print', async () => !!(await setupRun(t.id))?.output.includes('started'));
     expect((await call('POST', `/threads/${t.id}/stop`, {})).status).toBe(200);
     await r.until('the preparation to stop', () => r.thread(t.id).setup === 'failed');
-    expect(r.thread(t.id)).toMatchObject({ status: 'stopped', setup_error: 'Stopped by Ben before the agent started.' });
+    expect(r.thread(t.id)).toMatchObject({ status: 'stopped', setup_error: 'Stopped by you before the agent started.' });
     expect(await setupRun(t.id)).toMatchObject({ state: 'stopped' });
     await settle();
     expect(r.spawns(t.id)).toEqual([]);

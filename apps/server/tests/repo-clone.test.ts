@@ -157,7 +157,7 @@ describe('a worktree thread whose channel repository is not on this machine', ()
     await cloneShown(t.id);
     expect((await app.request(`/api/threads/${t.id}/stop`, { method: 'POST' })).status).toBe(200);
     const f = await r.until('the stop, before the clone ends', () => r.thread(t.id).setup === 'failed' && r.thread(t.id), 1500);
-    expect(f).toMatchObject({ status: 'stopped', setup_error: 'Stopped by Ben before the agent started.' });
+    expect(f).toMatchObject({ status: 'stopped', setup_error: 'Stopped by you before the agent started.' });
     expect(existsSync(t.cwd)).toBe(false);
     await r.until('the clone to land', () => existsSync(join(path, 'README.md')), 10_000);
     await retry(t.id);
