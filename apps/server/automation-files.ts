@@ -4,8 +4,9 @@
 // the written file goes to the other machines too (sync/handlers/automation-file.ts), so both agree on `machine:`.
 // A `precheck:` is a command a login shell runs before each scheduled run, so only a caller that may reach a shell
 // (request-trust.ts mayUseShell) makes one run that did not: a new or changed command, or a schedule for a file whose
-// precheck never ran. The editor's fields never carry it; the raw YAML can. Removing one, or saving over a file whose
-// precheck already runs, stays open: neither puts a new command in a shell.
+// precheck never ran, or moving one to another channel, whose folder it runs in. The editor's fields never carry it;
+// the raw YAML can. Removing one, or saving over a file whose precheck already runs where it ran, stays open: neither
+// puts a new command in a shell.
 
 import { existsSync, readFileSync } from 'node:fs';
 import YAML, { Document, isMap, isScalar, Scalar } from 'yaml';
@@ -250,18 +251,21 @@ export interface AutomationWriteBy {
 }
 
 /**
- * The precheck a file would run on its next scheduled run, or null: none, or one that never runs because the file is
- * an event automation or does not load. A missing Omni checkout is this machine's, not the file's (check below).
+ * The precheck a file would run on its next scheduled run, with the channel whose folder it runs in (automations.ts
+ * precheckDir), or null: none, or one that never runs because the file is an event automation or does not load. The
+ * same command in another channel's folder is another command (`./check.sh` is whatever that folder holds). A missing
+ * Omni checkout is this machine's, not the file's (check below).
  */
 function scheduledPrecheck(id: string, text: string): string | null {
   const a = parseAutomation(id, text);
-  if ((a.error && !a.error.startsWith('needs an Omni checkout')) || a.on) return null;
-  return a.precheck?.command ?? null;
+  if ((a.error && !a.error.startsWith('needs an Omni checkout')) || a.on || !a.precheck) return null;
+  return JSON.stringify([a.channel, a.precheck.command]);
 }
 
 /**
  * Save the editor's fields over an automation's file, or its raw YAML. A shipped one becomes the user's own copy. A
- * precheck that would run where none ran before, or with another command, needs a caller that may reach a shell: so
+ * precheck that would run where none ran before, with another command or in another channel's folder, needs a caller
+ * that may reach a shell: so
  * does turning an event automation, or one that did not load, that carries one into a scheduled one. One that already
  * runs can stay.
  */

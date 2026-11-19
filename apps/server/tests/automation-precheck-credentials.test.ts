@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 
@@ -129,6 +129,31 @@ describe('a precheck that never ran', () => {
       expect(loaded(event).on).toBeDefined();
       expect(loaded(broken).error).toBe('missing prompt');
       expect(launched()).not.toContain(command);
+    });
+});
+
+// A precheck runs in its channel's folder (automations.ts precheckDir), so the same command in another channel is
+// another command: `./check.sh` there is whatever that folder holds.
+describe("moving a precheck to another channel's folder", () => {
+  const elsewhere = join(r.tmp, 'elsewhere');
+  mkdirSync(elsewhere, { recursive: true });
+  r.db.channels.create({ id: 'elsewhere', name: 'Elsewhere', kind: 'internal', use_worktree: 0, base_dir: elsewhere });
+  for (const who of SIGNED_IN)
+    it(`${who}: ${CREDENTIALS[who].shell ? 'may' : 'may not'} move an automation whose precheck runs to another channel`, async () => {
+      const command = `echo moved-${++n}`;
+      const id = await tokenAutomation(command);
+      const before = fileText(id);
+      const moved = await call(who, 'PUT', `/automations/${id}`, { yaml: yaml(`precheck: ${command}\n`).replace('channel: scratch', 'channel: elsewhere') });
+      const def = (await call(TOKEN, 'GET', `/automations/${id}/definition`)).body;
+      const viaFields = await call(who, 'PUT', `/automations/${id}`, { fields: { ...def.fields, machine_id: undefined, channel: 'elsewhere' } });
+      if (CREDENTIALS[who].shell) {
+        for (const res of [moved, viaFields]) expect(res.status, JSON.stringify(res.body)).toBe(200);
+        expect(loaded(id).channel).toBe('elsewhere');
+        return;
+      }
+      for (const res of [moved, viaFields]) expectRefused(who, res);
+      expect(fileText(id)).toBe(before);
+      expect(loaded(id).channel).toBe('scratch');
     });
 });
 
