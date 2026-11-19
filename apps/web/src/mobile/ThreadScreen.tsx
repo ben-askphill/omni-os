@@ -1,4 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
+import { glyphLabel, showsCode } from '@omni/shared/display.ts';
+import { useDisplay } from '../display.ts';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
@@ -38,7 +40,7 @@ import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/sh
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { STATUS, asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
+import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
@@ -52,6 +54,7 @@ export function ThreadScreen() {
   const ran = useThreadAccount(thread?.id);
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
+  const display = useDisplay();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
   const [machineSheet, setMachineSheet] = useState(false);
@@ -96,6 +99,8 @@ export function ThreadScreen() {
   }
 
   const ch = channel(thread.channel_id);
+  // Show technical details, or a channel with a repo: PR and change chips, branch and session in the quick card.
+  const code = showsCode(display, ch);
   const conductor = thread.channel_id === 'conductor' || thread.role === 'conductor';
   const crew = children.filter((c) => c.source !== 'team');
   const item = needsYou?.items.find((i) => i.thread.id === thread.id);
@@ -119,10 +124,11 @@ export function ThreadScreen() {
   const openChip: ComposerChip = { label: 'Open PR', icon: 'pr', onClick: () => void openPR() };
   // The agent just asked whether to open a PR: answering yes sits next to the Machine chip.
   const offered = prOffered(events, !slotBusy && !queued.length, pr?.pr);
-  if (offered) chips.push(openChip);
+  if (code && offered) chips.push(openChip);
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
-  if (pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
-  else if (changes?.files.length) {
+  // Outside a code project with the switch off: no PR or change chips.
+  if (code && pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
+  else if (code && changes?.files.length) {
     chips.push({ label: slotBusy ? 'Changes so far' : 'Review changes', icon: 'diff', diff: [changes.add, changes.del], onClick: () => shell.open(href.threadView(thread.id, 'changes')) });
     if (!slotBusy && !offered) chips.push(openChip);
   }
@@ -137,7 +143,7 @@ export function ThreadScreen() {
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
   const reconnecting = !s.live && ready;
   const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
-  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label, mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
+  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
   const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
   const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status, turn };
 
@@ -192,6 +198,7 @@ export function ThreadScreen() {
             <div className="pop-in absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)]">
               <ThreadQuickCard
                 thread={thread}
+                code={code}
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
@@ -287,6 +294,7 @@ export function ThreadScreen() {
       {menu && (
         <MenuSheet
           thread={thread}
+          code={code}
           pr={pr?.pr ? { label: `PR #${pr.pr.number}`, line: prLine(pr.pr).text } : pr?.crew.length ? { label: 'PRs from delegated threads', line: crewLine(pr.crew).text } : null}
           changes={changes?.files.length ? `${plural(changes.files.length, 'file')} · +${changes.add} −${changes.del}` : null}
           onClose={() => setMenu(false)}

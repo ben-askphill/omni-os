@@ -8,7 +8,7 @@ import { AutomationEditor, type EditorTarget } from '../components/AutomationEdi
 import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, Segmented, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
 import { pageColumn, PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
-import { statusLabel } from '@omni/shared/status.ts';
+import { statusLabel } from '../components/ui.tsx';
 import { describeCron } from '@omni/shared/cron.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { shortPath } from '@omni/shared/short-path.ts';

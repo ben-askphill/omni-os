@@ -26,8 +26,9 @@ export function sendModeFor(thread: SteerFacts, catalog: readonly HarnessInfo[] 
   return steers(thread, catalog) ? 'steer' : 'queue';
 }
 
-export function composerPlaceholder(thread: SteerFacts, catalog: readonly HarnessInfo[] | null): string {
+export function composerPlaceholder(thread: SteerFacts, catalog: readonly HarnessInfo[] | null, technical = true): string {
   if (!isBusy(thread)) return 'Follow up';
+  if (!technical) return steers(thread, catalog) ? 'Add to what it is doing' : 'Send when it finishes';
   return steers(thread, catalog) ? 'Steer the agent' : 'Queue for after this turn';
 }
 

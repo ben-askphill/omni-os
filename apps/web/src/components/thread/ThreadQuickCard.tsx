@@ -17,6 +17,8 @@ import { shortPath } from '@omni/shared/short-path.ts';
 import type { ThreadPRs } from './panel/PRsTab.tsx';
 import type { InitP } from './panel/DetailsTab.tsx';
 import { CAPTION, CARD_PAD, DIVIDER, ROW } from './panel/inset.ts';
+import { markLabel, term } from '@omni/shared/display.ts';
+import { useTechnical } from '../../display.ts';
 
 function QuickRow({
   icon,
@@ -81,9 +83,15 @@ export function ThreadQuickCard({
   asking = false,
   turn,
   reconnecting = false,
+  code = true,
   className = '',
 }: {
   thread: Thread;
+  /**
+   * Show technical details is on, or the channel has a repo: the card lists the task id, working directory, session,
+   * branch and pull requests. Off outside a repo, it keeps the machine, the AI app, the run and the files.
+   */
+  code?: boolean;
   init: InitP | null;
   warm: boolean | undefined;
   slotBusy: boolean;
@@ -109,10 +117,11 @@ export function ThreadQuickCard({
   const cloudUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const model = thread.model || init?.model;
   const now = useNow(60_000);
+  const technical = useTechnical();
   // The run row says what the header pill says, except that a turn in progress reads as one.
   const need = useNeedOf(thread.id);
   const pill = threadPill(thread, { asking, reconnecting, now, turn, need, pr: prs?.pr });
-  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: runningLabel(thread, 'Turn running'), phase: pill.phase, mark: pill.phase ?? ('working' as const) };
+  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? markLabel('question', technical) : pill.label } : { glyph: 'running' as const, label: runningLabel(thread, term('turnRunning', technical)), phase: pill.phase, mark: pill.phase ?? ('working' as const) };
   const branchDisabled = !thread.branch;
   // The account its harness ran as when its process last started (apps/server/harness-accounts.ts), here or elsewhere.
   const ran = useThreadAccount(thread.id);
@@ -125,9 +134,9 @@ export function ThreadQuickCard({
     >
       <QuickRow icon="monitor">
         <span className="min-w-0 truncate">{machineLabel(machineName)}</span>
-        {thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-3">{thread.task_id}</span>}
+        {code && thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-3">{thread.task_id}</span>}
       </QuickRow>
-      {cloud && cloudUrl ? (
+      {!code && !cloud ? null : cloud && cloudUrl ? (
         <QuickRow icon="external" label="Open in Cursor" onClick={() => window.open(cloudUrl, '_blank', 'noopener,noreferrer')}>
           <span className="truncate">Open in Cursor</span>
         </QuickRow>
@@ -143,7 +152,7 @@ export function ThreadQuickCard({
         </QuickRow>
       )}
       <div className="my-[var(--sp-2)] h-px bg-line" />
-      <QuickRow icon="info" label="Harness and model">
+      <QuickRow icon="info" label={term('harnessAndModel', technical)}>
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />
         </span>
@@ -160,12 +169,12 @@ export function ThreadQuickCard({
         <StatusDot mark={run.mark} size={8} />
         <span className="truncate">
           {run.label}
-          {warm !== undefined && !remote && !reconnecting && (
+          {code && warm !== undefined && !remote && !reconnecting && (
             <span className="text-fg-3"> · {warm ? 'Live session' : 'Cold start next message'}</span>
           )}
         </span>
       </QuickRow>
-      {branchDisabled ? (
+      {!code ? null : branchDisabled ? (
         <QuickRow icon="branch" disabled>
           <span className="text-fg-3">No branch</span>
         </QuickRow>
@@ -184,7 +193,7 @@ export function ThreadQuickCard({
           <span className="font-medium">All details</span>
         </QuickRow>
       </div>
-      <PullRequests thread={thread} prs={prs} step={step} onOpen={onOpen} onOpenPR={onOpenPR} />
+      {code && <PullRequests thread={thread} prs={prs} step={step} onOpen={onOpen} onOpenPR={onOpenPR} />}
     </section>
   );
 }

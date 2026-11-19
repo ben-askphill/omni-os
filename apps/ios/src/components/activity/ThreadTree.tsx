@@ -12,7 +12,8 @@ import { fontSize, space, useOmniTheme } from '../../theme';
 import { HarnessLogo } from '../../ui/Brand';
 import { Icon } from '../../ui/Icon';
 import { Text } from '../../ui/Text';
-import { statusLabel } from '../glyph';
+import { statusWord } from '@omni/shared/display.ts';
+import { useTechnical } from '../../live/react';
 import { StatusDot } from '../StatusDot';
 
 /** A tree row's height, and where the rule's last elbow meets it (web: h-9, --tree-mid 18px). */
@@ -168,7 +169,8 @@ function Node({ n, last, spans, ...props }: TreeRowsProps & { n: StubNode; last:
   const title = t.title || 'Untitled';
   const channel = t.channel_id === 'conductor' ? 'Conductor' : props.channelName(t.channel_id);
   const agents = props.agents?.get(t.id) ?? 0;
-  const state = n.state === 'needs' ? 'Needs you' : t.done_at ? 'Marked done' : statusLabel(n.state);
+  const technical = useTechnical();
+  const state = n.state === 'needs' ? 'Needs you' : t.done_at ? 'Marked done' : statusWord(n.state, technical);
   return (
     <View style={styles.node}>
       <Rule last={last} />

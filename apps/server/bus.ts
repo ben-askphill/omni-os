@@ -22,6 +22,8 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine (crew-store.ts, sync). Clients refetch GET /api/crew. */
   | { type: 'crew' }
+  /** Show technical details or the Shopify add-on changed, here or on another machine (display.ts). Clients refetch GET /api/display. */
+  | { type: 'display' }
   /** The update check or Update moved on (update.ts). Clients refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed (claude-artifacts.ts). Clients refetch the list when it ends. */

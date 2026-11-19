@@ -1,14 +1,22 @@
 import type { ReactNode } from 'react';
-import { MARK, PHASE, STATUS, glyphFor, markOf, statusLabel, threadMark, threadPhase, type Glyph, type Mark, type MarkContext, type Phase } from '@omni/shared/status.ts';
+import { MARK, PHASE, glyphFor, markOf, threadMark, threadPhase, type Glyph, type Mark, type MarkContext, type Phase } from '@omni/shared/status.ts';
+import { glyphLabel, markLabel, plainDetail } from '@omni/shared/display.ts';
 import { useNeedOf } from '../../store.tsx';
+import { technicalNow, useTechnical } from '../../display.ts';
 import { Icon } from './icons.tsx';
 
-export { MARK, PHASE, STATUS, asksForYou, blockerMark, glyphFor, markOf, statusLabel, threadGlyph, threadMark, threadPhase, turnPhase, type Glyph, type Mark, type Phase, type TurnPhase } from '@omni/shared/status.ts';
+export { MARK, PHASE, STATUS, asksForYou, blockerMark, glyphFor, markOf, threadGlyph, threadMark, threadPhase, turnPhase, type Glyph, type Mark, type Phase, type TurnPhase } from '@omni/shared/status.ts';
+
+/**
+ * A thread status in words. With Show technical details on, its own label (Running, Limited, Queued); off, one of the
+ * five plain words (packages/shared/display.ts).
+ */
+export const statusLabel = (status: string | null | undefined) => glyphLabel(glyphFor(status), technicalNow());
 
 /** A thread's status in words: its phase while it is at work (Starting, Running, Waiting on crew), else its status. */
 export function threadStatusText(t: { status: string; delegating?: boolean; setup?: string | null }) {
   const phase = threadPhase(t);
-  return phase ? PHASE[phase].label : statusLabel(t.status);
+  return phase ? markLabel(phase, technicalNow()) : statusLabel(t.status);
 }
 
 // Every mark on a 16 unit box, in the mark's own color. The satellite (a small dot top right) says the state belongs
@@ -56,7 +64,7 @@ const SHAPE: Record<Mark | 'loading', ReactNode> = {
     </>
   ),
   held: <path d="M8 2 14 8 8 14 2 8Z" {...line} strokeWidth="2.4" />,
-  // Waiting for a sign-in: a hollow diamond, as nothing ran yet, with a keyhole dot, as Ben signs in to let it start.
+  // Waiting for a sign-in: a hollow diamond, as nothing ran yet, with a keyhole dot, as the user signs in to let it start.
   signin: (
     <>
       <path d="M8 2 14 8 8 14 2 8Z" {...line} strokeWidth="2.4" />
@@ -118,17 +126,20 @@ export function StatusDot({
   size?: number;
   className?: string;
 }) {
+  const technical = useTechnical();
   const m = mark ?? markOf(glyphFor(status), phase);
   const { family, glyph, motion } = MARK[m];
   // A bare status also marks things that are not threads (a connection, a check): it keeps the status's plain name.
   const named = mark || phase;
-  const label = named ? MARK[m].label : STATUS[glyph].label;
+  const label = named ? markLabel(m, technical) : glyphLabel(glyph, technical);
+  // Off, the plain word leads and the mark's own name follows it: "Needs you: Usage limit".
+  const detail = named && !technical ? plainDetail(m) : null;
   const box = boxOf(m, size);
   return (
     <span
       role="img"
-      aria-label={label}
-      title={named ? `${label}. ${MARK[m].hint}.` : label}
+      aria-label={detail ? `${label}: ${detail}` : label}
+      title={named ? `${label}${detail ? `: ${detail}` : ''}. ${MARK[m].hint}.` : label}
       data-s={glyph}
       data-mark={m}
       data-family={family}
@@ -191,12 +202,13 @@ export function ThreadDot({ t, state, busy = false, size = 7, pr, turn }: { t: M
 
 /** A failure announces itself (role="alert"); every other state is a polite status. */
 export function StatusPill({ status, phase, mark, label }: { status?: Glyph | string; phase?: Phase | null; mark?: Mark | null; label?: ReactNode }) {
+  const technical = useTechnical();
   const m = mark ?? markOf(glyphFor(status), phase);
   const s = MARK[m].glyph;
   return (
     <span role={s === 'failed' ? 'alert' : 'status'} data-s={s} data-mark={m} className="spill">
       <StatusDot mark={m} size={7} />
-      {label ?? (mark ? MARK[m].label : STATUS[s].label)}
+      {label ?? (mark ? markLabel(m, technical) : glyphLabel(s, technical))}
     </span>
   );
 }

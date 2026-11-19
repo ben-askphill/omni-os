@@ -1184,12 +1184,13 @@ server.registerTool('settings', {
     `Read-only: ${USER}'s Omni settings on this machine and where each value comes from. config: data/omni.config.json (you, folders, integrations, ` +
     'network access, run-on machine, worktree retention). env_overrides: config fields an environment variable overrides now, by section.key. ' +
     'server_options: the .env options (models, threads, worktrees, port), each with its value, default and source (env or default). ' +
+    'display: Show technical details (technical) and the Shopify add-on (shopify), shared by every client. ' +
     `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets, and set_secret saves one here or on another synced machine.`,
   inputSchema: {},
 }, async () => {
-  const [setup, server] = await Promise.all([call('/setup'), call('/setup/server')]);
+  const [setup, server, display] = await Promise.all([call('/setup'), call('/setup/server'), call('/display').catch(() => null)]);
   const { automations: _automations, ...config } = setup.config;
-  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options });
+  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options, display });
 });
 
 server.registerTool('signed_in_devices', {
