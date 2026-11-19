@@ -1,8 +1,8 @@
-import { progressCount, progressNow, progressPanel, progressTone, type ProgressPanel } from '@omni/shared/progress-panel.ts';
+import { progressCount, progressFinished, progressNow, progressPanel, progressTone, type ProgressPanel } from '@omni/shared/progress-panel.ts';
 import { buildItems, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { useMemo, useState } from 'react';
 import { readPref, writePref } from '../../store.tsx';
-import { IconButton } from '../ui.tsx';
+import { Icon, IconButton } from '../ui.tsx';
 import { StepRail } from './StepRail.tsx';
 import { CARD_PAD, ROW_X } from './panel/inset.ts';
 import { NowWithConnector } from '../ConnectorMark.tsx';
@@ -33,18 +33,29 @@ const TEXT = { done: 'text-fg-3', current: 'font-medium text-fg', pending: 'text
 
 /**
  * The thread's step list as a card under the quick card, like Claude's Progress card: a rail down the left, done steps
- * stepped back, a status mark on the step it is on. The X closes it for this list; a new list brings it back.
+ * stepped back, a status mark on the step it is on. Once every step is done the list ends on a done check and folds to
+ * its last step, with the earlier ones behind Show earlier steps. The X closes it for this list; a new list brings it back.
  */
 export function ProgressCard({ threadId, panel, className = '' }: { threadId: string; panel: ProgressPanel | null; className?: string }) {
   const [closed, setClosed] = useState(() => closedFor(threadId));
   // The card remembers the thread it read the closed key for, so a switch to another thread reads that one's.
   const [readFor, setReadFor] = useState(threadId);
+  // The finished list whose earlier steps Ben opened: a new list folds again.
+  const [unfolded, setUnfolded] = useState<string | null>(null);
   if (readFor !== threadId) {
     setReadFor(threadId);
     setClosed(closedFor(threadId));
   }
   if (!panel || closed === panel.key) return null;
   const { view } = panel;
+  const count = view.steps.length;
+  const finished = progressFinished(view);
+  // A finished list of more than one step folds to its last step; the toggle above it shows the rest.
+  const folds = finished && count > 1;
+  const open = unfolded === panel.key;
+  const first = folds && !open ? count - 1 : 0;
+  const earlier = count - 1;
+  const shown = view.steps.map((s, i) => ({ s, i })).slice(first);
 
   return (
     <section
@@ -65,14 +76,29 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
         />
       </div>
       <ol className={`${ROW_X} pb-[var(--sp-4)]`}>
-        {view.steps.map((s, i) => {
+        {folds && (
+          <li className="flex min-w-0 gap-[var(--sp-5)]">
+            <StepRail state="done" index={0} count={2} mid={MID} />
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setUnfolded(open ? null : panel.key)}
+              className="hov -ml-[var(--sp-2)] flex min-w-0 items-center gap-1 rounded-[var(--r-sm)] px-[var(--sp-2)] py-[var(--sp-3)] text-[12.5px] leading-[1.45] text-fg-3 hover:text-fg"
+            >
+              {open ? 'Hide earlier steps' : `Show ${earlier} earlier step${earlier === 1 ? '' : 's'}`}
+              <Icon name="chevronRight" size={11} className={`transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? '-rotate-90' : 'rotate-90'}`} />
+            </button>
+          </li>
+        )}
+        {shown.map(({ s, i }) => {
           const tone = progressTone(s.state);
           const now = progressNow(s);
+          const last = i === count - 1;
           return (
             <li key={s.key} data-state={s.state} className="flex min-w-0 gap-[var(--sp-5)]" aria-current={tone === 'current' ? 'step' : undefined}>
-              <StepRail state={s.state} index={i} count={view.steps.length} mid={MID} />
+              <StepRail state={s.state} index={folds ? i - first + 1 : i} count={folds ? shown.length + 1 : count} mid={MID} finished={finished} />
               <span className="min-w-0 flex-1 py-[var(--sp-3)] text-[12.5px] leading-[1.45]">
-                <span className={`block ${TEXT[tone]}`}>{s.title}</span>
+                <span className={`block ${finished && last ? 'text-fg-2' : TEXT[tone]}`}>{s.title}</span>
                 {now && (
                   <span className="block truncate text-[11.5px] text-fg-3">
                     <NowWithConnector now={now} connector={s.connector} />

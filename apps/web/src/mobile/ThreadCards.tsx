@@ -102,7 +102,7 @@ export function MoSteps({ v, failed, onActions }: { v: StepsView; failed: number
             return (
               <li key={s.key} data-state={s.state} className="flex items-start gap-2.5">
                 {/* The rail as on the Progress card; the row's top padding (4.5px) plus half of a 14px line at 1.35. */}
-                <StepRail state={s.state} index={i} count={v.steps.length} mid={14} className="w-3" />
+                <StepRail state={s.state} index={i} count={v.steps.length} mid={14} finished={ended === 'done'} className="w-3" />
                 <span className="min-w-0 flex-1 py-[4.5px]">
                   <span className={`block text-[14px] leading-[1.35] ${on ? 'text-fg' : 'text-fg-3'}`}>{s.title}</span>
                   {s.now && (

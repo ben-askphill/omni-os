@@ -58,6 +58,22 @@ describe('ProgressCard', () => {
     expect(lines(pending)).toEqual(['light']);
   });
 
+  it('ends a finished list on a done check, folded to its last step until Show earlier steps', () => {
+    const finished = [...start, ...setSteps('s2', LIST, 3)];
+    render('t1', finished);
+    const toggle = host.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+    expect(toggle.textContent).toBe('Show 2 earlier steps');
+    const items = () => [...host.querySelectorAll('li[data-state]')];
+    expect(items().map((li) => li.textContent)).toEqual(['Crunch the numbers']);
+    expect(items()[0].querySelector('[data-mark="done"]')).not.toBeNull();
+    act(() => toggle.click());
+    expect(toggle.textContent).toBe('Hide earlier steps');
+    expect(items().map((li) => li.textContent)).toEqual(LIST);
+    expect(items().map((li) => li.querySelector('[role="img"]')?.getAttribute('data-mark') ?? null)).toEqual([null, null, 'done']);
+    render('t1', [...finished, ...setSteps('s3', [...LIST, 'Write it up'], 4)]);
+    expect(host.querySelector('button[aria-expanded]')?.textContent).toBe('Show 3 earlier steps');
+  });
+
   it('renders nothing when the thread has no list', () => {
     render('t1', null);
     expect(host.innerHTML).toBe('');
