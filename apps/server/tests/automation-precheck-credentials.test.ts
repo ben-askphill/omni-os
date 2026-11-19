@@ -5,7 +5,7 @@ import { startRunner } from './runner-boot.ts';
 
 // An automation's precheck is a command a login shell runs before each scheduled run, so writing a new one or changing
 // its command takes the credential the terminal and channel actions take (request-trust.ts): the install's token, or a
-// session paired with it. A Google, Omni Connect or app session gets 403 and the file stays as it was. A precheck already
+// session paired with it. A Google, Omni Connect or app session, or a thread's own token, gets 403 and the file stays as it was. A precheck already
 // in the file keeps running, and every other edit stays open. The login shell is a stub that writes down the command it
 // was handed and exits 0, so every case is checked by what reached the launcher.
 
@@ -22,10 +22,18 @@ const automations = await import('../automations.ts');
 const { personalFile } = await import('../automation-store.ts');
 const { cookieName, sessionCookieName } = await import('../api-token.ts');
 const auth = await import('../google-auth.ts');
+const { mintThreadToken } = await import('../thread-tokens.ts');
 
 const launched = () => (existsSync(LAUNCHES) ? readFileSync(LAUNCHES, 'utf8').split('\n').filter(Boolean) : []);
 
 auth.linkOwner({ issuer: 'https://clerk.test', sub: 'user_ben', email: 'ben@example.com', name: 'Ben' });
+
+// A thread's own token (thread-tokens.ts, #832), for an interactive thread: it may edit automations, but it is not a
+// credential that reaches a shell, so it writes no precheck.
+r.db.db.prepare('INSERT INTO threads (id, channel_id, title, status, session_id, cwd, source) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+  'precheck-thread', 'scratch', 'Thread', 'done', 'precheck-thread', r.tmp, 'manual',
+);
+const threadToken = mintThreadToken('precheck-thread').token;
 
 const cookie = (token: string) => ({ authorization: '', cookie: `${sessionCookieName()}=${token}` });
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -35,6 +43,7 @@ const CREDENTIALS = {
   "an older build's raw-token cookie": { headers: { authorization: '', cookie: `${cookieName()}=${process.env.OMNI_TOKEN}` }, shell: true },
   'Google browser session (and Omni Connect)': { headers: cookie(auth.createSession('Chrome', 'browser', 'user_ben', 'google').token), shell: false },
   'Google app session': { headers: bearer(auth.createSession('iPhone', 'app', 'user_ben', 'google').token), shell: false },
+  "a thread's own token": { headers: bearer(threadToken), shell: false },
   'paired app (pairing code)': { headers: bearer(auth.createSession('iPhone', 'app', '', 'pairing').token), shell: false },
   'no credential': { headers: { authorization: '' }, shell: false },
 } satisfies Record<string, { headers: Record<string, string>; shell: boolean }>;
