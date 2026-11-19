@@ -1,6 +1,6 @@
 // The Omni mobile design system's parts (ui_kits/omni-mobile/MobileParts.jsx), on the Web UI's own components.
 // Metrics are the design's, in CSS pixels on a 390-wide phone.
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
@@ -24,6 +24,9 @@ export function MoRound({
   quiet,
   disabled,
   children,
+  expanded,
+  controls,
+  buttonRef,
 }: {
   icon?: IconName;
   label: string;
@@ -33,12 +36,19 @@ export function MoRound({
   quiet?: boolean;
   disabled?: boolean;
   children?: ReactNode;
+  /** A button that shows and hides a popup: whether it shows, and its id. */
+  expanded?: boolean;
+  controls?: string;
+  buttonRef?: Ref<HTMLButtonElement>;
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-label={label}
       title={label}
+      aria-expanded={expanded}
+      aria-controls={expanded ? controls : undefined}
       onClick={onClick}
       disabled={disabled}
       className={`mo-press grid shrink-0 place-items-center rounded-full disabled:opacity-40 ${ink ? 'bg-fg text-on-ink' : quiet ? 'bg-transparent text-fg' : 'bg-surface-2 text-fg'}`}

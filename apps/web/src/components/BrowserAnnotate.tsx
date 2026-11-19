@@ -15,6 +15,7 @@ import { useMarkEditor } from './useMarkEditor.ts';
 import { renderMarked } from './browser-marks-canvas.ts';
 import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';
 import { isImeEnter } from '../ime.ts';
+import { useDismissLayer } from './ui/dismiss-stack.ts';
 
 /** A page the server can capture: the browser is up and shows a web page. */
 export const canAnnotate = (s: { running: boolean; url: string } | null | undefined) => !!s?.running && /^https?:\/\//i.test(s.url);
@@ -109,20 +110,19 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded, from }: {
     [base, threadId],
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Escape in the text box being typed in cancels that text, not the whole layer.
-      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.hasAttribute?.('data-mark-text')) return;
-      e.preventDefault();
-      e.stopPropagation();
+  // A layer on the dismiss stack: Escape closes it unless a menu over it (Shapes, Color, Line width) is the top layer.
+  // Escape in the text box being typed in cancels that text, not the whole layer. A press outside leaves it open.
+  const layerRoot = useRef<HTMLDivElement>(null);
+  useDismissLayer(true, {
+    roots: () => [layerRoot.current],
+    escape: (e) => {
+      if ((e.target as HTMLElement | null)?.hasAttribute?.('data-mark-text')) return false;
       onClose();
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
+    },
+  });
 
   return (
-    <div role="dialog" aria-label="Annotate the page" className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg">
+    <div ref={layerRoot} role="dialog" aria-label="Annotate the page" className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg">
       <div className="flex shrink-0 items-center gap-2 px-3 py-2 text-[12px]">
         <Icon name="annotate" size={13} className="shrink-0 text-fg-3" />
         <span className="min-w-0 flex-1 truncate text-fg-2">{phase.at === 'draw' ? 'Mark up the page.' : phase.at === 'capturing' ? 'Capturing the page' : 'Could not capture the page'}</span>

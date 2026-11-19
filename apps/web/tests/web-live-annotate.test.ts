@@ -296,12 +296,12 @@ describe('the live Annotate overlay', () => {
     await pointer('pointerdown', 200, 100);
     await pointer('pointerup', 200, 100);
     await picked();
-    await act(async () => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await act(async () => void document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
     await settle();
     expect(card()).toBeNull();
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.url)).toEqual([`/api/channels/c1/browser/capture/${CAPTURE.image.name}?thread=t1`]);
     expect(onDone).not.toHaveBeenCalled();
-    await act(async () => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await act(async () => void document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
     expect(onDone).toHaveBeenCalledOnce();
   });
 });

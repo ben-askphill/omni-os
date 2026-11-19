@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ErrorNote } from './feedback.tsx';
 import { KbdHintText } from './overlay.tsx';
 import { Button, IconButton } from './primitives.tsx';
 import { useModalDialog } from './use-modal-dialog.ts';
+import { useExit } from './use-exit.ts';
 
 // ---------- modal / confirm ----------
 
@@ -50,12 +51,21 @@ type ModalProps = {
 
 /** `wide` for a page-sized view (a diff, a viewer), `roomy` for a form with long text (a crew role's charter). */
 export function Modal(props: ModalProps) {
-  // Mounted only while open, so the dialog's showModal() and close() follow the component's life.
-  return props.open ? <ModalDialog {...props} /> : null;
+  // Mounted while open and while its exit plays, so the dialog's showModal() and close() follow the component's life.
+  // The exit shows what it last showed: an owner often clears what the body reads as it closes.
+  const ref = useRef<HTMLDialogElement>(null);
+  const kept = useRef(props.children);
+  if (props.open) kept.current = props.children;
+  const exit = useExit(props.open, ref);
+  if (!exit.shown) return null;
+  return (
+    <ModalDialog {...props} dialogRef={ref} closing={exit.closing}>
+      {props.open ? props.children : kept.current}
+    </ModalDialog>
+  );
 }
 
-function ModalDialog({ onClose, children, title, wide, roomy, dismiss = 'any' }: ModalProps) {
-  const ref = useRef<HTMLDialogElement>(null);
+function ModalDialog({ onClose, children, title, wide, roomy, dismiss = 'any', dialogRef: ref, closing }: ModalProps & { dialogRef: RefObject<HTMLDialogElement | null>; closing: boolean }) {
   const titleId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -68,12 +78,14 @@ function ModalDialog({ onClose, children, title, wide, roomy, dismiss = 'any' }:
     if (dismiss === 'confirm' && dirty.current) setAsking(true);
     else onCloseRef.current();
   }, [dismiss]);
-  const { ready, dialogProps } = useModalDialog(ref, request);
+  // Closing, it hears nothing: the layer under it has the keys and presses.
+  const { ready, dialogProps } = useModalDialog(ref, closing ? undefined : request, !closing);
   return (
     <dialog
       ref={ref}
       aria-labelledby={title ? titleId : undefined}
       {...dialogProps}
+      data-closing={closing || undefined}
       className={`modal modal-in w-full sm:w-[calc(100%-48px)] ${wide ? 'sm:max-w-5xl' : roomy ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
     >
       {ready && (

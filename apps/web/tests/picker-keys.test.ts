@@ -203,12 +203,16 @@ describe('the shared Picker as a popover', () => {
     expect(pill().getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('leaves a mouse press outside to the browser, but closes on a tap outside itself (iOS Safari 18.0 to 18.2)', () => {
+  it('closes on a mouse press outside, and on a tap outside itself (iOS Safari 18.0 to 18.2), but not on a scroll', () => {
     act(() => root.render(createElement(PickerHost)));
     click(pill());
     press(document.body, 'mouse');
-    expect($('.pik-card')).not.toBeNull();
+    expect($('.pik-card')).toBeNull();
+    click(pill());
     press($('[role="option"]')!, 'touch');
+    expect($('.pik-card')).not.toBeNull();
+    // A finger that scrolls sends no mousedown.
+    act(() => void document.body.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true })));
     expect($('.pik-card')).not.toBeNull();
     press(document.body, 'touch');
     expect($('.pik-card')).toBeNull();
