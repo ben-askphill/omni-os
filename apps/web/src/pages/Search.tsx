@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { useApi, type SearchHit } from '../api.ts';
+import { Snippet } from '../components/command-palette/items.tsx';
 import { Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot } from '../components/ui.tsx';
 import { pageColumn } from '../components/ui/feedback.tsx';
-import { plural, safeSnippet } from '../format.ts';
+import { plural } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 
@@ -73,10 +74,9 @@ export function SearchPage({ q }: { q: string }) {
                         <span className="shrink-0 pl-1 font-num text-[12px] whitespace-nowrap text-fg-3 tabular-nums">{relTime(h.updated_at)}</span>
                       </div>
                       {h.snippet && (
-                        <p
-                          className="mt-1 line-clamp-2 pl-4 text-[12.5px] leading-relaxed break-words text-fg-2"
-                          dangerouslySetInnerHTML={{ __html: safeSnippet(h.snippet) }}
-                        />
+                        <p className="mt-1 line-clamp-2 pl-4 text-[12.5px] leading-relaxed break-words text-fg-2">
+                          <Snippet text={h.snippet} />
+                        </p>
                       )}
                     </a>
                   </li>

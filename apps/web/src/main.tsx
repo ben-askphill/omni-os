@@ -1,3 +1,5 @@
+// First: the Trusted Types default policy has to exist before anything writes to the DOM.
+import './trusted-html.ts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';

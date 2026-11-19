@@ -186,14 +186,3 @@ export function lastGrapheme(s: string) {
   const all = [...graphemes.segment(s.trim())];
   return all.length ? all[all.length - 1].segment : '';
 }
-
-/** Escape everything, then restore only the <mark> tags the search API adds. */
-export function safeSnippet(s: string) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/&lt;mark&gt;/g, '<mark>')
-    .replace(/&lt;\/mark&gt;/g, '</mark>');
-}

@@ -437,6 +437,12 @@ interface Bounds {
   height: number;
 }
 
+/**
+ * A console line Chromium writes for a CSP violation. Trusted Types sink violations do not name the policy: they say
+ * "This document requires 'TrustedHTML' assignment" (or TrustedScript, TrustedScriptURL).
+ */
+const CSP_MESSAGE = /Content Security Policy|requires 'Trusted(HTML|Script|ScriptURL)' assignment/;
+
 interface StepReport {
   step: number;
   action: string;
@@ -464,7 +470,10 @@ interface Report {
     folderDialogs: string[];
   };
   pageErrors: string[];
-  /** The console's Content-Security-Policy messages, report-only ones included, so a policy change shows what it trips. */
+  /**
+   * The console's Content-Security-Policy messages, report-only ones and Trusted Types ones included, so a policy change
+   * shows what it trips.
+   */
   cspViolations: string[];
 }
 
@@ -552,7 +561,7 @@ async function main(argv: readonly string[]): Promise<number> {
     watched.add(page);
     page.on('pageerror', (err) => report.pageErrors.length < 50 && report.pageErrors.push(`${page.url()}: ${err.message}`));
     page.on('console', (m) => {
-      if (/Content Security Policy/.test(m.text()) && report.cspViolations.length < 50) report.cspViolations.push(`${page.url()}: ${m.text()}`);
+      if (CSP_MESSAGE.test(m.text()) && report.cspViolations.length < 50) report.cspViolations.push(`${page.url()}: ${m.text()}`);
     });
   };
   app.on('window', watch);

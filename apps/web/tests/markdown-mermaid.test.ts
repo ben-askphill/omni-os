@@ -4,11 +4,14 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Markdown } from '../src/components/Markdown.tsx';
 
-const library = vi.hoisted(() => ({ loaded: vi.fn(), initialize: vi.fn(), render: vi.fn() }));
+const library = vi.hoisted(() => ({ loaded: vi.fn(), initialize: vi.fn(), render: vi.fn(), sanitize: vi.fn((svg: string) => svg) }));
 vi.mock('mermaid', () => {
   library.loaded();
   return { default: { initialize: library.initialize, render: library.render } };
 });
+// happy-dom parses an <svg> outside the SVG namespace, so the real DOMPurify drops it. tests/trusted-types-browser.test.ts
+// runs the real one in Chromium.
+vi.mock('dompurify', () => ({ default: { sanitize: library.sanitize } }));
 
 let host: HTMLDivElement;
 let root: Root;
@@ -39,6 +42,8 @@ describe('mermaid in shared Markdown', () => {
     expect(library.loaded).toHaveBeenCalledTimes(1);
     expect(library.render).toHaveBeenCalledWith(expect.stringMatching(/^omni-mermaid-/), 'flowchart LR\nAir <--> Relay\n');
     expect(host.querySelector('[role="img"] svg')).not.toBeNull();
+    // Mermaid's SVG goes through DOMPurify again, with Mermaid's own settings, before it reaches the page.
+    expect(library.sanitize).toHaveBeenCalledWith(expect.stringContaining('Air to Relay'), expect.objectContaining({ ADD_TAGS: ['foreignobject'] }));
     expect(host.textContent).toContain('After.');
     expect(library.initialize).toHaveBeenLastCalledWith(expect.objectContaining({ theme: 'base', securityLevel: 'strict', startOnLoad: false }));
     document.documentElement.dataset.theme = 'dark';

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { renderMermaid } from '../mermaid.ts';
+import { parseTrusted } from '../trusted-html.ts';
 
 /** Keep the source visible until a diagram renders, including while a streamed fence is incomplete. */
 export function MermaidDiagram({ source }: { source: string }) {
   const host = useRef<HTMLDivElement>(null);
-  const [rendered, setRendered] = useState<{ source: string; svg: string; width: number } | null>(null);
+  // `svg` is TrustedHTML from the omni-mermaid policy. React writes it as is, once per render of the diagram.
+  const [rendered, setRendered] = useState<{ source: string; svg: TrustedHTML | string; width: number } | null>(null);
   useEffect(() => {
     let disposed = false;
     let revision = 0;
@@ -17,7 +19,7 @@ export function MermaidDiagram({ source }: { source: string }) {
       try {
         const svg = await renderMermaid(source, { dark, background: style.backgroundColor, foreground: style.color, font: style.fontFamily });
         if (!disposed && current === revision) setRendered({ source, svg, width: Math.min(640,
-          Number(new DOMParser().parseFromString(svg, 'text/html').querySelector('svg')?.getAttribute('viewBox')?.split(/\s+/)[2]) || 0) });
+          Number(parseTrusted(svg).querySelector('svg')?.getAttribute('viewBox')?.split(/\s+/)[2]) || 0) });
       } catch {
         if (!disposed && current === revision) setRendered(null);
       }

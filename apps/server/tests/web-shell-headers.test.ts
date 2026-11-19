@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 
 // The Web UI shell (the build's index.html, for `/` and every client route) gets a CSP, report-only for now, with
-// the inline theme script by hash, an enforced clickjacking guard, nosniff and a referrer policy (web-headers.ts).
+// the inline theme script by hash and Trusted Types for the DOM sinks, an enforced clickjacking guard, nosniff and a
+// referrer policy (web-headers.ts).
 // /api keeps its own headers, so the artifact frames still load. Violations post to /api/csp-report (report-uri), which
 // counts them and keeps no address that could carry a token or a key.
 
@@ -28,10 +29,11 @@ const { app } = await import('../app.ts');
 const { resetCspReports } = await import('../csp-report-api.ts');
 
 const policy = (hash: string) =>
-  `script-src 'self' ${hash} 'report-sample'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; report-uri /api/csp-report`;
+  `script-src 'self' ${hash} 'report-sample'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; ` +
+  `require-trusted-types-for 'script'; trusted-types omni-mermaid dompurify default; report-uri /api/csp-report`;
 
 describe('the Web UI shell', () => {
-  it('sends a report-only CSP with the inline script by hash, and enforces the frame guard, nosniff and referrer policy', async () => {
+  it('sends a report-only CSP with the inline script by hash and Trusted Types, and enforces the frame guard, nosniff and referrer policy', async () => {
     for (const path of ['/', '/index.html', '/c/inbox', '/t/abc/details']) {
       const res = await app.request(path);
       expect(res.headers.get('content-type'), path).toContain('text/html');
@@ -155,6 +157,29 @@ describe('/api/csp-report', () => {
     const got = await counts();
     expect(got.violations.map((v) => [v.blocked, v.source])).toEqual(expect.arrayContaining([['https://evil.example', ''], ['eval', '/assets/index-abc.js']]));
     expect(JSON.stringify(got)).not.toContain('omni_secret');
+    warn.mockRestore();
+  });
+
+  it("keeps a Trusted Types violation's sink and the start of the string, as Chromium posts it", async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tt = {
+      'csp-report': {
+        'document-uri': 'http://127.0.0.1:4747/?pair=omni_secret_pair',
+        'violated-directive': 'require-trusted-types-for',
+        'effective-directive': 'require-trusted-types-for',
+        'blocked-uri': 'trusted-types-sink',
+        'source-file': 'http://127.0.0.1:4747/assets/index-abc.js',
+        'line-number': 1,
+        'column-number': 49,
+        'script-sample': 'Element innerHTML|<b>deliberate</b>',
+        disposition: 'report',
+      },
+    };
+    expect((await post(tt, 'application/csp-report', { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'no-cors' })).status).toBe(204);
+    expect((await counts()).violations).toEqual([
+      expect.objectContaining({ directive: 'require-trusted-types-for', blocked: 'trusted-types-sink', source: '/assets/index-abc.js', sample: 'Element innerHTML|<b>deliberate</b>', disposition: 'report' }),
+    ]);
+    expect(String(warn.mock.calls[0][0])).toContain('[csp] report require-trusted-types-for blocked trusted-types-sink at /assets/index-abc.js:1');
     warn.mockRestore();
   });
 

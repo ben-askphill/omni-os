@@ -31,21 +31,36 @@ const lead = (icon: IconName) => (
 /** The words typed, lowercased: an item matches when its label and sub hold every one. */
 export const queryWords = (q: string) => q.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
+type Piece = readonly [text: string, marked: boolean];
+
+/** Text in pieces, the marked ones in `<mark>`. Always text nodes, never parsed as HTML. */
+function Pieces({ pieces }: { pieces: readonly Piece[] }) {
+  return <>{pieces.map(([text, marked], i) => (marked ? <mark key={i}>{text}</mark> : text))}</>;
+}
+
 /** `text` with each typed word marked where it appears. */
 export function Marked({ text, words }: { text: string; words: readonly string[] }) {
   if (!words.length) return text;
   const lower = text.toLowerCase();
   const hit = new Array<boolean>(text.length).fill(false);
   for (const w of words) for (let i = lower.indexOf(w); i !== -1; i = lower.indexOf(w, i + w.length)) hit.fill(true, i, i + w.length);
-  const parts: ReactNode[] = [];
+  const pieces: Piece[] = [];
   let start = 0;
   for (let i = 1; i <= text.length; i++) {
     if (i < text.length && hit[i] === hit[start]) continue;
-    const piece = text.slice(start, i);
-    parts.push(hit[start] ? <mark key={start}>{piece}</mark> : piece);
+    pieces.push([text.slice(start, i), hit[start]]);
     start = i;
   }
-  return <>{parts}</>;
+  return <Pieces pieces={pieces} />;
+}
+
+/**
+ * A search hit's snippet. The search API puts `<mark>…</mark>` around each match (db/repos/search.ts). Those become
+ * marks and everything else stays text, so markup quoted in a transcript shows as written.
+ */
+export function Snippet({ text }: { text: string }) {
+  const pieces = text.split(/<mark>(.*?)<\/mark>/s).map((piece, i): Piece => [piece, i % 2 === 1]);
+  return <Pieces pieces={pieces.filter(([piece]) => piece)} />;
 }
 
 /** What the palette lists for `q`: pages, channels, recent threads and the theme, filtered by every word typed, plus a search row. */
