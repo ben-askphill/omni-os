@@ -119,7 +119,7 @@ describe('the thread quick card', () => {
     const child = (id: string, over: Partial<Thread> = {}) => thread({ id, title: `Lineage test: ${id}`, branch: null, parent_id: 't1', ...over });
     const running = [
       child('Sol', { harness: 'codex', status: 'running', run_started_at: new Date(now - 2000).toISOString() }),
-      child('Fable', { harness: 'claude-code', status: 'idle', delegating: true, run_started_at: new Date(now - 4000).toISOString() }),
+      child('Fable', { harness: 'claude-code', status: 'done', delegating: true, run_started_at: new Date(now - 4000).toISOString() }),
       child('Sonnet', { harness: 'claude-code', status: 'queued' }),
     ];
     const finished = [child('Old', { status: 'done', updated_at: '2026-10-28T08:00:00.000Z' }), child('Newer', { status: 'failed', updated_at: '2026-10-28T10:00:00.000Z' })];
@@ -146,7 +146,7 @@ describe('the thread quick card', () => {
     });
 
     it('shows the thread that delegated this one, though nothing runs', () => {
-      const parent = thread({ id: 'p1', title: 'Conductor', status: 'idle' });
+      const parent = thread({ id: 'p1', title: 'Conductor', status: 'done' });
       const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ parent_id: 'p1' }), parent }));
       expect(html).toContain('aria-label="Lineage"');
       expect(html).toContain('Back to the thread that delegated this one: Conductor');

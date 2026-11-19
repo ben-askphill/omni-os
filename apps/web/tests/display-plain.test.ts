@@ -80,7 +80,7 @@ describe('the quick card with Show technical details off', () => {
   });
 
   it('lists the PRs its crew opened, though the channel has no repo', () => {
-    const crew = { number: 41, title: 'Crew work', state: 'OPEN', isDraft: false, url: 'https://github.com/u/r/pull/41', repo: 'u/r', thread_id: 'c1', thread_title: 'Builder', channel_id: 'shop', task_id: null };
+    const crew = { number: 41, title: 'Crew work', state: 'OPEN' as const, isDraft: false, url: 'https://github.com/u/r/pull/41', repo: 'u/r', thread_id: 'c1', thread_title: 'Builder', channel_id: 'shop', task_id: null };
     const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ branch: null }), code: false, prs: { pr: null, prs: [], crew: [crew] } }));
     expect(html).toContain('aria-label="Pull requests"');
     expect(html).toContain('#41');
