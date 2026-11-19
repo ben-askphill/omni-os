@@ -12,6 +12,9 @@ const light = {
   onInk: '#ffffff',
   line: 'rgba(23, 24, 26, 0.08)',
   lineStrong: 'rgba(23, 24, 26, 0.16)',
+  /** A control's edge at 3:1 on every surface (web: --line-control, the scrollbar thumb and Toggle off track). The app's
+   * switches and scroll indicators are native, so nothing here reads it yet. */
+  lineControl: '#85847e',
   elev: '#ffffff',
   /** The selected segment of the iOS segmented control. The web has no thumb: its items take --wash-selected. */
   thumb: '#ffffff',
@@ -58,6 +61,7 @@ const dark: ColorTokens = {
   onInk: '#101114',
   line: 'rgba(236, 235, 231, 0.08)',
   lineStrong: 'rgba(236, 235, 231, 0.16)',
+  lineControl: '#83827c',
   elev: '#212429',
   thumb: 'rgba(255, 255, 255, 0.14)',
   wash: 'rgba(236, 234, 229, 0.06)',

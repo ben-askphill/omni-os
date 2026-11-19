@@ -19,12 +19,15 @@
   --fg-2: light-dark(#3c3b37, #b8b7b1);
   --fg-3: light-dark(#62615c, #a09f99);
   /* fg-4 is 2.75:1 on white: placeholders, disabled labels and decoration only, never text that must be read
-     (apps/web/tests/fg4-contrast.test.ts). --fg-disabled names that use. */
+     (apps/web/tests/token-contrast.test.ts). --fg-disabled names that use. */
   --fg-4: light-dark(#9d9c96, #83827c);
   --fg-disabled: var(--fg-4);
   --on-ink: light-dark(#ffffff, #101114);
   --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08));
   --line-strong: light-dark(rgb(23 24 26 / 0.16), rgb(236 235 231 / 0.16));
+  /* The edge a control's shape depends on: the scrollbar thumb and the Toggle's off track. 3:1 on bg, surface,
+     surface-2 and surface-3 in both schemes, where the hairlines above are about 1.4:1 (tests/token-contrast.test.ts). */
+  --line-control: light-dark(#85847e, #83827c);
   /* Status is the only color: ultramarine = running, vermilion = needs you, volt = done.
      Full saturation, never tinted. Needs and done carry ink text; vermilion is never text on white. */
   --ink: #17181a;
@@ -128,6 +131,16 @@
   --measure: 768px;
   --h-search: 40px;
   --w-page: 896px;
+}
+/* Increase contrast (macOS and iOS) or a high contrast setting: hairlines reach 3:1, faint text reads as fg-3. */
+@media (prefers-contrast: more) {
+  :root,
+  .scheme-dark {
+    --line: light-dark(rgb(23 24 26 / 0.3), rgb(236 235 231 / 0.3));
+    --line-strong: light-dark(rgb(23 24 26 / 0.5), rgb(236 235 231 / 0.5));
+    --line-control: var(--fg-3);
+    --fg-4: var(--fg-3);
+  }
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -304,6 +317,23 @@
     background: var(--bg);
     box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 4px var(--wash);
   }
+  /* The focus ring: 2px of fg, never the 1px hairline hover shows. An outline, so forced colors keeps it.
+     focus-ring-within puts it on a box whose own input has none (SearchField, the Settings search). */
+  .field:focus-visible,
+  .focus-ring:focus-visible,
+  .focus-ring-within:has(:focus-visible) {
+    outline: 2px solid var(--fg);
+    outline-offset: 1px;
+  }
+  .field:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+  /* Forced colors drops the inset hairline, which is all that draws a field's box. */
+  @media (forced-colors: active) {
+    .field {
+      border: 1px solid CanvasText;
+    }
+  }
   .field::placeholder {
     color: var(--fg-4);
   }
@@ -316,14 +346,7 @@
   }
   .scroll-thin {
     scrollbar-width: thin;
-    scrollbar-color: var(--line-strong) transparent;
-  }
-  /* Scrolls without a visible bar: the thread transcript. */
-  .scroll-none {
-    scrollbar-width: none;
-  }
-  .scroll-none::-webkit-scrollbar {
-    display: none;
+    scrollbar-color: var(--line-control) transparent;
   }
 
   /* Headline type: SF Pro, tight. */
@@ -673,10 +696,15 @@
     height: var(--h);
     border-radius: 999px;
     background: var(--surface-3);
-    transition: background-color 0.26s var(--ease-stretch);
+    /* Off, the track is about 1.1:1 on a card: the line-control edge is what shows it is there. */
+    box-shadow: inset 0 0 0 1px var(--line-control);
+    transition:
+      background-color 0.26s var(--ease-stretch),
+      box-shadow 0.26s var(--ease-stretch);
   }
   .tgl[aria-checked="true"] {
     background: var(--fg);
+    box-shadow: inset 0 0 0 1px var(--fg);
   }
   .tgl:disabled {
     opacity: 0.5;
@@ -703,6 +731,37 @@
   }
   .tgl[aria-checked="true"]:active:not(:disabled) .tgl-knob {
     transform: translateX(calc(var(--w) - var(--k) - 9px));
+  }
+  /* Forced colors drops the shadow and repaints both fills as Canvas, so the switch draws itself in system colors. */
+  @media (forced-colors: active) {
+    .tgl {
+      forced-color-adjust: none;
+      background: Canvas;
+      border: 1px solid CanvasText;
+    }
+    .tgl:focus-visible {
+      outline-color: Highlight;
+    }
+    .tgl-knob {
+      top: 1px;
+      left: 1px;
+      background: CanvasText;
+      box-shadow: none;
+    }
+    .tgl[aria-checked="true"] {
+      background: Highlight;
+      border-color: Highlight;
+    }
+    .tgl[aria-checked="true"] .tgl-knob {
+      background: HighlightText;
+    }
+    .tgl:disabled {
+      opacity: 1;
+      border-color: GrayText;
+    }
+    .tgl:disabled .tgl-knob {
+      background: GrayText;
+    }
   }
 
   /* ---- inline confirm with undo fuse (Bencho "say") ---- */

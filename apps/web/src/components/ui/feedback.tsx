@@ -179,7 +179,7 @@ export function PageToolbar({ children, right, className = '' }: { children?: Re
 export function SearchField({ value, onChange, placeholder, label, className = '' }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; className?: string }) {
   return (
     <label
-      className={`flex h-[var(--h-search,40px)] min-w-0 flex-[1_1_280px] items-center gap-2.5 rounded-full bg-surface px-3.5 text-fg-3 shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)] sm:max-w-[360px] ${className}`}
+      className={`flex h-[var(--h-search,40px)] min-w-0 flex-[1_1_280px] items-center gap-2.5 rounded-full bg-surface px-3.5 text-fg-3 shadow-[inset_0_0_0_1px_var(--line)] focus-ring-within transition-[box-shadow,background-color] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)] sm:max-w-[360px] ${className}`}
     >
       <Icon name="search" size={15} />
       <input

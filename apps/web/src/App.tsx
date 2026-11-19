@@ -79,7 +79,7 @@ function SidebarPane({ children }: { children: ReactNode }) {
         className="group/resize absolute inset-y-0 -right-1.5 z-30 w-3 cursor-col-resize touch-none outline-none"
       >
         <span
-          className={`pointer-events-none absolute inset-y-3 left-1/2 w-px -translate-x-1/2 rounded-full bg-[var(--line-strong)] transition-opacity group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 ${dragging ? 'opacity-100' : 'opacity-0'}`}
+          className={`pointer-events-none absolute inset-y-3 left-1/2 w-px -translate-x-1/2 rounded-full bg-[var(--line-strong)] transition-opacity group-hover/resize:opacity-100 group-focus-visible/resize:w-0 group-focus-visible/resize:border-l-2 group-focus-visible/resize:border-fg group-focus-visible/resize:opacity-100 ${dragging ? 'opacity-100' : 'opacity-0'}`}
         />
       </div>
       {dragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}

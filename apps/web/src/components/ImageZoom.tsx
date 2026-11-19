@@ -62,9 +62,9 @@ export function useImageZoom(src: string) {
 
 export type ImageZoom = ReturnType<typeof useImageZoom>;
 
-/** The image, fit to width; click, ctrl/cmd+scroll or pinch to zoom, drag to pan, Esc to fit. */
+/** The image, fit to width; click, ctrl/cmd+scroll, pinch or + and - to zoom, drag to pan, 0 or Esc to fit. */
 export function ZoomableImage({ src, alt, z }: { src: string; alt: string; z: ImageZoom }) {
-  const { view, img, natural, setNatural, setWidth, scale, zoomed, zoomTo, zoomInTarget } = z;
+  const { view, img, natural, setNatural, setWidth, scale, zoomed, zoomTo, zoomInTarget, step } = z;
   const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null);
   const [panning, setPanning] = useState(false);
 
@@ -135,21 +135,30 @@ export function ZoomableImage({ src, alt, z }: { src: string; alt: string; z: Im
     <div
       ref={view}
       tabIndex={0}
-      aria-label={`${alt}, ${zoomed ? 'zoomed. Click or press Escape to fit' : 'click to zoom'}`}
+      role="group"
+      aria-label={`${alt}, ${zoomed ? 'zoomed. Press 0 or Escape to fit, + or - to zoom' : 'press + to zoom'}`}
       data-keeps-esc={zoomed || undefined}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && zoomed) {
           e.preventDefault();
           e.stopPropagation();
           zoomTo(null);
+          return;
         }
+        // + (or = unshifted), - and 0, as image viewers take them. With a modifier they stay the browser's page zoom.
+        if (!natural || e.ctrlKey || e.metaKey || e.altKey) return;
+        const zoomKey = e.key === '+' || e.key === '=' ? STEP : e.key === '-' ? 1 / STEP : e.key === '0' ? 0 : null;
+        if (zoomKey == null) return;
+        e.preventDefault();
+        if (zoomKey === 0) zoomTo(null);
+        else step(zoomKey);
       }}
       onClick={onClick}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      className="scroll-thin relative h-full overflow-auto bg-surface-2 outline-none"
+      className="scroll-thin relative h-full overflow-auto bg-surface-2 -outline-offset-2"
       style={{ cursor: panning ? 'grabbing' : zoomed ? 'zoom-out' : 'zoom-in' }}
     >
       <div className="w-max min-w-full p-3">
