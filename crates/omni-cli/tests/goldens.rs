@@ -636,7 +636,7 @@ fn fixture(name: &str) -> Vec<JsValue> {
 /// The fixture files and how many scenarios each holds: a file or a scenario that goes missing fails here.
 const FIXTURES: [(&str, usize); 10] = [
     ("basics", 47),
-    ("connection", 42),
+    ("connection", 47),
     ("doctor", 26),
     ("http", 26),
     ("new", 25),

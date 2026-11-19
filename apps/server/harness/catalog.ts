@@ -183,7 +183,7 @@ export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
     id: m.id,
     label: m.label ?? m.id,
     efforts: m.efforts,
-    // Ben's configured effort applies to every model that supports it, as it does in Codex.
+    // The user's configured effort applies to every model that supports it, as it does in Codex.
     defaultEffort:
       (probe.defaultEffort && m.efforts.includes(probe.defaultEffort) ? probe.defaultEffort : '') ||
       m.defaultEffort ||

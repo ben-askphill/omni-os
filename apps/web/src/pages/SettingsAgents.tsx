@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { HarnessLogo } from '../components/brand.tsx';
 import { Button, ErrorNote, Icon, Loading, StatusDot } from '../components/ui.tsx';
@@ -8,24 +8,24 @@ import { asksAuto } from '@omni/shared/thread-run.ts';
 import { runBody, type ChannelRun } from '@omni/shared/channel-form.ts';
 import { applyRunToChannels, bulkRunError, NO_RUN, picksRun, resetChannelsToAuto, selectedIds, toggleSelected } from '@omni/shared/channel-bulk-run.ts';
 import { RunDefaultsField } from './ChannelSettings.tsx';
-import { Card, Origin, ResetButton, ServerOptions, useScopedChannel } from './settings-parts.tsx';
+import { Card, LinkLine, Origin, ResetButton, ServerOptions, useScopedChannel } from './settings-parts.tsx';
+import { href } from '../router.ts';
 import { ModelVisibilityCard } from './SettingsModelVisibility.tsx';
 
-// Settings, Harnesses & models: each harness with whether it can run, how to fix it, its models and its cap; which models
-// the pickers list (SettingsModelVisibility.tsx); Hermes's
-// server; the model a new thread starts on (a channel default, else Auto); and the .env options behind them. A thread or crew
+// Settings, Models: each harness with whether it can run, how to fix it, its models and its cap; which models
+// the pickers list (SettingsModelVisibility.tsx); the model a new thread starts on (a channel default, else Auto); and the .env options behind them. A thread or crew
 // role that picks its own model wins over the channel (apps/server/harness/resolve.ts).
 
-/** `hermes`: Hermes's config form, which Settings.tsx owns with the other config forms. */
-export function ModelsSection({ hermes }: { hermes: ReactNode }) {
+/** Hermes's server is under Extras. */
+export function ModelsSection() {
   const { channel } = useScopedChannel();
   return (
     <>
       <HarnessesCard channel={channel?.id} />
       <ModelVisibilityCard />
-      {hermes}
       {channel ? <ChannelModelCard channel={channel} /> : <ChannelDefaultsCard />}
       <ServerOptions section="models" entry="model-options" />
+      <LinkLine href={href.settingsSection('extras', 'hermes')}>Hermes is in Extras</LinkLine>
     </>
   );
 }

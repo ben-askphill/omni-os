@@ -1,4 +1,9 @@
 {
   "extends": ["//"],
-  "tags": ["app", "desktop"]
+  "tags": ["app", "desktop"],
+  "tasks": {
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package-lock.json"]
+    }
+  }
 }

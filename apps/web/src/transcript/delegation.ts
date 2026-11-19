@@ -1,7 +1,7 @@
 // Delegation cards: the threads the Conductor's delegate and delegate_team calls started, and the sub-agents
 // any thread's own run launched with the harness's Agent tool.
 import type { BackgroundTask, Thread } from '../api.ts';
-import { str, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
+import { str, type Item, type ReportP, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
 
 /** One delegated thread as a card row. Live fields come from the thread itself once it is known. */
 export interface Branch {
@@ -114,6 +114,37 @@ export function delegations(calls: ToolCall[]): Delegation[] {
     if (!b) continue;
     if (!solo) out.push((solo = { key: c.id, branches: [] }));
     solo.branches.push(b);
+  }
+  return out;
+}
+
+/**
+ * Reports shown in place (ReportP `shown`, the Conductor's: they started no turn), by the thread that reported, for
+ * the delegation cards. Only threads on a card among `items`: a report whose card is not loaded keeps its own row.
+ * A thread that reported twice shows its latest.
+ */
+export function shownAnswers(items: readonly Item[]): Map<string, ReportP> {
+  const onCards = new Set<string>();
+  for (const it of items) {
+    if (it.type !== 'tools') continue;
+    for (const d of delegations(it.calls)) {
+      if (d.lead) onCards.add(d.lead.id);
+      for (const b of d.branches) onCards.add(b.id);
+    }
+  }
+  const out = new Map<string, ReportP>();
+  for (const it of items) if (it.type === 'report' && it.p.shown && onCards.has(it.p.thread_id)) out.set(it.p.thread_id, it.p);
+  return out;
+}
+
+/** The answers for one group's cards, or none. */
+export function answersFor(calls: ToolCall[], answers: Map<string, ReportP>): Record<string, ReportP> | undefined {
+  let out: Record<string, ReportP> | undefined;
+  for (const d of delegations(calls)) {
+    for (const id of [d.lead?.id, ...d.branches.map((b) => b.id)]) {
+      const a = id && answers.get(id);
+      if (a) (out ??= {})[id] = a;
+    }
   }
   return out;
 }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildCheckoutMcp, type CheckoutBuild } from '../scripts/native.ts';
 
-// A thread's ask, render and threads servers are omni-mcp, the Rust build (native-mcp.ts). The run builds it once,
+// A thread's ask, render, steps and threads servers are omni-mcp, the Rust build (native-mcp.ts). The run builds it once,
 // before the workers start, and they inherit OMNI_TEST_MCP_BUILD. Only a machine without cargo goes on without it:
 // the tests that start the real servers skip (`hasMcpBuild` in support.ts), and OMNI_NATIVE_MCP names a stand-in
 // that only answers --version, so the config each harness gets is still checked. A build that fails (the crate, the

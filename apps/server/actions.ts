@@ -270,7 +270,7 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals) {
  * Stop a run: SIGTERM to its process group, then SIGKILL after STOP_GRACE_MS. Resolves with the record once it has
  * exited. Stopping a run that already ended returns it as it is.
  */
-export async function stopRun(runId: string, why = 'Stopped by Ben.'): Promise<ActionRun | undefined> {
+export async function stopRun(runId: string, why = 'Stopped by you.'): Promise<ActionRun | undefined> {
   const l = live.get(runId);
   if (!l) return settleOrphan(runId);
   l.stopping ??= why;

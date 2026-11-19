@@ -94,6 +94,27 @@ describe('threadView', () => {
     expect(v.turns[1].children.map((c) => c.id)).toEqual(['late']);
   });
 
+  it("puts a report shown in place on its thread's card in the turn that delegated it, starting no turn", () => {
+    const events = [
+      user('Ask the researcher and the builder', 0),
+      text('Both are on it.', 1),
+      result(2),
+      ev('crew_report', { text: 'First answer.', thread_id: 'r', role: 'researcher', shown: true }, 3),
+      ev('crew_report', { text: 'Second answer.', thread_id: 'r', role: 'researcher', shown: true }, 4),
+      // Its delegating turn is not among the events held: it shows as a report on the newest turn.
+      ev('crew_report', { text: 'From further back.', thread_id: 'old', shown: true }, 5),
+      user('Thanks', 6),
+      text('Anytime.', 7),
+      result(8),
+    ];
+    const v = threadView({ events, thread: thread('done'), artifacts: [], children: [child('r', 1), child('b', 1)] });
+    expect(v.turns).toHaveLength(2);
+    expect(v.turns[0].answers).toEqual({ r: expect.objectContaining({ text: 'Second answer.' }) });
+    expect(v.turns[0].reports).toEqual([]);
+    expect(v.turns[1].prompts.map((p) => p.text)).toEqual(['Thanks']);
+    expect(v.turns[1].reports.map((r) => r.text)).toEqual(['From further back.']);
+  });
+
   it('shows a run switch under the turn it followed, not as a step', () => {
     const claude = { harness: 'claude', model: '', effort: '', harnessName: 'Claude Code', modelLabel: 'Opus' };
     const codex = { harness: 'codex', model: '', effort: '', harnessName: 'Codex', modelLabel: 'GPT-5.5' };

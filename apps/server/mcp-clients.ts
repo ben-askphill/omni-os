@@ -79,7 +79,7 @@ export const mcpClients = {
     const r = row(id);
     return r ? toClient(r) : null;
   },
-  /** Removed wins over the config file, so Ben can cut off a configured client without editing it. */
+  /** Removed wins over the config file, so the user can cut off a configured client without editing it. */
   status: (id: string): ClientStatus | null => {
     const r = db.prepare('SELECT status FROM mcp_clients WHERE id = ?').get(id) as { status: ClientStatus } | undefined;
     if (r?.status === 'removed') return 'removed';

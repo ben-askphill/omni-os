@@ -63,6 +63,7 @@ import { basePick, baseView } from './worktree-base.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
 import { stepOf, stepPrompts } from '@omni/shared/thread-glance.ts';
 import { fixChecksPrompt } from './fix-checks.ts';
+import { shellAllowed } from './request-guard.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
 export const threadRoutesApi = new Hono();
@@ -84,6 +85,8 @@ const createSchema = z.object({
   task_id: z.string().nullish(),
   /** A review: the thread whose work it reviews. The run goes to the other model family (harness/review.ts). */
   review_of: z.string().max(100).nullish(),
+  /** A delegation whose report wakes its delegate-only parent, which will act on it (runner/queue.ts showsInPlace). */
+  follow_up: z.boolean().optional(),
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
   /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
   folder: z.string().max(200).nullish(),
@@ -245,7 +248,7 @@ threadRoutesApi.get('/:id/summary', (c) => {
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
     // It waits for a sign-in to an account it needs (runner/setup.ts holdForSignIn): which, and how to sign in.
     ...(t.setup === 'signin' && { waits_for_sign_in: t.setup_error }),
-    // What its last turn left open for Ben (packages/shared/open-items.ts). Only while some are.
+    // What its last turn left open for the user (packages/shared/open-items.ts). Only while some are.
     ...(t.open_items && { open_items: readOpenItems(t.open_items) }),
     // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
     session: sessionWarmth(t),
@@ -273,7 +276,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
       mode: z.enum(['steer', 'queue', 'interrupt']).default('steer'),
       // The client's id for this send, kept across its retries: a retry gets the first acceptance back.
       request_id: z.string().min(1).max(200).optional(),
-      // Records Ben attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
+      // Records the user attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
       context: z.unknown().optional(),
       // A parent thread's send to a thread whose session went cold is refused unless it was asked to resume that thread.
       wake_cold: z.boolean().default(false),
@@ -321,7 +324,7 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
   const id = c.req.param('id');
   const { ids } = z.object({ ids: z.array(z.string().min(1)).max(200).optional() }).parse(await c.req.json().catch(() => ({})));
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  await resumeRequests(id, ids);
+  await resumeRequests(id, ids, { shell: shellAllowed(c) });
   return c.json(afterRecovery(id));
 });
 
@@ -334,7 +337,7 @@ threadActionsApi.post('/:id/setup/retry', async (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   const { skip_signin } = z.object({ skip_signin: z.boolean().optional() }).parse(await c.req.json().catch(() => ({})));
-  retrySetup(id, { skipSignIn: skip_signin });
+  retrySetup(id, { shell: shellAllowed(c), skipSignIn: skip_signin });
   return c.json(afterRecovery(id));
 });
 
@@ -344,11 +347,11 @@ threadActionsApi.post('/:id/setup/retry', async (c) => {
  * Each sends the messages waiting for Resume; with none, Ben's next message goes the chosen way. A 409 while it runs.
  */
 threadActionsApi.post('/:id/session/retry', async (c) => {
-  await retryResume(c.req.param('id'));
+  await retryResume(c.req.param('id'), { shell: shellAllowed(c) });
   return c.json(afterRecovery(c.req.param('id')));
 });
 threadActionsApi.post('/:id/session/fresh', async (c) => {
-  await startFresh(c.req.param('id'));
+  await startFresh(c.req.param('id'), { shell: shellAllowed(c) });
   return c.json(afterRecovery(c.req.param('id')));
 });
 

@@ -45,6 +45,9 @@ export type FeedEvent =
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);
 
+/** A thread event was stored, by a run here (runner/state.ts addEvent) or synced in: (threadId, kind). The step line may have moved (step-line.ts). */
+export const EVENT_ADDED = 'event_added';
+
 /** A sub-agent's task row came in from another machine (sync/handlers/event.ts), so `delegating` may have changed. */
 export const SYNCED_TASK = 'synced_task';
 
