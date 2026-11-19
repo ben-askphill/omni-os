@@ -30,6 +30,7 @@ import { ForkThreadButton } from './ContinueSheet.tsx';
 import { removeDraftContext, settleDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { referencesFor } from '../message-context/thread-picker.ts';
 import { ReferenceThreadButton } from './ThreadReference.tsx';
+import { QuickAnswer } from './QuickAnswer.tsx';
 
 import { AttachButton, AttachmentStrip, useAttachments } from './composer/attachments.tsx';
 import { DropHint, enterKey, SendButton, shell, StopButton, useAutosize, useFocusRequests, withKeys } from './composer/controls.tsx';
@@ -79,6 +80,8 @@ export function NewThreadComposer({
   // As the channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   const [busy, setBusy] = useState(false);
+  // A quick ask from Ask: answered under the composer (components/QuickAnswer.tsx), no thread to open.
+  const [answering, setAnswering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
@@ -191,6 +194,31 @@ export function NewThreadComposer({
     }
   };
 
+  /** Ask: a quick ask in this channel, on the picked run, answered right here with read-only tools. */
+  const ask = async () => {
+    const prompt = text.trim();
+    if (!prompt || busy || toGrok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const t = await api.send<Thread>(
+        '/threads',
+        { channel, prompt, quick: true, ...draftRunRequest(picked ? { choice, effort } : null), ...(refs.length && { context: referencesFor(refs, channel) }) },
+        att.files,
+      );
+      keepLocalFiles(t.id, att.files);
+      drafts.delete(key);
+      settleDraftContext(key, refs.map((r) => r.id));
+      setText('');
+      att.clear();
+      setAnswering(t.id);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const { channelOptions, roleOptions } = pickerOptions(visibleChannels, channel, crew);
   return (
     <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
@@ -250,6 +278,11 @@ export function NewThreadComposer({
           </button>
         )}
         <div className="ml-auto flex items-center gap-2.5">
+          {!toGrok && (
+            <Button size="sm" variant="secondary" disabled={!text.trim() || busy} onClick={() => void ask()} title="Answer here with read-only tools, without starting a thread">
+              Ask
+            </Button>
+          )}
           <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
             {toGrok ? 'Send' : 'Start'}
           </SendButton>
@@ -262,6 +295,14 @@ export function NewThreadComposer({
       {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
       {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
+      {answering && (
+        <div className="mx-2 mb-2 rounded-[16px] bg-bg px-3.5 py-3 shadow-[var(--shadow-card)]">
+          <QuickAnswer key={answering} id={answering} onOpen={(id) => navigate(`/t/${id}`)} />
+          <button type="button" onClick={() => setAnswering(null)} className="press mt-2 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+            Close
+          </button>
+        </div>
+      )}
     </div>
   );
 }

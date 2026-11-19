@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   ANSWER_EVENT,
+  approvalResultText,
   parseAnswers,
   parseQuestions,
   QUESTION_EVENT,
@@ -134,8 +135,11 @@ export async function answerQuestion(threadId: string, id: string, raw: unknown)
   const via = waitedOn(threadId, id) || runningElsewhere(thread) ? 'tool' : 'message';
   const answers = parsed.value;
   const state = stateOf(answers) as AnswerPayload['state'];
+  // An approval whose call ended before the answer (a restart): the call was refused then, so the message says what
+  // the user decided and that the call may be made again.
+  const asMessage = q.approval ? approvalResultText(q.approval, answers) : resultText(q.questions, state, answers);
   if (via === 'message' && holder) {
-    await runnerPorts().routing.forwardMessage(thread, resultText(q.questions, state, answers), { mode: 'steer', from: 'ben' });
+    await runnerPorts().routing.forwardMessage(thread, asMessage, { mode: 'steer', from: 'ben' });
   } else if (via === 'message') {
     const blocked = turnBlocked(thread, runsHere(threadId));
     if (blocked) throw refusal(blocked, 409);
@@ -145,7 +149,7 @@ export async function answerQuestion(threadId: string, id: string, raw: unknown)
   if (via === 'message' && !holder) {
     // Ben's reply, delivered as one (run-on.ts does the same with a forwarded one): it runs the thread here even when
     // another machine ran it last, which a wake of Omni's own never does.
-    const row = saveOwn(threadId, `question:${id}`, { prompt: resultText(q.questions, state, answers), kind: 'user', source: 'ben', payload: null });
+    const row = saveOwn(threadId, `question:${id}`, { prompt: asMessage, kind: 'user', source: 'ben', payload: null });
     if (row) void wakePrepared(row).catch((err) => console.error(`[questions] ${id}:`, (err as Error).message));
   }
   settled(threadId);

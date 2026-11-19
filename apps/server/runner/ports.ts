@@ -33,6 +33,8 @@ export interface RunnerPorts {
   /** What the rest of Omni does with a tool result once it is in the transcript (published.ts, then the automations). */
   reporting: {
     toolResult(threadId: string, r: { tool_use_id: string; text: string; is_error: boolean }): void;
+    /** A quick ask's turn ended done with this reply (quick-ask.ts afterQuickTurn): a TASK line or a file promotes it. */
+    quickTurn(threadId: string, reply: string): Promise<void>;
   };
 }
 
@@ -62,7 +64,7 @@ const unbound = (what: string) => () => {
 const ports: RunnerPorts = {
   routing: { targetFor: unbound('routing.targetFor'), forwardMessage: unbound('routing.forwardMessage'), forwardReport: unbound('routing.forwardReport') },
   handoff: { sendNewThread: unbound('handoff.sendNewThread') },
-  reporting: { toolResult: unbound('reporting.toolResult') },
+  reporting: { toolResult: unbound('reporting.toolResult'), quickTurn: unbound('reporting.quickTurn') },
 };
 
 let deps: ControllerDeps | null = null;

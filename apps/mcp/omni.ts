@@ -1,6 +1,7 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
 // so delegated threads are ordinary threads the user can open, search and continue.
 import { randomUUID } from 'node:crypto';
+import { accessLevelOf, accessSummary, connectorAccessOf } from '@omni/shared/access.ts';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -49,7 +50,8 @@ server.registerTool(
   {
     description:
       'List Omni channels (one per client or project) with repo, store, running thread count, sidebar folders and, when set, what new worktrees copy or share from the main checkout. ' +
-      'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in.',
+      'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in. ' +
+      '`access` says what agents there may do without a yes (Read only, Ask first, Full access, and any account set apart). Only the user changes it, in Channel settings.',
   },
   async () => {
     const list = await call('/channels');
@@ -66,6 +68,7 @@ server.registerTool(
         ...(c.worktree_include ? { copy_into_worktrees: c.worktree_include.split('\n') } : {}),
         ...(c.worktree_shared ? { shared_directories: c.worktree_shared.split('\n') } : {}),
         folders: folderSummary(c.folders),
+        access: accessSummary(accessLevelOf(c.access_level ?? c.access_default), connectorAccessOf(c.connector_access)),
       })),
     );
   },

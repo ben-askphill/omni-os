@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSend, CONDUCTOR, dictationSettled, quickPromptHints, quickPromptKey, quickPromptThread, reopened, sentLabel } from '../src/pages/quick-prompt-model.ts';
+import { canSend, CONDUCTOR, dictationSettled, quickPromptAsk, quickPromptHints, quickPromptKey, quickPromptThread, reopened, sentLabel } from '../src/pages/quick-prompt-model.ts';
 import { pageTitle, parseHash } from '../src/router.ts';
 import { screenOf } from '../src/mobile/screens.ts';
 
@@ -33,11 +33,11 @@ describe('the Quick Prompt', () => {
     expect(canSend(' ', { kind: 'editing' })).toBe(false);
   });
 
-  it('sends on Return, sends and opens on Cmd or Ctrl-Return, and leaves Shift-Return and composing alone', () => {
-    expect(key({})).toBe('send');
-    expect(key({ metaKey: true })).toBe('send-open');
-    expect(key({ ctrlKey: true })).toBe('send-open');
-    expect(key({ shiftKey: true })).toBeNull();
+  it('asks on Return, makes a task on Shift-Return, makes and opens it on Cmd or Ctrl-Return, and leaves composing alone', () => {
+    expect(key({})).toBe('ask');
+    expect(key({ metaKey: true })).toBe('task-open');
+    expect(key({ ctrlKey: true })).toBe('task-open');
+    expect(key({ shiftKey: true })).toBe('task');
     expect(key({ isComposing: true })).toBeNull();
     expect(key({ keyCode: 229 })).toBeNull();
     expect(key({ key: 'a' })).toBeNull();
@@ -54,12 +54,15 @@ describe('the Quick Prompt', () => {
   it('goes back to the Conductor after a send, and keeps the channel for an unsent draft', () => {
     expect(reopened({ kind: 'sent', thread: { id: 't1', title: '' } }, 'volero')).toEqual({ phase: { kind: 'editing' }, channel: CONDUCTOR });
     expect(reopened({ kind: 'failed', message: 'x' }, 'volero')).toEqual({ phase: { kind: 'editing' }, channel: 'volero' });
+    expect(reopened({ kind: 'answering', id: 't1' }, 'volero')).toEqual({ phase: { kind: 'editing' }, channel: CONDUCTOR });
   });
 
   it('says what it started, and which keys do what on each OS', () => {
     expect(sentLabel('Plan the week')).toBe('Started “Plan the week”');
     expect(sentLabel('')).toBe('Started a thread');
-    expect(quickPromptHints(true).map(([keys, label]) => `${keys.join('')} ${label}`)).toEqual(['↵ send', '⌘↵ send and open', 'esc close']);
-    expect(quickPromptHints(false)[1]).toEqual([['Ctrl', '↵'], 'send and open']);
+    expect(quickPromptHints(true).map(([keys, label]) => `${keys.join('')} ${label}`)).toEqual(['↵ ask', '⇧↵ make a task', '⌘↵ task and open', 'esc close']);
+    expect(quickPromptHints(false)[2]).toEqual([['Ctrl', '↵'], 'task and open']);
+    expect(quickPromptAsk('  what is live? ', 'volero')).toEqual({ channel: 'volero', prompt: 'what is live?', quick: true, source: 'capture' });
+    expect(quickPromptAsk(' ', CONDUCTOR)).toBeNull();
   });
 });

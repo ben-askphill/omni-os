@@ -94,12 +94,12 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
     void refreshPinned();
   }
 
-  /** The thread's new copy in its place by activity. An archived one leaves the list. */
+  /** The thread's new copy in its place by activity. An archived one leaves the list, and a quick ask never joins it. */
   function patchRecent(thread: Thread) {
     state.set((s) => {
       if (!s.recent) return s;
       const list = s.recent.filter((t) => t.id !== thread.id);
-      if (!thread.archived) list.push(thread);
+      if (!thread.archived && !thread.quick) list.push(thread);
       list.sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0));
       return { ...s, recent: list.slice(0, RECENT_LIMIT) };
     });

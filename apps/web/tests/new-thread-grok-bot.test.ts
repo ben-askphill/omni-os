@@ -77,6 +77,8 @@ afterEach(async () => {
 
 const mount = async (phone: boolean) => {
   await act(async () => root.render(phone ? createElement(NewSheet, { channel: 'omni-os' }) : createElement(NewThreadComposer, { channelId: 'omni-os' })));
+  // The sheet opens on Ask, a quick ask; these start a thread.
+  if (phone) await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Task')?.click());
 };
 
 const buttons = () => [...document.body.querySelectorAll('button')];

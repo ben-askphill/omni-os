@@ -77,6 +77,16 @@ Needs you holds unread results and threads waiting for you to act. A delegated t
 
 On desktop web and in the desktop app, use the check on a Needs you row or an Inbox card, the check in the thread header, or the thread's menu. The thread header keeps only the crew role the thread runs as (beside the channel crumb, left out on the Conductor's own threads), the channels its delegated threads work in, the context meter, Mark as done, the status, the thread menu (⋯) and the quick-card and panel toggle. Pin, Reference and Send to Grok Bot are in the menu. Hand off and Take over are on the reply box's Machine chip. On a phone, use the check on an Activity row or Thread options. The Conductor can use `mark_thread_done` when you ask it to.
 
+## Quick asks
+
+A quick ask is a question answered where you asked it, not a thread to manage. Ask from the desktop app's Quick Prompt (Return), or the phone web's and the iOS app's New screen with Ask picked (Task starts a thread as before).
+
+- It runs on Auto unless you pick a model, with read-only tools: it reads files in the channel's folder, searches and fetches the web and reads connectors, but cannot edit files, run commands, use a browser or delegate. Hermes and Cursor Cloud cannot run one (409), since Omni takes those tools away on this machine.
+- It gets no charter, worktree, folder or task id (its `workspace` is `read`, or `none` in a channel with no folder), and stays out of the sidebar, channel lists, the Inbox and notifications. Recent asks lists the last 7 days (`GET /api/threads/asks`).
+- Keep as thread lists it as an ordinary thread where it is, still with read-only tools. Make it a task starts a task thread in the same channel, with its own worktree and full tools, whose first message carries the questions and answers so far (`POST /api/threads/:id/promote` with `to: keep` or `task`).
+- When the agent finds the ask needs real work, it answers `TASK: <title>`. Omni shows "This needs a task" under the answer and highlights Make it a task, which then takes that title. Only you start the task: text the agent read (a page, a file) cannot start one by writing a TASK line.
+- Other code starts one through `startQuickAsk` (`apps/server/quick-ask.ts`), or `POST /api/threads` with `quick: true`.
+
 ## The composer
 
 - A new thread follows the channel and crew defaults until you pick a model or effort for that draft. When no default is set, Auto picks from the first prompt. The Conductor role's charter is Auto, and a saved #conductor channel default still wins. See [Harnesses](harnesses.md#auto).
@@ -233,6 +243,24 @@ An agent can stop and ask you one to four multiple-choice questions with Omni's 
 - If the call is gone by the time you answer (Omni restarted, you pressed Stop, or the harness gave up on it), your answers go to the thread as a message and it runs on them.
 - A thread that runs on another machine takes the answer the same way, however it got there: sent there, delegated there by the Conductor, or moved there by a reply or Take over on that machine. While a turn runs there, the answer syncs to that machine and its waiting call returns. Between turns, Omni forwards the answer as a message to a thread that stays on that machine (one sent or delegated there, or a worktree thread); any other thread runs on your answer here, as it would on a reply. Answer on the hub, on the thread's card or the parent's. You do not need to open the other machine. If the other machine refuses the answer for a reason other than "already answered", the card shows that reason instead of waiting.
 - Sending a message instead (steer or interrupt) closes the card as not answered, and the agent reads your message. A message queued for after the turn leaves the card open.
+
+## Access levels
+
+Channel settings > Access sets how much a channel's agents may do before they ask you ([ADR 0015](../adr/0015-access-levels.md)).
+
+| Level | Runs without asking | Waits for your yes | Refused |
+| --- | --- | --- | --- |
+| Read only | Reading, searching, read-only commands | Nothing | Edits, other commands, account actions |
+| Ask first | The same, plus edits in the thread's folder | Other commands and edits, account actions that send or change things | Nothing |
+| Full access | Everything | Nothing | Nothing |
+
+- Each connector (Gmail, Google Calendar, Slack, Notion, Google Drive, Granola, the browser) can have its own level, or Off, where even its reading tools are refused. One left at Same as channel follows the channel.
+- A channel with no level runs at this computer's default: Full access on an install that already had threads, Ask first on a new one. The setting shows which.
+- Ask first shows an approval card in the thread, on the same rails as a question card: Needs you, the alert, the phone and the other machine. Allow runs it once, Allow in this thread stops asking for that tool in the thread, Always allow for <role> stops asking for that crew role in the channel, and Don't allow (or a typed note) stops it and tells the agent. Channel settings lists the Always allowed tools with Remove.
+- A crew role's file can set `access: read` or `access: ask` to run stricter than its channel ([Crew](crew.md)).
+- Per harness: Claude Code and Codex ask per call. Cursor Agent cannot ask, so Ask first runs as Read only there. Hermes and Cursor Cloud run elsewhere, so a channel below Full access refuses them. Connector levels other than the browser hold on Claude Code only: Codex and Cursor Agent run the MCP servers from your own Codex or Cursor config without asking Omni.
+- Ask first still asks before an edit to a file a tool runs code from, such as `.git/`, `.claude/` or `.mcp.json`.
+- Agents cannot change levels or grants: only you can, in Channel settings.
 
 ## What a thread gets
 

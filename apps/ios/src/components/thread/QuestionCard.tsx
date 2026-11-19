@@ -26,7 +26,7 @@ import {
   type Phase,
   type Settled,
 } from '../../questions/card-state';
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
+import { fontSize, lineHeight, minTarget, mono, radius, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 
 export type SendAnswers = (questionId: string, answers: Answer[]) => Promise<{ state: ThreadQuestion['state'] }>;
@@ -59,6 +59,9 @@ export function QuestionCard({ q, send }: { q: ThreadQuestion; send: SendAnswers
   };
 
   const last = draft.page === q.questions.length - 1;
+  // An "Ask first" approval (packages/shared/access.ts): its full command under the title, and no Skip, since Don't allow is a choice.
+  const approval = q.approval;
+  const detail = approval?.detail && approval.detail !== approval.summary ? approval.detail : null;
   const answered = pick.selected.length > 0 || (pick.otherOn && pick.other.trim().length > 0);
 
   return (
@@ -68,6 +71,7 @@ export function QuestionCard({ q, send }: { q: ThreadQuestion; send: SendAnswers
         <Text style={styles.step}>{`Question ${draft.page + 1} of ${q.questions.length}`}</Text>
       ) : null}
       <Prompt question={question} />
+      {detail ? <Detail text={detail} /> : null}
       <View style={styles.options} accessibilityRole={question.multiSelect ? undefined : 'radiogroup'}>
         {question.options.map((o) => (
           <OptionRow
@@ -101,7 +105,7 @@ export function QuestionCard({ q, send }: { q: ThreadQuestion; send: SendAnswers
         {draft.page > 0 ? (
           <Button label="Back" variant="secondary" disabled={busy} onPress={() => setDraft(goBack(draft))} />
         ) : null}
-        <Button label="Skip" variant="secondary" disabled={busy} onPress={() => void go(true)} />
+        {approval ? null : <Button label="Skip" variant="secondary" disabled={busy} onPress={() => void go(true)} />}
         <Button label={last ? 'Send' : 'Next'} busy={busy} disabled={!answered} onPress={() => void go(false)} />
       </View>
     </Frame>
@@ -124,6 +128,15 @@ function Pill({ children }: { children: string }) {
     <View style={[styles.pill, { backgroundColor: colors.surface3 }]}>
       <Text style={[styles.pillText, { color: colors.fg2 }]}>{children}</Text>
     </View>
+  );
+}
+
+function Detail({ text }: { text: string }) {
+  const { colors } = useOmniTheme();
+  return (
+    <Text selectable numberOfLines={8} style={[styles.detail, { backgroundColor: colors.bg, color: colors.fg2 }]}>
+      {text}
+    </Text>
   );
 }
 
@@ -301,6 +314,15 @@ const styles = StyleSheet.create({
   },
   options: {
     gap: space.s4,
+  },
+  detail: {
+    fontFamily: mono,
+    fontSize: fontSize.meta,
+    lineHeight: Math.round(fontSize.meta * lineHeight.body),
+    borderRadius: radius.md,
+    paddingHorizontal: space.s6,
+    paddingVertical: space.s4,
+    overflow: 'hidden',
   },
   option: {
     minHeight: minTarget,
