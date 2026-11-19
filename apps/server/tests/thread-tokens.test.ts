@@ -173,6 +173,17 @@ describe('a thread under an automation, with no header', () => {
     expect((await call('POST', `/threads/${elsewhere.id}/published/comments`, { token, body: { url } })).status).toBe(403);
     expect((await call('POST', `/threads/${run.id}/published/comments`, { token, body: { url } })).status).toBe(200);
   });
+
+  it('cannot retry, start fresh or resume a thread outside its own lineage, which the Conductor still may', async () => {
+    const elsewhere = await spawned();
+    const run = await spawned();
+    underAutomation(run.id);
+    for (const path of ['setup/retry', 'session/retry', 'session/fresh', 'limit/resume']) {
+      expect((await call('POST', `/threads/${elsewhere.id}/${path}`, { token: run.token, body: {} })).status, path).toBe(403);
+    }
+    const interactive = await spawned();
+    expect((await call('POST', `/threads/${elsewhere.id}/session/retry`, { token: interactive.token, body: {} })).status).not.toBe(403);
+  });
 });
 
 describe('any thread token', () => {

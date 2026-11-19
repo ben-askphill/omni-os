@@ -392,6 +392,19 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
  * session, and its first prompt once it is ready. `skip_signin` is Start anyway: the thread starts without the sign-in
  * check this once. Safe to send twice; a thread that is ready or already being prepared is left as it is.
  */
+/**
+ * Recovery that sends a thread's parked messages or restarts its run: Retry setup, Retry or Start fresh (the
+ * Conductor's recover_thread_session), and the usage-limit continuation. Under an automation or a usage scan, a thread
+ * does these only for threads under the same one (automation-guard.ts lineageRefusal).
+ */
+const recovery = async (c: Context, next: () => Promise<void>) => {
+  if (lineageRefusal(c, c.req.param('id')!, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
+  await next();
+};
+threadActionsApi.use('/:id/setup/*', recovery);
+threadActionsApi.use('/:id/session/*', recovery);
+threadActionsApi.use('/:id/limit/*', recovery);
+
 threadActionsApi.post('/:id/setup/retry', async (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
