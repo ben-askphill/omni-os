@@ -21,11 +21,12 @@ import { RemoteMark } from '../components/ConnectAgent.tsx';
 import { useShell } from './shell.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../forwarded.ts';
 import type { NowDoing, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
-import { actionsLabel, STEP_GLYPH, stepsHeader, stepsLabel, type StepsView } from '@omni/shared/steps.ts';
+import { actionsLabel, stepsHeader, stepsLabel, type StepsView } from '@omni/shared/steps.ts';
 import { threadMark } from '@omni/shared/status.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { Folded } from '../components/Folded.tsx';
 import { ConnectorMark, NowWithConnector } from '../components/ConnectorMark.tsx';
+import { StepRail } from '../components/thread/StepRail.tsx';
 import { connectorsUsed } from '@omni/shared/connectors.ts';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
@@ -90,15 +91,14 @@ export function MoSteps({ v, failed, onActions }: { v: StepsView; failed: number
         </button>
       )}
       {open && (
-        <ol className="flex flex-col gap-[9px] px-4 pt-2 pb-1">
-          {v.steps.map((s) => {
+        <ol className="flex flex-col px-4 pt-[3.5px]">
+          {v.steps.map((s, i) => {
             const on = s.state === 'active' || s.state === 'needs';
             return (
               <li key={s.key} data-state={s.state} className="flex items-start gap-2.5">
-                <span className="grid h-[19px] w-3 shrink-0 place-items-center">
-                  <StatusDot status={STEP_GLYPH[s.state]} size={8} />
-                </span>
-                <span className="min-w-0 flex-1">
+                {/* The rail as on the Progress card; the row's top padding (4.5px) plus half of a 14px line at 1.35. */}
+                <StepRail state={s.state} index={i} count={v.steps.length} mid={14} className="w-3" />
+                <span className="min-w-0 flex-1 py-[4.5px]">
                   <span className={`block text-[14px] leading-[1.35] ${on ? 'text-fg' : 'text-fg-3'}`}>{s.title}</span>
                   {s.now && (
                     <span className="block text-[12.5px] leading-[1.35] text-fg-3">

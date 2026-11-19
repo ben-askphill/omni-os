@@ -5,9 +5,10 @@
 import { useState } from 'react';
 import type { Thread } from '../../api.ts';
 import { href } from '../../router.ts';
-import { actionsLabel, STEP_GLYPH, stepsHeader, type Step, type StepsView } from '@omni/shared/steps.ts';
+import { actionsLabel, stepsHeader, type Step, type StepsView } from '@omni/shared/steps.ts';
 import { Icon, StatusDot, StatusPill, Ticks } from '../ui.tsx';
 import { ToolRow } from './ToolRows.tsx';
+import { StepRail } from './StepRail.tsx';
 import { NowWithConnector } from '../ConnectorMark.tsx';
 
 const CHEVRON = 'text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)]';
@@ -24,49 +25,52 @@ function StepThread({ id, byId }: { id: string; byId: Map<string, Thread> }) {
   );
 }
 
-function StepRow({ s, cwd, running, byId }: { s: Step; cwd?: string | null; running: boolean; byId: Map<string, Thread> }) {
+/** A step title's first line's middle: the row's top padding (5px) plus half of a 13.5px line at 1.4. */
+const MID = 14.5;
+
+function StepRow({ s, index, count, cwd, running, byId }: { s: Step; index: number; count: number; cwd?: string | null; running: boolean; byId: Map<string, Thread> }) {
   const [open, setOpen] = useState(false);
   const on = s.state === 'active' || s.state === 'needs';
   return (
-    <li data-state={s.state} className="py-[5px]">
-      <div className="flex min-w-0 items-start gap-2.5">
-        <span className="grid h-[19px] w-3 shrink-0 place-items-center">
-          <StatusDot status={STEP_GLYPH[s.state]} size={8} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className={`block text-[13.5px] leading-[1.4] break-words ${on ? 'font-medium text-fg' : s.state === 'pending' ? 'text-fg-3' : 'text-fg-2'}`}>{s.title}</span>
-          {s.now && (
-            <span className="block text-[12.5px] leading-[1.4] break-words text-fg-3">
-              <NowWithConnector now={s.now} connector={s.connector} />
-            </span>
+    <li data-state={s.state} className="flex min-w-0 gap-2.5">
+      <StepRail state={s.state} index={index} count={count} mid={MID} className="w-3" />
+      <div className="min-w-0 flex-1 py-[5px]">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="min-w-0 flex-1">
+            <span className={`block text-[13.5px] leading-[1.4] break-words ${on ? 'font-medium text-fg' : s.state === 'pending' ? 'text-fg-3' : 'text-fg-2'}`}>{s.title}</span>
+            {s.now && (
+              <span className="block text-[12.5px] leading-[1.4] break-words text-fg-3">
+                <NowWithConnector now={s.now} connector={s.connector} />
+              </span>
+            )}
+          </span>
+          {s.actions > 0 && (
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              className="hov press inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 font-num text-[11.5px] text-fg-3 hover:text-fg"
+            >
+              {actionsLabel(s.actions)}
+              <Icon name="chevronRight" size={11} className={`${CHEVRON} ${open ? 'rotate-90' : ''}`} />
+            </button>
           )}
-        </span>
-        {s.actions > 0 && (
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            className="hov press inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 font-num text-[11.5px] text-fg-3 hover:text-fg"
-          >
-            {actionsLabel(s.actions)}
-            <Icon name="chevronRight" size={11} className={`${CHEVRON} ${open ? 'rotate-90' : ''}`} />
-          </button>
+        </div>
+        {s.threads.length > 0 && (
+          <div className="mt-1 space-y-0.5">
+            {s.threads.map((id) => (
+              <StepThread key={id} id={id} byId={byId} />
+            ))}
+          </div>
+        )}
+        {open && (
+          <div className="fade-in mt-1.5 -ml-2 rounded-[16px] bg-surface p-1">
+            {s.calls.map((c) => (
+              <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
+            ))}
+          </div>
         )}
       </div>
-      {s.threads.length > 0 && (
-        <div className="mt-1 ml-[22px] space-y-0.5">
-          {s.threads.map((id) => (
-            <StepThread key={id} id={id} byId={byId} />
-          ))}
-        </div>
-      )}
-      {open && (
-        <div className="fade-in mt-1.5 ml-[14px] rounded-[16px] bg-surface p-1">
-          {s.calls.map((c) => (
-            <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
-          ))}
-        </div>
-      )}
     </li>
   );
 }
@@ -97,8 +101,8 @@ export function StepsCard({ v, cwd, byId }: { v: StepsView; cwd?: string | null;
       )}
       {open && (
         <ol className={v.live ? '' : 'fade-in mt-1'}>
-          {v.steps.map((s) => (
-            <StepRow key={s.key} s={s} cwd={cwd} running={v.live} byId={byId} />
+          {v.steps.map((s, i) => (
+            <StepRow key={s.key} s={s} index={i} count={n} cwd={cwd} running={v.live} byId={byId} />
           ))}
         </ol>
       )}

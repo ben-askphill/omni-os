@@ -49,6 +49,15 @@ describe('ProgressCard', () => {
     expect(items[0].querySelector('[role="img"]')).toBeNull();
   });
 
+  it('darkens the rail from the first step into the mark of the step it is on', () => {
+    render('t1', start);
+    const lines = (li: Element) => [...li.querySelectorAll('span[aria-hidden]')].map((l) => (l.className.includes('bg-fg-4') ? 'dark' : 'light'));
+    const [done, active, pending] = [...host.querySelectorAll('li')];
+    expect(lines(done)).toEqual(['dark']);
+    expect(lines(active)).toEqual(['dark', 'light']);
+    expect(lines(pending)).toEqual(['light']);
+  });
+
   it('renders nothing when the thread has no list', () => {
     render('t1', null);
     expect(host.innerHTML).toBe('');
