@@ -149,6 +149,23 @@ function notionLines(thread: Thread, secretNames: readonly string[]) {
 const delegateOnlyRule = (name: string) =>
   `Answer quick asks yourself, in this thread, and start no thread for them: anything you can answer from the conversation, Omni's own state (the omni tools) or a light lookup with the tools you have (a fact you know, a page or doc read in a call or two, a connector read). Delegate with Omni's delegate tool, before anything else, when the work writes or edits files, runs commands, browses at length, changes code, a store, an inbox, a calendar or Notion, or will clearly grow past a few lookups. You have no shell, file editing, browser or subagent tools, by design: when a quick ask turns out to need them, delegate it instead of working around that. A plain question gets a plain answer: no brief, no folder question. Ask ${name} only for decisions that are theirs to make.`;
 
+/**
+ * A no-edits role (the reviewer): what it is without, and that the shell is not a way around it. Omni takes the edit
+ * tools away on Claude Code, Codex and Cursor (crew.ts NO_EDITS_DENIED); on Hermes and Cursor Cloud it cannot, so
+ * there the rule is this text alone.
+ */
+function noEditsLines(thread: Thread, role?: CrewRole) {
+  if (role?.tools !== 'no-edits' || readsOnly(thread)) return [];
+  return [
+    '',
+    '## No file edits',
+    isProviderHarness(thread.harness)
+      ? 'This role does not edit files. Omni cannot take the edit tools away on this harness, so the rule is yours to keep: do not change, create or delete files, and do not commit or push.'
+      : 'This role does not edit files: your file-edit tools are off. The shell is still yours for reading, `gh`, git and running checks. Do not use it to change, create or delete files, or to commit or push, either.',
+    'Report what you found instead, and leave the changes to the thread that owns the work.',
+  ];
+}
+
 /** What the user said about their work and tools in onboarding or Settings > General, when they said anything. */
 function profileLines(name: string) {
   const { work, tools } = userConfig().user;
@@ -208,6 +225,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           SESSION_CACHE_RULE,
         ]
       : []),
+    ...noEditsLines(thread, role),
     ...(hands ? workspaceLines(thread, channel) : []),
     ...(hands ? notionLines(thread, secretNames) : []),
     ...commandLineLines(thread, role),

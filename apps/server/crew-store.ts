@@ -11,7 +11,7 @@ import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, crewTexts, getCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
@@ -58,6 +58,11 @@ export const crewFields = z
     channel: optText(100),
     mcp: z.array(z.string().trim().min(1).max(80)).max(20).nullable().optional(),
     delegate_only: z.boolean().nullable().optional(),
+    /** full, no-edits or delegate-only. Empty or null removes the key. */
+    tools: z
+      .union([z.enum(CREW_TOOLS as [string, ...string[]]), z.literal('')])
+      .nullable()
+      .optional(),
     delegatable: z.boolean().nullable().optional(),
     review: z.boolean().nullable().optional(),
   })

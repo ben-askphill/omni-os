@@ -336,6 +336,8 @@ export function writeCursorPlugin(input: McpInput): string {
 
 /** The Cursor Agent permission rules a delegate-only role runs under. Deny beats `--force`, and MCP tools stay allowed. */
 export const CURSOR_DELEGATE_ONLY_DENY = ['Shell(*)', 'Write(**)'];
+/** A no-edits role's (crew.ts NO_EDITS_DENIED): no file writes, with the shell kept, so it is not read only. */
+export const CURSOR_NO_EDITS_DENY = ['Write(**)'];
 
 /**
  * Make dir a delegate-only role's Cursor config folder, for CURSOR_CONFIG_DIR: the user's own folder with `cli-config.json`

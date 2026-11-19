@@ -8,7 +8,7 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Omni reads th
 | researcher | Research, audits, answers to client questions, HTML reports |
 | writer | Drafts and edits writing in your voice: emails, posts, proposals, docs, summaries. Never sends or publishes |
 | builder | Code in a repo channel, own worktree, opens PRs. |
-| reviewer | Reviews a PR against its brief, from the spec and diff only. Read only. A review role (`review: true`) |
+| reviewer | Reviews a PR against its brief, from the spec and diff only. A review role (`review: true`) with no file-edit tools (`tools: no-edits`), which is not read only: see [No file edits](#no-file-edits) |
 | inbox | Admin: mail, calendar, time tracking, tasks, notes and chat drafts. Never sends on its own; Approve on a run's question card is the go-ahead for that draft |
 | usage-scan | Leads Scan my usage in #inbox: turns the repeated asks Omni found into up to 3 suggested automations ([Automations](automations.md#scan-my-usage)). Omni starts it; not for delegation |
 
@@ -36,6 +36,8 @@ A file there with a shipped role's name is your edit of that built-in, an overla
 
 `delegatable: false` keeps a role out of the Conductor's `list_crew` and makes `delegate` and `delegate_team` refuse it. The conductor and usage-scan set it. Starting a thread as a role no file has, or one hidden on this machine, is refused with the valid ids; it used to run with no charter.
 
+`tools` sets the tools a role's threads get: `full` (the default), `no-edits` or `delegate-only` (`delegate_only: true`, the older key, means the same and wins over `tools`). See [No file edits](#no-file-edits).
+
 `access: read` or `access: ask` runs the role's threads stricter than their channel's level, never looser ([Access levels](threads.md#access-levels)).
 
 `harness` is the role's runtime binding: any harness id this machine's catalog has, checked when the role is saved. A role whose harness this machine lacks still loads, with an error on it. Omni keeps frontmatter keys it does not know when it edits a file.
@@ -50,9 +52,22 @@ Settings > Crew, in the Agents group, lists every role this machine has, hidden 
 - **Duplicate** makes a role of your own with everything the role has now, its whole charter included. A copy of a built-in no longer changes with a release.
 - **Compare with built-in** shows the built-in charter and yours line by line. When the built-in changed under a charter you replaced, it offers Keep mine, Add mine to the new one, or Take the new one.
 - **Hide** and **Show** a built-in on this machine, **Reset to built-in** drops your overlay, and **Delete** removes a role of your own.
-- **Powers**: whether the Conductor may delegate to it, the conductor tools, whether it only routes work, and whether it reviews work (`review: true`). A field or action the role cannot change shows a lock and why.
+- **Powers**: whether the Conductor may delegate to it, the conductor tools, whether it only routes work, whether it has no file edits (`tools: no-edits`) and whether it reviews work (`review: true`). A field or action the role cannot change shows a lock and why.
 
 The composer's Role picker leaves out roles the Conductor may not delegate to, as `list_crew` does, except the Conductor itself, which the composer attaches in #conductor.
+
+## No file edits
+
+`tools: no-edits` (No file edits under Powers in Settings > Crew) takes a role's file-edit tools away. The shipped reviewer has it. It is not read only: the shell stays, so the reviewer can run `gh pr diff`, git and the checks, and a shell command can still change a file. The role's prompt tells it not to, and that is all that stops a command on any harness. Use a channel's Read only level ([Access levels](threads.md#access-levels)) or `access: read` when nothing may change.
+
+| Harness | Blocked | Still runs |
+| --- | --- | --- |
+| Claude Code | `Edit`, `Write`, `MultiEdit`, `NotebookEdit` (`--disallowedTools`) | Bash, reading, MCP tools, subagents |
+| Codex | File patches: it asks before each one (`approvalPolicy: untrusted`) and Omni declines | Shell commands, with network, without asking you |
+| Cursor Agent | File writes (`Write(**)` in its deny rules) | Shell, reading, MCP tools |
+| Hermes, Cursor Cloud | Nothing: Omni cannot take a tool away there, so the prompt is the only rule | Everything |
+
+On Codex, a read-only sandbox would also stop the network, and with it `gh`, so Omni declines the patches instead. A channel at Read only or Ask first still holds the commands as its level says. `tools` is one of a role's powers: an agent's save never sets it (see the crew guard below).
 
 ## The API
 
@@ -63,7 +78,7 @@ The clients edit roles through the API, the same files underneath:
 | `GET /api/crew` | Every role this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `delegatable`, `review`, `locks` on the roles Omni relies on and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
 | `GET /api/crew/:id` | The role, the built-in alone (`builtIn`), the shipped file's text, your file's text, the shipped charter's hash, and the charters as written (`charters.builtIn`, `charters.own`, `charters.effective`) |
 | `POST /api/crew` | A new role of your own: `{ id, fields, charter }` or `{ id, markdown }` |
-| `PUT /api/crew/:id` | Edit a role: `{ fields, charter?, charter_mode? }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only`, `delegatable` and `review`) removes it. Send `charter` and `charter_mode` only to change them: either one records the built-in charter as seen |
+| `PUT /api/crew/:id` | Edit a role: `{ fields, charter?, charter_mode? }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only`, `tools`, `delegatable` and `review`) removes it. Send `charter` and `charter_mode` only to change them: either one records the built-in charter as seen |
 | `POST /api/crew/draft` | `{ id?, own?, save }`: the file a save would write and the role it makes, nothing written. `own` stands in for your file. Settings' Form and Markdown tabs turn into each other through it |
 | `POST /api/crew/:id/duplicate` | `{ id, name? }`: a new role of your own with everything this one has |
 | `DELETE /api/crew/:id` | Delete a role of your own |
@@ -80,7 +95,7 @@ Three built-ins keep fields and refuse actions, each with a reason the API sends
 | --- | --- | --- |
 | conductor | `delegate_only`, the `omni` MCP server, `delegatable: false` | Duplicate, Hide |
 | usage-scan | `delegate_only`, the `omni` MCP server, `delegatable: false`, and its charter can only be added to (`charter_mode: append`) | Duplicate (a copy would not be a usage scan: only Omni starts one), Hide |
-| reviewer | `review: true` | none: duplicate it for a reviewer without the review rules |
+| reviewer | `review: true` (`tools: no-edits` is not locked: turn it off, or duplicate the role) | none: duplicate it for a reviewer without the review rules |
 
 The locks hold however the file got there. A crew file another machine syncs that breaks one is refused and listed under Refused changes in Settings > Sync, and an overlay written by hand loads with the locked fields as the built-in has them (its other edits still apply).
 
@@ -90,7 +105,7 @@ A role is a prompt every later thread of it runs with, so an agent thread's writ
 
 - It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings. A reset that would change the role's powers (your edit gave the built-in the conductor tools, say) is refused: reset it yourself.
 - The thread runs as the Conductor. No other role writes roles, even one you gave the `omni` MCP server, and usage-scan never does.
-- The save leaves powers alone: no `mcp`, `delegate_only`, `delegatable` or `review`, and no whole-file `markdown`. Those are yours to set.
+- The save leaves powers alone: no `mcp`, `delegate_only`, `tools`, `delegatable` or `review`, and no whole-file `markdown`. Those are yours to set.
 - No automation started the thread or any thread above it.
 - You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends, including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card. The same holds for review notes an agent thread sends, and for messages a thread carries when it moves to another machine, which keep their sender.
 

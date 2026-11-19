@@ -17,7 +17,7 @@ import { processSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { CodexClient, type RpcServerRequest } from './client.ts';
-import { handshake, openThread, sessionEnv, sessionParams, threadConfig } from './session-start.ts';
+import { declinesPatches, handshake, openThread, sessionEnv, sessionParams, threadConfig } from './session-start.ts';
 export { threadConfig };
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
@@ -161,6 +161,8 @@ export const codexAdapter: HarnessAdapter = {
       const legacy = r.method === 'execCommandApproval' || r.method === 'applyPatchApproval';
       const answer = (ok: boolean) => client.respond(r.id, { decision: legacy ? (ok ? 'approved' : 'denied') : ok ? 'accept' : 'decline' });
       if (!call) return void client.respond(r.id, {});
+      // A no-edits role never patches a file, whatever the channel's level; its commands go on as usual.
+      if (call.tool === 'file change' && declinesPatches(ctx)) return void answer(false);
       if (!ctx.permission) return void answer(true);
       ctx.permission
         .check(call)

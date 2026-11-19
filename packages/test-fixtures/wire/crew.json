@@ -8,6 +8,7 @@
     "mcp": [
       "omni"
     ],
+    "tools": "delegate-only",
     "delegateOnly": true,
     "delegatable": false,
     "review": false,
@@ -32,6 +33,7 @@
     "description": "Writes code in a repo channel. Bug fixes, UI changes, features. Works in its own git worktree and opens PRs.",
     "model": "auto",
     "mcp": [],
+    "tools": "full",
     "delegateOnly": false,
     "delegatable": true,
     "review": false,
@@ -46,6 +48,7 @@
     "model": "auto",
     "channel": "inbox",
     "mcp": [],
+    "tools": "full",
     "delegateOnly": false,
     "delegatable": true,
     "review": false,
@@ -59,6 +62,7 @@
     "description": "Research, audits and answers to client questions. Web, docs, code and connected data. Produces a written answer or an HTML report.",
     "model": "auto",
     "mcp": [],
+    "tools": "full",
     "delegateOnly": false,
     "delegatable": true,
     "review": false,
@@ -69,9 +73,10 @@
   {
     "id": "reviewer",
     "name": "Reviewer",
-    "description": "Reviews a pull request against its brief. Gets only the spec and the PR, never the builder's conversation. Read only.",
+    "description": "Reviews a pull request against its brief. Gets only the spec and the PR, never the builder's conversation. Has no file-edit tools.",
     "model": "auto",
     "mcp": [],
+    "tools": "no-edits",
     "delegateOnly": false,
     "delegatable": true,
     "review": true,
@@ -95,6 +100,7 @@
     "mcp": [
       "omni"
     ],
+    "tools": "delegate-only",
     "delegateOnly": true,
     "delegatable": false,
     "review": false,
