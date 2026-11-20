@@ -24,7 +24,9 @@ export function useThreadInterruptKey({
       const el = e.target instanceof HTMLElement ? e.target : null;
       // A zoomed image preview keeps Esc to zoom back out.
       if (el?.closest('[data-keeps-esc]')) return;
-      if (el && (el.isContentEditable || el.matches('input, select') || (el.matches('textarea') && !el.hasAttribute('data-reply-composer')))) return;
+      // An open `@` or `/` menu in the reply box takes Esc to close itself.
+      if (el?.closest('[data-menu-open]')) return;
+      if (el && !el.hasAttribute('data-reply-composer') && (el.isContentEditable || el.matches('input, select, textarea'))) return;
       void interrupt();
     };
     window.addEventListener('keydown', onKey, true);

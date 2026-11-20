@@ -20,6 +20,7 @@ vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], st
 import { ReplyComposer } from '../src/components/Composer.tsx';
 import { MoComposer } from '../src/mobile/MoComposer.tsx';
 import { shownAnswers } from '../src/transcript/delegation.ts';
+import { messageBox, typeIn } from './message-box.ts';
 
 const thread = { id: 't1', channel_id: 'c1', title: 'A thread', status: 'done', harness: 'claude-code', model: 'claude-sonnet-5-5', effort: 'high', role: null } as unknown as Thread;
 const harnesses = [{ id: 'claude-code', name: 'Claude Code', available: true, capabilities: { steer: true }, models: [{ id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', efforts: ['high'], defaultEffort: 'high', default: true }] }];
@@ -72,15 +73,9 @@ const mount = async (phone: boolean) => {
     root.render(phone ? createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} }) : createElement(ReplyComposer, { thread })),
   );
 };
-const textarea = () => host.querySelector('textarea')!;
+const textarea = () => messageBox(host)!;
 const type = async (value: string) => {
-  const input = textarea();
-  await act(async () => {
-    input.focus();
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value);
-    input.setSelectionRange(value.length, value.length);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeIn(textarea(), value);
   await settle();
 };
 const askButton = () => [...host.querySelectorAll('button')].find((b) => /^Ask\b/.test(b.getAttribute('aria-label') ?? ''))!;
@@ -98,7 +93,7 @@ describe.each([false, true])('an Ask from the reply box, phone=%s', (phone) => {
     await act(async () => askButton().click());
     expect(asks).toEqual([{ role: 'hermes-box', question: 'what do the logs say?', excerpt: true, wake: true, request_id: expect.any(String) }]);
     expect(messages).toEqual([]);
-    expect(textarea().value).toBe('');
+    expect(textarea().textContent).toBe('');
   });
 
   it('sends Just show it and no excerpt when Ben picks them', async () => {

@@ -20,6 +20,7 @@ vi.mock('../src/components/Toaster.tsx', () => ({ useToast: () => (t: { title: s
 
 import { NewThreadComposer } from '../src/components/Composer.tsx';
 import { NewSheet } from '../src/mobile/NewSheet.tsx';
+import { messageBox, typeIn } from './message-box.ts';
 
 const harnesses = [
   {
@@ -95,11 +96,7 @@ const pick = async (label: string) => {
 };
 
 const type = async (text: string) => {
-  const input = host.querySelector('textarea')!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, text);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeIn(messageBox(host)!, text);
 };
 
 const sendButton = (phone: boolean) =>
@@ -120,7 +117,7 @@ describe.each([false, true])('Grok Bot on the new-thread Machine chip, phone=%s'
     expect(document.body.querySelector('button[aria-label="Run on: Grok Bot"]')?.textContent).toContain('To');
     // The run's own pickers step aside: Grok Bot has no model.
     expect(host.textContent).not.toContain('Sonnet 5.5');
-    expect(host.querySelector('textarea')!.placeholder).toBe('Message Grok Bot. Its reply comes back in Grok Bot, not here.');
+    expect(messageBox(host)!.getAttribute('aria-placeholder')).toBe('Message Grok Bot. Its reply comes back in Grok Bot, not here.');
     expect(host.textContent).toContain('No thread starts in Omni.');
 
     await type('  Check the cart drawer  ');
@@ -128,7 +125,7 @@ describe.each([false, true])('Grok Bot on the new-thread Machine chip, phone=%s'
     expect(posts).toEqual([{ url: '/api/grokbot', body: { request: 'Check the cart drawer', context: { channel_id: 'omni-os' } } }]);
     expect(state.toasts).toEqual(['Sent to Grok Bot']);
     if (phone) expect(state.sheet).toHaveBeenCalledWith(null);
-    else expect(host.querySelector('textarea')!.value).toBe('');
+    else expect(messageBox(host)!.textContent).toBe('');
   });
 
   it("shows the server's error and keeps the text", async () => {
@@ -139,7 +136,7 @@ describe.each([false, true])('Grok Bot on the new-thread Machine chip, phone=%s'
     await type('Check the cart drawer');
     await click(sendButton(phone));
     expect(host.textContent).toContain(reason);
-    expect(host.querySelector('textarea')!.value).toBe('Check the cart drawer');
+    expect(messageBox(host)!.textContent).toBe('Check the cart drawer');
     expect(state.toasts).toEqual([]);
     expect(posts.map((p) => p.url)).toEqual(['/api/grokbot']);
   });

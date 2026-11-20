@@ -15,12 +15,9 @@ import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
-import { SlashMenu, useCommands } from './SlashMenu.tsx';
-import { FileMenu, useFileMenu } from './FileMenu.tsx';
+import { useCommands } from './composer/use-commands.ts';
 import { askOf } from '@omni/shared/ask.ts';
 import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from './AskCard.tsx';
-import { machineMentions } from '../message-context/machine-mention.tsx';
-import { useMentionField } from '../message-context/MentionField.tsx';
 import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
@@ -38,8 +35,9 @@ import { ReferenceThreadButton } from './ThreadReference.tsx';
 import { QuickAnswer } from './QuickAnswer.tsx';
 
 import { AttachButton, AttachmentStrip, useAttachments } from './composer/attachments.tsx';
-import { DropHint, enterKey, SendButton, shell, StopButton, useAutosize, useFocusRequests, withKeys } from './composer/controls.tsx';
-import { joinMenus, useNewThreadMenus, useSlashMenu } from './composer/menus.tsx';
+import { DropHint, enterKey, SendButton, shell, StopButton, useFocusRequests, withKeys } from './composer/controls.tsx';
+import { useNewThreadCommands } from './composer/menus.tsx';
+import { MessageEditor, newThreadScope, type MessageEditorHandle } from './composer/MessageEditor.tsx';
 import { pickerOptions } from './composer/pickerOptions.tsx';
 import { finePointer, SteerButton, ThreadRunPills } from './composer/ReplyControls.tsx';
 import { ThreadMachineChip, type MachineHeld } from './composer/MachineChip.tsx';
@@ -90,11 +88,12 @@ export function NewThreadComposer({
   // A quick ask from Ask: answered under the composer (components/QuickAnswer.tsx), no thread to open.
   const [answering, setAnswering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<MessageEditorHandle>(null);
+  const [frame, setFrame] = useState<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const att = useAttachments();
   // Threads Ben referenced for the first message: chips over the box, kept like its text until Start.
   const refs = useDraftContext(key);
-  useAutosize(ref, text);
   useFocusRequests(ref, true);
 
   const [base, setBase] = useBasePick(channel);
@@ -146,16 +145,12 @@ export function NewThreadComposer({
     setPicked(null);
   };
 
-  // `@` a machine: the Conductor (or a role with the omni tools) starts the task there (message-context/machine-mention.tsx).
-  const mentions = machineMentions(key, setError);
   const update = (v: string) => {
     setText(v);
     drafts.set(key, v);
-    mentions.edited(v);
   };
 
-  const { slashMenu, fileMenu, menus, hint } = useNewThreadMenus({ ref, text, onText: update, choice, channel, role, onMachine: mentions.picked });
-  const field = useMentionField(ref, text, refs);
+  const { commands, hint } = useNewThreadCommands({ text, choice, channel });
   const templates = useTemplates();
 
   /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
@@ -237,45 +232,37 @@ export function NewThreadComposer({
   // A template chip puts `/<name> ` in the box, ready for what the job is about.
   const pickTemplate = (t: Template) => {
     update(templateDraft(t));
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    });
+    requestAnimationFrame(() => ref.current?.focus('end'));
   };
   return (
     <>
       {/* flow-root: the last note's or the answer's bottom margin stays inside the box, which has no padding to hold it. */}
-      <div className={shell('flow-root rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
+      <div ref={setFrame} className={shell('flow-root rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
         <DropHint over={att.over} />
-        {/* Near the top of the page, so it opens downward. */}
-        {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
-        {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
         <ContextChips records={chipRecords(text, refs)} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
-        {field.layer}
-        <textarea
-          ref={ref}
-          value={text}
-          {...menus.textarea}
-          onSelect={(e) => {
-            field.onSelect(e);
-            menus.textarea.onSelect(e);
-          }}
-          onScroll={field.onScroll}
-          style={field.style}
+        <MessageEditor
+          handle={ref}
+          text={text}
+          onText={update}
+          draft={key}
+          records={refs}
+          // `@` a machine: the Conductor (or a role with the omni tools) starts the task there.
+          mentions={newThreadScope(channel, role)}
+          commands={{ ...commands, where: 'new-thread' }}
+          // Near the top of the page, so the menus open downward.
+          below
+          anchor={frame}
+          onError={setError}
+          onMenuOpen={setMenuOpen}
           onPaste={att.onPaste}
           onKeyDown={(e) => {
-            if (menus.onKey(e)) return;
-            if (field.onKeyDown(e, update)) return;
-            if (enterKey(e, text, update)) void submit();
+            if (enterKey(e, () => ref.current?.insert('\n'))) void submit();
           }}
-          rows={big ? 3 : 2}
           // Named, not left to the placeholder: that changes with the target and carries key hints.
-          aria-label="Message"
+          label="Message"
           placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
-          className={`block field-sizing-content max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
+          className={`block max-h-[220px] w-full overflow-y-auto bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
         />
         <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
           {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
@@ -325,7 +312,7 @@ export function NewThreadComposer({
           </div>
         </div>
         {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-        <div aria-live="polite">{hint && !menus.open && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+        <div aria-live="polite">{hint && !menuOpen && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
         {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
         {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
         {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
@@ -426,11 +413,12 @@ export function ReplyComposer({
   // A send the server refused with where the thread lives or a raw reason (LivesOn.tsx), and the mode it went with.
   const [away, setAway] = useState<{ refusal: SendRefusal; mode?: SendMode } | null>(null);
   const [takingOver, setTakingOver] = useState(false);
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<MessageEditorHandle>(null);
+  const [frame, setFrame] = useState<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const att = useAttachments();
   const context = useDraftContext(threadId);
   const sendReply = useReplySend(threadId);
-  useAutosize(ref, text);
 
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
   const takeover = machine?.takeover;
@@ -453,21 +441,15 @@ export function ReplyComposer({
   const latest = useRef(text);
   latest.current = text;
 
-  // ----- the `/` menu -----
-  const mentions = machineMentions(threadId, setError);
+  // ----- the `/` and `@` menus -----
   const update = (v: string) => {
     setText(v);
     drafts.set(key, v);
-    mentions.edited(v);
   };
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
-  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'reply' });
   // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts): the role answers, not this thread's agent.
   const askRoles = useAskRoles(thread);
-  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}`, roles: askRoles, onMachine: mentions.picked });
-  const menus = joinMenus(slashMenu, fileMenu);
-  const field = useMentionField(ref, text, context);
   const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
   const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
 
@@ -574,43 +556,44 @@ export function ReplyComposer({
   };
 
   return (
-    <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
+    <div ref={setFrame} className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
-      {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
-      {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
       {ask && <AskChip threadId={threadId} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
       <ContextChips records={chipRecords(text, context)} onRemove={(id) => removeDraftContext(threadId, id)} className="px-3 pt-3 pb-0.5" />
       <AttachmentStrip files={att.files} onRemove={att.remove} />
-      {field.layer}
-      <textarea
-        ref={ref}
-        data-reply-composer
-        value={text}
-        {...menus.textarea}
-        onSelect={(e) => {
-          field.onSelect(e);
-          menus.textarea.onSelect(e);
-        }}
-        onScroll={field.onScroll}
-        style={field.style}
+      <MessageEditor
+        // A fresh box per thread: its Undo history is that thread's draft.
+        key={threadId}
+        handle={ref}
+        reply
+        text={text}
+        onText={update}
+        draft={threadId}
+        records={context}
+        // `@` a machine: the Conductor (or a role with the omni tools) starts the task there.
+        mentions={`thread=${encodeURIComponent(threadId)}`}
+        roles={askRoles}
+        commands={{ ...commands, where: 'reply' }}
+        anchor={frame}
+        onError={setError}
+        onMenuOpen={setMenuOpen}
         onPaste={att.onPaste}
         onKeyDown={(e) => {
-          if (menus.onKey(e)) return;
-          if (field.onKeyDown(e, update)) return;
           if (e.key === 'Tab' && suggestion && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
-            return update(suggestion);
+            update(suggestion);
+            requestAnimationFrame(() => ref.current?.focus('end'));
+            return;
           }
-          const key = enterKey(e, text, update);
+          const key = enterKey(e, () => ref.current?.insert('\n'));
           if (!key) return;
           if (omni) return void runOmni();
           const busyMode: SendMode = key === 'interrupt' ? 'interrupt' : steers ? 'steer' : 'queue';
           void submit(busyThread ? busyMode : undefined);
         }}
-        rows={1}
-        aria-label="Message"
+        label="Message"
         placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? (technical ? 'Steer the agent. It reads this at its next step' : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')}
-        className="block field-sizing-content max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none placeholder:text-fg-3"
+        className="block max-h-[220px] min-h-[60px] w-full overflow-y-auto bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         <AttachButton onPick={att.add} disabled={busy} />
@@ -648,7 +631,7 @@ export function ReplyComposer({
       </div>
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
       <div aria-live="polite">
-        {slash.hint && !menus.open && (
+        {slash.hint && !menuOpen && (
           <div className="px-4 pb-2.5 text-[12px] text-fg-3">{slash.hint}</div>
         )}
       </div>

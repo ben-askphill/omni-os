@@ -411,6 +411,6 @@ export function useAfterAdd(close: () => void) {
   return useCallback(() => {
     close();
     if (shell) shell.back();
-    else requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[data-reply-composer]')?.focus());
+    else requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-reply-composer]')?.focus());
   }, [close, shell]);
 }

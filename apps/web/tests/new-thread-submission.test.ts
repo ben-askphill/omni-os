@@ -11,6 +11,7 @@ vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), sh
 import { NewThreadComposer } from '../src/components/Composer.tsx';
 import { NewSheet } from '../src/mobile/NewSheet.tsx';
 import { openNewThread, setInboxUp } from '../src/router.ts';
+import { messageBox, typeIn } from './message-box.ts';
 
 const harnesses = [{
   id: 'claude-code', name: 'Claude Code', available: true, plan: 'Claude plan', models: [
@@ -62,12 +63,7 @@ const click = async (button: Element | undefined | null) => {
 };
 
 const typeAndSend = async (phone: boolean) => {
-  const input = host.querySelector('textarea')!;
-  await act(async () => {
-    // Use the native setter so React sees the input event as an edit.
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, 'Fix the typo');
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeIn(messageBox(host)!, 'Fix the typo');
   await click(phone ? host.querySelector('button[aria-label="Send"]') : [...host.querySelectorAll('button')].find((b) => b.textContent === 'Start'));
   expect(requests).toHaveLength(1);
   return requests[0];

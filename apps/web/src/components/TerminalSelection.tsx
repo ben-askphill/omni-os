@@ -103,7 +103,7 @@ export function TerminalSelectionDock({ threadId, cwd, term, text }: { threadId:
     t?.clearSelection();
     setNote('');
     if (shell) shell.back();
-    else document.querySelector<HTMLTextAreaElement>('textarea[data-reply-composer]')?.focus();
+    else document.querySelector<HTMLElement>('[data-reply-composer]')?.focus();
   };
 
   return (

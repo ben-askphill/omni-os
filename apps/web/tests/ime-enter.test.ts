@@ -38,7 +38,7 @@ describe('the composer\'s Enter', () => {
   const press = (init: { isComposing?: boolean; keyCode?: number; metaKey?: boolean }) => {
     const preventDefault = vi.fn();
     const e = { key: 'Enter', keyCode: init.keyCode ?? 13, altKey: false, shiftKey: false, ctrlKey: false, metaKey: !!init.metaKey, nativeEvent: { isComposing: !!init.isComposing }, preventDefault };
-    return { result: enterKey(e as unknown as ReactKeyboardEvent<HTMLTextAreaElement>, 'hi', () => {}), preventDefault };
+    return { result: enterKey(e as unknown as ReactKeyboardEvent<HTMLElement>, () => {}), preventDefault };
   };
 
   it('sends on a plain Enter', () => {

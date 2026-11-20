@@ -26,7 +26,7 @@ import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { MentionText } from '../message-context/MentionField.tsx';
+import { MentionText } from '../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';

@@ -10,7 +10,7 @@ import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf } from '../../r
 import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';
-import { MentionText } from '../../message-context/MentionField.tsx';
+import { MentionText } from '../../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
 import { isImeEnter } from '../../ime.ts';

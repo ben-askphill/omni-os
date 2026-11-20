@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newContext } from '../message-context.ts';
 import { parseContexts, readContexts } from '../message-context-kinds.ts';
-import { chipRecords, deleteMention, droppedMentions, machineMention, mentionBody, mentionPieces, mentionSpans, mentions, mentionsMachine, snapOutOfMention } from '../message-context-machine.ts';
+import { chipRecords, machineMention, mentionBody, mentionPieces, mentionSpans, mentionsMachine } from '../message-context-machine.ts';
 
 const AT = new Date('2026-11-19T12:00:00.000Z');
 const ids = (() => {
@@ -33,17 +33,15 @@ describe('machine_mention', () => {
   });
 
   it('finds @name as a word of its own, in any case', () => {
-    expect(mentions("@Ben's MacBook Pro build the page", "Ben's MacBook Pro")).toBe(true);
-    expect(mentions('then @OMARCHY, run the tests', 'omarchy')).toBe(true);
-    expect(mentions('email me@omarchy.dev', 'omarchy')).toBe(false);
-    expect(mentions('@omarchy2 run it', 'omarchy')).toBe(false);
-    expect(mentions('omarchy run it', 'omarchy')).toBe(false);
+    const found = (text: string, r = box) => mentionSpans(text, [r]).length > 0;
+    expect(found("@Ben's MacBook Pro build the page", pro)).toBe(true);
+    expect(found('then @OMARCHY, run the tests')).toBe(true);
+    expect(found('email me@omarchy.dev')).toBe(false);
+    expect(found('@omarchy2 run it')).toBe(false);
+    expect(found('omarchy run it')).toBe(false);
   });
 
-  it('drops the chip of a mention deleted from the text, and knows a machine already mentioned', () => {
-    const text = "@Ben's MacBook Pro build the POOWS collection page, @omarchy run the server tests";
-    expect(droppedMentions(text, [pro, box])).toEqual([]);
-    expect(droppedMentions("@Ben's MacBook Pro build it, then run the tests", [pro, box])).toEqual([box.id]);
+  it('knows a machine already mentioned', () => {
     expect(mentionsMachine([pro, box], 'box-1')).toBe(true);
     expect(mentionsMachine([pro], 'box-1')).toBe(false);
   });
@@ -81,26 +79,5 @@ describe('machine mentions inline', () => {
     const other = { id: 'x', kind: 'thread_reference', v: 1, label: 'T-1', note: '', body: {} };
     expect(chipRecords(text, [pro, other])).toEqual([other]);
     expect(chipRecords('build it', [pro, other])).toEqual([pro, other]);
-  });
-
-  it('deletes a mention as one unit with Backspace or Delete, and grows a selection that cuts into one', () => {
-    const spans = mentionSpans(text, [pro, box]);
-    const rest = text.slice(proEnd);
-    expect(deleteMention(text, proEnd, proEnd, 'Backspace', spans)).toEqual({ text: rest, caret: 0 });
-    expect(deleteMention(text, 3, 3, 'Backspace', spans)).toEqual({ text: rest, caret: 0 });
-    expect(deleteMention(text, 0, 0, 'Delete', spans)).toEqual({ text: rest, caret: 0 });
-    expect(deleteMention(text, 0, 0, 'Backspace', spans)).toBeNull();
-    expect(deleteMention(text, proEnd, proEnd, 'Delete', spans)).toBeNull();
-    expect(deleteMention(text, 5, proEnd + 6, 'Backspace', spans)).toEqual({ text: text.slice(proEnd + 6), caret: 0 });
-    expect(deleteMention(text, 0, proEnd, 'Backspace', spans)).toBeNull();
-  });
-
-  it('moves a caret out of a pill the way it came', () => {
-    const spans = mentionSpans(text, [pro, box]);
-    expect(snapOutOfMention(proEnd - 1, proEnd, spans)).toBe(0);
-    expect(snapOutOfMention(1, 0, spans)).toBe(proEnd);
-    expect(snapOutOfMention(proEnd - 2, 30, spans)).toBe(0);
-    expect(snapOutOfMention(proEnd - 2, proEnd - 3, spans)).toBe(proEnd);
-    expect(snapOutOfMention(proEnd, 0, spans)).toBeNull();
   });
 });
