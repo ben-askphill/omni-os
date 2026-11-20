@@ -11,6 +11,7 @@ import { useListbox } from './ui/use-listbox.ts';
 import { useExit } from './ui/use-exit.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import { pickerModels } from '@omni/shared/model-visibility.ts';
+import { localHarnesses } from '@omni/shared/remote-agent.ts';
 
 export interface ModelChoice {
   harness: string;
@@ -18,7 +19,8 @@ export interface ModelChoice {
 }
 
 /**
- * One model pill whose list starts with Auto, then groups models under each harness, with a sticky header naming the
+ * One model pill whose list starts with Auto, then groups models under each local harness (a remote agent's server is
+ * never listed: ADR 0020), with a sticky header naming the
  * plan, one search across all groups, and the harness default marked "(default)". Models hidden in Settings > Harnesses
  * & models are left out, unless one is the model already picked. A harness that
  * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
@@ -84,7 +86,8 @@ export function ModelPicker({
 
   const groups = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return harnesses.map((h) => {
+    // Remote agents' servers are not runs to pick (ADR 0020): a remote agent is picked by name, as an agent.
+    return localHarnesses(harnesses).map((h) => {
       // Models hidden in Settings stay out, except the one already picked.
       const listed = pickerModels(h.models, h.id === value.harness ? value.model : null);
       return {

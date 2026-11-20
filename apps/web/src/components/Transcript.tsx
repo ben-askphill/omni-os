@@ -22,18 +22,21 @@ import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
+import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
+import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
 import { OmniMark } from './brand.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
-import { leadLine } from '@omni/shared/members.ts';
+import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
-import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../message-context/agent-mention.tsx';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
@@ -143,8 +146,12 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy, from }: { p: 
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
   const { crew } = useApp();
   // A team lead's message to its members (slice 6) names who sent it and who it went to.
-  const label = leadLine(p, from, (a) => crew.find((r) => r.id === a)?.name ?? a) ?? (p.source ? SOURCE_LABEL[p.source] : undefined);
+  const lead = leadMessage(p, from, (a) => crew.find((r) => r.id === a)?.name ?? a);
+  const label = lead?.from ?? (p.source ? SOURCE_LABEL[p.source] : undefined);
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
+  const sent = useMemo(() => sentContext(text, p.context), [text, p.context]);
+  // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
+  const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
   const body = (
     <>
       {pieces.map(({ text: t, hit }, i) =>
@@ -176,10 +183,11 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy, from }: { p: 
             <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
+        <SentTo agents={to} />
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
-      <ContextChips records={chipRecords(text, p.context)} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
+      <ContextChips records={sent.chips} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
           data-find-event={event}
@@ -254,14 +262,17 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
   );
 }
 
-/** An agent joined or left a group thread (ADR 0019): a quiet line, with its avatar. */
+/**
+ * An agent joined or left a group thread (ADR 0019), or Ben committed a remote-led thread's changes (ADR 0020): a
+ * quiet line, with the agent's avatar or a commit mark.
+ */
 export function MemberLine({ p }: { p: MemberP }) {
-  const look = useAgent(p.agent) ?? { id: p.agent, name: p.name };
+  const look = useAgent(p.agent || null) ?? { id: p.agent, name: p.name };
   return (
     <div data-member-line={p.event} className="flex items-center gap-3 py-1 text-[12px] font-medium text-fg-3">
       <div className="h-px flex-1 bg-line" />
-      <span className="inline-flex min-w-0 items-center gap-1.5">
-        <AgentAvatar agent={{ ...look, name: p.name }} size={16} />
+      <span className="inline-flex min-w-0 items-center gap-1.5" title={p.commit?.sha ? p.commit.sha.slice(0, 12) : undefined}>
+        {p.event === 'committed' ? <Icon name="check" size={13} className="shrink-0" /> : <AgentAvatar agent={{ ...look, name: p.name }} size={16} />}
         <span className="min-w-0 break-words">{memberLine(p)}</span>
       </span>
       <div className="h-px flex-1 bg-line" />
@@ -474,13 +485,19 @@ export const Transcript = memo(function Transcript({
   lead = null,
   harness,
   model,
+  channelId,
+  seats,
 }: {
   threadId: string;
+  /** The thread's channel, which a remote agent's lock line names and links (ADR 0020). */
+  channelId?: string;
   /** The agent the thread runs as: its replies carry its author line, and rows from before Omni recorded one read as its. */
   lead?: string | null;
   /** The thread's run now, for the author line's harness and model on replies after its last switch. */
   harness?: string;
   model?: string | null;
+  /** The thread's seated agents (`thread.members`): a member's author line names its own run, not the lead's. */
+  seats?: readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model'>[];
   /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
   code?: boolean;
   /** Every row held, anchors included. */
@@ -549,12 +566,14 @@ export const Transcript = memo(function Transcript({
     let now: ReplyRun | null = first ? { harness: first.p.from.harness, model: first.p.from.modelLabel } : run;
     for (const it of items) {
       if (it.type === 'switch') now = { harness: it.p.to.harness, model: it.p.to.modelLabel };
-      if (heads.has(it.key)) out.set(it.key, now);
+      if (heads.has(it.key)) out.set(it.key, seatRun(seats, heads.get(it.key)) ?? now);
     }
     return out;
-  }, [items, heads, run]);
+  }, [items, heads, run, seats]);
   const leadLook = useAgent(lead);
   const { crew: agents, channel } = useApp();
+  // Where each run of a remote agent's replies ends: a lock line, since it could not read the thread's files.
+  const tails = useMemo(() => (channelId ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId]);
   // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
   const conductorLook = channel(CONDUCTOR_CHANNEL);
   const faceOf = (look: AgentLook) =>
@@ -658,6 +677,7 @@ export const Transcript = memo(function Transcript({
               defer={defers(idx, flow.length, LIVE_ROWS)}
               indent={!!lead && isReply(it)}
             />,
+            tails.has(it.key) && channelId ? <RemoteLockLine key={`lock${it.key}`} channelId={channelId} className={REPLY_INDENT} /> : null,
           ])}
           {edgeRow(-1)}
           {!lanesLive && liveHead && leadLook && (liveSteps || !asking) && (

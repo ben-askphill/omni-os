@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import type { Channel, ModStatus, Thread } from '../../api.ts';
 import { headerShowsRole } from '@omni/shared/crew-role.ts';
+import { isRemoteAgentHarness, TALKS_ONLY } from '@omni/shared/remote-agent.ts';
 import { ChannelStack } from '../ChannelStack.tsx';
 import { ContinueCrumbs } from '../ContinueLinks.tsx';
 import { harnessLabel } from '../brand.tsx';
@@ -76,6 +77,7 @@ export function ThreadHeader({
   /** The account its harness last ran as (useThreadAccount). */
   account?: ThreadAccount | null;
 }) {
+  const remoteLead = isRemoteAgentHarness(thread.harness) && !!thread.role;
   return (
     <div className="@container flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
       <span className="hidden sm:block @max-3xl:hidden">
@@ -94,7 +96,13 @@ export function ThreadHeader({
               </a>
             </>
           )}
-          {roleName && headerShowsRole(thread) && <RoleChip role={thread.role!} name={roleName} />}
+          {roleName && (headerShowsRole(thread) || remoteLead) && <RoleChip role={thread.role!} name={roleName} />}
+          {/* A remote agent leads talk-only; a local member seated in it changes files (ADR 0020). */}
+          {remoteLead && (
+            <span className="shrink-0" data-talks-only>
+              · {TALKS_ONLY}
+            </span>
+          )}
           {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3">{thread.task_id}</span>}
           <AccountChip ran={account} />
           <ContinueCrumbs links={links} />

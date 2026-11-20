@@ -93,13 +93,15 @@ describe('parseHash', () => {
     expect(parseHash('#/t/t1/nope?turn=x')).toEqual({ name: 'thread', id: 't1' });
   });
 
-  it('opens Models\' Connect an agent sheet from a pairing link, as the desktop app or a browser opens it', () => {
+  it('opens Agents\' Add remote agent sheet from a pairing link, as the desktop app or a browser opens it', () => {
     const query = 'url=http%3A%2F%2Fh.tail1.ts.net%3A8642&code=GB8Z-DP5J-0TGX-R608';
     const link = `omni://connect-agent?${query}`;
-    expect(parseHash(`#/connect-agent?${query}`)).toEqual({ name: 'settings', section: 'models', connect: link });
-    expect(parseHash(`#/settings/models?connect=${encodeURIComponent(link)}`)).toEqual({ name: 'settings', section: 'models', connect: link, focus: undefined });
-    // Only Models takes one.
-    expect(parseHash(`#/settings/crew?connect=${encodeURIComponent(link)}`)).toEqual({ name: 'settings', section: 'crew', focus: undefined });
+    expect(parseHash(`#/connect-agent?${query}`)).toEqual({ name: 'settings', section: 'crew', connect: link });
+    expect(parseHash(`#/settings/crew?connect=${encodeURIComponent(link)}`)).toEqual({ name: 'settings', section: 'crew', connect: link });
+    // A link from before slice 4 still names Models, and lands on Agents.
+    expect(parseHash(`#/settings/models?connect=${encodeURIComponent(link)}`)).toEqual({ name: 'settings', section: 'crew', connect: link });
+    // Only those two take one.
+    expect(parseHash(`#/settings/general?connect=${encodeURIComponent(link)}`)).toEqual({ name: 'settings', section: 'general', focus: undefined });
   });
 
   it('reads the event a search hit opens the thread at, and ignores one that is not an id', () => {

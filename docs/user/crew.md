@@ -42,12 +42,13 @@ A file there with a shipped agent's name is your edit of that built-in, an overl
 
 `tokens:` names the accounts the agent reaches through a token instead of their connector, each with the secret that holds it (`tokens: { notion: OMNI_NOTION_TOKEN }`). While that secret is set, the agent's threads do not wait for that account's connector at the [sign-in check](automations.md#sign-in-check). Omni's [Notion](notion.md) section tells a thread how to use `OMNI_NOTION_TOKEN`; for any other token, the charter has to. The shipped agents that do their own work set it for Notion. A map with an unknown account or a bad secret name is left out, so the agent waits as before.
 
-`harness` is the agent's runtime binding: any harness id this machine's catalog has, checked when the agent is saved. An agent whose harness this machine lacks still loads, with an error on it. Omni keeps frontmatter keys it does not know when it edits a file.
+`harness` is the agent's runtime binding: any local harness id this machine's catalog has, checked when the agent is saved. An agent whose harness this machine lacks still loads, with an error on it. `harness: hermes` or `harness: custom:<slug>` makes it a [remote agent](#remote-agents), which only a new agent's file can name. Omni keeps frontmatter keys it does not know when it edits a file.
 
 ## Settings > Agents
 
 Settings > Agents, in the Assistant group, lists every agent this machine has, hidden ones included, on desktop web, phone web and the desktop app. Each row shows the agent's avatar, its chips (Built-in, Edited or Yours, then Hidden, Built-in charter changed, or Can't run here when its run defaults name a harness or model this machine lacks), its description and the run it defaults to. A row opens the agent as a page of its own (`#/settings/crew/<id>`): its avatar, name and description on top, an Avatar card, then the editor. The iOS app gets the section later; until then use phone web.
 
+- **Add remote agent** connects an AI agent on a server of your own and makes it an agent here ([Remote agents](#remote-agents)).
 - **New agent** makes an agent of your own: a name, an id (made from the name; it never changes), a description, an icon, a charter, run defaults, a default channel and its powers. It opens on its page once made. Names are unique, ignoring case: a second Builder (or builder) is refused when you save it.
 - **Edit** opens a Form or the Markdown. On a built-in, the form writes your overlay: a field you set back to the built-in's value leaves the overlay, so a release sets it again, and your text is added to the built-in charter (Add to built-in) or replaces it (Replace). Markdown saves the file as written. The two tabs are one draft: switching carries your edits across, and keys the form does not show stay in the file.
 - **Avatar**: the Avatar card on the agent's page uploads an image: PNG, JPEG or WebP up to 2 MB, which Omni crops square from the center and scales to 256px before saving it at once. It is kept inline in the agent's file, as `avatar: { image: "data:image/webp;base64,..." }`, so it syncs to your other machines and the phone with the file. **Remove image** takes it out. Without an image the agent shows its icon: one of the shared icons or one emoji on a background color, set in the editor's Identity section (`avatar: { icon: icon:tool, bg: "#d4e9fa" }`). Without either, a built-in keeps its mark and any other agent shows a disc with two letters, unique across your agents (Researcher RS, Reviewer RV), its color taken from the agent's id. Below 18px the disc shows its color only. The avatar shows in the composer's Agent picker, the thread header, the quick-actions card, the phone's sub line and on every reply the agent writes ([Threads](threads.md#who-wrote-a-reply)).
@@ -59,6 +60,44 @@ Settings > Agents, in the Assistant group, lists every agent this machine has, h
 
 The composer's Agent picker leaves out agents the Conductor may not delegate to, as `list_crew` does, except the Conductor itself, which the composer attaches in #conductor.
 
+## Remote agents
+
+A remote agent is an agent whose run is a server outside Omni: Hermes (`hermes`), or an AI service you connected, such as an [eve agent](harnesses.md#eve-agents) like Nomos. Its server is a detail of the agent ([ADR 0020](../adr/0020-remote-agents-are-agents.md)), so it never shows in the harness and model pickers, Auto never picks one, and a local agent never runs on a remote server. You mention it, seat it in a thread or start a thread as it, like any agent. How Omni reaches the server: [Remote agents' servers](harnesses.md#remote-agents-servers).
+
+### Add remote agent
+
+**Add remote agent** in Settings > Agents (and on the Harnesses step of setup) connects a server without pasting its key, on desktop web, the phone layout and the desktop app.
+
+1. **On a Hermes server**, run the pairing helper the sheet shows, pinned to this build: `curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh`. It prints an `omni://connect-agent` link, a QR code when `qrencode` is installed, and an address and code to type. It makes `API_SERVER_KEY` in Hermes's `.env` when there is none (restart Hermes after), and answers one pairing for at most 10 minutes. **For an eve agent** there is nothing to run: go straight to Find with its address.
+2. **Find.** Click the link (the desktop app opens it), or paste it, a bare address, or the helper's address and code into the sheet. Omni looks at the address without a key and shows what it found: its name, avatar and host, what kind of agent it is, whether it is on this machine, the tailnet or https, and chips for what it can and cannot do. Plain `http://` off the tailnet, an address this machine cannot reach, a Vercel deployment behind Vercel's login wall, and A2A agents (a later version) say why they cannot connect.
+3. **Sign in.** With a code, **Pair** redeems it server to server: the key goes into this machine's server and never reaches the page. An eve agent that pairs shows **Get a code**, which opens its own Connect Omni page in a new tab or your browser: sign in there if it asks, copy the code, paste it in the sheet and press Pair. Without pairing, pick the secret in Secrets that holds the key, or add it there from the sheet.
+4. **Test.** One short turn on its own session ("Reply with one line: your name and the model you run on"), with the reply, the model, the time it took and its tokens, or which step failed and what came back.
+5. **Connect** saves only after the test passed: a paired key as the global secret `AGENT_<SLUG>_KEY`, the server's file, and the agent, with the same id, delegatable, with no powers and no charter. **Open <name>** then opens its page. A failure at any step undoes the steps before it.
+
+A link never reaches out to anything by itself: it fills the sheet in, you press Find, and Connect once its test turn passed. `#/settings/crew?connect=<link>` opens the same sheet on a phone or in a browser (an older `#/settings/models?connect=` link still works). Agent threads cannot add, change, test or remove one (403); the Conductor hands you the page instead.
+
+**The avatar** is the one the server offers when it connects: a square PNG, JPEG or WebP data URL of at most 256px a side and 256 KB ([protocol](../internals/remote-harness-protocol.md#the-offered-avatar)). A server that offers none, or one Omni does not take, gets the initials disc, and Find says why. **Test connection** reads the offer again and takes a new avatar, unless you set one of your own on the agent's Avatar card.
+
+### A remote agent's page
+
+Its page in Settings > Agents has the Avatar card and editor any agent has, without the run and the powers it cannot use (its run is its server's, and it changes no files), and two cards of its own:
+
+- **Server**: whether it is connected, **Test connection** and **Remove**, which is how a remote agent goes: the editor has no Delete for one, since its file alone would come back at the next start. With **Show technical details** on, also its address, kind, the secret its key is in and how many of its turns run at once, plus **Edit** for a server you connected and a link to Extras for Hermes's address. **Remove** revokes the key at the server when it offers that, deletes the secret Connect made for it (a secret you picked yourself stays), and removes the server's file and the agent, here and on your other machines. Editing its address or secret first makes Remove skip the revoke and leave every secret alone. Hermes gives every machine the same key, so to cut one machine off, change `API_SERVER_KEY` on the server. Removing Hermes clears its address on this machine and removes the agent; its key stays in Secrets.
+- **In threads**: what it may do there. Files: **Can't read or change**, in every channel. Messages: the other agents' replies and a catch-up, in channels that send remote agents thread excerpts, and elsewhere only the message to it.
+
+The charter you write on its page goes to its server as instructions. Without one, Omni sends only who it is and how the thread works, and the server's own instructions lead.
+
+### In a thread
+
+- **Leading.** A thread started as a remote agent has it as its lead, and talks only. The crumbs read "<name> · talks only", the composer's placeholder says a local agent changes files, and the quick-actions card's model row is empty and its Files row says **Can't read or change**. The thread gets its worktree at the start, like a local thread, so the machine, folder and branch rows fill.
+- **Changing files.** Seat a local agent with an @ mention ([Agents in a thread](threads.md#agents-in-a-thread)). It edits the worktree; the remote lead does not. When something is left to commit, the composer shows **Commit**, which commits everything with the message you give (the thread's title by default) and says so in the transcript. **Open PR** then pushes the branch and opens the pull request. Only you commit or open the PR: an agent thread gets a 403.
+- **Seated as a member.** A remote agent can sit in any thread, local-led or not, and answers the messages that name it. It gets the thread as text: a catch-up and the other agents' replies, in channels that send remote agents thread excerpts. With **No thread excerpts to remote agents** on in Channel settings, it gets only the message addressed to it.
+- **The lock line.** Each run of a remote agent's replies ends with "Remote agents can't read files in #<channel>", linking Channel settings.
+
+### Threads and agents from before
+
+At start, Omni turns what came before into remote agents, once and on each machine: Hermes in use (an address set, an agent or a thread on it) gets the agent `hermes`, and a server file no agent is bound to gets an agent with its name. A thread on `hermes` or `custom:<slug>` that its own agent does not lead is led by the server's agent from then on, and keeps working. Those older threads keep only their own data folder, so they show no Changes, branch or Commit. A thread whose server has no file on this machine yet keeps its harness and refuses to run, as before.
+
 ## No file edits
 
 `tools: no-edits` (No file edits under Powers in Settings > Agents) takes an agent's file-edit tools away. The shipped reviewer has it. It is not read only: the shell stays, so the reviewer can run `gh pr diff`, git and the checks, and a shell command can still change a file. The agent's prompt tells it not to, and that is all that stops a command on any harness. Use a channel's Read only level ([Access levels](threads.md#access-levels)) or `access: read` when nothing may change.
@@ -68,7 +107,7 @@ The composer's Agent picker leaves out agents the Conductor may not delegate to,
 | Claude Code | `Edit`, `Write`, `MultiEdit`, `NotebookEdit` (`--disallowedTools`) | Bash, reading, MCP tools, subagents |
 | Codex | File patches: it asks before each one (`approvalPolicy: untrusted`) and Omni declines | Shell commands, with network, without asking you |
 | Cursor Agent | File writes (`Write(**)` in its deny rules) | Shell, reading, MCP tools |
-| Hermes, Cursor Cloud | Nothing: Omni cannot take a tool away there, so the prompt is the only rule | Everything |
+| Cursor Cloud | Nothing: Omni cannot take a tool away there, so the prompt is the only rule | Everything |
 
 On Codex, a read-only sandbox would also stop the network, and with it `gh`, so Omni declines the patches instead. A channel at Read only or Ask first still holds the commands as its level says. `tools` is one of an agent's powers: an agent's save never sets it (see the crew guard below).
 
@@ -78,7 +117,7 @@ The clients edit agents through the API, the same files underneath:
 
 | Call | Does |
 | --- | --- |
-| `GET /api/crew` | Every agent this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `tools`, `delegatable`, `review`, `memory`, `memoryWrites`, `memoryWaiting` when lessons wait, `locks` on the agents Omni relies on and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
+| `GET /api/crew` | Every agent this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `tools`, `delegatable`, `review`, `memory`, `memoryWrites`, `memoryWaiting` when lessons wait, `locks` on the agents Omni relies on, `server` on a remote agent (`harness`, `builtIn`, `kind`, `url`, `host`, `secret`, `cap`, `available`, `fix`, and `avatarOffered` while its image is the one the server offered; never the key) and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
 | `GET /api/crew/:id` | The agent, the built-in alone (`builtIn`), the shipped file's text, your file's text, the shipped charter's hash, and the charters as written (`charters.builtIn`, `charters.own`, `charters.effective`) |
 | `POST /api/crew` | A new agent of your own: `{ id, fields, charter }` or `{ id, markdown }` |
 | `PUT /api/crew/:id` | Edit an agent: `{ fields, charter?, charter_mode? }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only`, `tools`, `delegatable`, `review`, `memory` and `memory_writes`) removes it. Send `charter` and `charter_mode` only to change them: either one records the built-in charter as seen |
@@ -91,8 +130,12 @@ The clients edit agents through the API, the same files underneath:
 | `GET /api/crew/:id/avatar` | The uploaded image. Agents list it as `avatar.image`, a URL that changes with the image |
 | `GET /api/crew/:id/memory` | The agent's lessons, waiting ones first, and how many wait |
 | `POST /api/crew/:id/memory` | `{ text, channel? }`: a lesson for the agent, in the channel named or (null) every channel. Yours applies at once; see [Agent memory](#agent-memory) for an agent's |
+| `POST /api/crew/:id/server/test` | A remote agent's Test connection: the test turn's outcome, and its offered avatar read again |
+| `DELETE /api/crew/:id/server` | A remote agent's Remove: its server, the secret Connect made, and the agent |
+| `POST /api/threads/:id/commit` | `{ message }`: commit everything left in a remote-led thread's worktree. 409 while an agent is running or with nothing to commit |
+| `POST /api/threads/:id/open-pr` | Push a remote-led thread's branch and open its PR, `{ url }`. 409 while something is left to commit |
 
-A save is refused when its run defaults, default channel or MCP servers are unknown here, when it breaks a lock below, or when it puts an agent that only routes work on Hermes or Cursor Cloud, where it would never start.
+A save is refused when its run defaults, default channel or MCP servers are unknown here, when it breaks a lock below, when it puts an agent that only routes work on Cursor Cloud, where it would never start, or when an edit binds an agent to a remote server or takes one off it. Only you change an agent, test or remove its server, commit or open a PR in a remote-led thread: an agent thread gets a 403.
 
 ## Agents Omni relies on
 

@@ -53,6 +53,8 @@ import { FindBar } from '../components/thread/FindBar.tsx';
 import { useThreadFind } from '../pages/useThreadFind.ts';
 import { FindTargetCtx } from '../transcript/find-target.ts';
 import { tailId } from '@omni/shared/history.ts';
+import { isRemoteAgentHarness, TALKS_ONLY } from '@omni/shared/remote-agent.ts';
+import { CommitSheet } from '../components/thread/CommitButton.tsx';
 
 /** The phone follows no bottom: a find has nothing to let go of. */
 const STAYS = () => {};
@@ -85,6 +87,7 @@ export function ThreadScreen() {
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
   const [members, setMembers] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [machineSheet, setMachineSheet] = useState(false);
   const spans = history.history.spans;
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
@@ -142,8 +145,15 @@ export function ThreadScreen() {
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
   const theirs = conductor ? 'the Conductor' : thread.role ? `the ${crewRoleName(thread.role, roles)}` : 'the agent';
 
+  // A remote agent that leads talks only: Ben commits, and Omni opens the pull request itself (ADR 0020).
+  const remoteLead = isRemoteAgentHarness(thread.harness);
   const openPR = async () => {
     try {
+      if (remoteLead) {
+        await api.post<{ url: string }>(`/threads/${encodeURIComponent(thread.id)}/open-pr`, {});
+        shell.toast('Opened the pull request');
+        return;
+      }
       applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: prompts.open }), true);
       shell.toast(`Asked ${theirs} to open a PR`);
     } catch (e) {
@@ -158,12 +168,14 @@ export function ThreadScreen() {
   // The agent just asked whether to open a PR: answering yes sits next to the Machine chip.
   const offered = prOffered(events, !slotBusy && !queued.length, pr?.pr);
   if (code && offered) chips.push(openChip);
+  if (remoteLead && !slotBusy && changes?.uncommitted) chips.push({ label: 'Commit', icon: 'check', onClick: () => setCommitting(true) });
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
   // Outside a code project with the switch off: no PR or change chips.
   if (code && pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
   else if (code && changes?.files.length) {
     chips.push({ label: slotBusy ? 'Changes so far' : 'Review changes', icon: 'diff', diff: [changes.add, changes.del], onClick: () => shell.open(href.threadView(thread.id, 'changes')) });
-    if (!slotBusy && !offered) chips.push(openChip);
+    // A remote-led thread's PR waits for Ben's commit: Omni opens it from what is committed (ADR 0020).
+    if (!slotBusy && !offered && !(remoteLead && changes.uncommitted)) chips.push(openChip);
   }
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
@@ -183,7 +195,8 @@ export function ThreadScreen() {
         </>
       )}
       {' · '}
-      {ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)}
+      {/* A remote agent leads talk-only: no harness of Omni's runs it (ADR 0020). */}
+      {remoteLead ? <span data-talks-only>{TALKS_ONLY}</span> : ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)}
     </>
   );
   // A Conductor thread needs Ben while any thread it delegated does.
@@ -380,6 +393,16 @@ export function ThreadScreen() {
         />
       )}
       {members && <MemberSheet thread={thread} onClose={() => setMembers(false)} />}
+      <CommitSheet
+        thread={thread}
+        files={changes?.uncommitted ?? 0}
+        open={committing}
+        onClose={() => setCommitting(false)}
+        onDone={(r) => {
+          changes?.reload();
+          shell.toast(`Committed ${r.files} ${r.files === 1 ? 'file' : 'files'}`);
+        }}
+      />
       {machineSheet && held && (
         <RunOnSheet
           rows={held.rows}

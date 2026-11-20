@@ -10,6 +10,7 @@ import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
 import { agentLook, type AgentLook } from '../components/AgentAvatar.tsx';
 import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
+import { RemoteLockLine } from '../components/thread/RemoteLockLine.tsx';
 import { Avatar, Icon, Segmented } from '../components/ui.tsx';
 import { tabPanelProps } from '../components/ui/segmented.tsx';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
@@ -19,7 +20,8 @@ import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../message-context/agent-mention.tsx';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
@@ -28,13 +30,14 @@ import { HtmlRender } from '../components/HtmlRender.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoConnectors, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { askCaption } from '@omni/shared/ask.ts';
-import { leadLine } from '@omni/shared/members.ts';
+import { leadMessage } from '@omni/shared/members.ts';
 import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
 import type { useShell, useThread } from './shell.tsx';
 import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
 import { isReply, replyAt } from '@omni/shared/transcript-fold.ts';
+import { seatRun } from '@omni/shared/members.ts';
 
 /** A worktree thread's changes since its base, again whenever a turn starts or ends. */
 export function useBranchChanges(thread: Thread | null, busy: boolean) {
@@ -47,8 +50,10 @@ export function useBranchChanges(thread: Thread | null, busy: boolean) {
   }, [busy, reload]);
   return useMemo(() => {
     const v = res.data ? changesView(res.data) : null;
-    return v ? { files: v.groups.flatMap((g) => g.files.map((f) => ({ path: f.file.path, add: f.diff.add, del: f.diff.del }))), add: v.additions, del: v.deletions } : null;
-  }, [res.data]);
+    // What no commit has taken yet: what a remote-led thread's Commit button commits (ADR 0020).
+    const uncommitted = res.data?.available ? res.data.groups.filter((g) => g.kind !== 'committed').reduce((n, g) => n + g.files.length, 0) : 0;
+    return v ? { files: v.groups.flatMap((g) => g.files.map((f) => ({ path: f.file.path, add: f.diff.add, del: f.diff.del }))), add: v.additions, del: v.deletions, uncommitted, reload } : null;
+  }, [res.data, reload]);
 }
 
 
@@ -66,8 +71,8 @@ export type TurnCtx = {
   pr: ReturnType<typeof useThreadPR>[0];
   now: number;
   shell: ReturnType<typeof useShell>;
-  /** This machine's agents, for each reply's author line. */
-  agents: readonly AgentLook[];
+  /** This machine's agents, for each reply's author line, and the lock line under a remote agent's (`server` set). */
+  agents: readonly (AgentLook & { server?: unknown })[];
   /** The running turn's latest status (`statusLabel`), null for the default. */
   status: string | null;
   /** What the running turn is doing (`turnPhase`), for the thinking line's dot. */
@@ -129,6 +134,8 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         <MoConnectors t={t} onOpen={() => steps(t)} />
         {t.prose && <MoProse text={t.prose} event={t.proseKey} />}
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
+        {/* A remote agent could not read the thread's files: its reply ends with the lock line (ADR 0020). */}
+        {t.prose && !!t.author && !!c.agents.find((a) => a.id === t.author)?.server && <RemoteLockLine channelId={thread.channel_id} />}
         {delegated}
         {t.artifacts.filter((a) => !isRenderPath(a.path)).map((a) => (
           <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
@@ -160,8 +167,10 @@ function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNod
   const first = t.items.find(isReply);
   return (
     <div className="flex flex-col gap-2">
-      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={{ harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
-      <div className={`flex min-w-0 flex-col gap-4 ${REPLY_INDENT} empty:hidden`}>{children}</div>
+      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={seatRun(c.thread.members, look.id) ?? { harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
+      <div className={`flex min-w-0 flex-col gap-4 ${REPLY_INDENT} empty:hidden`}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -245,32 +254,44 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     <>
     {t.prompts.map((p, k) => {
       const brief = first && k === 0 && !!thread.parent_id && atStart(c.history.history);
+      const sent = sentContext(p.text ?? '', p.context);
+      const lead = leadMessage(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a);
+      // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
+      const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
+      const words = p.dropped
+        ? p.undelivered
+          ? `Not delivered · ${p.undelivered}`
+          : 'Not sent'
+        : lead
+          ? lead.from
+        : p.source === 'pr-watch'
+          ? 'PR watch'
+        : p.source === 'team'
+          ? 'Team'
+          : brief
+            ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
+            : k > 0
+              ? 'Sent while it ran'
+              : undefined;
       return (
       <Fragment key={k}>
         <MoBubble
           event={p.key}
           fold={brief}
           caption={
-            p.dropped
-              ? p.undelivered
-                ? `Not delivered · ${p.undelivered}`
-                : 'Not sent'
-              : p.source === 'lead'
-                ? leadLine(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a)
-              : p.source === 'pr-watch'
-                ? 'PR watch'
-              : p.source === 'team'
-                ? 'Team'
-              : brief
-                ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
-                : k > 0
-                  ? 'Sent while it ran'
-                  : undefined
+            to.length ? (
+              <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                {words && <span>{words}</span>}
+                <SentTo agents={to} />
+              </span>
+            ) : (
+              words
+            )
           }
           above={
             <>
               {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} lazy={!last} /> : null}
-              <ContextChips records={chipRecords(p.text ?? '', p.context)} align="end" className="w-full max-w-[86%]" />
+              <ContextChips records={sent.chips} align="end" className="w-full max-w-[86%]" />
             </>
           }
         >

@@ -18,6 +18,8 @@ import { baseRequest } from '../worktree-base.ts';
 import { useCommands } from './composer/use-commands.ts';
 import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { replyTo, routingHint } from '@omni/shared/members.ts';
+import { isRemoteAgentHarness, remoteLeadPlaceholder } from '@omni/shared/remote-agent.ts';
+import { CommitButton } from './thread/CommitButton.tsx';
 import { useThreadAgents } from '../thread-agents.ts';
 import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { replySlash } from '@omni/shared/composer-slash.ts';
@@ -268,7 +270,8 @@ export function NewThreadComposer({
         <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
           {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
           {showRole && <Picker label="Agent" value={role} options={roleOptions} onChange={onRole} />}
-          {harnesses && !toGrok && (
+          {/* A remote agent runs on its own server: no harness or model to pick for it (ADR 0020). */}
+          {harnesses && !toGrok && !roleObj?.server && (
             <ModelPicker
               harnesses={harnesses}
               onOpen={() => {
@@ -382,6 +385,7 @@ export function ReplyComposer({
   machine,
   asking = false,
   openPR,
+  commit,
 }: {
   thread: Thread;
   /**
@@ -397,6 +401,8 @@ export function ReplyComposer({
   stop?: { busy: boolean; run: () => void } | null;
   /** Set when the agent's last reply asks whether to open a PR: Open PR beside the Machine chip answers yes. */
   openPR?: { busy: boolean; prompt: string; run: () => void } | null;
+  /** Set in a remote-led thread while its worktree has changes no one committed: the Commit button (ADR 0020). */
+  commit?: { files: number; onDone: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
   /** Called as a message leaves the box, before the server has it: it shows in the thread from now on. */
   onSending?: () => void;
@@ -436,6 +442,8 @@ export function ReplyComposer({
   }, [key]);
 
   const busyThread = status === 'running' || status === 'queued';
+  // A remote agent leads: it talks only, so the box says who changes files (ADR 0020).
+  const remoteLead = isRemoteAgentHarness(thread.harness);
   const replying = asking && steers;
   // The server's guess at the next reply, shown in the empty box. Tab takes it.
   const suggestion = !busyThread && !text && thread.suggestion ? thread.suggestion : null;
@@ -581,15 +589,17 @@ export function ReplyComposer({
             ? thread.read_only
             : suggestion
               ? `${suggestion} · ⇥ to use`
-              : withKeys(!busyThread || replying ? replyTo(thread.role ? agents.lead.name : null) : steers ? (technical ? `Steer ${agents.lead.name}. It reads this at its next step` : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')
+              : withKeys(!busyThread || replying ? (remoteLead ? remoteLeadPlaceholder(agents.lead.name) : replyTo(thread.role ? agents.lead.name : null)) : steers ? (technical ? `Steer ${agents.lead.name}. It reads this at its next step` : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')
         }
         className="block max-h-[220px] min-h-[60px] w-full overflow-y-auto bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         <AttachButton onPick={att.add} disabled={busy} />
         <ForkThreadButton thread={thread} disabled={busy} />
-        <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
+        {/* A remote agent's run is its server: no harness or model to pick (ADR 0020). */}
+        {!remoteLead && <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />}
         {machine && <ThreadMachineChip thread={thread} held={machine} disabled={busy} onError={setError} />}
+        {commit && <CommitButton thread={thread} files={commit.files} onDone={commit.onDone} />}
         {openPR && (
           <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={openPR.prompt} onClick={openPR.run}>
             {openPR.busy ? STEP_WORKING.open : 'Open PR'}

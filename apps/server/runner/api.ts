@@ -17,6 +17,9 @@ import { listTemplates } from '../templates.ts';
 import { withMentions } from '../mentions.ts';
 import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
 import { isProviderHarness, type HarnessId } from '../harness/types.ts';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
+import { isRemoteAgent, localCatalog, remoteAgentFor } from '../remote-agents.ts';
+import { offMachineHarness } from '../thread-files.ts';
 import { capabilitiesOf, providerWhere } from '../harness/registry.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
@@ -167,6 +170,28 @@ export interface CreateThreadInput {
 const isDelegated = (source: ThreadSource | undefined) => source === 'conductor' || source === 'team';
 
 /** The role a new thread starts as. An id no role has, or a hidden one, is refused rather than run with no charter. */
+/**
+ * The agent a new thread starts as. A thread asked for on a remote agent's server with no agent named is led by that
+ * server's agent, so an older client's Hermes thread still starts. A local agent asked to run on one is refused.
+ */
+function leadFor(input: CreateThreadInput): CrewRole | undefined {
+  const named = roleFor(input.role, input.source);
+  const asked = input.harness;
+  if (!isRemoteAgentHarness(asked)) return named;
+  if (!named) {
+    const agent = remoteAgentFor(asked);
+    if (!agent) throw refusal(`No remote agent runs on ${asked} on this machine. Add it in Settings > Agents with Add remote agent.`, 400);
+    return roleFor(agent.id, input.source);
+  }
+  if (named.harness === asked) return named;
+  throw refusal(
+    isRemoteAgent(named)
+      ? `${named.name} is a remote agent: it runs on its own server, not on ${asked}.`
+      : `${named.name} is a local agent, and a local agent no longer runs on a remote agent's server. Start the thread as that remote agent instead, and seat ${named.name} in it to change files.`,
+    400,
+  );
+}
+
 function roleFor(id: string | null | undefined, source: ThreadSource | undefined): CrewRole | undefined {
   const r = crewForNewThread(id, isDelegated(source));
   if ('refused' in r) throw refusal(r.refused, r.status);
@@ -195,8 +220,12 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
     : given;
   // Refused before the catalog, which may not know the harness at all here.
   if (input.quick && input.harness && isProviderHarness(input.harness)) throw refusal(quickAskRemoteRefusal(providerWhere(input.harness)), 409);
-  const role = roleFor(input.role, input.source);
-  const asked = askedRun(input, role);
+  const role = leadFor(input);
+  // A remote agent runs only on its own server, and a local agent or a channel default never on one (ADR 0020). A run
+  // a client's pill still sends for a thread started as a remote agent is not its to pick, so it is left out.
+  const remoteLead = isRemoteAgent(role);
+  const asked = remoteLead ? {} : askedRun(input, role);
+  const runCatalog = (cat: Catalog) => (remoteLead ? cat : localCatalog(cat));
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
   if (!channel) throw refusal(`unknown channel "${channelId}"`, 404);
@@ -212,8 +241,8 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
     resolveRun(
       asked,
       roleDefaults,
-      channelCatalog(cat, channel.id),
-      withChannel ? channelDefaults : undefined,
+      runCatalog(channelCatalog(cat, channel.id)),
+      withChannel && !remoteLead ? channelDefaults : undefined,
     );
   let run = resolve(getCatalog());
   if (!run.ok) run = resolve(await freshCatalog());
@@ -238,7 +267,9 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
   const id = input.id ?? randomUUID();
-  const remote = isProviderHarness(harness);
+  // Cursor Cloud works on its own clone. A remote agent's thread gets its checkout here at the start (Q31), so a local
+  // member seated later changes files with no setup run.
+  const remote = offMachineHarness(harness);
   // Refused before anything is made, so a ref that names nothing leaves the draft where it was typed.
   const base = await checkBase(channel, input.base, { remote });
   const wd = await prepareWorkdir(channel, id, { remote, quick: input.quick });

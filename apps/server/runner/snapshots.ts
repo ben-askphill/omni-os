@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.ts';
 import { completions, threads, turnSnapshots } from '../db.ts';
 import { snapshot, snapshotCheckout, turnRef } from '../turns.ts';
-import { isProviderHarness } from '../harness/types.ts';
+import { filesOffMachine } from '../thread-files.ts';
 import { crash, deliver, emitThread, lives, track, type Live } from './state.ts';
 
 /** Each thread's last queued save. */
@@ -62,7 +62,7 @@ async function save(threadId: string, turnId: string, side: 'before' | 'after') 
 export function startTurnSnapshot(live: Live) {
   if (live.snap || !config.turnSnapshots) return;
   const t = threads.get(live.threadId);
-  if (!t?.branch || isProviderHarness(t.harness)) return;
+  if (!t?.branch || filesOffMachine(t)) return;
   if (t.source === 'member' || covering.get(t.id)) return;
   const id = randomUUID();
   live.snapStarted(id);
@@ -90,7 +90,7 @@ export function startTurnSnapshot(live: Live) {
 export async function startMessageSnapshot(threadId: string): Promise<string | null> {
   if (!config.turnSnapshots) return null;
   const t = threads.get(threadId);
-  if (!t?.branch || isProviderHarness(t.harness)) return null;
+  if (!t?.branch || filesOffMachine(t)) return null;
   covering.set(t.id, (covering.get(t.id) ?? 0) + 1);
   const id = randomUUID();
   turnSnapshots.start(id, t.id, completions.latest(t.id)?.n ?? 0);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avatarMark, busiest, groupGlyph, groupMark, leadLine, markLine, recipients, replyTo, routingHint, type MemberState } from '../members.ts';
+import { avatarMark, busiest, groupGlyph, groupMark, leadMessage, markLine, recipients, replyTo, routingHint, seatRun, type MemberState } from '../members.ts';
 import { threadGlyph, threadMark } from '../status.ts';
 import { agentMention, mentionedAgents } from '../message-context-agent.ts';
 
@@ -61,6 +61,22 @@ describe('agent mention records', () => {
   });
 });
 
+describe('seatRun', () => {
+  const seats = [
+    { agent: 'nomos', lead: true, harness: 'custom:nomos', model: 'default' },
+    { agent: 'builder', lead: false, harness: 'claude-code', model: 'claude-haiku-4-5' },
+  ];
+  it("gives a member's reply its own run, never the lead's", () => {
+    expect(seatRun(seats, 'builder')).toEqual({ harness: 'claude-code', model: 'claude-haiku-4-5' });
+  });
+  it('leaves the lead, an agent with no seat and a thread with no members to the thread run', () => {
+    expect(seatRun(seats, 'nomos')).toBeNull();
+    expect(seatRun(seats, 'designer')).toBeNull();
+    expect(seatRun(undefined, 'builder')).toBeNull();
+    expect(seatRun(seats, null)).toBeNull();
+  });
+});
+
 describe('the avatar mark', () => {
   const m = (agent: string, state: MemberState, lead = false) => ({ agent, name: agent[0].toUpperCase() + agent.slice(1), lead, state });
 
@@ -100,11 +116,11 @@ describe('the avatar mark', () => {
 
 describe("a team lead's message", () => {
   const nameOf = (a: string) => ({ builder: 'Builder', designer: 'Designer', critic: 'Critic' })[a] ?? a;
-  it('names the lead and the members it went to, and nothing on any other message', () => {
-    expect(leadLine({ source: 'lead', to: ['designer'] }, 'builder', nameOf)).toBe('Builder to Designer');
-    expect(leadLine({ source: 'lead', to: ['designer', 'critic'] }, 'builder', nameOf)).toBe('Builder to Designer and Critic');
-    expect(leadLine({ source: 'ben', to: ['designer'] }, null, nameOf)).toBeNull();
-    expect(leadLine({ source: 'conductor' }, null, nameOf)).toBeNull();
+  it('names the lead and the members it went to, once each, and nothing on any other message', () => {
+    expect(leadMessage({ source: 'lead', to: ['designer'] }, 'builder', nameOf)).toEqual({ from: 'Builder', to: [{ agent: 'designer', name: 'Designer' }] });
+    expect(leadMessage({ source: 'lead', to: ['designer', 'critic', 'designer'] }, 'builder', nameOf)?.to.map((m) => m.name)).toEqual(['Designer', 'Critic']);
+    expect(leadMessage({ source: 'ben', to: ['designer'] }, null, nameOf)).toBeNull();
+    expect(leadMessage({ source: 'conductor' }, null, nameOf)).toBeNull();
   });
 });
 

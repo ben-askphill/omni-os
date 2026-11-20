@@ -7,7 +7,7 @@ import type { Reachability } from './handoff.ts';
 import { ID_MAX, cutLabel, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
 import { cleanLine } from './message-context-thread.ts';
 import { plain } from './message-context-terminal.ts';
-import { agentMention, type AgentMention } from './message-context-agent.ts';
+import { agentMention, mentionedAgents, type AgentMention } from './message-context-agent.ts';
 
 export interface MachineMention {
   /** The machine's sync id. */
@@ -137,4 +137,18 @@ export function chipRecords(text: string, records: unknown): unknown[] {
   if (!Array.isArray(records) || !records.length) return [];
   const inline = new Set(mentionSpans(text, records).map((s) => s.id));
   return inline.size ? records.filter((r) => !(isObj(r) && typeof r.id === 'string' && inline.has(r.id))) : [...records];
+}
+
+/**
+ * A sent or queued message's context, as its bubble draws it: `chips` over the bubble, and `to`, each agent the
+ * message went to that its text does not name inline, once each. Those show by name on the line over the bubble, not
+ * as chips. An agent the text names keeps its pill in the text.
+ */
+export function sentContext(text: string, records: unknown): { chips: unknown[]; to: AgentMention[] } {
+  const left = chipRecords(text, records);
+  const named = new Set(mentionSpans(text, records).flatMap((s) => (s.kind === 'agent' ? [s.agent.agent] : [])));
+  return {
+    chips: left.filter((r) => !(isObj(r) && r.kind === agentMention.kind)),
+    to: mentionedAgents(left).filter((a) => !named.has(a.agent)),
+  };
 }

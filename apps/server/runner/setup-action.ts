@@ -3,7 +3,7 @@
 // on a thread being prepared ends the attempt here, whichever step it is on, and keeps the first prompt for Retry.
 import { startRun, stopRun } from '../actions.ts';
 import { channelActions, threadSetupRuns, threads, type Thread } from '../db.ts';
-import { isProviderHarness } from '../harness/types.ts';
+import { offMachineHarness } from '../thread-files.ts';
 import { SHELL_REFUSAL } from '../request-trust.ts';
 
 export const STOPPED = 'Stopped by you before the agent started.';
@@ -57,7 +57,7 @@ export interface SetupHold {
  * `shell` is false for a Retry setup whose caller may not reach a shell: a step added since it was let in is held.
  */
 export async function runSetupAction(t: Thread, shell = true): Promise<SetupHold | null> {
-  const action = isProviderHarness(t.harness) ? undefined : channelActions.setupFor(t.channel_id);
+  const action = offMachineHarness(t.harness) ? undefined : channelActions.setupFor(t.channel_id);
   if (action && !shell && !stops.has(t.id)) return { stopped: false, reason: `The setup action "${action.name}" did not run: ${SHELL_REFUSAL}.` };
   if (action && !stops.has(t.id)) {
     let started: Awaited<ReturnType<typeof startRun>>;

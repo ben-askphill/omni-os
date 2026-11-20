@@ -170,12 +170,17 @@ it("counts the lessons that wait on the Memory tab, and adds one of yours for ev
 
 it("leaves an agent page's address alone when the Agents list sits under it, as the phone's screen stack keeps it", async () => {
   const { SettingsPage } = await import('../src/pages/Settings.tsx');
-  location.hash = '#/settings/crew/builder';
+  // happy-dom fires hashchange late, after the render below; the router reads the address on the event, as in a browser.
+  const go = (hash: string) => {
+    location.hash = hash;
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  };
+  go('#/settings/crew/builder');
   await act(async () => root.render(createElement(SettingsPage, { section: 'crew' })));
   await flush();
   expect(location.hash).toBe('#/settings/crew/builder');
   // Without an agent in the address, the list still puts its section's own address in.
-  location.hash = '#/settings/general';
+  go('#/settings/general');
   await act(async () => root.render(createElement(SettingsPage, { section: 'crew' })));
   await flush();
   expect(location.hash).toBe('#/settings/crew');

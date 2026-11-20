@@ -8,9 +8,10 @@ import { callerOf } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { avatarImageUrl, parseAvatarImage } from './agent-avatar.ts';
 import { getCrew, listCrew, type CrewRole } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, MARKDOWN_MAX, resetCrew, saveCrew, saveCrewAvatar, setCrewHidden, type CrewDetail, type CrewSave, type CrewSaveContext } from './crew-store.ts';
+import { avatarOffered, crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, MARKDOWN_MAX, resetCrew, saveCrew, saveCrewAvatar, setCrewHidden, type CrewDetail, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels, memories } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
+import { serverOf } from './remote-agents.ts';
 
 export const crewApi = new Hono();
 
@@ -23,6 +24,7 @@ const detailView = (d: CrewDetail): CrewDetail => ({ ...d, role: roleView(d.role
 
 // Hidden roles only with ?all=1 (Settings): pickers and the Conductor offer only the rest.
 // memoryWaiting: how many lessons its threads proposed wait for the user (memory-api.ts), when any do.
+// server: a remote agent's server (remote-agents.ts serverOf), for its page's Server card. Never a key.
 crewApi.get('/crew', (c) => {
   const cat = getCatalog();
   const all = c.req.query('all') === '1';
@@ -30,7 +32,11 @@ crewApi.get('/crew', (c) => {
   return c.json(
     listCrew()
       .filter((r) => all || !r.hidden)
-      .map((r) => ({ ...roleView(r), error: r.error ?? crewRunProblem(r, cat), ...(waiting[r.id] && { memoryWaiting: waiting[r.id] }) })),
+      .map((r) => {
+        const server = serverOf(r, cat);
+        const shown = server && (avatarOffered(r) ? { ...server, avatarOffered: true } : server);
+        return { ...roleView(r), error: r.error ?? (server ? undefined : crewRunProblem(r, cat)), ...(shown && { server: shown }), ...(waiting[r.id] && { memoryWaiting: waiting[r.id] }) };
+      }),
   );
 });
 
@@ -88,6 +94,9 @@ crewApi.put('/crew/:id', async (c) => write(c, (save) => saveCrew(c.req.param('i
 crewApi.delete('/crew/:id', (c) =>
   guard(c, 'delete') ??
   run(c, () => {
+    // A remote agent goes with its server (ADR 0020): its file alone would come back at the next start (convertRemoteAgents).
+    const role = getCrew(c.req.param('id'));
+    if (role && serverOf(role, getCatalog())?.url) throw Object.assign(new Error(`Remove ${role.name} on its Server card in Settings > Agents: that removes its server with it.`), { status: 409 });
     deleteCrew(c.req.param('id'));
     return { ok: true };
   }),

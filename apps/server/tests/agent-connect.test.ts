@@ -143,7 +143,7 @@ describe('reading what an address answers', () => {
 });
 
 describe('pairing, testing and connecting', () => {
-  it('pairs, tests and connects, with the key only in the secret store, and makes a starter role', async () => {
+  it('pairs, tests and connects, with the key only in the secret store, and makes its remote agent', async () => {
     const paired = await post('harnesses/connect/pair', { url: runs.url, pair: pair.url, code: CODE.toLowerCase().replaceAll('-', ' ') });
     expect(paired.status).toBe(200);
     expect(paired.json).toMatchObject({ url: runs.url, name: 'Hermes on box', sharedKey: true, revoke: false });
@@ -176,7 +176,8 @@ describe('pairing, testing and connecting', () => {
     const role = readFileSync(join(paths.data, 'crew', 'box.md'), 'utf8');
     expect(role).toMatch(/harness: custom:box/);
     expect(role).toMatch(/delegatable: true/);
-    expect(role).toMatch(/a remote agent working for \{\{user\}\}/);
+    // No charter of Omni's: the server's own instructions lead (ADR 0020, Q28).
+    expect(role).toMatch(/---\n$/);
     const { getCrew } = await import('../crew.ts');
     expect(getCrew('box')).toMatchObject({ harness: 'custom:box', delegateOnly: false, review: false, mcp: [] });
     // A draft is spent by Connect.
@@ -200,7 +201,8 @@ describe('pairing, testing and connecting', () => {
     expect((await post('harnesses/connect/test', { url: runs.url, secret: 'MANUAL_AGENT_KEY' })).json.ok).toBe(true);
     const done = await post('harnesses/connect', { slug: 'manual', name: 'Manual', url: runs.url, secret: 'MANUAL_AGENT_KEY', role: false });
     expect(done.status).toBe(201);
-    expect(done.json.role).toBeNull();
+    // role: false from an older client still makes the agent: it is what connecting is for (ADR 0020).
+    expect(done.json.role).toEqual({ id: 'manual', name: 'Manual' });
     expect(done.json.harness.pairing).toBeUndefined();
     const removed = await app.request('/api/harnesses/custom/manual', { method: 'DELETE' });
     expect(await removed.json()).toEqual({ deleted: true, revoked: null, secret: null });

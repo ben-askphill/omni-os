@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { replyTo, routingHint } from '@omni/shared/members.ts';
+import { isRemoteAgentHarness, remoteLeadPlaceholder } from '@omni/shared/remote-agent.ts';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
@@ -104,7 +105,9 @@ export function MoComposer({
   const busyThread = thread.status === 'running' || thread.status === 'queued';
   // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
   const steers = canSteer(thread.harness, harnesses) && !thread.queued_harness;
-  const hint = thread.read_only ?? (!busyThread && thread.role ? replyTo(agents.lead.name) : typeof placeholder === 'function' ? placeholder(steers) : placeholder);
+  // A remote agent leads: it talks only, so the box says who changes files (ADR 0020).
+  const remoteLead = isRemoteAgentHarness(thread.harness);
+  const hint = thread.read_only ?? (!busyThread && thread.role ? (remoteLead ? remoteLeadPlaceholder(agents.lead.name) : replyTo(agents.lead.name)) : typeof placeholder === 'function' ? placeholder(steers) : placeholder);
   const canSend = !thread.read_only && (!!text.trim() || context.length > 0);
   /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
   const submit = async (sendThere = false) => {
@@ -269,7 +272,7 @@ export function MoComposer({
             onFork();
           }}
           onRun={
-            harnesses
+            harnesses && !remoteLead
               ? () => {
                   setPlus(false);
                   reload();

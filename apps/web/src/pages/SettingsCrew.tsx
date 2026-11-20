@@ -23,11 +23,15 @@ import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, 
 import { AVATAR_UPLOAD_MAX_BYTES } from '@omni/shared/agent-avatar.ts';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
 import { useApp, useIsMobile } from '../store.tsx';
-import { href, navigate } from '../router.ts';
+import { href, navigate, useRoute } from '../router.ts';
 import { squareAvatar } from '../agent-avatar-upload.ts';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 import { remoteRoleNote } from '@omni/shared/crew-settings.ts';
+import { isRemoteAgentHarness, serverStatus, type RemoteServer } from '@omni/shared/remote-agent.ts';
+import { ConnectAgentSheet, RemoteMark } from '../components/ConnectAgent.tsx';
+import { useTechnical } from '../display.ts';
+import { InThreadsCard, ServerCard } from './RemoteAgentCards.tsx';
 import { Card, LockNote } from './settings-parts.tsx';
 
 // Settings > Agents: every agent this machine has, hidden ones included. Each opens as a page of its own
@@ -35,9 +39,33 @@ import { Card, LockNote } from './settings-parts.tsx';
 // editor (plan slice S3, docs/plans/2026-11-18-user-defined-crew.md). New agent opens the editor in a dialog. Saves go
 // to /api/crew (apps/server/crew-api.ts): a role of your own is its whole file in data/crew/, an edit of a built-in is
 // an overlay that adds to its charter or replaces it. The editor's Memory tab holds the role's lessons (slice S6,
-// components/RoleMemory.tsx), which save one by one. The same page is the phone's Settings section and the desktop app's.
+// components/RoleMemory.tsx), which save one by one. Add remote agent connects a server and makes its agent (ADR 0020);
+// a remote agent's page has a Server card and an In threads card (RemoteAgentCards.tsx) in place of its run and the
+// powers Omni cannot hold it to. The same page is the phone's Settings section and the desktop app's.
 
 type CrewDetail = CrewDetailView<CrewRole>;
+
+/**
+ * Add remote agent, beside New agent (ADR 0020, Q58). An omni://connect-agent link, or #/settings/crew?connect=<link>,
+ * opens its sheet filled in. Only the list reads the address for it, so an agent's page never does.
+ */
+function AddRemoteAgent({ onConnected }: { onConnected: () => void }) {
+  const route = useRoute();
+  const linked = route.name === 'settings' ? route.connect : undefined;
+  const [connecting, setConnecting] = useState(false);
+  const close = () => {
+    setConnecting(false);
+    if (linked) navigate(href.settingsSection('crew'), { replace: true });
+  };
+  return (
+    <>
+      <Button size="sm" icon="plus" onClick={() => setConnecting(true)}>
+        Add remote agent
+      </Button>
+      <ConnectAgentSheet open={connecting || !!linked} initial={linked} onClose={close} onConnected={() => onConnected()} />
+    </>
+  );
+}
 
 /** The list of agents, or one agent's page when `agent` names one. */
 export function CrewSection({ agent }: { agent?: string }) {
@@ -45,6 +73,7 @@ export function CrewSection({ agent }: { agent?: string }) {
   const roles = useApi<CrewRole[]>('/crew?all=1');
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');
   const [creating, setCreating] = useState(false);
+  const technical = useTechnical();
   const reload = roles.reload;
   // A save here, by the Conductor or on another machine, or a lesson proposed or settled (the waiting counts).
   useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect' || (e.type === 'memory' && !!e.role)) && reload()), [subscribe, reload]);
@@ -63,9 +92,12 @@ export function CrewSection({ agent }: { agent?: string }) {
         title="Agents"
         subtitle="A thread started as an agent runs with its charter. The Conductor hands work to the ones it may delegate to."
         actions={
-          <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
-            New agent
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <AddRemoteAgent onConnected={reload} />
+            <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+              New agent
+            </Button>
+          </div>
         }
       >
         {roles.error ? (
@@ -83,11 +115,12 @@ export function CrewSection({ agent }: { agent?: string }) {
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className={`truncate text-[13px] font-medium ${r.hidden ? 'text-fg-3' : ''}`}>{r.name}</span>
+                      {r.server && <RemoteMark host={technical ? r.server.host : undefined} />}
                       <RoleChips role={r} />
                     </span>
                     {r.description && <span className="mt-0.5 line-clamp-2 block text-[12.5px] text-fg-3">{r.description}</span>}
                     <span className="mt-0.5 block truncate text-[12px] text-fg-3">
-                      {crewRunLine(r, names)}
+                      {r.server ? `Talks only · ${serverStatus(r.server)}` : crewRunLine(r, names)}
                       {r.channel && ` · #${r.channel}`}
                       {r.delegateOnly && ' · routes only'}
                       {r.tools === 'no-edits' && ' · no file edits'}
@@ -159,6 +192,12 @@ function AgentPage({ id, roles, onSaved }: { id: string; roles: CrewRole[] | und
         </div>
       </header>
       {listed && <AvatarCard agent={listed} onSaved={saved} />}
+      {listed?.server && (
+        <>
+          <ServerCard agent={listed as CrewRole & { server: RemoteServer }} onChanged={onSaved} />
+          <InThreadsCard agent={listed} />
+        </>
+      )}
       <Card title={view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : 'Agent'} subtitle={view === 'edit' ? 'Its name, charter, run defaults, powers and memory.' : undefined}>
         <EditorBody
           key={`${id}:${round}`}
@@ -178,6 +217,7 @@ function AgentPage({ id, roles, onSaved }: { id: string; roles: CrewRole[] | und
 
 /** Where an agent's face comes from, in a line under it. */
 function avatarSource(agent: CrewRole) {
+  if (agent.avatar?.image && agent.server?.avatarOffered) return 'The avatar its server offered. Test connection reads it again until you upload your own.';
   if (agent.avatar?.image) return 'An image you uploaded. It syncs to your other machines with the agent.';
   if (agent.avatar?.icon) return 'Its icon, on its color. An uploaded image takes its place.';
   if (agent.kind !== 'own' && !agent.avatar?.bg && ['conductor', 'researcher', 'builder', 'store-ops', 'inbox'].includes(agent.id)) return 'Its built-in mark. An uploaded image takes its place.';
@@ -352,6 +392,8 @@ function EditorBody({
   const d = detail.data ?? null;
   const builtIn = !!d?.builtIn;
   const role = d?.role;
+  // A remote agent's run is its server, on its page's Server card (ADR 0020).
+  const remoteAgent = isRemoteAgentHarness(draft?.harness ?? role?.harness);
   const locked = role?.locks?.fields ?? {};
   const refusedActions = role?.locks?.actions ?? {};
   // What the role's action row offers: an edited built-in compares and resets, a built-in hides, a role of the user's own is deleted.
@@ -359,7 +401,8 @@ function EditorBody({
     duplicate: !refusedActions.duplicate,
     edited: builtIn && role?.kind === 'edited',
     hide: builtIn && (!!role?.hidden || !refusedActions.hide),
-    delete: !builtIn,
+    // A remote agent goes with its server, through Remove on the Server card: its file alone would come back at the next start.
+    delete: !builtIn && !remoteAgent,
   };
   const theId = id ?? newId ?? crewIdFrom(draft?.name ?? '');
 
@@ -586,7 +629,9 @@ function EditorBody({
                 id="crew-charter"
                 label={builtIn ? (draft.charterMode === 'append' ? 'Your additions' : 'Your charter') : 'Charter'}
                 hint={
-                  builtIn && draft.charterMode === 'append'
+                  remoteAgent
+                    ? "Sent to its server as instructions only when you write one. Empty, its server's own instructions lead."
+                    : builtIn && draft.charterMode === 'append'
                     ? 'Added after the built-in charter, so release fixes to it still reach this agent. {{user}} and the other placeholders are filled in.'
                     : builtIn
                       ? 'Replaces the built-in charter. Omni says when a release changes the one you replaced.'
@@ -597,7 +642,7 @@ function EditorBody({
               </Field>
             </Section>
 
-            <Section title="Run">
+            {!remoteAgent && <Section title="Run">
               <Field label="Harness, model and effort" hint="Default leaves it to the channel, then Auto. A thread or delegation that names its own run wins.">
                 <RunDefaultsField value={{ harness: draft.harness, model: draft.model, effort: draft.effort }} onChange={(v) => setDraft((x) => (x ? { ...x, ...v } : x))} />
               </Field>
@@ -606,7 +651,7 @@ function EditorBody({
                   {remoteRoleNote(draft.harness)}
                 </p>
               )}
-            </Section>
+            </Section>}
 
             <Section title="Where">
               <Field label="Default channel" hint="Where a thread starts as this agent when no channel is named.">
@@ -616,15 +661,20 @@ function EditorBody({
 
             <Section title="Powers">
               <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the agent pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} locked={locked.delegatable} />
-              <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other agents." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
-              <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
-              <Switch
-                label="No file edits"
-                hint={NO_EDITS_NOTE}
-                checked={draft.noEdits && !draft.delegateOnly}
-                onChange={(v) => set('noEdits', v)}
-                locked={draft.delegateOnly ? 'Only routes work takes the shell and every edit tool away already.' : undefined}
-              />
+              {/* A remote agent runs its own tools on its own server, where Omni cannot take any away (Q32). */}
+              {!remoteAgent && (
+                <>
+                  <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other agents." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
+                  <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
+                  <Switch
+                    label="No file edits"
+                    hint={NO_EDITS_NOTE}
+                    checked={draft.noEdits && !draft.delegateOnly}
+                    onChange={(v) => set('noEdits', v)}
+                    locked={draft.delegateOnly ? 'Only routes work takes the shell and every edit tool away already.' : undefined}
+                  />
+                </>
+              )}
               <Switch
                 label="Reviews work"
                 hint="A review on a GPT model runs at high effort, and one the Conductor starts for a thread runs on the other model family from that thread's."

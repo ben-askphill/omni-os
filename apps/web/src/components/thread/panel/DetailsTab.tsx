@@ -16,6 +16,7 @@ import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
 import { CAPTION, CARD_PAD, ROW_X, ROW_X_BLEED } from './inset.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { remoteLedCheckout } from '@omni/shared/remote-agent.ts';
 import { connectorFor } from '@omni/shared/connectors.ts';
 import { ConnectorMark } from '../../ConnectorMark.tsx';
 
@@ -140,7 +141,10 @@ export function DetailsTab({
   const technical = useTechnical();
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
-  const remote = isRemoteHarnessId(thread.harness);
+  // Its run is on another machine: Cursor Cloud, or a remote agent's server. Nothing resumes it in a terminal here.
+  const runsElsewhere = isRemoteHarnessId(thread.harness);
+  // A remote-led thread has its checkout here since slice 4 (ADR 0020, Q31), so its folder reads as a local thread's.
+  const remote = runsElsewhere && !remoteLedCheckout(thread);
   const agentUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
@@ -150,7 +154,7 @@ export function DetailsTab({
   // The composer's model pill reads these too, so Details names the model and effort the same way.
   const run = threadRunLabels(thread, harnesses);
   const slug = thread.model || init?.model;
-  const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
+  const resume = runsElsewhere ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-[var(--sp-6)] overflow-y-auto px-[var(--sp-5)] pb-[var(--sp-6)] [&>*]:shrink-0">
       {code && <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} parked={parked} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />}
@@ -186,7 +190,7 @@ export function DetailsTab({
         </Row>}
         {code && <Row k="Working dir">
           {remote ? (
-            <span className="text-fg-3">{cloud ? 'Cursor Cloud, not an Omni worktree' : 'Hermes server, not an Omni worktree'}</span>
+            <span className="text-fg-3">{cloud ? 'Cursor Cloud, not an Omni worktree' : 'Its server, not an Omni worktree'}</span>
           ) : (
             <span className="font-mono text-[12px]">{cwd}</span>
           )}
@@ -227,7 +231,7 @@ export function DetailsTab({
         )}
       </dl>
 
-      {!code ? null : remote ? (
+      {!code ? null : runsElsewhere ? (
         <div className={`rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
           <div className={`caption ${CAPTION}`}>{cloud ? 'Cursor Cloud' : 'Remote session'}</div>
           {cloud ? (
@@ -244,7 +248,8 @@ export function DetailsTab({
             </p>
           ) : (
             <p className={`${ROW_X} pb-[var(--sp-4)] text-[12.5px] leading-relaxed text-fg-2`}>
-              This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
+              {roleName ?? 'Its agent'} runs on its own server and talks only. Another message here resumes <span className="font-mono">{thread.session_id}</span> there
+              {remote ? '.' : ', and the local agents seated here change the files in its working dir.'}
             </p>
           )}
         </div>

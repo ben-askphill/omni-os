@@ -64,6 +64,8 @@ export interface FakeHermes {
   script: unknown[] | null;
   /** Write one non-JSON data line before the events, to prove the client skips it. */
   injectBadData: boolean;
+  /** The avatar its signed-in GET /v1/capabilities offers, as image data (ADR 0020), or null for none. */
+  avatar: string | null;
   complete(output?: string): void;
   reset(): void;
   close(): Promise<void>;
@@ -84,6 +86,7 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
     steerConflict: false,
     script: null,
     injectBadData: false,
+    avatar: null,
     complete(output = 'done') {
       for (const run of runs.values()) {
         if (run.status !== 'running') continue;
@@ -95,6 +98,7 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
       }
     },
     reset() {
+      fake.avatar = null;
       fake.failPosts = 0;
       fake.rejectInstructions = false;
       fake.dropStream = false;
@@ -223,6 +227,7 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
     if (req.method === 'GET' && path === '/v1/capabilities') {
       json(res, 200, {
         model: 'hermes',
+        ...(fake.avatar && { avatar: fake.avatar }),
         features: { run_submission: true, run_status: true, run_events_sse: true, run_stop: true, run_steer: true, run_approval_response: true, runs_idempotency: {} },
       });
       return;

@@ -1,6 +1,6 @@
 # Remote agents are agents, and read the worktree only where the channel allows
 
-> Decided with Ben on 2026-11-20. Not built yet: slices 4 and 5 of [the group threads plan](../plans/2026-11-20-group-threads.md). Until they ship, [ADR 0017](0017-custom-harnesses.md), [ADR 0018](0018-eve-agents.md) and [Custom harnesses](../user/harnesses.md#custom-harnesses) describe what runs.
+> Decided with Ben on 2026-11-20. Slice 4 of [the group threads plan](../plans/2026-11-20-group-threads.md) built everything here but the switch and the read tool: until slice 5 ships, the channel's existing **No thread excerpts to remote agents** switch decides what a remote agent sees, and no remote agent reads the worktree. [Remote agents](../user/crew.md#remote-agents) describes what runs.
 
 [ADR 0017](0017-custom-harnesses.md) made a remote agent Ben registers a custom harness: a file whose id is `custom:<slug>`, listed in the harness and model pickers, with an agent bound to it by `harness: custom:<slug>`. [ADR 0018](0018-eve-agents.md) added eve agents as `kind: eve`. The Connect sheet already makes an agent of the same id by default (**Make an agent for it**). So Ben meets one server twice, once as a harness to pick and once as an agent. ADR 0017 also gave a remote agent nothing but Omni's prompt: "no channel or global secret, no install or thread token, no Omni tools". In a group thread ([ADR 0019](0019-group-threads.md)), a remote agent can sit next to local agents that change files, and Ben wants it to be able to read them.
 
@@ -29,7 +29,7 @@ Ben picked these on 2026-11-20 from the same prototype as [ADR 0019](0019-group-
 - ADR 0018: eve agents "connect as custom harnesses". They connect as remote agents, through the same eve API.
 - `GLOSSARY.md`: Custom harness and eve agent. This change replaces them with Remote agent and eve agent.
 - **No thread excerpts to remote agents** in Channel settings ([Ask an agent](../user/threads.md#ask-an-agent)), which **Remote agents can see this channel's work** replaces. Off now means nothing goes, and a channel keeps sending excerpts only if an Ask there has already sent one to a remote agent.
-- [Custom harnesses](../user/harnesses.md#custom-harnesses) in `docs/user/harnesses.md` (the Harnesses card list, **Make an agent for it**, "An agent binds to it by id" and "What it runs like") and [What a remote harness does not get](../internals/remote-harness-protocol.md#what-a-remote-harness-does-not-get) ("No Omni MCP tools … worktree"). Both change when slices 4 and 5 ship.
+- Custom harnesses in `docs/user/harnesses.md` (the Harnesses card list, **Make an agent for it**, "An agent binds to it by id" and "What it runs like"), now [Remote agents' servers](../user/harnesses.md#remote-agents-servers), and [What a remote harness does not get](../internals/remote-harness-protocol.md#what-a-remote-harness-does-not-get) ("No Omni MCP tools … worktree"), which changes when slice 5 ships.
 - The user-facing half of the crew plan's runtime binding ([user-defined crew plan](../plans/2026-11-18-user-defined-crew.md), section 2.5: an outside agent "joins the harness catalog under its id"). The binding stays in the code. Ben no longer picks it.
 
 ## Considered
