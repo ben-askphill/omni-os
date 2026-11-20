@@ -1,4 +1,5 @@
 import { canSteer, type HarnessInfo, type PendingMsg, type SendMode, type Thread } from '@omni/client-core';
+import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 
 /** A turn is running or waiting for a slot, so a message to it steers or queues instead of starting the next turn. */
 export function isBusy(thread: Pick<Thread, 'status'>): boolean {
@@ -10,7 +11,7 @@ export function canStop(thread: Pick<Thread, 'status' | 'setup'>): boolean {
   return isBusy(thread) && !thread.setup;
 }
 
-type SteerFacts = Pick<Thread, 'status' | 'harness' | 'queued_harness'>;
+type SteerFacts = Pick<Thread, 'status' | 'harness' | 'queued_harness'> & Partial<Pick<Thread, 'role'>>;
 
 /**
  * Whether a message to a busy thread steers. A run switch queued behind the turn makes the message wait for it too
@@ -20,9 +21,15 @@ export function steers(thread: SteerFacts, catalog: readonly HarnessInfo[] | nul
   return canSteer(thread.harness, catalog) && !thread.queued_harness;
 }
 
-/** The mode a send carries. Undefined on an idle thread: the server just starts the next turn. */
-export function sendModeFor(thread: SteerFacts, catalog: readonly HarnessInfo[] | null): SendMode | undefined {
+/**
+ * The mode a send carries. Undefined on an idle thread: the server just starts the next turn. A message whose agent
+ * mentions name other agents and not the lead goes to them, not the lead's running turn, so it neither steers nor
+ * queues behind it (ADR 0019).
+ */
+export function sendModeFor(thread: SteerFacts, catalog: readonly HarnessInfo[] | null, context: readonly unknown[] = []): SendMode | undefined {
   if (!isBusy(thread)) return undefined;
+  const named = mentionedAgents(context);
+  if (named.length && !named.some((a) => a.agent === thread.role)) return undefined;
   return steers(thread, catalog) ? 'steer' : 'queue';
 }
 

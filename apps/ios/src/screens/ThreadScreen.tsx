@@ -3,7 +3,7 @@ import { takeoverShown } from '@omni/shared/thread-machine.ts';
 import { crewRoleName, headerShowsRole } from '@omni/shared/crew-role.ts';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { HeaderButton } from '../components/HeaderButton';
@@ -18,8 +18,9 @@ import { ThreadHeader } from '../components/thread/ThreadHeader';
 import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
-import { useCrew } from '../newthread/hooks';
-import { useChannels, useTechnical, useThreadLive, useThreadView } from '../live/react';
+import { MemberButton, MemberSheet } from '../components/thread/MemberSheet';
+import { useAgents, useChannels, useTechnical, useThreadLive, useThreadView } from '../live/react';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
@@ -47,6 +48,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPage, setMenuPage] = useState<'menu' | 'machine'>('menu');
   const [runOpen, setRunOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,8 +72,14 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const status = thread?.status;
   const technical = useTechnical();
   const channelName = listed?.name ?? view?.channel?.name ?? null;
-  const crew = useCrew();
-  const roleName = thread && headerShowsRole(thread) ? crewRoleName(thread.role, crew ?? []) : null;
+  const crew = useAgents();
+  const roleName = thread && headerShowsRole(thread) ? crewRoleName(thread.role, crew) : null;
+  const lead = thread && headerShowsRole(thread) ? thread.role : null;
+  // A remote agent leads talk-only (ADR 0020), said quietly where the harness would be.
+  const talksOnly = !!thread && isRemoteAgentHarness(thread.harness);
+  // A group thread's avatars are the only sign of who works: the header has no Working label (ADR 0019).
+  const group = !!thread?.members?.length;
+  const groupWorking = group && thread!.members!.some((m) => m.state === 'working');
   const device = view ? threadDeviceName({ takeover: takeoverShown(view.takeover, view.handoff), machine: machine.machine, hereName: server.data?.device?.name }) : null;
   const ran = useRemote(useCallback((api: OmniApi) => api.threadAccount(id), [id]));
   const account = ran.data?.account ? threadAccountLabel(ran.data.account) : null;
@@ -87,17 +95,27 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
         <ThreadTitle
           title={title}
           status={status}
-          statusLabel={threadStatusLabel(status, technical)}
+          statusLabel={groupWorking ? '' : threadStatusLabel(status, technical)}
           channel={channelName}
           role={roleName}
+          lead={lead}
+          talksOnly={talksOnly}
+          wide={group}
           device={device}
           account={account}
           onOpenMachine={canPick ? () => openMenu('machine') : undefined}
         />
       ),
-      headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => openMenu('menu')} /> : undefined,
+      headerRight: hasThread
+        ? () => (
+            <View style={styles.right}>
+              {thread ? <MemberButton thread={thread} onOpen={() => setMembersOpen(true)} /> : null}
+              <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => openMenu('menu')} />
+            </View>
+          )
+        : undefined,
     });
-  }, [navigation, title, status, technical, channelName, roleName, device, account, canPick, hasThread, openMenu]);
+  }, [navigation, title, status, technical, channelName, roleName, lead, talksOnly, group, groupWorking, device, account, canPick, hasThread, openMenu, thread]);
 
   // A machine can fall asleep while the thread stays open: read the list again each time the menu opens.
   const { reload: reloadMachines } = machine;
@@ -126,6 +144,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const openActions = useCallback(() => leaveMenuFor(() => navigation.navigate('Actions', { threadId: id })), [leaveMenuFor, navigation, id]);
   const openChanges = useCallback(() => leaveMenuFor(() => navigation.navigate('Changes', { id })), [leaveMenuFor, navigation, id]);
   const openPR = useCallback(() => leaveMenuFor(() => navigation.navigate('PullRequest', { id })), [leaveMenuFor, navigation, id]);
+  const addAgent = useCallback(() => leaveMenuFor(() => setMembersOpen(true)), [leaveMenuFor]);
 
   const say = useCallback((message: string) => {
     if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -173,7 +192,9 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
         onActions={openActions}
         onChanges={openChanges}
         onPR={openPR}
+        onAddAgent={view.thread && !view.thread.read_only ? addAgent : undefined}
       />
+      {view.thread ? <MemberSheet thread={view.thread} visible={membersOpen} onClose={() => setMembersOpen(false)} /> : null}
       <TakeoverSheet
         visible={machine.ui.asking}
         takeover={takeoverShown(view.takeover, view.handoff)}
@@ -197,5 +218,9 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  right: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
