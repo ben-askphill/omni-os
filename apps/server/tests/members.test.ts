@@ -134,6 +134,25 @@ describe('seating by agent mention', () => {
     expect(second).toContain('---\n\nwhat do you think now');
   });
 
+  it('includes a concurrent reply on the turn after a member’s catch-up', T, async () => {
+    const t = await groupThread('plain start');
+    const catchUp = await holdCatchUp();
+    const concurrent = 'one more detail from Lead';
+    let reply = '';
+    try {
+      await say(t.id, 'first look', ['designer', 'Designer']);
+      await catchUp.started;
+      await say(t.id, concurrent);
+      reply = await H.until('Lead replied during catch-up', () => replies(t.id).find(([a, text]) => a === 'lead' && text?.includes(concurrent))?.[1]);
+    } finally {
+      catchUp.finish();
+    }
+    await untilIdle(t.id, 3);
+    await say(t.id, 'second look', ['designer', 'Designer']);
+    await untilIdle(t.id, 4);
+    expect(readBy(t.id, 'designer')[1]).toContain(`### Lead\n\n${reply.trim()}`);
+  });
+
   it('gives the lead the members’ replies since its last turn, and names the lead to a plain message', T, async () => {
     const t = await groupThread('plain start');
     await say(t.id, 'designer, sketch it', ['designer', 'Designer']);
