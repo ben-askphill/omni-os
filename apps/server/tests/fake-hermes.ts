@@ -28,6 +28,7 @@ interface Run {
 /** A read the fake asks Omni for with `tool.requested` (docs/internals/remote-harness-protocol.md, the read call). */
 export interface FakeRead {
   arguments: unknown;
+  call_id?: string;
   /** Stamp the call with another run's id: a server replaying a call from a turn that has ended. */
   run_id?: string;
 }
@@ -242,7 +243,7 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
     let n = 0;
     writeEvent(res, { event: 'run.started', run_id: run.id, seq: n }, ++n);
     for (const [i, read] of run.reads.entries()) {
-      const call_id = `call_${run.id}_${i + 1}`;
+      const call_id = read.call_id ?? `call_${run.id}_${i + 1}`;
       const answered = new Promise<void>((resolve) => (run.waiting = { call_id, resolve }));
       writeEvent(res, { event: 'tool.requested', run_id: read.run_id ?? run.id, call_id, name: 'omni_worktree', arguments: read.arguments, seq: n }, ++n);
       await answered;

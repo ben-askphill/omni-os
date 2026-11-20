@@ -260,6 +260,24 @@ describe('a remote agent reads the worktree where the channel allows it', () => 
     expect(readRows(t.id).map((r) => r.result?.is_error)).toEqual([true, false]);
   });
 
+  it('answers the same tool call ID in two runs of one session', T, async () => {
+    await setSwitch(true);
+    hermes.reads = [{ call_id: 'read_1', arguments: { action: 'read', path: 'src/a.ts' } }];
+    const t = await H.runner.createThread({ channel: 'repo', prompt: 'first read', role: 'hermes' });
+    await H.untilResults(t.id, 1);
+    expect((await call(`/threads/${t.id}/messages`, json('POST', { prompt: 'second read' }))).status).toBe(200);
+    await H.until('the second read was requested', () => readRows(t.id).length === 2);
+    await H.until('the second run received its answer', () => hermes.toolResults.length === 2, 2_000);
+    expect(hermes.toolResults.map(({ call_id, is_error }) => ({ call_id, is_error }))).toEqual([
+      { call_id: 'read_1', is_error: false },
+      { call_id: 'read_1', is_error: false },
+    ]);
+    expect(new Set(hermes.toolResults.map((r) => r.run_id)).size).toBe(2);
+    const runs = hermes.calls.filter((c) => c.method === 'POST' && c.path === '/v1/runs');
+    expect(runs.map((c) => (c.body as { session_id: string }).session_id)).toEqual([`omni-${t.id}`, `omni-${t.id}`]);
+    await H.untilResults(t.id, 2);
+  });
+
   it('keeps a server that takes no client-side tools working, without the read', T, async () => {
     hermes.rejectTools = true;
     const t = await H.runner.createThread({ channel: 'repo', prompt: 'hello', role: 'hermes' });

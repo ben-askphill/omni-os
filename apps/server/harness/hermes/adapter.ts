@@ -84,7 +84,6 @@ export const hermesAdapter: HarnessAdapter = {
     // The worktree read (worktree-read.ts): each run's grant, closed when its turn ends, so a call that names an ended
     // run is refused. The server never sees a grant.
     const reads = new Map<string, string>();
-    const answered = new Set<string>();
     // Cleared once the server answers a run's `tools` with a 400: it takes no client-side tools (protocol doc).
     let serverTakesTools = true;
 
@@ -116,6 +115,7 @@ export const hermesAdapter: HarnessAdapter = {
 
     async function follow(id: string, ac: AbortController, startedAt: number, normIn: HermesNormState): Promise<void> {
       let norm = normIn;
+      const answered = new Set<string>();
       /** Apply one event: 'seen' when a replay already applied it, 'done' when it ends the run. */
       const applyRaw = (evt: unknown): 'seen' | 'done' | 'more' => {
         const seq = evt && typeof evt === 'object' && typeof (evt as { seq?: unknown }).seq === 'number' ? (evt as { seq: number }).seq : null;
