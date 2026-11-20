@@ -40,6 +40,8 @@ A file there with a shipped agent's name is your edit of that built-in, an overl
 
 `access: read` or `access: ask` runs the agent's threads stricter than their channel's level, never looser ([Access levels](threads.md#access-levels)).
 
+`tokens:` names the accounts the agent reaches through a token instead of their connector, each with the secret that holds it (`tokens: { notion: OMNI_NOTION_TOKEN }`). While that secret is set, the agent's threads do not wait for that account's connector at the [sign-in check](automations.md#sign-in-check). Omni's [Notion](notion.md) section tells a thread how to use `OMNI_NOTION_TOKEN`; for any other token, the charter has to. The shipped agents that do their own work set it for Notion. A map with an unknown account or a bad secret name is left out, so the agent waits as before.
+
 `harness` is the agent's runtime binding: any harness id this machine's catalog has, checked when the agent is saved. An agent whose harness this machine lacks still loads, with an error on it. Omni keeps frontmatter keys it does not know when it edits a file.
 
 ## Settings > Agents

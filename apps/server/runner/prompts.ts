@@ -4,7 +4,7 @@ import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
 import { artifacts, memories, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
-import type { CrewRole } from '../crew.ts';
+import { doesOwnWork, type CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { harnessName } from '../harness/registry.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
@@ -213,7 +213,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
   // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
-  const hands = !role?.delegateOnly && !readsOnly(thread);
+  const hands = doesOwnWork(thread, role);
   const { shopify } = displayPrefs();
   const lines = [
     '# Omni OS context',

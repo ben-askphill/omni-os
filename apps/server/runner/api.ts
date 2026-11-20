@@ -252,7 +252,7 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
     folder_id: filedIn?.id ?? null,
     // A thread for another machine has its worktree made there (handoff.ts take). A new thread whose brief or role
     // needs a connector checks its sign-in first, as a worktree thread's preparation does (setup.ts).
-    setup: !elsewhere && (needsWorktree(channel, { remote, workspace }) || (status === 'queued' && connectorsFor({ id, harness, role: role?.id ?? null }, input.prompt, input.connectors).length > 0)) ? 'preparing' : null,
+    setup: !elsewhere && (needsWorktree(channel, { remote, workspace }) || (status === 'queued' && connectorsFor({ id, harness, role: role?.id ?? null, channel_id: channel.id, quick: input.quick ? 1 : 0, workspace }, input.prompt, input.connectors).length > 0)) ? 'preparing' : null,
     quick: input.quick ? 1 : 0,
     workspace,
   });

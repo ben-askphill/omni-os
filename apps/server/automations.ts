@@ -13,9 +13,10 @@ import { fillPlaceholders, fillShellPlaceholders, NEEDS_CHECKOUT, omniCheckout, 
 import { parsePrecheck, runPrecheck, type Precheck } from './automation-precheck.ts';
 import { commandsFolder } from './sandbox.ts';
 import { DRY_RUN_TITLE, withRunRules } from './automation-rules.ts';
-import { neededConnectors, parseConnectorList } from './connectors.ts';
+import { neededConnectors, parseConnectorList, withoutTokenAccounts } from './connectors.ts';
 import { checkSignIn } from './sign-in-check.ts';
-import { getCrew } from './crew.ts';
+import { doesOwnWork, getCrew } from './crew.ts';
+import { threadSecretSet } from './secrets.ts';
 import { about } from './about.ts';
 
 export interface Automation {
@@ -220,13 +221,15 @@ function setReportedSignIn(id: string, key: string | null) {
 
 /**
  * The connectors a scheduled run needs that are signed out here, or null. Only Claude Code reports sign-ins, so an
- * automation pinned to another harness is never held.
+ * automation pinned to another harness is never held. Its role's token accounts are left out, as its thread's are
+ * (runner/setup.ts connectorsFor).
  */
 async function signInGap(a: Automation): Promise<{ key: string; message: string } | null> {
   const role = getCrew(a.role);
   const harness = a.harness ?? role?.harness;
   if (harness && harness !== 'claude-code' && harness !== 'auto') return null;
-  const needs = neededConnectors(a.prompt, a.connectors, role?.connectors);
+  const declared = neededConnectors(a.prompt, a.connectors, role?.connectors);
+  const needs = doesOwnWork({}, role) ? withoutTokenAccounts(declared, role?.tokens, (name) => threadSecretSet(a.channel, name)) : declared;
   if (!needs.length) return null;
   const check = await checkSignIn(needs, precheckDir(a));
   if (!check.signedOut.length) return null;

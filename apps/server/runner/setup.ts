@@ -16,8 +16,9 @@ import { userName } from '../user-config.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
 import { about } from '../about.ts';
-import { getCrew } from '../crew.ts';
-import { neededConnectors, signInMessage } from '../connectors.ts';
+import { doesOwnWork, getCrew } from '../crew.ts';
+import { neededConnectors, signInMessage, withoutTokenAccounts } from '../connectors.ts';
+import { threadSecretSet } from '../secrets.ts';
 import { checkSignIn } from '../sign-in-check.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { Attachment } from '../uploads.ts';
@@ -50,15 +51,19 @@ export function saveStart(thread: Thread, prompt: string, attachments: Attachmen
 
 /**
  * The connectors a thread's start needs: its role's `connectors:` and the ones its first prompt names. Only Claude
- * Code reports their sign-ins, so a thread on another harness needs none here.
+ * Code reports their sign-ins, so a thread on another harness needs none here. An account its role reaches through a
+ * token (`tokens:`) needs no connector while that secret reaches the thread and the thread does its own work, as only
+ * then is it told to use the token (runner/prompts.ts).
  */
 export function connectorsFor(
-  t: Pick<Thread, 'id' | 'harness' | 'role'>,
+  t: Pick<Thread, 'id' | 'harness' | 'role' | 'channel_id' | 'quick' | 'workspace'>,
   prompt = messageRequests.byRequestId(t.id, START_REQUEST)?.prompt ?? '',
   declared = kv.get<string[] | null>(declaredKey(t.id)) ?? undefined,
 ): string[] {
   if (t.harness !== 'claude-code') return [];
-  return neededConnectors(prompt, declared, getCrew(t.role)?.connectors);
+  const role = getCrew(t.role);
+  const needs = neededConnectors(prompt, declared, role?.connectors);
+  return doesOwnWork(t, role) ? withoutTokenAccounts(needs, role?.tokens, (name) => threadSecretSet(t.channel_id, name)) : needs;
 }
 
 /** A thread's own `connectors:` (its automation's), kept for Try again. Per machine, as the check is. */
