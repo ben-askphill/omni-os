@@ -5,9 +5,10 @@ import { Empty, Icon } from '../../ui.tsx';
 
 /**
  * The thread's files over the one picked, newest first. Under them, the files of the threads it delegated to, at any
- * depth, each row naming the thread it came from. The viewer links to that thread.
+ * depth, each row naming the thread it came from. The viewer links to that thread, and Annotate on an image sends the
+ * marked-up image to it, or to this thread (`threadId`).
  */
-export function ArtifactsTab({ artifacts, crew, selected, onSelect }: { artifacts: Artifact[]; crew: ArtifactWithThread[]; selected: Artifact | ArtifactWithThread | undefined; onSelect: (id: number) => void }) {
+export function ArtifactsTab({ threadId, artifacts, crew, selected, onSelect }: { threadId: string; artifacts: Artifact[]; crew: ArtifactWithThread[]; selected: Artifact | ArtifactWithThread | undefined; onSelect: (id: number) => void }) {
   if (!artifacts.length && !crew.length) {
     return (
       <Empty icon="layers" title="No files yet">
@@ -34,7 +35,7 @@ export function ArtifactsTab({ artifacts, crew, selected, onSelect }: { artifact
           )}
         </div>
       )}
-      <div className="min-h-0 flex-1 bg-bg">{selected ? <ArtifactViewer key={selected.id} a={selected} from={from} /> : <div className="p-4 text-[13px] text-fg-3">Pick a file.</div>}</div>
+      <div className="min-h-0 flex-1 bg-bg">{selected ? <ArtifactViewer key={selected.id} a={selected} from={from} annotateIn={threadId} /> : <div className="p-4 text-[13px] text-fg-3">Pick a file.</div>}</div>
     </div>
   );
 }

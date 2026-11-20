@@ -130,7 +130,7 @@ export function ThreadPanel({
       <div className="min-h-0 flex-1" {...tabPanelProps(panel, tab)}>
         {tab === 'details' && <DetailsTab thread={thread} {...details} />}
         {tab === 'prs' && <PRsTab thread={thread} {...prs} />}
-        {tab === 'artifacts' && <ArtifactsTab artifacts={files} crew={crewArtifacts.files} selected={selectedArtifact} onSelect={onSelect} />}
+        {tab === 'artifacts' && <ArtifactsTab threadId={thread.id} artifacts={files} crew={crewArtifacts.files} selected={selectedArtifact} onSelect={onSelect} />}
         {tab === 'changes' && <ChangesTab thread={thread} />}
         {tab === 'browser' && <BrowserTab channelId={thread.channel_id} threadId={thread.id} shots={shots} crew={crewArtifacts.shots} />}
         {desktop && webFor === thread.channel_id && (

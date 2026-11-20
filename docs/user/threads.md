@@ -220,6 +220,12 @@ If the page navigates, the tab changes, the browser is resized or the page scrol
 
 **Picking an element.** A click or tap, as opposed to a drag, asks the page what element is under that spot. Omni marks its box and, under **Details**, shows its tag, selector, text, a short excerpt of its markup and its computed styles before you send it. The agent gets that same excerpt, quoted as data from the page. The excerpt is capped at 600 characters of text, 2,000 of markup and four parent tags. It never holds what you typed into a field, and it leaves out a link's query and fragment. Omni says so when the page has moved on since the screenshot, the spot is in a frame from another site, or the page cannot be read. The screenshot and any area you drag still go with the message, without the element. How it works: [Message context](../internals/message-context.md).
 
+## Mark up an image file and send it back
+
+In a thread's Files tab (desktop web and the desktop app), open an image and press **Annotate and send** in its header. The same markup toolbar opens over the image, starting on the rectangle: pen, rectangle, ellipse, arrow, line, text notes, color, line width, undo, delete and **Clear**. Click with the text tool to pin a note to that spot. Write what should change under it, then press **Send**.
+
+The thread gets a new message from you with the marks flattened into a PNG attachment. The message lists the text notes, numbered, and every other mark, all in the image's own pixels. An image from **From delegated threads** goes to the thread that made it, and **Send to** switches it to this one. When that delegated thread has been idle past the prompt cache's hour, Omni says so and the button reads **Wake and send**; **Send to this thread instead** keeps it asleep. The phone layout has no Annotate on files.
+
 ## Point the agent at another thread
 
 In the thread's header, press the **Reference another thread** button (the speech bubble next to the context meter on desktop web and in the desktop app). On every surface, **Reference a thread** in the thread's menu does the same. Archived threads hide the button. Search by title or channel and pick a thread. It goes into the reply box as a chip, next to whatever you have typed, and x takes it out. The search lists this channel's threads. **All channels** lists the others, and Omni attaches a thread from another channel only when you pick it there, marked "other channel". When two threads share a title, the start of their id tells them apart.
