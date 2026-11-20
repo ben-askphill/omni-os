@@ -2,7 +2,7 @@
 
 How to build [ADR 0019](../adr/0019-group-threads.md) (threads are group chats with agents) and [ADR 0020](../adr/0020-remote-agents-are-agents.md) (remote agents are agents, with worktree read gated per channel), as six slices in dependency order plus an iOS slice. Task T-9079.
 
-- Status: Ben settled the decisions on 2026-11-20, in a grilling session. Nothing is built. Section 5 lists the questions this plan raised, which the decisions leave open. None of them is decided here.
+- Status: Ben settled the decisions on 2026-11-20, in a grilling session, and picked the UI the same day from a prototype (section 3.5). Nothing is built. Section 5 lists the questions this plan and the prototype raised, which the decisions leave open. None of them is decided here.
 - Surveyed: `main` at `0ce9873b` (desktop 0.1.43). Paths below are on that commit.
 - Words: [GLOSSARY.md](../../GLOSSARY.md) as this change leaves it: **lead**, **member**, **seat**, **agent mention**, **collision** and **remote agent** are new. "Custom harness" stays the code's word for a remote agent's server.
 
@@ -81,6 +81,24 @@ These are proposals for the slices to start from, not decisions. A slice that fi
 - A remote agent is an agent whose run is a custom harness. The harness file, its key and its adapter stay as ADR 0017 and 0018 built them. Settings > Agents shows the server inside the agent, and the pickers stop listing it.
 - The worktree read tool is the one Omni tool a remote agent can get. It lists, reads and searches one thread's worktree, through a credential that opens nothing else.
 
+### 3.5 UI
+
+Ben picked the UI on 2026-11-20. [ADR 0019](../adr/0019-group-threads.md#how-it-looks) and [ADR 0020](../adr/0020-remote-agents-are-agents.md#how-it-looks) record the picks under How it looks, and the slices below build them.
+
+- The prototype is on the branch `prototype/group-threads`, never merged. `npm run prototype` serves it, and its README says how to switch screens and states. Each screen opens on Ben's pick, with the variants he turned down behind the switcher.
+- It draws inside Omni's real channel rail and list panel, on a fake `/api` built from the wire fixtures. Its data, wording and sizes are a starting point, not a spec.
+- Questions Q48 to Q58 come from it.
+
+| Screen | Pick | Slice |
+| --- | --- | --- |
+| Who wrote a reply | Avatar in a 24px gutter, name and time beside it | 1 |
+| Agent mention | One `@` menu, agents first, and a hint line under the composer naming who gets the message | 2 |
+| Member list | Avatars in the thread header open the list (popover, phone sheet); the quick-actions card keeps Lead and Members rows | 2 |
+| Parallel turns | A lane per agent, one per tab on the phone, the collision flag above | 3 |
+| Mark in a list | Desktop: the avatars are the mark, the one asking first. Phone: a second line | 3 |
+| Remote lead | Quiet labels in the crumbs, the composer, a lock line and the quick-actions card | 4 |
+| Settings > Agents | An agent page, with Avatar and Server cards | 1, 4 |
+
 ## 4. Slices
 
 Ordered by dependency. Each slice ships on desktop web, phone web and the desktop app in one PR, per the repo rules. Each slice also decides every harness (Claude Code, Codex, Cursor Agent, Cursor Cloud, Hermes and custom harnesses), and adds any new state to sync, any changed API shape to the wire fixtures, the Conductor tools that apply and the design system components it needs. Each one rewrites the docs it makes wrong.
@@ -105,9 +123,11 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
   - Transcript rows record their agent. A one-agent thread shows the lead's name and avatar on its replies.
   - With Show technical details on, the harness and model show beside the name. Off, they do not.
   - The quick-actions card's Agent row, the thread header and the phone's sub line show the avatar beside the name.
+  - A reply's author line: the avatar in a 24px gutter, the name and time beside it, one head for replies in a row from one agent (section 3.5).
+  - Settings > Agents opens an agent as a page with its avatar on top and an Avatar card (section 3.5). Slice 4 adds the Server card.
 - **Sync.** The avatar image has to reach the other machines with the agent's file (Q2).
 - **Wire.** Thread and message shapes gain the author. Re-record the fixtures that change.
-- **Design system.** An agent avatar (image and initials) and a message author line.
+- **Design system.** An agent avatar (image and initials, Q48 and Q49), the gutter author line and the agent page.
 - **Docs.** `docs/user/crew.md` Avatar line, `docs/user/threads.md` on how a reply reads.
 - **Done when.** An uploaded avatar shows in Settings > Agents, the composer's Agent picker and on every reply of a thread that agent leads, on all three surfaces and on a second synced machine. An agent without one shows its initials disc.
 
@@ -115,8 +135,9 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
 
 - **Goal.** Ben seats agents in a thread with an agent mention, and each one answers there in its own session.
 - **Scope.**
-  - The member list (section 3.1) and a members strip in the thread, from which Ben removes a member. Removing one closes its session and keeps its replies.
-  - Agent mentions in the composer's `@` menu, anywhere in a message, on every composer that can send to a thread. They are typed records on the request.
+  - The member list (section 3.1). The members' avatars at the right of the thread header open it as a popover on desktop and a sheet on the phone, with Remove on each member. Removing one closes its session and keeps its replies. The quick-actions card gets a Lead row and a Members row.
+  - Agent mentions in the composer's `@` menu, anywhere in a message, on every composer that can send to a thread. They are typed records on the request. The menu lists the thread's members, then the agents a mention would seat, then machines and files.
+  - A hint line under the composer names who gets the message: the lead, or the named agents and whether one joins (Q50).
   - Routing (section 3.2): no mention goes to the lead, mentions go to the named agents only. In this slice, several named agents reply one after another, in the order the message names them. Slice 3 makes them parallel.
   - Context since each agent's last turn, with no tool calls (section 3.2).
   - Once per thread: a mention of a seated member makes it reply and seats nothing.
@@ -129,7 +150,7 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
 - **Sync.** Member list and authors. A handoff moves every agent's session.
 - **Conductor.** `get_thread` and `list_threads` show members. The Conductor cannot seat in this slice. Slice 6 adds that.
 - **Wire.** Member list on the thread, author and mentions on messages. Re-record the fixtures.
-- **Design system.** Agent mention pill, members strip, member row with Remove.
+- **Design system.** Agent mention pill (Q53), header avatars, member list popover and sheet with Remove, the composer's hint line.
 - **Docs.** Rewrite `docs/user/threads.md` Ask an agent as members, `docs/internals/message-context.md` for the new record kind and `docs/internals/execution-state.md` for several sessions per thread.
 - **Done when.** In one thread, Ben seats two agents, a message with no mention gets only the lead's reply, and a message naming both gets a reply from each, which read each other's earlier replies but not their tool calls. Removing one keeps its replies, and its session does not resume. This works on all three surfaces and after a handoff to the other machine.
 
@@ -141,12 +162,13 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
   - Changed files per turn, per agent (Q21).
   - When two agents in a thread touch the same file, Omni tells each running agent which files the other changed this turn (Q22 covers harnesses that cannot steer).
   - The thread flags every file both agents edited, in the transcript and in the Changes tab.
-  - Avatars on the status mark show which agents are running, wherever the mark has room (Q35).
+  - While several agents answer one message, the turn splits into a lane per agent with its steps and changed files, the collision flag above the lanes. The phone shows one lane per tab (Q55, Q56).
+  - In the desktop thread list, the avatars are the mark while agents run or wait on Ben: the one asking first, in the Needs you ring and diamond, then the ones working in the Working ring, two at most, else one and a count. Phone rows say it on their second line. Other places the mark shows are Q35.
   - Stop and steering with several agents running (Q13).
   - Git operations two agents start at once, such as two commits (Q24).
 - **Harnesses.** Claude Code and Codex can be told mid-turn by a steer. Cursor Agent cannot steer, so it hears at its next turn. Cursor Cloud is Q20.
 - **Sync.** Collisions travel with the thread.
-- **Design system.** The status mark with running avatars, and the collision flag.
+- **Design system.** The avatar mark (Needs you and Working), the phone row's second line, lanes and the collision flag.
 - **Docs.** `docs/user/threads.md` status marks and Changes, `docs/internals/execution-state.md`.
 - **Done when.** Two agents named in one message run at once and both edit `a.ts`. Each is told mid-turn that the other changed it, and the thread flags `a.ts`. The mark shows both avatars while they run and settles to the busiest state after.
 
@@ -156,14 +178,15 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
 - **Scope.**
   - The Connect sheet always makes the agent. **Make an agent for it** goes.
   - The offer a server makes when connecting can carry an avatar (Q29). The agent takes its name from the offer, as today.
-  - Settings > Agents shows a remote agent's server (address, kind, secret, Test connection, Remove) inside the agent. Settings > Models > Harnesses stops listing custom harnesses. Hermes's URL and key move under its agent (Q27).
+  - Settings > Agents shows a remote agent's server (address, kind, secret, Test connection, Remove) as a Server card on the agent's page, with an In threads card for where it may read files. Settings > Models > Harnesses stops listing custom harnesses. Hermes's URL and key move under its agent (Q27). Where Connect lives is Q58.
   - The harness and model pickers list local harnesses only. A local agent can no longer be run on a remote server.
-  - A thread can start as a remote agent. It leads talk-only, and Ben seats a local member to change files (Q31 covers when such a thread gets its worktree).
+  - A thread can start as a remote agent. It leads talk-only, and Ben seats a local member to change files (Q31 covers when such a thread gets its worktree). The thread says so with quiet labels: "talks only" in the crumbs, the composer's placeholder, a lock line under a reply that could not read files, and a Files row in the quick-actions card (section 3.5, Q57).
   - A remote agent can be seated as a member and gets context as message text (section 3.2), subject to the channel's excerpt switch (Q37).
   - Existing threads and agents on `hermes` or `custom:<slug>` (Q26).
 - **Harnesses.** Hermes and custom harnesses of both kinds.
 - **Sync.** The agent file and harness file sync as today. A new avatar travels as slice 1's do.
 - **Conductor.** `list_crew` marks remote agents. `list_harnesses` stops listing them.
+- **Design system.** The Server and In threads cards, the Remote tag, the lock line.
 - **Docs.** `docs/user/harnesses.md` Custom harnesses and Hermes, `docs/user/crew.md`, and `docs/internals/remote-harness-protocol.md` for the offer's avatar.
 - **Done when.** Connecting Nomos makes a Nomos agent with its avatar, which shows in no picker. A thread started as Nomos answers without a worktree, and seating Builder in it makes the file change.
 
@@ -198,7 +221,7 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
 ### Slice 7: iOS
 
 - **Goal.** The iOS app shows and sends what slices 1 to 6 add.
-- **Scope.** Author name and avatar on messages, agent mentions in the composer, the members strip, the busiest-state mark with running avatars, collisions in Changes, and remote agents in Settings and Agents once the app has that section (crew plan S8).
+- **Scope.** Author name and avatar on messages, agent mentions in the composer with the hint line, the member list sheet, the busiest-state mark with the phone row's second line, a lane per tab for parallel turns, collisions in Changes, and remote agents in Settings and Agents once the app has that section (crew plan S8). The phone layouts in section 3.5 are the starting point.
 - **Needs.** Slice 2 at least, and each later slice before its part. Whether iOS ships inside each slice instead is Q47.
 
 ## 5. Open questions
@@ -220,7 +243,7 @@ Raised while writing this plan. None is decided. Each names the slice that needs
 - **Q8.** Can Ben seat an agent without sending it a message, for example by turning **Ask an agent…** into **Add an agent…**, or only by mention?
 - **Q9.** Can Ben seat agents in a #conductor thread, or in a quick ask? The decision limits only the Conductor.
 - **Q10.** Which agents can be seated: the Conductor, usage-scan and other `delegatable: false` agents, a delegate-only agent, or an agent this machine cannot run?
-- **Q11.** How does the `@` menu order agents, machines, files and artifacts, now that agent mentions are not only at the start of a message?
+- **Q11.** How does the `@` menu order agents, machines, files and artifacts, now that agent mentions are not only at the start of a message? Partly answered on 2026-11-20: agents first (members, then agents a mention would seat), then machines and files. Where artifacts go is still open.
 - **Q12.** Removing a member while its turn runs: stop the turn first, or let it finish? What happens to messages queued for it?
 - **Q13.** Steering and Stop with several agents running: does a message with no mention steer only the lead, and does Stop stop every running agent or one?
 - **Q14.** Handoff, Take over, fork and continue on another harness with several sessions: do they move every agent at once, and are they refused while any member runs?
@@ -253,7 +276,7 @@ Raised while writing this plan. None is decided. Each names the slice that needs
 ### Status mark (slices 2 and 3)
 
 - **Q34.** Where do Failed, Stopped, Usage limit, Setup failed and Message held rank against Needs you, Working and Done in "the busiest state"?
-- **Q35.** Where do running avatars show: only in the thread's header, or also on Inbox cards, sidebar rows and phone Activity rows, and how many before a +N?
+- **Q35.** Where do running avatars show: only in the thread's header, or also on Inbox cards, sidebar rows and phone Activity rows, and how many before a +N? Partly answered on 2026-11-20: the desktop thread list draws them as the mark, two at most, else one and a count, and phone rows on their second line. Inbox cards, the dashboard and phone Activity are still open.
 
 ### Remote worktree read (slice 5)
 
@@ -275,3 +298,19 @@ Raised while writing this plan. None is decided. Each names the slice that needs
 ### Surfaces
 
 - **Q47.** Does iOS ship inside each slice, or as slice 7 after them, as crew plan S8 did?
+
+### UI, from the prototype
+
+Raised by the prototype (section 3.5). Each names its slice.
+
+- **Q48.** Initials collide: Reviewer and Researcher are both "RE". Do agents get unique initials, as channels do from `monograms()`, or does Q4 cover initials as well as names? (Slice 1)
+- **Q49.** Two letters do not read below about 18px: header avatars, mention pills, list rows and the avatar mark. Does the disc show one letter there, as the prototype does? (Slice 1)
+- **Q50.** When does the hint line under the composer show: always, once Ben starts typing, or only when the message names an agent? The phone's placeholder already says "Reply to Builder". (Slice 2)
+- **Q51.** The composer's run pill shows one harness and model. In a thread with members, whose run does it show, and does switching it change only one member's run (Q15)? (Slice 2)
+- **Q52.** Does seating write a line in the transcript ("You seated Reviewer and Hermes"), and removing one too? Without one, nothing marks when an agent joined. (Slice 2)
+- **Q53.** Agent mention pills use the machine mention pill's blue. Should the two look different? (Slice 2)
+- **Q54.** The header shows the members' avatars and the Working pill side by side. Which one says who is working: the pill naming the agent, or a ring on the running avatars? (Slice 3)
+- **Q55.** What do a turn's lanes become once every agent has finished: do they stay as lanes in the transcript, or fold back into replies with the collision flag kept? How do lanes fit three or more agents on desktop? (Slice 3)
+- **Q56.** A file name alone misleads (`status.tsx` and `status.ts` in one turn). How much of the path do collision flags and a lane's file list show? (Slice 3)
+- **Q57.** A remote-led thread has no machine, folder or branch for the quick-actions card's top rows. The prototype shows the agent's server and "No worktree until a local agent joins", which assumes an answer to Q31. (Slice 4)
+- **Q58.** Where does Connect live once remote agents leave Settings > Models? The prototype puts **Connect remote agent** beside **New agent** in Settings > Agents. (Slice 4)
