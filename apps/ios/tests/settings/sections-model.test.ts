@@ -42,7 +42,10 @@ describe('small models', () => {
   it('describes each harness and how to fix one', () => {
     const rows = harnessRows(catalog());
     expect(rows[0]).toMatchObject({ name: 'Claude Code', ready: true, detail: 'Claude plan · 2 models · default Sonnet 5.5 · 0 of 4 running', fix: null });
-    expect(rows.find((r) => r.id === 'hermes')).toMatchObject({ ready: false, fix: 'hermes login' });
+    const down = harnessRows([...catalog(), { ...catalog()[1], id: 'gemini', name: 'Gemini', available: false, fix: 'gemini login' } as never]);
+    expect(down.find((r) => r.id === 'gemini')).toMatchObject({ ready: false, fix: 'gemini login' });
+    // Hermes and a connected server are remote agents, not harnesses (ADR 0020).
+    expect(rows.map((r) => r.id)).toEqual(['claude', 'codex']);
   });
 
   it('offers the saved idle days even when it is not a usual choice', () => {

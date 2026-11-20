@@ -13,6 +13,8 @@ import { useSyncTrouble } from '../../send/use-sync-trouble';
 import { useMinuteClock } from '../../live/use-minute-clock';
 import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
 import { OutboxRow } from './OutboxRow';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from './rows/Group';
 
 /**
  * Everything below the last transcript row: the messages the agent has not read yet, then the one this phone is
@@ -45,6 +47,7 @@ function PendingRow({ message, threadId, trouble }: { message: PendingMsg; threa
       <Text accessibilityRole={forwarded && trouble ? 'alert' : undefined} style={[styles.meta, { color: forwarded && trouble ? colors.needs : colors.fg3 }]}>
         {label}
       </Text>
+      <SentTo agents={sentContext(message.text, message.context).to} />
       <Text numberOfLines={3} style={[styles.text, { color: quiet ? colors.fg3 : colors.fg2 }]}>
         {message.text}
       </Text>

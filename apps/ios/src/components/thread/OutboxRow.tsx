@@ -8,6 +8,7 @@ import { space, useOmniTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { UserBubble } from '../UserBubble';
 import { editInComposer } from './drafts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
 
 /**
  * The message on its way, drawn where it will land in the transcript. Files show as chips with a progress bar and a
@@ -19,7 +20,11 @@ export function OutboxRow({ live, threadId }: { live: ThreadLive; threadId: stri
   const key = useThreadKey(threadId);
   const item = outbox.item;
   if (!item) return null;
-  const text = [item.text, ...item.context.map((c) => `Attached ${c.label}`)].filter(Boolean).join('\n');
+  // An agent the message goes to is no attachment: the text names it, else the To line under it does (ADR 0019).
+  const sent = sentContext(item.text, item.context);
+  const chips = item.context.filter((c) => sent.chips.includes(c));
+  const to = sent.to.length ? `To ${sent.to.map((a) => a.name).join(', ')}` : null;
+  const text = [item.text, ...chips.map((c) => `Attached ${c.label}`), to].filter(Boolean).join('\n');
 
   if (item.phase === 'sending') {
     const uploading = item.files.length > 0;

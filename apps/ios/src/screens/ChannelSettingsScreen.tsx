@@ -231,6 +231,12 @@ function ChannelSettingsForm({ channel, machineDefault, navigation }: { channel:
         <SwitchRow title="Worktree per thread" detail="Each thread gets its own branch (omni/…), so parallel work never collides. Off runs in the repo itself." value={form.use_worktree} disabled={!hasRepo} onValueChange={(v) => set('use_worktree', v)} />
         <SwitchRow title="Show the browser window" detail="Off runs the channel browser headless. On, to watch it or log in by hand. Logins stay per channel." value={form.showBrowser} onValueChange={(v) => set('showBrowser', v)} />
         <SwitchRow title="Leave out of usage scans" detail="Scan my usage skips this channel’s threads, so none of their text reaches a model." value={form.scanOptOut} onValueChange={(v) => set('scanOptOut', v)} />
+        <SwitchRow
+          title="Remote agents can see this channel’s work"
+          detail="Agents on another server, such as Hermes, get the other agents’ replies in a thread and can read its git-tracked files and diff. Off, they get only the message sent to them. Every read shows in the thread."
+          value={form.remoteWork}
+          onValueChange={(v) => set('remoteWork', v)}
+        />
       </Group>
 
       {hasRepo && form.use_worktree ? (

@@ -12,7 +12,9 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { StatusDot } from '../../components/StatusDot';
-import { useChannels, useLiveHub, useStore } from '../../live/react';
+import { useAgents, useChannels, useLiveHub, useStore, useTechnical } from '../../live/react';
+import { AgentAvatar } from '../../components/AgentAvatar';
+import { remoteAgentRows } from '../remote-agents';
 import { useRemote } from '../../live/use-remote';
 import type { RootStackParamList } from '../../navigation/types';
 import { fontSize, lineHeight, mono, space, useOmniTheme } from '../../theme';
@@ -31,11 +33,15 @@ const loadDevices = (api: OmniApi) => api.devices();
 const loadStatus = (api: OmniApi) => api.status();
 const loadAccounts = (api: OmniApi) => api.accounts();
 
-/** Models: whether each harness can run, each channel's default model, and the .env options behind them. Hermes is under Extras. */
+/**
+ * Models: whether each local harness can run, the remote agents and whether each is connected, each channel's default
+ * model, and the .env options behind them.
+ */
 export function ModelsSection() {
   const { colors } = useOmniTheme();
   const navigation = useNavigation<Nav>();
   const harnesses = useRemote(loadHarnesses);
+  const remote = remoteAgentRows(useAgents(), useTechnical());
   const { channels } = useChannels();
   const listed = (channels ?? []).filter((c) => !c.archived);
   const own = listed.filter((c) => setsRun(channelForm(c).run)).length;
@@ -59,6 +65,23 @@ export function ModelsSection() {
       ) : (
         <Loading error={harnesses.error} retry={harnesses.reload} />
       )}
+      {remote.length ? (
+        <Group title="Remote agents" footer="Hermes and the servers you connected are agents with a name and an avatar. Connect, test or remove one in Settings > Agents on the computer.">
+          {remote.map((r, i) => (
+            <View key={r.id} style={[styles.harness, i > 0 && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
+              <View style={styles.head}>
+                <AgentAvatar agent={r.id} size={20} />
+                <Text style={[styles.name, { color: colors.fg }]}>{r.name}</Text>
+                <StatusDot glyph={r.ok ? 'done' : 'needs'} size={7} />
+                <Text numberOfLines={1} style={[styles.meta, styles.shrink, { color: colors.fg3 }]}>
+                  {r.status}
+                </Text>
+              </View>
+              {r.server ? <Text style={[styles.meta, { color: colors.fg3, fontFamily: mono }]}>{r.server}</Text> : null}
+            </View>
+          ))}
+        </Group>
+      ) : null}
       <Group
         title="Default model for new threads"
         footer={`Without one, Auto picks from the prompt. A thread or agent that picks its own wins. ${own ? `${own} of ${listed.length} channels set one.` : 'Auto everywhere.'}`}
@@ -227,6 +250,9 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: fontSize.small,
     lineHeight: Math.round(fontSize.small * lineHeight.body),
+  },
+  shrink: {
+    flexShrink: 1,
   },
   fix: {
     fontFamily: mono,

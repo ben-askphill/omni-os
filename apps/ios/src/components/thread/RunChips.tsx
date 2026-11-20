@@ -6,6 +6,7 @@ import { Icon } from '../../ui/Icon';
 
 import { chipHeight, chipSlop, fontSize, radius, space, useOmniTheme, weight } from '../../theme';
 import { nextTurnLabel, runChipLabel, type RunThread } from '../../thread/run-model';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 
 interface RunChipProps {
   thread: RunThread;
@@ -21,6 +22,8 @@ interface RunChipProps {
 export function ModelButton({ thread, harnesses, onPress }: RunChipProps) {
   const { colors } = useOmniTheme();
   const label = runChipLabel(thread, harnesses);
+  // A remote agent's run is its server, not one to switch (ADR 0020).
+  if (isRemoteAgentHarness(thread.harness)) return null;
   return (
     <Pressable
       accessibilityRole="button"
