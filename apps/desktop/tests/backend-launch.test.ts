@@ -106,6 +106,9 @@ describe('decide', () => {
     expect(checkoutProblem('/repo', () => false)).toBe('missing');
     expect(checkoutProblem('/repo', (path) => path.endsWith('apps/server/index.ts'))).toBe('dependencies');
     expect(checkoutProblem('/repo', () => true)).toBeNull();
+    const worktree = '/home/me/omni-os/data/worktrees/abc';
+    const parentDeps = (path: string) => path === `${worktree}/apps/server/index.ts` || path === '/home/me/omni-os/node_modules/tsx/package.json';
+    expect(checkoutProblem(worktree, parentDeps)).toBeNull();
     expect(checkoutMessage('dependencies', '/repo')).toContain('npm install --include=dev');
   });
 
