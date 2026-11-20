@@ -282,9 +282,12 @@ CREATE TABLE IF NOT EXISTS pr_watch_events (
 `;
 
 /** Add a column the current schema needs to a database created by an older version. Safe to run again. */
-export function ensureColumn(table: string, column: string, decl: string) {
+/** Add a column a database made by an older version lacks. True when it was added just now. */
+export function ensureColumn(table: string, column: string, decl: string): boolean {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
-  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  if (cols.some((c) => c.name === column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  return true;
 }
 
 /** A random v4 uuid, per row, in SQL. */
@@ -355,9 +358,17 @@ export function migrate() {
   for (const col of ['prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks']) ensureColumn('channels', col, 'TEXT');
   // 1 keeps the channel's threads out of usage scans (usage-scan/asks.ts): a client channel with data that should not reach a model.
   ensureColumn('channels', 'scan_opt_out', 'INTEGER NOT NULL DEFAULT 0');
-  // 1 never sends an excerpt of the channel's threads to a remote agent with an Ask (ask.ts): a client channel's data
-  // stays on Omni's machines. Asks to local roles still carry one.
+  // 1 sent no excerpt of the channel's threads with an Ask to a remote agent. Ask is gone (group threads slice 2) and
+  // remote_work replaced the switch; the column stays so the migration below can read it.
   ensureColumn('channels', 'remote_excerpts_off', 'INTEGER NOT NULL DEFAULT 0');
+  // Remote agents can see this channel's work (ADR 0020, Q36, Q69): messages and worktree reads. It starts on only in a
+  // channel where an Ask already sent a remote agent an excerpt and that Ben has not closed to them since; every other
+  // channel, and every new one, starts off.
+  if (ensureColumn('channels', 'remote_work', 'INTEGER NOT NULL DEFAULT 0')) {
+    db.exec(`UPDATE channels SET remote_work = 1 WHERE remote_excerpts_off = 0 AND id IN (
+      SELECT t.channel_id FROM events e JOIN threads t ON t.id = e.thread_id
+      WHERE e.kind = 'ask' AND json_valid(e.payload) AND json_extract(e.payload, '$.remote') = 1 AND json_type(e.payload, '$.excerpt') = 'object')`);
+  }
   // What the channel's agents may do without a yes, and its connectors' own levels (apps/server/access.ts, ADR 0015).
   // Null is full access, so every channel made before levels runs as it did.
   ensureColumn('channels', 'access_level', 'TEXT');

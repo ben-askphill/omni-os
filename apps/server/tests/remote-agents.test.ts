@@ -274,7 +274,7 @@ describe("a remote agent's server card", () => {
 describe('a remote agent seated as a member', () => {
   it('reads the thread as message text, or only the message to it in a channel closed to remote agents', T, async () => {
     for (const closed of [false, true]) {
-      H.db.channels.update('scratch', { remote_excerpts_off: closed ? 1 : 0 });
+      H.db.channels.update('scratch', { remote_work: closed ? 0 : 1 });
       const t = await H.runner.createThread({ channel: 'scratch', prompt: 'RICH plan the release', role: 'lead' });
       await H.untilResults(t.id, 1);
       eve.reset();
@@ -290,7 +290,7 @@ describe('a remote agent seated as a member', () => {
       // Its reply lands in the group thread as Nomos.
       expect(H.db.events.since(t.id).filter((r) => r.kind === 'assistant_text').map((r) => r.agent)).toContain('nomos');
     }
-    H.db.channels.update('scratch', { remote_excerpts_off: 0 });
+    H.db.channels.update('scratch', { remote_work: 0 });
   });
 });
 

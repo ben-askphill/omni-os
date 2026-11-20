@@ -42,8 +42,8 @@ export interface ChannelRecord {
   prompt_fix_checks?: string | null;
   /** 1 leaves the channel out of usage scans. Missing from an older server. */
   scan_opt_out?: number;
-  /** 1 sends no thread excerpt with an Ask to a remote agent. Missing from an older server. */
-  remote_excerpts_off?: number;
+  /** 1: remote agents can see this channel's work, its messages and its files (ADR 0020). Missing from an older server. */
+  remote_work?: number;
   /** What agents here may do without a yes (access.ts). Null or missing is full access. */
   access_level?: string | null;
   /** The connectors' own levels, as the stored JSON map. */
@@ -81,8 +81,8 @@ export interface ChannelForm {
   prompts: Record<PRStep, string>;
   /** Leave the channel's threads out of usage scans. */
   scanOptOut: boolean;
-  /** Asks from this channel's threads to a remote agent never carry an excerpt of the thread. */
-  remoteExcerptsOff: boolean;
+  /** Remote agents can see this channel's work: other agents' replies as text, and the thread's git-tracked files. */
+  remoteWork: boolean;
   /** What agents here may do without a yes: the channel's own level, else the machine's default. */
   access: AccessLevel;
   /**
@@ -119,7 +119,7 @@ export function channelForm(c?: ChannelRecord, accessDefault?: string): ChannelF
     worktree_shared: c?.worktree_shared ?? '',
     prompts: { open: c?.prompt_open_pr ?? '', conflicts: c?.prompt_fix_conflicts ?? '', checks: c?.prompt_fix_checks ?? '' },
     scanOptOut: c?.scan_opt_out === 1,
-    remoteExcerptsOff: c?.remote_excerpts_off === 1,
+    remoteWork: c?.remote_work === 1,
     access: accessLevelOf(c?.access_level ?? c?.access_default ?? accessDefault),
     accessSet: isAccessLevel(c?.access_level),
     connectors: connectorAccessOf(c?.connector_access),
@@ -201,7 +201,7 @@ export function channelBody(f: ChannelForm, opts: { system: boolean; github: boo
     worktree_shared: storedList(f.worktree_shared),
     ...promptsBody(f.prompts),
     scan_opt_out: f.scanOptOut ? 1 : 0,
-    remote_excerpts_off: f.remoteExcerptsOff ? 1 : 0,
+    remote_work: f.remoteWork ? 1 : 0,
     ...(f.accessSet && { access_level: f.access }),
     connector_access: f.connectors,
   };

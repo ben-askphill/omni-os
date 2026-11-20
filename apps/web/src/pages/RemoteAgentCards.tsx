@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KIND_LABEL, type AgentTest } from '@omni/shared/connect-agent.ts';
-import { REMOTE_FILES, serverStatus, type RemoteServer } from '@omni/shared/remote-agent.ts';
+import { serverStatus, type RemoteServer } from '@omni/shared/remote-agent.ts';
 import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
 import { api, errorText, useApi, type CrewRole } from '../api.ts';
 import { useTechnical } from '../display.ts';
@@ -99,11 +99,11 @@ export function InThreadsCard({ agent }: { agent: CrewRole }) {
     <Card title="In threads" subtitle="What it may do in a thread it leads or is seated in.">
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
         <dt className="text-fg-3">Files</dt>
-        <dd data-files-row>{REMOTE_FILES}, in every channel</dd>
-        <dt className="text-fg-3">Messages</dt>
-        <dd className="min-w-0">
-          Other agents' replies and a catch-up, in channels that send remote agents thread excerpts (Channel settings). Elsewhere only the message to it.
+        <dd data-files-row className="min-w-0">
+          Reads a thread's git-tracked files and diff in channels with Remote agents can see this channel's work on (Channel settings). Never changes them.
         </dd>
+        <dt className="text-fg-3">Messages</dt>
+        <dd className="min-w-0">Other agents' replies and a catch-up, in those channels. Elsewhere only the message to it.</dd>
       </dl>
       <p className="text-[12.5px] text-fg-3">
         {agent.name} talks only. To change files, seat a local agent beside it with @. In a thread {agent.name} leads, you commit their changes with Commit.

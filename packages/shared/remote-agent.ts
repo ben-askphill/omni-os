@@ -38,8 +38,14 @@ export interface RemoteServer {
 /** The connection status line on the Server card, shown with technical details off too (Q30). */
 export const serverStatus = (s: Pick<RemoteServer, 'available' | 'fix'>) => (s.available ? 'Connected' : s.fix ? `Not connected: ${s.fix}` : 'Not connected');
 
+/**
+ * Remote agents can see this channel's work (ADR 0020, Q36): its messages, and its threads' git-tracked files through
+ * the read tool. Off in a channel from an older server, which has no such switch.
+ */
+export const remoteReadsOpen = (channel: { remote_work?: number } | null | undefined): boolean => channel?.remote_work === 1;
+
 /** What a remote agent may do with a thread's files, for the quick-actions card's Files row. */
-export const REMOTE_FILES = "Can't read or change";
+export const remoteFiles = (open: boolean) => (open ? "Can read, can't change" : "Can't read or change");
 
 /** The crumbs' note on a thread a remote agent leads. */
 export const TALKS_ONLY = 'talks only';
