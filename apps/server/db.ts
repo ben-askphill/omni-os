@@ -42,5 +42,6 @@ export { assignments, parseTrail, type Assignment, type TrailStop } from './db/r
 export { transitions, type TransitionRow } from './db/repos/transitions.ts';
 export { reviewNotes, type ReviewNote } from './db/repos/review-notes.ts';
 export { memories, type Memory } from './db/repos/memories.ts';
+export { memberId, members, type MemberRow } from './db/repos/members.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';

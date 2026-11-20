@@ -289,6 +289,8 @@ describe('plain words', () => {
     expect(plainCall({ name: 'Bash', input: { command: 'rm -rf node_modules && npm ci', description: 'reinstall the packages' } }).now).toBe('Reinstall the packages');
     expect(plainCall({ name: 'Bash', input: { command: 'git status' } }).now).toBe('Running a command');
     expect(plainCall({ name: 'Grep', input: { pattern: 'foo\\(.*\\)' } }).now).toBe('Searching the files');
+    // A remote agent's read of the thread's diff (apps/server/harness/read-tool.ts) is reading, with the files.
+    expect(plainCall({ name: 'Diff', input: { description: "The thread's diff and changed files" } })).toEqual({ phase: 'files', title: 'Looking through the files', now: 'Reading the changes' });
     expect(plainCall({ name: 'Edit', input: { file_path: '/Users/ben/r/snippets/cart.liquid' } }).now).toBe('Editing "cart.liquid"');
     expect(plainCall({ name: 'mcp__claude_ai_Gmail__search_threads', input: {} })).toMatchObject({ phase: 'app:Checking your mail', title: 'Checking your mail', now: 'Using Gmail', connector: { id: 'gmail', name: 'Gmail' } });
     expect(plainCall({ name: 'mcp__claude_ai_Google_Calendar__create_event', input: {} }).now).toBe('Using Google Calendar');
@@ -296,6 +298,7 @@ describe('plain words', () => {
     expect(plainCall({ name: 'mcp__omni-browser__browser_navigate', input: {} }).connector).toBeUndefined();
     expect(plainCall({ name: 'mcp__omni-browser__browser_navigate', input: { url: 'https://www.volero.com/cart' } })).toMatchObject({ title: 'Checking the website', now: 'Opening volero.com' });
     expect(plainCall({ name: 'mcp__omni-render__html_render', input: { title: 'Price table' } }).now).toBe('Building "Price table"');
+    expect(plainCall({ name: 'mcp__omni-team__message_members', input: { to: ['designer'], message: 'Draw it' } })).toEqual({ phase: 'omni', title: 'Checking on the work', now: 'Giving the members their parts' });
     expect(plainCall({ name: 'mcp__acme_crm__lookup', input: {} })).toMatchObject({ title: 'Using Acme crm', now: 'Using Acme crm', connector: { id: 'mcp:acme_crm', mark: { type: 'generic' } } });
     expect(plainCall({ name: 'mcp__0b5e2a40-1111-4222-8333-944455556666__run', input: {} }).title).toBe('Using a connected app');
     expect(plainCall({ name: 'mcp__omni__delegate', input: { role: 'researcher' } }).now).toBe('Handing it to Researcher');

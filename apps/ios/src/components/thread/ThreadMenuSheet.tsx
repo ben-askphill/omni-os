@@ -27,6 +27,7 @@ const ICON: Record<ThreadActionIcon, IconName> = {
   branch: 'fork',
   message: 'message',
   grok: 'sparkle',
+  user: 'user',
 };
 
 type MenuPage = 'menu' | 'move' | 'machine' | 'takeover';
@@ -49,12 +50,14 @@ interface ThreadMenuSheetProps {
   onChanges?: () => void;
   /** Opens the thread's pull request. Without it the menu has no Pull request row. */
   onPR?: () => void;
+  /** Opens the member sheet's agent list. Without it the menu has no Add an agent row. */
+  onAddAgent?: () => void;
   /** The page the sheet opens on: the machine name in the open thread's title opens Runs on directly. */
   openOn?: 'menu' | 'machine';
 }
 
 /** The thread menu as a sheet: pin, done, rename, move to folder and archive, from the header and from a list row. */
-export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, onFork, onActions, onChanges, onPR, openOn = 'menu' }: ThreadMenuSheetProps) {
+export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, onFork, onActions, onChanges, onPR, onAddAgent, openOn = 'menu' }: ThreadMenuSheetProps) {
   const { colors } = useOmniTheme();
   const run = useThreadActions();
   const [asked, setPage] = useState<MenuPage>(openOn);
@@ -76,7 +79,7 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
   // The machine pages fall back to the menu when the picker goes away, as when a handoff starts from the other machine.
   const page = (asked === 'machine' || asked === 'takeover') && !picker ? 'menu' : asked;
   const items = useMemo(() => (target ? organizeItems(target) : []), [target]);
-  const extras = useMemo(() => (target ? menuExtras(target, picker, !!onFork, !!onActions) : []), [target, picker, onFork, onActions]);
+  const extras = useMemo(() => (target ? menuExtras(target, picker, !!onFork, !!onActions, !!onAddAgent) : []), [target, picker, onFork, onActions, onAddAgent]);
   const links = useMemo(() => menuLinks(!!onChanges, !!onPR), [onChanges, onPR]);
   const choices = useMemo(() => folderChoices(folders, target?.folderId ?? null), [folders, target?.folderId]);
 
@@ -194,10 +197,10 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
                 key={extra.id}
                 label={extra.label}
                 sub={extra.sub}
-                leading={<Icon name={extra.id === 'machine' ? 'machine' : extra.id === 'actions' ? 'play' : ICON.branch} size={18} color={colors.fg2} />}
-                opens={extra.id === 'machine'}
+                leading={<Icon name={extra.id === 'machine' ? 'machine' : extra.id === 'actions' ? 'play' : extra.id === 'add-agent' ? ICON.user : ICON.branch} size={18} color={colors.fg2} />}
+                opens={extra.id === 'machine' || extra.id === 'add-agent'}
                 disabled={pending || !!extra.off}
-                onPress={() => (extra.id === 'machine' ? openMachine() : extra.id === 'actions' ? onActions?.() : onFork?.())}
+                onPress={() => (extra.id === 'machine' ? openMachine() : extra.id === 'actions' ? onActions?.() : extra.id === 'add-agent' ? onAddAgent?.() : onFork?.())}
                 last={i === extras.length - 1}
               />
             ))}

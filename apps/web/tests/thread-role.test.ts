@@ -44,12 +44,13 @@ const details = (t: Thread) =>
 const rows = (html: string) => [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map((m) => m[1]);
 
 describe('the crew role of a thread', () => {
-  it('shows in the header by its display name, with its mark', () => {
+  it('shows in the header by its display name, with its avatar', () => {
     const html = header(thread({ role: 'store-ops' }));
     expect(html).toContain('data-role="store-ops"');
     expect(html).toContain('>Store ops<');
     expect(html).toContain('title="Runs as Store ops"');
-    expect(html).toContain('aria-label="Store ops"');
+    // A built-in's mark, as its avatar: the chip's text names it.
+    expect(html).toMatch(/title="Runs as Store ops"[^>]*><span aria-hidden="true"[^>]*><svg/);
   });
 
   it('has an Agent row in Details, right under Channel', () => {

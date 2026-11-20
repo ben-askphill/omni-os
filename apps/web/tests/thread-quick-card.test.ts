@@ -77,7 +77,7 @@ describe('the thread quick card', () => {
     const mine = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ owner: null, role: 'builder', harness: 'claude-code' }) }));
     expect(mine).toContain('>Owner<');
     expect(mine).toMatch(/data-owner="">.*?>You</);
-    expect(mine).toMatch(/>Agent<\/span><span class="min-w-0 truncate ">Builder</);
+    expect(mine).toMatch(/>Agent<\/span>.*?<svg[^]*?<span class="min-w-0 truncate ">Builder</);
     const theirs = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ owner: 'Maya Jansen', role: null }) }));
     expect(theirs).toMatch(/data-owner="Maya Jansen">.*?>Maya Jansen</);
     expect(theirs).toMatch(/>Agent<\/span><span class="min-w-0 truncate text-fg-3">No agent</);

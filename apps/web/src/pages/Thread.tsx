@@ -1,6 +1,6 @@
 import { turnPhase } from '@omni/shared/status.ts';
 import { useThreadAccount } from '../accounts.ts';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, type HarnessWithRunning } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, SendingMessages, Transcript } from '../components/Transcript.tsx';
@@ -51,6 +51,7 @@ import { FindTargetCtx } from '../transcript/find-target.ts';
 import { scrollBehavior } from '../motion.ts';
 import { tailId } from '@omni/shared/history.ts';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 
 export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: string; artifact?: number; at?: number; view?: ThreadView }) {
   const { mods, tasks, crew: roles, channel: listedChannel } = useApp();
@@ -171,12 +172,17 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   // A step prompt that never reached the agent (a restart, or a session download that failed): its button says why, and
   // pressing it again resumes that message rather than sending a second copy.
   const parked = useMemo(() => (underway ? null : stepParked(queued, prompts)), [underway, queued, prompts]);
-  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, parked, prompts, applyThread, setQueued, setActionError, pin });
+  // A remote-led thread's Open PR opens it here and then reads the PRs again (ADR 0020).
+  const prsReload = useRef<() => void>(() => {});
+  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, parked, prompts, applyThread, setQueued, setActionError, pin, onOpenedPR: () => prsReload.current() });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
   const [prs, reloadPRs] = useThreadPR(thread, slotBusy);
+  prsReload.current = reloadPRs;
   const watch = usePRWatch(thread?.id, prs);
   const changes = useBranchChanges(thread, slotBusy);
-  const next = prNext(prs?.pr ?? null, !!changes?.files.length, prompts);
+  // A remote-led thread's PR waits for Ben's commit: Omni opens it from what is committed (ADR 0020).
+  const waitsForCommit = !!thread && isRemoteAgentHarness(thread.harness) && !!changes?.uncommitted;
+  const next = prNext(prs?.pr ?? null, !!changes?.files.length && !waitsForCommit, prompts);
   const step = stepOf(sending, prompts) ?? underway;
   const offered = useMemo(() => prOffered(events, !slotBusy && !queued.length, prs?.pr), [events, slotBusy, queued, prs?.pr]);
 
@@ -257,7 +263,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
                     <FindTargetCtx.Provider value={find.target}>
-                      <Transcript threadId={id} code={code} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                      <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} seats={thread.members} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
                     </FindTargetCtx.Provider>
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>
@@ -376,6 +382,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               machine={{ blocked, handoff, takeover, onChanged: handedOff }}
               asking={asking}
               openPR={offered || step === 'open' ? { busy: step === 'open', prompt: prompts.open, run: () => void ask(prompts.open) } : null}
+              // A remote-led thread: Ben commits what its local members changed (ADR 0020, Q64).
+              commit={isRemoteAgentHarness(thread.harness) && !slotBusy && changes?.uncommitted ? { files: changes.uncommitted, onDone: changes.reload } : null}
             />
           </div>
         </div>

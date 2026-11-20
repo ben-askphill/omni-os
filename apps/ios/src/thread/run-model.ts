@@ -2,6 +2,7 @@ import type { HarnessInfo, Thread } from '@omni/client-core';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { pickedModelRun, runModel, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
 import { pickerModels } from '@omni/shared/model-visibility.ts';
+import { localHarnesses } from '@omni/shared/remote-agent.ts';
 
 /** What the run switch reads of a thread: its run, and the run queued to start after the current turn. */
 export type RunThread = Pick<
@@ -43,8 +44,8 @@ export interface RunSheetModel {
 }
 
 /**
- * The model sheet as rows, from `/harnesses` alone: every harness the server reports is listed, so a new one needs no
- * code here. The checked rows are the run the thread shows: the one queued for its next turn, else the one it runs on.
+ * The model sheet as rows, from `/harnesses` alone: every local harness the server reports is listed, so a new one
+ * needs no code here. A remote agent's server (Hermes, a connected one) is the agent's, not a pick (ADR 0020). The checked rows are the run the thread shows: the one queued for its next turn, else the one it runs on.
  */
 export function runSheetModel(thread: RunThread, harnesses: HarnessInfo[]): RunSheetModel {
   const shown = shownRun(thread);
@@ -61,7 +62,7 @@ export function runSheetModel(thread: RunThread, harnesses: HarnessInfo[]): RunS
             selected: shown.effort === value,
           }))
         : [],
-    harnesses: harnesses.map((h) => ({
+    harnesses: localHarnesses(harnesses).map((h) => ({
       id: h.id,
       name: h.name,
       plan: h.plan,

@@ -11,7 +11,8 @@ export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' 
 export type ThreadSetup = 'preparing' | 'failed' | 'signin';
 /** A turn stopped at the harness's usage limit: `limited` until Ben acts, `scheduled` to resume at the reset time. */
 export type ThreadLimit = 'limited' | 'scheduled';
-export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
+/** `member`: the session of an agent seated in a group thread (runner/members.ts), under that thread and listed nowhere. */
+export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team' | 'member';
 export type ThreadWorkspace = 'none' | 'read' | 'worktree';
 
 export interface Thread {
@@ -214,7 +215,7 @@ export const threads = {
   /** A channel's threads, without team members: those are listed under their lead. */
   byChannel: (channelId: string, limit = 200, archived = false) =>
     db
-      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND quick = 0 AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source NOT IN ('team', 'member') AND quick = 0 AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
       .all(channelId, archived ? 1 : 0, limit) as unknown as Thread[],
   /**
    * One page of a channel's threads, newest first, after `after` (the last row of the page before). The clients page
@@ -224,15 +225,16 @@ export const threads = {
     const after = opts.after ?? null;
     return db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND quick = 0 AND archived = ?
+        `SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source NOT IN ('team', 'member') AND quick = 0 AND archived = ?
          AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
       )
       .all(channelId, opts.archived ? 1 : 0, after?.updated_at ?? null, after?.updated_at ?? null, after?.updated_at ?? null, after?.id ?? null, opts.limit) as unknown as Thread[];
   },
   recent: (limit = 50) =>
-    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 AND quick = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 AND quick = 0 AND source != 'member' ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
+  /** The threads delegated from this one. A group thread's member threads are its agents' sessions, not delegations (runner/members.ts). */
   children: (parentId: string) =>
-    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? AND source != 'member' ORDER BY created_at`).all(parentId) as unknown as Thread[],
   /** The threads working on a branch, newest first. Omni names branches per thread, so it is one in practice. */
   withBranch: (branch: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE branch = ? ORDER BY created_at DESC, rowid DESC`).all(branch) as unknown as Thread[],
@@ -321,7 +323,7 @@ export const threads = {
   recentPerChannel: (perChannel = 5) =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC, created_at DESC, id) AS n FROM threads WHERE source != 'team' AND quick = 0 AND archived = 0) WHERE n <= ?`,
+        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC, created_at DESC, id) AS n FROM threads WHERE source NOT IN ('team', 'member') AND quick = 0 AND archived = 0) WHERE n <= ?`,
       )
       .all(perChannel) as unknown as Thread[],
   /** Threads in a folder of their own channel, newest first, without archived ones and team members. */
@@ -329,7 +331,7 @@ export const threads = {
     db
       .prepare(
         `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `t.${c}`).join(', ')} FROM threads t JOIN folders f ON f.id = t.folder_id AND f.channel_id = t.channel_id
-         WHERE t.archived = 0 AND t.source != 'team' AND t.quick = 0 ${channelId ? 'AND t.channel_id = ?' : ''} ORDER BY t.updated_at DESC`,
+         WHERE t.archived = 0 AND t.source NOT IN ('team', 'member') AND t.quick = 0 ${channelId ? 'AND t.channel_id = ?' : ''} ORDER BY t.updated_at DESC`,
       )
       .all(...(channelId ? [channelId] : [])) as unknown as Thread[],
   /** Pinned threads, the latest pin first, without archived ones or those of an archived channel. */
@@ -342,7 +344,8 @@ export const threads = {
       .all() as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
   /**
-   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts), and
+   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts), a
+   * group thread whose member runs counting as running for the threads above it (its own mark comes from its members), and
    * the threads in `agentHosts` (whose own sub-agents still run) with every thread above them. A host whose turn was
    * stopped or failed counts for nothing. An archived thread pins nothing. UNION drops an id met again, so a parent_id
    * cycle ends.
@@ -352,7 +355,9 @@ export const threads = {
       db
         .prepare(
           `WITH RECURSIVE up(id) AS (
-             SELECT parent_id FROM threads WHERE status IN ('running','queued') AND archived = 0 AND parent_id IS NOT NULL
+             SELECT parent_id FROM threads WHERE status IN ('running','queued') AND archived = 0 AND parent_id IS NOT NULL AND source != 'member'
+             UNION SELECT g.parent_id FROM threads m JOIN threads g ON g.id = m.parent_id
+               WHERE m.source = 'member' AND m.status IN ('running','queued') AND m.archived = 0 AND g.archived = 0 AND g.parent_id IS NOT NULL
              UNION SELECT id FROM threads WHERE id IN (SELECT value FROM json_each(?)) AND status NOT IN ('stopped','failed') AND archived = 0
              UNION SELECT t.parent_id FROM threads t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
            SELECT id FROM up`,
@@ -363,7 +368,7 @@ export const threads = {
   runMachine: (id: string) =>
     (db.prepare('SELECT run_machine FROM threads WHERE id = ?').get(id) as { run_machine: string | null } | undefined)?.run_machine ?? null,
   list(filter: { channel?: string; status?: string; limit?: number }) {
-    const where: string[] = ['archived = 0', 'quick = 0'];
+    const where: string[] = ['archived = 0', 'quick = 0', "source != 'member'"];
     const args: (string | number)[] = [];
     if (filter.channel) (where.push('channel_id = ?'), args.push(filter.channel));
     if (filter.status) (where.push('status = ?'), args.push(filter.status));
@@ -379,7 +384,7 @@ export const threads = {
   recentAsks: (days = 7, limit = 50) =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 AND (quick = 1 OR promoted_to IS NOT NULL) AND created_at >= ?
+        `SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 AND source != 'member' AND (quick = 1 OR promoted_to IS NOT NULL) AND created_at >= ?
          ORDER BY created_at DESC LIMIT ?`,
       )
       .all(new Date(Date.now() - days * 86_400_000).toISOString(), limit) as unknown as Thread[],

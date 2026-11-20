@@ -14,7 +14,7 @@ const codex: RunName = { harness: 'codex', model: 'gpt-5.6-sol', effort: '', har
 const CWD = '/data/worktrees/src';
 
 let id = 0;
-const ev = (kind: string, p: unknown): EventRow => ({ id: ++id, thread_id: 'src', kind, payload: JSON.stringify(p), created_at: '' });
+const ev = (kind: string, p: unknown): EventRow => ({ id: ++id, thread_id: 'src', kind, payload: JSON.stringify(p), created_at: '', agent: null });
 const entry = (text: string) => ({ text });
 
 const events = [

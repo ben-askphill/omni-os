@@ -5,6 +5,7 @@ import { glyphLabel, showsCode } from '@omni/shared/display.ts';
 import { useDisplay } from '../display.ts';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
+import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { OpenItemsCard } from '../components/thread/OpenItemsCard.tsx';
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
@@ -31,6 +32,8 @@ import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
 import { MoEmpty, MoHeader, MoRound } from './parts.tsx';
+import { MemberButton, MemberSheet } from './MemberSheet.tsx';
+import { MARK } from '@omni/shared/status.ts';
 import { useShell, useThread } from './shell.tsx';
 import { Pending, Sending } from './ThreadCards.tsx';
 import { MenuSheet } from './ThreadMenuSheet.tsx';
@@ -50,6 +53,8 @@ import { FindBar } from '../components/thread/FindBar.tsx';
 import { useThreadFind } from '../pages/useThreadFind.ts';
 import { FindTargetCtx } from '../transcript/find-target.ts';
 import { tailId } from '@omni/shared/history.ts';
+import { isRemoteAgentHarness, TALKS_ONLY } from '@omni/shared/remote-agent.ts';
+import { CommitSheet } from '../components/thread/CommitButton.tsx';
 
 /** The phone follows no bottom: a find has nothing to let go of. */
 const STAYS = () => {};
@@ -81,6 +86,8 @@ export function ThreadScreen() {
   const display = useDisplay();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
+  const [members, setMembers] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [machineSheet, setMachineSheet] = useState(false);
   const spans = history.history.spans;
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
@@ -138,8 +145,15 @@ export function ThreadScreen() {
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
   const theirs = conductor ? 'the Conductor' : thread.role ? `the ${crewRoleName(thread.role, roles)}` : 'the agent';
 
+  // A remote agent that leads talks only: Ben commits, and Omni opens the pull request itself (ADR 0020).
+  const remoteLead = isRemoteAgentHarness(thread.harness);
   const openPR = async () => {
     try {
+      if (remoteLead) {
+        await api.post<{ url: string }>(`/threads/${encodeURIComponent(thread.id)}/open-pr`, {});
+        shell.toast('Opened the pull request');
+        return;
+      }
       applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: prompts.open }), true);
       shell.toast(`Asked ${theirs} to open a PR`);
     } catch (e) {
@@ -154,19 +168,37 @@ export function ThreadScreen() {
   // The agent just asked whether to open a PR: answering yes sits next to the Machine chip.
   const offered = prOffered(events, !slotBusy && !queued.length, pr?.pr);
   if (code && offered) chips.push(openChip);
+  if (remoteLead && !slotBusy && changes?.uncommitted) chips.push({ label: 'Commit', icon: 'check', onClick: () => setCommitting(true) });
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
   // Outside a code project with the switch off: no PR or change chips.
   if (code && pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
   else if (code && changes?.files.length) {
     chips.push({ label: slotBusy ? 'Changes so far' : 'Review changes', icon: 'diff', diff: [changes.add, changes.del], onClick: () => shell.open(href.threadView(thread.id, 'changes')) });
-    if (!slotBusy && !offered) chips.push(openChip);
+    // A remote-led thread's PR waits for Ben's commit: Omni opens it from what is committed (ADR 0020).
+    if (!slotBusy && !offered && !(remoteLead && changes.uncommitted)) chips.push(openChip);
   }
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
-  const sub = conductor
-    ? `Conductor · ${plural(crew.length, 'crew thread')}`
-    : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)].filter(Boolean).join(' · ');
+  // The agent it runs as, its lead, with its avatar beside its name.
+  const agentName = conductor ? null : crewRoleName(thread.role, roles);
+  const lead = agentName && thread.role ? (roles.find((r) => r.id === thread.role) ?? { id: thread.role, name: agentName }) : null;
+  const sub = conductor ? (
+    `Conductor · ${plural(crew.length, 'crew thread')}`
+  ) : (
+    <>
+      #{ch?.name ?? thread.channel_id}
+      {lead && agentName && (
+        <>
+          {' · '}
+          <AgentAvatar agent={{ ...lead, name: agentName }} size={14} className="inline-grid align-[-2px]" /> {agentName}
+        </>
+      )}
+      {' · '}
+      {/* A remote agent leads talk-only: no harness of Omni's runs it (ADR 0020). */}
+      {remoteLead ? <span data-talks-only>{TALKS_ONLY}</span> : ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)}
+    </>
+  );
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
@@ -174,7 +206,7 @@ export function ThreadScreen() {
   const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
   const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
-  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status, turn };
+  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, agents: roles, ch, changes, pr, now, shell, status, turn };
 
   const openFromCard = (tab: PanelTab) => {
     setQuick(false);
@@ -214,7 +246,9 @@ export function ThreadScreen() {
         }
         right={
           <>
-            <StatusPill mark={pill.mark} label={pill.label} />
+            {/* A group thread shows its agents, a ring on each one that works, and no Working label (ADR 0019). */}
+            {thread.members?.length ? <MemberButton thread={thread} onOpen={() => (setQuick(false), setMembers(true))} /> : null}
+            {!(thread.members?.length && MARK[pill.mark].glyph === 'running') && <StatusPill mark={pill.mark} label={pill.label} />}
             {/* The quick card shows in every channel: Show technical details only changes which rows it lists. */}
             <MoRound
               icon="panel"
@@ -358,6 +392,17 @@ export function ThreadScreen() {
           onFind={find.show}
         />
       )}
+      {members && <MemberSheet thread={thread} onClose={() => setMembers(false)} />}
+      <CommitSheet
+        thread={thread}
+        files={changes?.uncommitted ?? 0}
+        open={committing}
+        onClose={() => setCommitting(false)}
+        onDone={(r) => {
+          changes?.reload();
+          shell.toast(`Committed ${r.files} ${r.files === 1 ? 'file' : 'files'}`);
+        }}
+      />
       {machineSheet && held && (
         <RunOnSheet
           rows={held.rows}

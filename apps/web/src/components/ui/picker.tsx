@@ -21,6 +21,8 @@ export interface PickerOption<T extends string> {
   omni?: boolean;
   /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
   lead?: ReactNode;
+  /** A face of its own in place of the letter avatar, drawn at the size the row asks for (an agent's AgentAvatar). */
+  face?: (size: number) => ReactNode;
   /** Listed but not pickable now, with `sub` saying why (a machine that is offline). */
   disabled?: boolean;
 }
@@ -127,7 +129,9 @@ export function Picker<T extends string>({
             : 'press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45'
         }
       >
-        {current?.lead ? (
+        {current?.face ? (
+          current.face(24)
+        ) : current?.lead ? (
           <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">{current.lead}</span>
         ) : current && current.avatar !== false ? (
           <Avatar name={current.avatar || current.label} icon={current.icon} omni={current.omni} channelIcon={current.channelIcon} avatarBg={current.avatarBg} size={24} />
@@ -206,7 +210,9 @@ export function Picker<T extends string>({
                 onClick={() => pick(o)}
                 className="pik-row disabled:opacity-45"
               >
-                {o.lead ? (
+                {o.face ? (
+                  o.face(28)
+                ) : o.lead ? (
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{o.lead}</span>
                 ) : o.avatar !== false ? (
                   <Avatar name={o.avatar || o.label} icon={o.icon} omni={o.omni} channelIcon={o.channelIcon} avatarBg={o.avatarBg} size={28} />

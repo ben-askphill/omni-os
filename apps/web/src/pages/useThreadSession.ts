@@ -239,8 +239,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setLinks((prev) => linksWith(prev, id, t));
   });
 
-  // Queued or running: the header interrupt and the composer treat both as busy.
-  const slotBusy = thread?.status === 'running' || thread?.status === 'queued';
+  // Queued or running: the header interrupt and the composer treat both as busy. In a group thread, any agent at work
+  // counts: Stop stops every one of them (ADR 0019).
+  const slotBusy = thread?.status === 'running' || thread?.status === 'queued' || !!thread?.members?.some((m) => !m.lead && (m.state === 'working' || m.state === 'needs'));
   // Running only. Queued is waiting for a slot, so the transcript does not show a working turn.
   const turnInProgress = thread?.status === 'running';
   const { interrupting, interrupt, actionError, setActionError } = useInterrupt(id, slotBusy, queued, events);
@@ -267,7 +268,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   // The server's pending rows and the in-flight send drawn in the transcript: the Sending bubbles leave both out.
   const listed = useMemo(() => [...queued, ...sends.map(asPending).filter((p) => !shown.pending.some((q) => q.uuid === p.uuid))], [queued, sends, shown.pending]);
   // The shown rows: once the opening message is drawn, its turn is under way and another sent message steers it.
-  const { init, lastResult, betweenTurns } = useTurnState(shown.events);
+  const { init, lastResult, betweenTurns } = useTurnState(shown.events, thread?.role);
 
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);

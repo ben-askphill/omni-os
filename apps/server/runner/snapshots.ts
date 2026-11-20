@@ -4,17 +4,22 @@
 // Each thread's saves run one after another, so a turn's before snapshot waits for the last turn's after snapshot,
 // and its first message waits for its before snapshot (bounded), so the harness changes nothing first. Every save
 // writes only the row of the turn it was started for, keyed by that turn's id.
+// A group thread (ADR 0019, Q25) saves one checkpoint per message across all its agents: a message that names agents
+// saves the checkout before it is handed to any of them and after the last one finishes (runner/members.ts), and
+// while that checkpoint is open, no agent's turn saves one of its own. A member's session never saves its own.
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.ts';
 import { completions, threads, turnSnapshots } from '../db.ts';
 import { snapshot, snapshotCheckout, turnRef } from '../turns.ts';
-import { isProviderHarness } from '../harness/types.ts';
+import { filesOffMachine } from '../thread-files.ts';
 import { crash, deliver, emitThread, lives, track, type Live } from './state.ts';
 
 /** Each thread's last queued save. */
 const chains = new Map<string, Promise<void>>();
 /** Saves not settled yet, for shutdown to wait on. */
 const pending = new Set<Promise<void>>();
+/** Group threads with a message checkpoint open, and how many: their agents' turns save none of their own. */
+const covering = new Map<string, number>();
 
 /** Run fn after the thread's earlier saves. A failure is fn's to record; this only keeps the chain going. */
 function queue(threadId: string, fn: () => Promise<void>): Promise<void> {
@@ -57,7 +62,8 @@ async function save(threadId: string, turnId: string, side: 'before' | 'after') 
 export function startTurnSnapshot(live: Live) {
   if (live.snap || !config.turnSnapshots) return;
   const t = threads.get(live.threadId);
-  if (!t?.branch || isProviderHarness(t.harness)) return;
+  if (!t?.branch || filesOffMachine(t)) return;
+  if (t.source === 'member' || covering.get(t.id)) return;
   const id = randomUUID();
   live.snapStarted(id);
   turnSnapshots.start(id, t.id, completions.latest(t.id)?.n ?? 0);
@@ -74,6 +80,42 @@ export function startTurnSnapshot(live: Live) {
     release(live);
   });
   live.gateOn(gate);
+}
+
+/**
+ * A message to a group thread's agents (runner/members.ts): record its checkpoint and save the checkout before any
+ * of them changes it, waiting at most as long as a turn's first message would. Its id, for finishMessageSnapshot, or
+ * null when the thread saves no turns.
+ */
+export async function startMessageSnapshot(threadId: string): Promise<string | null> {
+  if (!config.turnSnapshots) return null;
+  const t = threads.get(threadId);
+  if (!t?.branch || filesOffMachine(t)) return null;
+  covering.set(t.id, (covering.get(t.id) ?? 0) + 1);
+  const id = randomUUID();
+  turnSnapshots.start(id, t.id, completions.latest(t.id)?.n ?? 0);
+  emitThread(t.id);
+  const saved = queue(t.id, () => save(t.id, id, 'before'));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([saved, new Promise<void>((done) => (timer = setTimeout(done, config.turnSnapshotWaitMs)))]);
+  clearTimeout(timer);
+  if (!turnSnapshots.get(id)?.before_sha && turnSnapshots.fail(id, 'Saving the checkout before this message took too long, so the agents ran without it.')) emitThread(t.id);
+  return id;
+}
+
+/** Every agent the message named has finished: link the last Result and save the checkout after the message. */
+export function finishMessageSnapshot(threadId: string, id: string | null) {
+  if (!id) return;
+  const left = (covering.get(threadId) ?? 1) - 1;
+  if (left > 0) covering.set(threadId, left);
+  else covering.delete(threadId);
+  const row = turnSnapshots.get(id);
+  if (!row) return;
+  const c = completions.latest(threadId);
+  turnSnapshots.end(id, c && c.n > row.prior_n ? c.uid : null);
+  if (turnSnapshots.get(id)?.state !== 'capturing') return;
+  emitThread(threadId);
+  void queue(threadId, () => save(threadId, id, 'after'));
 }
 
 /** Write the messages a warm process held back while the checkout was saved. */

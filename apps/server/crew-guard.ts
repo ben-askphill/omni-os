@@ -24,10 +24,10 @@ import type { CrewSave } from './crew-store.ts';
 import { threads } from './db.ts';
 import { userName } from './profile.ts';
 
-export type CrewWrite = 'save' | 'reset' | 'duplicate' | 'delete' | 'hide';
+export type CrewWrite = 'save' | 'reset' | 'duplicate' | 'delete' | 'hide' | 'avatar';
 
 /** The writes that stay Ben's: no tool an agent has makes them. A duplicate copies a role's powers with it. */
-const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', delete: 'deletes', hide: 'hides or shows' };
+const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', delete: 'deletes', hide: 'hides or shows', avatar: 'sets the avatar of' };
 
 /** The crew role whose threads may change roles, once Ben agrees. */
 const EDITOR_ROLE = 'conductor';

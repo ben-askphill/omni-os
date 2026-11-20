@@ -21,10 +21,12 @@ import { runnerPorts } from './ports.ts';
 import {
   addEvent,
   browserHolder,
+  endedTurn,
   clearMods,
   deliveryPhase,
   drop,
   emitThread,
+  groupStopping,
   deliveryCaps,
   isShuttingDown,
   lives,
@@ -124,6 +126,7 @@ export function abortStart(live: Live, status: ThreadStatus) {
   applyQueued(live.threadId);
   finishTurnSnapshot(live);
   emitThread(live.threadId);
+  endedTurn(live.threadId, status);
   pump();
 }
 
@@ -144,7 +147,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   settleContext(id);
   // A quick ask is read where it was asked, so it alerts nobody. The task it turns into does. A quiet automation run
   // with nothing to report alerts nobody either (automation-quiet.ts).
-  if (!more && !t?.quick) {
+  if (!more && !t?.quick && t?.source !== 'member') {
     const reply = events.lastRunReply(id, turnFrom);
     if (!(status === 'done' && runnerPorts().reporting.quietRun(id, reply))) notifyEnded(id, status, reply);
   }
@@ -164,6 +167,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   // The agent may have switched to a branch of its own and opened its PR from it.
   void followBranch(id).then((moved) => moved && emitThread(id), () => {});
   armIdle(live);
+  if (!more) endedTurn(id, status);
   pump();
 }
 
@@ -193,6 +197,12 @@ export function fenceStale() {
 }
 
 export function interruptThread(threadId: string) {
+  // A group thread (ADR 0019, Q13): Stop stops every agent in it, each in the session it runs in.
+  for (const stop of groupStopping) stop(threadId, stopOne);
+  return stopOne(threadId);
+}
+
+function stopOne(threadId: string) {
   // A worktree still being prepared has no agent yet: Stop ends the preparation, its setup run included, and a
   // lead's team with it, as for a lead that waits.
   if (stopPreparation(threadId)) {
@@ -215,7 +225,11 @@ export function interruptThread(threadId: string) {
     waiting.splice(w, 1);
     drop(threadId, waitingMsgs.get(threadId) ?? []);
     waitingMsgs.delete(threadId);
-    if (!live?.turn) threads.update(threadId, { status: 'stopped' });
+    if (!live?.turn) {
+      threads.update(threadId, { status: 'stopped' });
+      // Its turn never started, and now never will: what waited on it hears that it is over (runner/members.ts).
+      endedTurn(threadId, 'stopped');
+    }
   }
   // A process already being stopped needs nothing more; what waited for its successor was dropped above.
   if (live?.turn && !live.closing) {

@@ -220,6 +220,8 @@ export function plainCall(c: Pick<ToolCall, 'name' | 'input'>): Plain {
     case 'Glob':
     case 'LS':
       return { phase: 'files', title: FILES, now: 'Finding the right files' };
+    case 'Diff':
+      return { phase: 'files', title: FILES, now: 'Reading the changes' };
     case 'Edit':
     case 'MultiEdit':
     case 'NotebookEdit':
@@ -273,6 +275,8 @@ export function plainCall(c: Pick<ToolCall, 'name' | 'input'>): Plain {
     if (BROWSER_SERVER.test(server)) return { phase: 'browser', title: BROWSER, now: browserNow(tool, i) };
     if (server === 'omni') return omniPlain(tool, i);
     if (/^omni[-_]threads$/.test(server)) return { phase: 'omni', title: OMNI, now: 'Reading the thread you pointed to' };
+    // message_members: a team thread's lead gives its members their parts (apps/server/runner/team.ts).
+    if (/^omni[-_]team$/.test(server)) return { phase: 'omni', title: OMNI, now: 'Giving the members their parts' };
     const app = connectorFor(server);
     if (app) {
       const now = `Using ${app.name === 'Connected app' ? 'a connected app' : app.name}`;

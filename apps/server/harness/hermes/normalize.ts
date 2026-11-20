@@ -5,6 +5,7 @@
 // where the transcript already knows how to render them.
 import type { Record as StreamRecord } from '../../stream.ts';
 import { toolResult } from '../tool-result.ts';
+import { READ_TOOL, readRow } from '../read-tool.ts';
 import type { HermesRun, HermesRuntime, HermesUsage } from './client.ts';
 
 const DISPLAY: Record<string, string> = {
@@ -31,11 +32,13 @@ export interface HermesNormState {
   /** Assistant text already emitted, so a terminal output does not repeat it. */
   emitted: string;
   seq: number;
+  /** Client-side tool calls Omni answers (the worktree read), by call id: their row's id. */
+  calls: Record<string, string>;
 }
 
-export const emptyHermesNorm = (): HermesNormState => ({ open: [], delta: '', emitted: '', seq: 0 });
+export const emptyHermesNorm = (): HermesNormState => ({ open: [], delta: '', emitted: '', seq: 0, calls: {} });
 
-const clone = (s: HermesNormState): HermesNormState => ({ ...s, open: s.open.slice() });
+const clone = (s: HermesNormState): HermesNormState => ({ ...s, open: s.open.slice(), calls: { ...s.calls } });
 
 type Raw = Record<string, unknown>;
 
@@ -234,6 +237,24 @@ export function applyHermesEvent(prev: HermesNormState, raw: unknown): HermesApp
       const errText = typeof evt.error === 'string' ? evt.error : '';
       const text = name === 'tool.failed' ? errText || previewText(evt.preview) : previewText(evt.preview) || errText;
       records.push(toolResult(id, text, isError));
+      break;
+    }
+    case 'tool.requested': {
+      // A client-side tool call (the worktree read): its row now, its result once Omni answers (`tool.answered`).
+      boundary();
+      const callId = str(evt.call_id);
+      if (!callId || state.calls[callId]) break;
+      const id = `hermes-${str(evt.run_id) || 'run'}-call-${callId}`;
+      state.calls[callId] = id;
+      // Omni offers no other client-side tool: one it does not know still gets a row, and the adapter refuses it.
+      const row = str(evt.name) === READ_TOOL ? readRow(evt.arguments) : { name: str(evt.name) || 'tool', input: asObj(evt.arguments) ?? {} };
+      records.push(toolUse(id, row.name, row.input));
+      break;
+    }
+    case 'tool.answered': {
+      // Not on the wire: the adapter's own event once it answered a `tool.requested`.
+      const id = state.calls[str(evt.call_id)];
+      if (id) records.push(toolResult(id, str(evt.output), evt.is_error === true));
       break;
     }
     case 'subagent.start': {

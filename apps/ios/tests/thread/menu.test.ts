@@ -36,6 +36,12 @@ describe('menuExtras', () => {
     expect(cloud[0]?.sub).toBe(cloud[0]?.off);
   });
 
+  it('offers Add an agent… where the screen can seat one, from the list every client shares (ADR 0019)', () => {
+    const extras = menuExtras(targetOfThread(thread()), null, false, false, true);
+    expect(extras).toEqual([{ id: 'add-agent', label: 'Add an agent…', sub: 'Seat another agent in this thread. It answers here when you @mention it', off: null }]);
+    expect(menuExtras(targetOfThread(thread({ archived: 1 })), null, false, false, true)).toEqual([]);
+  });
+
   it('adds Actions last, only where the screen can open them', () => {
     const extras = menuExtras(targetOfThread(thread()), holds, true, true);
     expect(extras.map((e) => e.id)).toEqual(['machine', 'fork', 'actions']);

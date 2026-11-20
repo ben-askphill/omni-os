@@ -14,7 +14,7 @@ import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
 import { threadPill } from './thread-state.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
-import { useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
+import { useChannel, useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import type { ThreadPRs } from './panel/PRsTab.tsx';
@@ -23,11 +23,14 @@ import { CAPTION, CARD_PAD, DIVIDER, ROW } from './panel/inset.ts';
 import { NO_CREW_ROLE } from '@omni/shared/thread-owner.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { OwnerField } from './OwnerField.tsx';
+import { MembersLine } from './Members.tsx';
+import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { markLabel, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../../display.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 import { runElapsed } from '@omni/shared/ran-on.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { isRemoteAgentHarness, remoteFiles, remoteLedCheckout, remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 
 function QuickRow({
   icon,
@@ -138,7 +141,10 @@ export function ThreadQuickCard({
   className?: string;
 }) {
   const cloud = thread.harness === 'cursor-cloud';
-  const remote = isRemoteHarnessId(thread.harness);
+  // A remote agent leads (ADR 0020): its rows match a local thread's, its checkout's folder and branch filled in from
+  // the start (Q31), and the ones that do not apply to it, its model, empty (Q57).
+  const remoteLead = isRemoteAgentHarness(thread.harness) && !!thread.role;
+  const remote = isRemoteHarnessId(thread.harness) && !remoteLedCheckout(thread);
   const cloudUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const model = thread.model || init?.model;
   const now = useNow(60_000);
@@ -154,6 +160,10 @@ export function ThreadQuickCard({
   const crew = useCrewRoles();
   // Who it is for and who does it, as separate rows (thread-owner.ts); the harness has its own row below.
   const agent = crewRoleName(thread.role, crew);
+  const look = useAgent(thread.role);
+  // A group thread (ADR 0019): the thread's own agent leads, and the Members row names the others.
+  const group = (thread.members ?? []).some((m) => !m.lead);
+  const ch = useChannel(thread.channel_id);
 
   return (
     <section
@@ -185,15 +195,36 @@ export function ThreadQuickCard({
         <OwnerField thread={thread} className="flex-1" />
       </QuickRow>
       <QuickRow icon="delegate">
-        <span className="shrink-0 text-fg-3">Agent</span>
+        <span className="shrink-0 text-fg-3">{group ? 'Lead' : 'Agent'}</span>
+        {look && agent && <AgentAvatar agent={{ ...look, name: agent }} size={18} />}
         <span className={`min-w-0 truncate ${agent ? '' : 'text-fg-3'}`}>{agent ?? NO_CREW_ROLE}</span>
       </QuickRow>
-      <QuickRow icon="info" label={term('harnessAndModel', technical)}>
-        <span className="shrink-0 whitespace-nowrap">
-          <HarnessMark harness={thread.harness} withLabel />
-        </span>
-        {!technical ? null : model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
-      </QuickRow>
+      {group && (
+        <QuickRow icon="user">
+          <span className="shrink-0 text-fg-3">Members</span>
+          <MembersLine thread={thread} />
+        </QuickRow>
+      )}
+      {remoteLead ? (
+        <>
+          <QuickRow icon="info" label={term('harnessAndModel', technical)}>
+            <span className="shrink-0 text-fg-3">{technical ? 'Model' : 'Runs on'}</span>
+          </QuickRow>
+          <QuickRow icon="lock" label="Files">
+            <span className="shrink-0 text-fg-3">Files</span>
+            <span className="min-w-0 truncate" data-files-row>
+              {remoteFiles(remoteReadsOpen(ch))}
+            </span>
+          </QuickRow>
+        </>
+      ) : (
+        <QuickRow icon="info" label={term('harnessAndModel', technical)}>
+          <span className="shrink-0 whitespace-nowrap">
+            <HarnessMark harness={thread.harness} withLabel />
+          </span>
+          {!technical ? null : model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
+        </QuickRow>
+      )}
       {technical && ran && (
         <QuickRow icon="user">
           <span className="min-w-0 truncate" title={`${harnessLabel(ran.harness)} ran as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>
@@ -375,7 +406,7 @@ function LineageMark({ t }: { t: Thread }) {
     <span className="relative grid size-5 shrink-0 place-items-center text-fg-3">
       <HarnessLogo harness={t.harness ?? 'claude-code'} size={15} title={harnessLabel(t.harness ?? 'claude-code')} />
       <span className="absolute -right-0.5 -bottom-0.5 grid place-items-center rounded-full bg-surface p-px">
-        <ThreadDot t={t} size={6} />
+        <ThreadDot t={t} size={6} faces={false} />
       </span>
     </span>
   );

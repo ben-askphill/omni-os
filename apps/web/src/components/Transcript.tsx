@@ -15,20 +15,29 @@ import { PRWakeList } from './thread/PRWatch.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
-import { COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, useCopy } from './ui.tsx';
+import { Avatar, COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, useCopy } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
+import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
+import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
+import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
+import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
+import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
+import { OmniMark } from './brand.tsx';
+import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
-import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../message-context/agent-mention.tsx';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
@@ -39,6 +48,9 @@ import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 import { AgentRow, ConnectorRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
 import { connectorGroups } from '@omni/shared/connectors.ts';
 import { StepsCard } from './thread/StepsCard.tsx';
+import { LanesBlock, type LaneItems } from './thread/Lanes.tsx';
+import { CollisionFlag } from './thread/Collision.tsx';
+import { laneFold, lanesEnded, type LaneFolded } from '@omni/shared/lanes.ts';
 import { Attachments } from './thread/Attachments.tsx';
 import { QueuedMessages, SendingMessages } from './thread/PendingMessages.tsx';
 
@@ -77,6 +89,7 @@ const SOURCE_LABEL: Record<string, string> = {
   import: 'Imported',
   limit: 'After the usage limit',
   'pr-watch': 'PR watch',
+  omni: 'From Omni',
 };
 
 
@@ -120,7 +133,7 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
  * Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief).
  * `lazy`: its images wait until they near the screen, as older rows do; the newest rows load them at once.
  */
-function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean }) {
+function UserBubble({ p, at, threadId, event, clipped, fold, lazy, from }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean; from?: string }) {
   const [more, setMore] = useState(false);
   // The find bar's match is in this message: a long one shows all of it.
   const found = useFindOpens((t) => t === event, () => setMore(true));
@@ -132,8 +145,14 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
   const cut = long && !more && !found;
   const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
-  const label = p.source ? SOURCE_LABEL[p.source] : undefined;
+  const { crew } = useApp();
+  // A team lead's message to its members (slice 6) names who sent it and who it went to.
+  const lead = leadMessage(p, from, (a) => crew.find((r) => r.id === a)?.name ?? a);
+  const label = lead?.from ?? (p.source ? SOURCE_LABEL[p.source] : undefined);
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
+  const sent = useMemo(() => sentContext(text, p.context), [text, p.context]);
+  // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
+  const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
   const body = (
     <>
       {pieces.map(({ text: t, hit }, i) =>
@@ -165,10 +184,11 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
             <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
+        <SentTo agents={to} />
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
-      <ContextChips records={chipRecords(text, p.context)} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
+      <ContextChips records={sent.chips} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
           data-find-event={event}
@@ -239,6 +259,24 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
         <div className="h-px flex-1 bg-line" />
       </div>
       {note && <div className="mt-1 px-6 font-normal">{note}</div>}
+    </div>
+  );
+}
+
+/**
+ * An agent joined or left a group thread (ADR 0019), or Ben committed a remote-led thread's changes (ADR 0020): a
+ * quiet line, with the agent's avatar or a commit mark.
+ */
+export function MemberLine({ p }: { p: MemberP }) {
+  const look = useAgent(p.agent || null) ?? { id: p.agent, name: p.name };
+  return (
+    <div data-member-line={p.event} className="flex items-center gap-3 py-1 text-[12px] font-medium text-fg-3">
+      <div className="h-px flex-1 bg-line" />
+      <span className="inline-flex min-w-0 items-center gap-1.5" title={p.commit?.sha ? p.commit.sha.slice(0, 12) : undefined}>
+        {p.event === 'committed' ? <Icon name="check" size={13} className="shrink-0" /> : <AgentAvatar agent={{ ...look, name: p.name }} size={16} />}
+        <span className="min-w-0 break-words">{memberLine(p)}</span>
+      </span>
+      <div className="h-px flex-1 bg-line" />
     </div>
   );
 }
@@ -333,6 +371,8 @@ interface ItemRowProps {
   onCard?: boolean;
   /** Not one of the newest rows: it skips rendering while out of view (`.tx-row`). */
   defer?: boolean;
+  /** An agent's reply in a thread with an agent: it sits in under its author line (REPLY_INDENT). */
+  indent?: boolean;
 }
 
 /**
@@ -341,11 +381,11 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer, indent }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
-          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} lazy={defer} />;
+          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} lazy={defer} from={it.agent} />;
           return team ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
         }
         case 'text':
@@ -402,6 +442,10 @@ const ItemRow = memo(
           return <SwitchLine key={it.key} it={it} running={running} />;
         case 'question':
           return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+        case 'member':
+          return <MemberLine key={it.key} p={it.p} />;
+        case 'collision':
+          return <CollisionFlag key={it.key} c={it.c} threadId={threadId} />;
         case 'ask':
           return <AskItem key={it.key} p={it.p} byId={byId} reports={reports} answer={answers?.[it.p.thread_id]} />;
         default:
@@ -411,7 +455,7 @@ const ItemRow = memo(
     const shown = Array.isArray(body) ? body.length > 0 : !!body;
     // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
     return shown ? (
-      <div data-key={it.key} className={defer ? 'tx-row space-y-4' : 'space-y-4'}>
+      <div data-key={it.key} className={`${defer ? 'tx-row ' : ''}space-y-4${indent ? ` ${REPLY_INDENT}` : ''}`}>
         {body}
       </div>
     ) : null;
@@ -439,8 +483,22 @@ export const Transcript = memo(function Transcript({
   limit = null,
   elsewhere = false,
   code = true,
+  lead = null,
+  harness,
+  model,
+  channelId,
+  seats,
 }: {
   threadId: string;
+  /** The thread's channel, which a remote agent's lock line names and links (ADR 0020). */
+  channelId?: string;
+  /** The agent the thread runs as: its replies carry its author line, and rows from before Omni recorded one read as its. */
+  lead?: string | null;
+  /** The thread's run now, for the author line's harness and model on replies after its last switch. */
+  harness?: string;
+  model?: string | null;
+  /** The thread's seated agents (`thread.members`): a member's author line names its own run, not the lead's. */
+  seats?: readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model'>[];
   /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
   code?: boolean;
   /** Every row held, anchors included. */
@@ -468,21 +526,63 @@ export const Transcript = memo(function Transcript({
   const spans = history?.history.spans;
   // The last fold's items, whose unchanged ones the next fold keeps (`keepSame`).
   const held = useRef<Item[]>([]);
-  const items = useMemo(() => {
+  const all = useMemo(() => {
     held.current = keepSame(held.current, buildItems(events, spans).items);
     return held.current;
   }, [events, spans]);
+  // A message several agents answered gathers their replies into lanes (ADR 0019, @omni/shared/lanes.ts). `items` is
+  // the flow outside the lanes, which the author lines and the turns' steps read; each lane folds its own.
+  const flow = useMemo<LaneFolded[]>(() => laneFold(all, { lead, cwd }), [all, lead, cwd]);
+  const items = useMemo(() => (flow.some((x) => x.type === 'lanes') ? flow.filter((x): x is Item => x.type !== 'lanes') : all), [flow, all]);
+  // The turns' boundaries: lanes whose agents have all finished end their turn as a result does.
+  const turnItems = useMemo(
+    () => (flow.some((x) => x.type === 'lanes') ? flow.flatMap((x): Item[] => (x.type !== 'lanes' ? [x] : lanesEnded(x) ? [{ type: 'result', key: x.key + 0.5, p: { ok: true, subtype: 'success', turns: 1 } }] : [])) : all),
+    [flow, all],
+  );
+  // The lanes are still running: they show their own steps and latest line, not the transcript's live ones.
+  const lanesLive = useMemo(() => {
+    const at = flow.findLast((x) => x.type !== 'mod' && x.type !== 'collision');
+    return at?.type === 'lanes' && !lanesEnded(at);
+  }, [flow]);
   const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
   // The first item is the thread's first message only when the start is held.
   const fromStart = !spans || atStart({ spans });
-  const pages = useMemo(() => publishedByGroup(items), [items]);
-  const answers = useMemo(() => shownAnswers(items), [items]);
+  const pages = useMemo(() => publishedByGroup(all), [all]);
+  const answers = useMemo(() => shownAnswers(all), [all]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
   const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
   const since = useMemo(() => (running ? turnStart(events) : null), [events, running]);
   const phase = useMemo(() => (running ? turnPhase(events) : 'working'), [events, running]);
+
+  // Who wrote each run of replies: an author line over its first item (ADR 0019).
+  const heads = useMemo(() => replyHeads(items, lead), [items, lead]);
+  // The run each head's reply came from: before the first switch, the run it moved from; after one, the run it moved to.
+  const run = useMemo<ReplyRun | null>(() => (harness ? { harness, model } : null), [harness, model]);
+  const runs = useMemo(() => {
+    const out = new Map<number, ReplyRun | null>();
+    if (!heads.size) return out;
+    const first = items.find((it): it is SwitchItem => it.type === 'switch');
+    let now: ReplyRun | null = first ? { harness: first.p.from.harness, model: first.p.from.modelLabel } : run;
+    for (const it of items) {
+      if (it.type === 'switch') now = { harness: it.p.to.harness, model: it.p.to.modelLabel };
+      if (heads.has(it.key)) out.set(it.key, seatRun(seats, heads.get(it.key)) ?? now);
+    }
+    return out;
+  }, [items, heads, run, seats]);
+  const leadLook = useAgent(lead);
+  const { crew: agents, channel } = useApp();
+  // Where each run of a remote agent's replies ends: a lock line, since it could not read the thread's files. A channel
+  // open to remote agents lets them read, so it draws none.
+  const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
+  const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
+  // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
+  const conductorLook = channel(CONDUCTOR_CHANNEL);
+  const faceOf = (look: AgentLook) =>
+    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon ? (
+      conductorLook && hasOwnLook(conductorLook) ? <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} /> : <OmniMark size={24} />
+    ) : undefined;
 
   // Mod log lines are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
@@ -492,7 +592,7 @@ export const Transcript = memo(function Transcript({
 
   // Each turn's steps: a finished turn's fold onto its first group of calls, the running one's sit under the transcript.
   const { folded, liveSteps } = useMemo(() => {
-    const turns = turnsOf(items);
+    const turns = turnsOf(turnItems);
     const folded = new Map<number, StepsView>();
     let liveSteps: StepsView | null = null;
     turns.forEach((turn, k) => {
@@ -505,7 +605,47 @@ export const Transcript = memo(function Transcript({
       }
     });
     return { folded, liveSteps: liveSteps as StepsView | null };
-  }, [items, running, asking, latestStatus]);
+  }, [turnItems, running, asking, latestStatus]);
+
+  // A turn that runs with no reply of the lead's open yet (Ben just wrote): its live steps and thinking line get a head.
+  const liveHead = running && !!leadLook && (() => {
+    const at = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'result');
+    const it = items[at];
+    return !it || !isReply(it) || (it.agent ?? lead) !== lead;
+  })();
+  const author = (key: number) => {
+    const id = heads.get(key);
+    if (!id) return null;
+    const it = items.find((x) => x.key === key);
+    const look = agents.find((a) => a.id === id) ?? (id === lead ? leadLook : null) ?? { id, name: id };
+    return (
+      <div key={`h${key}`} className="mb-2">
+        <AuthorLine agent={look} at={it && isReply(it) ? replyAt(it) : null} run={runs.get(key)} face={faceOf(look)} />
+      </div>
+    );
+  };
+
+  // One lane's rows, drawn as the transcript draws them, with its steps on its first calls.
+  const laneItems: LaneItems = (its, steps) => {
+    if (!its.length) return steps ? <StepsCard key="lane-steps" v={steps} cwd={cwd} byId={byId} /> : null;
+    const first = its.find((x) => x.type === 'tools')?.key;
+    return its.map((it) => (
+      <ItemRow
+        key={it.key}
+        it={it}
+        threadId={threadId}
+        cwd={cwd}
+        running={running}
+        reports={reports}
+        byId={byId}
+        artifacts={artifacts}
+        pages={pages.get(it.key)}
+        steps={steps && it.key === first ? steps : undefined}
+        code={it.type === 'result' ? code : undefined}
+        answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
+      />
+    ));
+  };
 
   const edgeRow = (key: number) => {
     const edge = edges?.get(key);
@@ -517,8 +657,9 @@ export const Transcript = memo(function Transcript({
       <TaskCtx.Provider value={tasks}>
         <div className="space-y-4">
           {!fromStart && team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null}
-          {items.flatMap((it, idx) => [
+          {flow.flatMap((it, idx) => it.type === 'lanes' ? [<LanesBlock key={`lanes${it.key}`} block={it} threadId={threadId} render={laneItems} />] : [
             edgeRow(it.key),
+            author(it.key),
             <ItemRow
               key={it.key}
               it={it}
@@ -536,12 +677,27 @@ export const Transcript = memo(function Transcript({
               code={it.type === 'result' ? code : undefined}
               answers={it.type === 'tools' ? answersFor(it.calls, answers) : it.type === 'ask' && answers.has(it.p.thread_id) ? { [it.p.thread_id]: answers.get(it.p.thread_id)! } : undefined}
               onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
-              defer={defers(idx, items.length, LIVE_ROWS)}
+              defer={defers(idx, flow.length, LIVE_ROWS)}
+              indent={!!lead && isReply(it)}
             />,
+            tails.has(it.key) && channelId ? <RemoteLockLine key={`lock${it.key}`} channelId={channelId} className={REPLY_INDENT} /> : null,
           ])}
           {edgeRow(-1)}
-          {liveSteps && <StepsCard key="live-steps" v={liveSteps} cwd={cwd} byId={byId} />}
-          {running && !asking && <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />}
+          {!lanesLive && liveHead && leadLook && (liveSteps || !asking) && (
+            <div key="live-head" className="mb-2">
+              <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} />
+            </div>
+          )}
+          {!lanesLive && liveSteps && (
+            <div className={lead ? REPLY_INDENT : undefined}>
+              <StepsCard key="live-steps" v={liveSteps} cwd={cwd} byId={byId} />
+            </div>
+          )}
+          {running && !asking && !lanesLive && (
+            <div className={lead ? REPLY_INDENT : undefined}>
+              <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />
+            </div>
+          )}
         </div>
       </TaskCtx.Provider>
     </HistoryCtx.Provider>

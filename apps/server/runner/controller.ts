@@ -22,6 +22,8 @@ export interface ControllerThread {
   harness: string;
   model?: string | null;
   effort?: string;
+  /** The agent it runs as. */
+  role?: string | null;
 }
 
 export class ThreadController {
@@ -34,6 +36,8 @@ export class ThreadController {
   readonly harness: string;
   readonly model: string;
   readonly effort: string;
+  /** The agent this process runs as, by id: the author of the rows it writes. Null for a thread with no agent. */
+  readonly agent: string | null;
   /** A turn is in progress. Holds a concurrency slot. */
   turn = true;
   /** The CLI itself is inside a turn: between its init and its result. False in the gap between two queued turns. */
@@ -94,6 +98,7 @@ export class ThreadController {
     this.harness = thread.harness;
     this.model = thread.model ?? '';
     this.effort = thread.effort ?? '';
+    this.agent = thread.role ?? null;
     this.inflight = [first];
     let done = () => {};
     this.exited = new Promise<void>((r) => (done = r));

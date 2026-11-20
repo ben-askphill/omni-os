@@ -1,13 +1,16 @@
 import type { ComponentProps } from 'react';
 import type { Channel, ModStatus, Thread } from '../../api.ts';
 import { headerShowsRole } from '@omni/shared/crew-role.ts';
+import { isRemoteAgentHarness, TALKS_ONLY } from '@omni/shared/remote-agent.ts';
 import { ChannelStack } from '../ChannelStack.tsx';
 import { ContinueCrumbs } from '../ContinueLinks.tsx';
-import { CrewMark, harnessLabel, isCrewRole } from '../brand.tsx';
+import { harnessLabel } from '../brand.tsx';
+import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { threadAccountLabel, type ThreadAccount } from '@omni/shared/harness-accounts.ts';
 import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
 import { HeaderActions } from './HeaderActions.tsx';
+import { MemberAvatars } from './Members.tsx';
 
 /** The status lines the thread's mods pinned with $.ui.status, one per plugin, while its process runs. */
 function ModStatusLines({ lines }: { lines: ModStatus[] }) {
@@ -24,11 +27,12 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
-/** The crew role the thread runs as, beside the crumbs: its mark when it has one, and its name. */
+/** The agent the thread runs as, its lead, beside the crumbs: its avatar and its name. */
 function RoleChip({ role, name }: { role: string; name: string }) {
+  const look = useAgent(role);
   return (
     <Chip className="ml-1 gap-1 font-normal" title={`Runs as ${name}`}>
-      {isCrewRole(role) && <CrewMark role={role} size={12} className="text-fg-3" />}
+      {look && <AgentAvatar agent={{ ...look, name }} size={14} />}
       <span data-role={role}>{name}</span>
     </Chip>
   );
@@ -73,6 +77,7 @@ export function ThreadHeader({
   /** The account its harness last ran as (useThreadAccount). */
   account?: ThreadAccount | null;
 }) {
+  const remoteLead = isRemoteAgentHarness(thread.harness) && !!thread.role;
   return (
     <div className="@container flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
       <span className="hidden sm:block @max-3xl:hidden">
@@ -91,7 +96,13 @@ export function ThreadHeader({
               </a>
             </>
           )}
-          {roleName && headerShowsRole(thread) && <RoleChip role={thread.role!} name={roleName} />}
+          {roleName && (headerShowsRole(thread) || remoteLead) && <RoleChip role={thread.role!} name={roleName} />}
+          {/* A remote agent leads talk-only; a local member seated in it changes files (ADR 0020). */}
+          {remoteLead && (
+            <span className="shrink-0" data-talks-only>
+              · {TALKS_ONLY}
+            </span>
+          )}
           {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3">{thread.task_id}</span>}
           <AccountChip ran={account} />
           <ContinueCrumbs links={links} />
@@ -102,6 +113,7 @@ export function ThreadHeader({
         {modLines.length > 0 && <ModStatusLines lines={modLines} />}
       </div>
       <ChannelStack threads={delegated} own={thread.channel_id} to={href.threadView(thread.id, 'details')} className="mr-1" />
+      <MemberAvatars thread={thread} />
       <HeaderActions {...actions} />
     </div>
   );

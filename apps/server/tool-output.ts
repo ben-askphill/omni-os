@@ -9,11 +9,11 @@ import { toolOutput, type StoredHead } from './db/repos/tool-output.ts';
 const points = (s: string) => Array.from(s);
 
 /** The row as transport carries it. The text becomes `head`, flagged `truncated`, and `output` says what was cut. */
-function build(row: Pick<EventRow, 'id' | 'thread_id' | 'kind' | 'created_at'>, rest: object, head: string, chars: number, lines: number): EventRow {
+function build(row: Pick<EventRow, 'id' | 'thread_id' | 'kind' | 'created_at' | 'agent'>, rest: object, head: string, chars: number, lines: number): EventRow {
   const exit = exitCodeOf(head);
   const output: OutputMeta = { chars, lines, ...(exit !== undefined && { exit_code: exit }) };
   const payload = JSON.stringify({ ...rest, text: head, truncated: true, output });
-  return { id: row.id, thread_id: row.thread_id, kind: row.kind, payload, created_at: row.created_at };
+  return { id: row.id, thread_id: row.thread_id, kind: row.kind, payload, created_at: row.created_at, agent: row.agent };
 }
 
 /** A result a client reads as data (`wholeResult`): one indexed read of its call, made only for a result over the preview. */
@@ -56,7 +56,7 @@ export function compactStored(id: number): EventRow | null {
     return null;
   }
   if (readAsData(s.thread_id, (rest as { tool_use_id?: unknown }).tool_use_id)) return null;
-  return build({ id: s.id, thread_id: s.thread_id, kind: 'tool_result', created_at: s.created_at }, rest, s.head, s.chars, s.breaks + 1);
+  return build({ id: s.id, thread_id: s.thread_id, kind: 'tool_result', created_at: s.created_at, agent: s.agent }, rest, s.head, s.chars, s.breaks + 1);
 }
 
 /**

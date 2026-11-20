@@ -15,7 +15,8 @@ import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { assignments, channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
 import { holderOf, remoteHolder } from './ownership.ts';
-import { HARNESS_META, isHarnessId, isProviderHarness, type HarnessId } from './harness/types.ts';
+import { HARNESS_META, isHarnessId } from './harness/types.ts';
+import { offMachineHarness } from './thread-files.ts';
 import { needsWorktree, plannedWorktree } from './sandbox.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
 import { handoffView, inFlight, moving, offerOf, offers, phaseOf, replyOf, requestOf, requests, writeOffer, writeReply, writeRequest } from './handoff/records.ts';
@@ -23,6 +24,7 @@ import { inOwnWorktree, packWorktree, unpackWorktree, type WorktreeBundle } from
 import { releaseForHandoff, runsHere, saveOwn, wake, wakePrepared, type Msg } from './runner.ts';
 import { failSetup, setUpThread, START_REQUEST } from './runner/setup.ts';
 import { drop } from './runner/state.ts';
+import { busyAgents, sessionThreads } from './runner/members.ts';
 import { computerName, deviceName, deviceRecord, ownName } from './sync/devices.ts';
 import { receiveUploads, sessionOnThisMac, uploadNow, type UploadRef } from './sync/files.ts';
 import type { Attachment } from './uploads.ts';
@@ -79,6 +81,10 @@ function refusal(t: Thread, where: string): string | null {
   if (threads.children(t.id).some(busy)) return `Threads this one delegated are still running on ${where}. Try again once they finish.`;
   // Only the Mac that ran the turn resumes a limit stop, so the resume would run there, not where the thread went.
   if (t.limit_state) return `This thread is waiting on a usage limit on ${where}. Resume it first.`;
+  // A group thread moves with every agent's session at once, so only once all of them are idle (Q14).
+  const members = busyAgents(t.id);
+  if (members) return members;
+  if (t.source === 'member') return 'This is an agent’s session in a group thread. Hand off the thread it is seated in.';
   return null;
 }
 
@@ -271,8 +277,12 @@ async function giveAway(offer: HandoffOffer, worker: SyncWorker) {
     const t = threads.get(id)!;
     // Stopped in its first turn: the harness has a session all the same, which the other Mac must resume.
     if (!t.has_run && sessionOnThisMac(t)) threads.update(id, { has_run: 1, updated_at: t.updated_at });
+    // Every agent seated in it goes along: each member's warm session closes here and its files go up with the thread's.
+    const memberSessions = sessionThreads(id).filter((s) => s !== id);
+    for (const s of memberSessions) await releaseForHandoff(s);
     advance(b, { state: 'preparing', step: 'uploading' });
     await uploadNow(id);
+    for (const s of memberSessions) await uploadNow(s);
     let bundle: WorktreeBundle | null = null;
     let left: string | null = null;
     if (inOwnWorktree(t)) {
@@ -324,7 +334,7 @@ function restoreFresh(offer: Offered) {
     if (row) messageRequests.park(row.id);
   });
   const channel = channels.get(t.channel_id);
-  const worktree = !!t.branch && !!channel && needsWorktree(channel, { remote: isProviderHarness(t.harness as HarnessId) });
+  const worktree = !!t.branch && !!channel && needsWorktree(channel, { remote: offMachineHarness(t.harness) });
   if (worktree) failSetup(offer.thread, `${reason} Retry runs it on this machine.`);
   else threads.update(offer.thread, { status: 'stopped', updated_at: t.updated_at });
   publishFeed({ type: 'needs_you', thread_id: offer.thread });
@@ -448,7 +458,7 @@ async function take(offer: Offered, worker: SyncWorker) {
     }
     // A new thread's worktree is cut here by its setup, which then sends the first prompt. The hub made none.
     const channel = channels.get(t.channel_id);
-    const setUp = !!offer.fresh && !!t.branch && !!channel && needsWorktree(channel, { remote: isProviderHarness(t.harness as HarnessId) });
+    const setUp = !!offer.fresh && !!t.branch && !!channel && needsWorktree(channel, { remote: offMachineHarness(t.harness) });
     // In this machine's own worktrees folder, wherever the hub keeps its data.
     if (setUp) threads.update(id, { cwd: plannedWorktree(id).cwd, updated_at: t.updated_at });
     else await prepareTurn(threads.get(id)!, false, true);
@@ -460,6 +470,14 @@ async function take(offer: Offered, worker: SyncWorker) {
       writeReply(id, { offer: offer.id, at: iso(), state: 'accepted' });
       // This Mac owns the thread from here: the next generation, so a turn the other Mac still has is stale.
       assignments.claim(id);
+      // Its agents' sessions too, in its folder on this machine.
+      const cwd = threads.get(id)!.cwd;
+      for (const s of sessionThreads(id).filter((x) => x !== id)) {
+        const member = threads.get(s);
+        if (!member) continue;
+        assignments.claim(s);
+        if (member.cwd !== cwd) threads.update(s, { cwd, updated_at: member.updated_at });
+      }
       // Between turns there is nothing to continue: the thread waits for Ben's next message here.
       return [
         ...(offer.idle ? [] : [saveOwn(id, `handoff:${offer.id}`, continuation(offer))]),

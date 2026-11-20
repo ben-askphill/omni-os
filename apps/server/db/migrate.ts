@@ -282,9 +282,12 @@ CREATE TABLE IF NOT EXISTS pr_watch_events (
 `;
 
 /** Add a column the current schema needs to a database created by an older version. Safe to run again. */
-export function ensureColumn(table: string, column: string, decl: string) {
+/** Add a column a database made by an older version lacks. True when it was added just now. */
+export function ensureColumn(table: string, column: string, decl: string): boolean {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
-  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  if (cols.some((c) => c.name === column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  return true;
 }
 
 /** A random v4 uuid, per row, in SQL. */
@@ -355,9 +358,17 @@ export function migrate() {
   for (const col of ['prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks']) ensureColumn('channels', col, 'TEXT');
   // 1 keeps the channel's threads out of usage scans (usage-scan/asks.ts): a client channel with data that should not reach a model.
   ensureColumn('channels', 'scan_opt_out', 'INTEGER NOT NULL DEFAULT 0');
-  // 1 never sends an excerpt of the channel's threads to a remote agent with an Ask (ask.ts): a client channel's data
-  // stays on Omni's machines. Asks to local roles still carry one.
+  // 1 sent no excerpt of the channel's threads with an Ask to a remote agent. Ask is gone (group threads slice 2) and
+  // remote_work replaced the switch; the column stays so the migration below can read it.
   ensureColumn('channels', 'remote_excerpts_off', 'INTEGER NOT NULL DEFAULT 0');
+  // Remote agents can see this channel's work (ADR 0020, Q36, Q69): messages and worktree reads. It starts on only in a
+  // channel where an Ask already sent a remote agent an excerpt and that Ben has not closed to them since; every other
+  // channel, and every new one, starts off.
+  if (ensureColumn('channels', 'remote_work', 'INTEGER NOT NULL DEFAULT 0')) {
+    db.exec(`UPDATE channels SET remote_work = 1 WHERE remote_excerpts_off = 0 AND id IN (
+      SELECT t.channel_id FROM events e JOIN threads t ON t.id = e.thread_id
+      WHERE e.kind = 'ask' AND json_valid(e.payload) AND json_extract(e.payload, '$.remote') = 1 AND json_type(e.payload, '$.excerpt') = 'object')`);
+  }
   // What the channel's agents may do without a yes, and its connectors' own levels (apps/server/access.ts, ADR 0015).
   // Null is full access, so every channel made before levels runs as it did.
   ensureColumn('channels', 'access_level', 'TEXT');
@@ -741,10 +752,29 @@ export function migrate() {
   // The machines that held a thread before its holder, oldest first (db/repos/assignments.ts), for the Inbox row's
   // machine history. JSON; synced with the row. Null reads as none.
   ensureColumn('assignments', 'trail', 'TEXT');
+  // The agent that wrote a transcript row (group threads slice 1, ADR 0019): the thread's agent on the rows its runs
+  // write. Ben's rows and Omni's own have none, and rows from before this read as the thread's lead's.
+  ensureColumn('events', 'agent', 'TEXT');
   // Sub-agents another machine runs, read from their synced task rows (db/repos/events.ts openTasksSince): the recent
   // ones, and each one's start.
   db.exec(`CREATE INDEX IF NOT EXISTS events_task_at ON events(created_at) WHERE kind = 'task';
     CREATE INDEX IF NOT EXISTS events_task ON events(thread_id, json_extract(payload, '$.task_id')) WHERE kind = 'task';`);
+  // The agents seated in a thread (group threads slice 2, ADR 0019): one row per agent per thread, the lead included
+  // once a member is seated (db/repos/members.ts). `session_thread` is the hidden thread whose session the agent runs
+  // in, the thread itself for the lead. `cursor` is the uid of the last transcript row the agent has read. Removing a
+  // member keeps its row with `removed_at`. Synced, last writer wins on the whole row (sync/handlers/thread-member.ts).
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_members (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    agent TEXT NOT NULL,
+    lead INTEGER NOT NULL DEFAULT 0,
+    session_thread TEXT NOT NULL,
+    cursor TEXT,
+    seated_at TEXT NOT NULL,
+    removed_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS thread_members_agent ON thread_members(thread_id, agent);`);
   // Older builds counted every sync's retry of an unsigned change waiting in sync_deferred as one more change applied
   // without a valid signature (sync/apply.ts): two rows on one Mac passed 12 million. The real number is lost, so those
   // counts start over at one; each row keeps its machine, entity, reason and time. Refusals and held actions

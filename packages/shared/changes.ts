@@ -2,6 +2,7 @@
 // (changes-view.ts, which both phone UIs draw) import: GET /api/threads/:id/changes (`BranchChanges`) and GET /api/threads/:id/turns
 // (`TurnChanges`). apps/server/tests/wire-fixtures.test.ts checks the recorded answers with `changesProblems` and
 // `turnChangesProblems`.
+import type { Collision } from './collisions.ts';
 
 /** `turn`: what one turn changed, between its before and after snapshots (apps/server/turns.ts). */
 export const CHANGE_KINDS = ['committed', 'staged', 'unstaged', 'untracked', 'turn'] as const;
@@ -53,9 +54,14 @@ export interface ChangeBase {
   recorded_at: string;
 }
 
-export type BranchChanges =
+/**
+ * `collisions`: the files two of the thread's agents both edited, while the flags are up (ADR 0019, collisions.ts).
+ * Changes still shows one combined diff, crediting no change to an agent.
+ */
+export type BranchChanges = (
   | { available: false; reason: string }
-  | { available: true; cwd: string; branch: string | null; head: string; base: ChangeBase; groups: ChangeGroup[] };
+  | { available: true; cwd: string; branch: string | null; head: string; base: ChangeBase; groups: ChangeGroup[] }
+) & { collisions?: Collision[] };
 
 /** One side of a turn: a snapshot commit under a hidden ref, and HEAD when it was taken. */
 export interface TurnSide {
@@ -145,8 +151,11 @@ const changedFileShape = {
 };
 const changeGroupShape = { kind: oneOf(CHANGE_KINDS), files: list(object(changedFileShape)), truncated: bool };
 const changeBaseShape = { sha: str, ref: str, how: oneOf(BASE_HOWS), recorded_at: str };
-const unavailableShape = { available: bool, reason: str };
-const availableShape = { available: bool, cwd: str, branch: nullable(str), head: str, base: object(changeBaseShape), groups: list(object(changeGroupShape)) };
+const collisionShape = { id: num, key: str, path: str, label: str, agents: list(str), at: str, cleared: nullable(oneOf(['commit', 'dismiss'] as const)) };
+// The route always sends the flags still up, an empty list for a thread with none.
+const flagged = { collisions: list(object(collisionShape)) };
+const unavailableShape = { available: bool, reason: str, ...flagged };
+const availableShape = { available: bool, cwd: str, branch: nullable(str), head: str, base: object(changeBaseShape), groups: list(object(changeGroupShape)), ...flagged };
 const turnSideShape = { sha: str, ref: str, head: str };
 const turnViewShape = {
   id: str,

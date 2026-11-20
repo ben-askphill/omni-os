@@ -4,6 +4,8 @@ import { glyphLabel, markLabel, plainDetail } from '@omni/shared/display.ts';
 import { useNeedOf } from '../../store.tsx';
 import { technicalNow, useTechnical } from '../../display.ts';
 import { Icon } from './icons.tsx';
+import { AvatarMark, drawsFaces } from '../thread/AvatarMark.tsx';
+import type { ThreadMember } from '@omni/shared/members.ts';
 
 export { MARK, PHASE, STATUS, asksForYou, blockerMark, glyphFor, markOf, threadGlyph, threadMark, threadPhase, turnPhase, type Glyph, type Mark, type Phase, type TurnPhase } from '@omni/shared/status.ts';
 
@@ -181,7 +183,7 @@ export function DoneMark({ size = 8, className = '' }: { size?: number; classNam
   );
 }
 
-type Marked = { id?: string; status: string; delegating?: boolean; setup?: string | null; limit_state?: string | null; done_at?: string | null };
+type Marked = { id?: string; status: string; delegating?: boolean; setup?: string | null; limit_state?: string | null; done_at?: string | null; members?: ThreadMember[] };
 
 /**
  * A thread's mark on a row: what holds it up for Ben (its Needs you item), its phase while it is at work, the check
@@ -189,8 +191,11 @@ type Marked = { id?: string; status: string; delegating?: boolean; setup?: strin
  * failed come before the thread's own), which a phase gives way to. `busy`: the row knows of work the thread's own
  * state does not say, as sub-agents a stopped turn left behind. `pr`: the pull request on its branch.
  */
-export function ThreadDot({ t, state, busy = false, size = 7, pr, turn }: { t: Marked; state?: Glyph; busy?: boolean; size?: number } & Pick<MarkContext, 'pr' | 'turn'>) {
+export function ThreadDot({ t, state, busy = false, size = 7, pr, turn, faces = 16 }: { t: Marked; state?: Glyph; busy?: boolean; size?: number; faces?: number | false } & Pick<MarkContext, 'pr' | 'turn'>) {
   const need = useNeedOf(t.id);
+  // A group thread whose agents run or wait on Ben draws their faces as its mark (thread/AvatarMark.tsx); `faces`
+  // false keeps the dot where a face cannot fit.
+  if (faces && drawsFaces(t.members)) return <AvatarMark members={t.members} size={faces} />;
   const mark = threadMark(t, { need, pr, turn });
   const own = MARK[mark].glyph;
   // The tree put a state first that the thread's own mark does not say: draw the tree's.

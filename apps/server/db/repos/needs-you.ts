@@ -90,7 +90,7 @@ const marks = PARKED.map((s) => `'${s}'`).join(',');
  * whatever it waits on, until something new happens there: db/repos/threads.ts clears it). A delegated thread's
  * success went to its parent as a crew report, so only its failures and stops are results for Ben.
  */
-const LISTED = `t.archived = 0 AND t.source != 'team' AND t.quick = 0 AND t.done_at IS NULL`;
+const LISTED = `t.archived = 0 AND t.source NOT IN ('team', 'member') AND t.quick = 0 AND t.done_at IS NULL`;
 
 export const completions = {
   get: (uid: string) => db.prepare('SELECT * FROM completions WHERE uid = ?').get(uid) as unknown as Completion | undefined,

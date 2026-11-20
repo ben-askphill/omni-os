@@ -1,0 +1,127 @@
+{
+  "name": "rich-group",
+  "status": "done",
+  "events": [
+    {
+      "id": 101,
+      "kind": "user",
+      "payload": "{\"text\": \"Plan the sale page\", \"source\": \"ben\"}",
+      "created_at": "2026-11-20T12:00:01.000Z"
+    },
+    {
+      "id": 102,
+      "kind": "assistant_text",
+      "payload": "{\"text\": \"I'll start with the hero.\"}",
+      "created_at": "2026-11-20T12:00:02.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 103,
+      "kind": "result",
+      "payload": "{\"ok\": true, \"subtype\": \"success\", \"duration_ms\": 4000, \"turns\": 2}",
+      "created_at": "2026-11-20T12:00:03.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 104,
+      "kind": "member",
+      "payload": "{\"event\": \"joined\", \"agent\": \"designer\", \"name\": \"Designer\"}",
+      "created_at": "2026-11-20T12:00:04.000Z"
+    },
+    {
+      "id": 105,
+      "kind": "user",
+      "payload": "{\"text\": \"@Designer and @Builder, both take a look\", \"source\": \"ben\", \"to\": [\"designer\", \"builder\"], \"context\": [{\"kind\": \"agent_mention\", \"v\": 1, \"id\": \"m1\", \"body\": {\"agent\": \"designer\", \"name\": \"Designer\"}}, {\"kind\": \"agent_mention\", \"v\": 1, \"id\": \"m2\", \"body\": {\"agent\": \"builder\", \"name\": \"Builder\"}}]}",
+      "created_at": "2026-11-20T12:00:05.000Z"
+    },
+    {
+      "id": 106,
+      "kind": "tool_use",
+      "payload": "{\"id\": \"tb1\", \"name\": \"Edit\", \"input\": {\"file_path\": \"/work/volero/sections/hero.liquid\", \"old_string\": \"a\", \"new_string\": \"b\"}}",
+      "created_at": "2026-11-20T12:00:06.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 107,
+      "kind": "tool_use",
+      "payload": "{\"id\": \"td1\", \"name\": \"Edit\", \"input\": {\"file_path\": \"/work/volero/sections/hero.liquid\", \"old_string\": \"c\", \"new_string\": \"d\"}}",
+      "created_at": "2026-11-20T12:00:07.000Z",
+      "agent": "designer"
+    },
+    {
+      "id": 108,
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\": \"tb1\", \"text\": \"Edited.\", \"is_error\": false}",
+      "created_at": "2026-11-20T12:00:08.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 109,
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\": \"td1\", \"text\": \"Edited.\", \"is_error\": false}",
+      "created_at": "2026-11-20T12:00:09.000Z",
+      "agent": "designer"
+    },
+    {
+      "id": 110,
+      "kind": "collision",
+      "payload": "{\"key\": \"k-hero\", \"path\": \"sections/hero.liquid\", \"agents\": [\"builder\", \"designer\"], \"head\": \"abc123\"}",
+      "created_at": "2026-11-20T12:00:10.000Z"
+    },
+    {
+      "id": 111,
+      "kind": "assistant_text",
+      "payload": "{\"text\": \"Hero copy is tighter now.\"}",
+      "created_at": "2026-11-20T12:00:11.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 112,
+      "kind": "assistant_text",
+      "payload": "{\"text\": \"Spacing fixed on the hero.\"}",
+      "created_at": "2026-11-20T12:00:12.000Z",
+      "agent": "designer"
+    },
+    {
+      "id": 113,
+      "kind": "result",
+      "payload": "{\"ok\": true, \"subtype\": \"success\", \"duration_ms\": 4000, \"turns\": 2}",
+      "created_at": "2026-11-20T12:00:13.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 114,
+      "kind": "result",
+      "payload": "{\"ok\": true, \"subtype\": \"success\", \"duration_ms\": 4000, \"turns\": 2}",
+      "created_at": "2026-11-20T12:00:14.000Z",
+      "agent": "designer"
+    },
+    {
+      "id": 115,
+      "kind": "user",
+      "payload": "{\"text\": \"Designer, take the footer.\", \"source\": \"lead\", \"to\": [\"designer\"]}",
+      "created_at": "2026-11-20T12:00:15.000Z",
+      "agent": "builder"
+    },
+    {
+      "id": 116,
+      "kind": "assistant_text",
+      "payload": "{\"text\": \"Footer done.\"}",
+      "created_at": "2026-11-20T12:00:16.000Z",
+      "agent": "designer"
+    },
+    {
+      "id": 117,
+      "kind": "result",
+      "payload": "{\"ok\": true, \"subtype\": \"success\", \"duration_ms\": 4000, \"turns\": 2}",
+      "created_at": "2026-11-20T12:00:17.000Z",
+      "agent": "designer"
+    },
+    {
+      "id": 118,
+      "kind": "member",
+      "payload": "{\"event\": \"left\", \"agent\": \"designer\", \"name\": \"Designer\"}",
+      "created_at": "2026-11-20T12:00:18.000Z"
+    }
+  ]
+}

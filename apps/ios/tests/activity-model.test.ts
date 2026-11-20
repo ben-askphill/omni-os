@@ -186,3 +186,12 @@ describe('the Activity inbox', () => {
     expect(a.waiting[0]).toMatchObject({ channel: 'Volero', canMarkDone: true });
   });
 });
+
+describe('a group thread in Activity (ADR 0019)', () => {
+  it("draws its busiest agent's mark and the line saying who asks and who works", () => {
+    const seat = (agent: string, name: string, state: 'needs' | 'working' | 'idle', lead = false) => ({ agent, name, lead, state, status: 'done', harness: 'claude-code', model: null, effort: '', seated_at: '' });
+    const g = thread('g', { status: 'done', members: [seat('builder', 'Builder', 'idle', true), seat('designer', 'Designer', 'working')] });
+    const row = inbox({ recent: [g] }).waiting.find((r) => r.id === 'g') ?? inbox({ recent: [g] }).working.find((r) => r.id === 'g');
+    expect(row).toMatchObject({ glyph: 'running', markLine: 'Designer working', faces: { faces: [{ agent: 'designer', ring: 'working' }], more: 0 } });
+  });
+});

@@ -203,6 +203,10 @@ export function wake(r: MessageRequest) {
  */
 export function reportToParent(childId: string, status: string, text: string, completion = events.lastId(childId)) {
   const child = threads.get(childId)!;
+  // A member's session reports to no one: its replies are in the group thread already (runner/members.ts).
+  if (child.source === 'member') return;
+  // A team's lead reports after the turn its members' replies wake it for, not its planning turn (runner/team.ts).
+  if (status === 'done' && reportHeld.some((held) => held(childId))) return;
   const parent = threads.get(child.parent_id!);
   if (!parent) return;
   // An Ask Ben sent from the parent (ask.ts): its event there says whether the answer wakes the parent.
@@ -231,6 +235,9 @@ export function reportToParent(childId: string, status: string, text: string, co
   if (heldElsewhere(parent.id)) return runnerPorts().routing.forwardReport(parent.id, key, prompt, report);
   fileReport(parent.id, key, prompt, report);
 }
+
+/** Whether a finished turn's report waits for a later turn of the same thread (runner/team.ts holdsReport). */
+export const reportHeld: ((threadId: string) => boolean)[] = [];
 
 /** A report as its parent's harness reads it. A remote child's names the server it ran on. */
 const reportText = (r: Record<string, unknown>) =>

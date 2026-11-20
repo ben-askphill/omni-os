@@ -7,7 +7,7 @@ import { HermesClient, probeRunsApi, type RunsApiProbe } from './hermes/client.t
 export type RemoteKind = 'runs-api' | 'eve';
 
 /** The calls a remote turn makes. */
-export type RemoteClient = Pick<HermesClient, 'createRun' | 'events' | 'getRun' | 'steer' | 'stop'>;
+export type RemoteClient = Pick<HermesClient, 'createRun' | 'events' | 'getRun' | 'steer' | 'stop' | 'toolResult'>;
 
 export const remoteClient = (kind: RemoteKind, url: string, key: string): RemoteClient => (kind === 'eve' ? new EveClient(url, key) : new HermesClient(url, key));
 

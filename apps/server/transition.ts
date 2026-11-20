@@ -19,6 +19,7 @@ import { cancelHandoff, handOff, handOffCheck, requestTakeover, takeoverCheck, t
 import { handoffView, offerOf, replyOf, requestOf } from './handoff/records.ts';
 import { refusal } from './runner/state.ts';
 import { cancelQueued, previewSwitch, queuedRun, runForRole, runName, switchRun } from './runner/switch.ts';
+import { busyAgents } from './runner/members.ts';
 import { deviceRecord, ownName } from './sync/devices.ts';
 
 export type ThreadTransition = Transition<Thread>;
@@ -83,6 +84,9 @@ async function previewRelocate(threadId: string, to: string): Promise<Transition
  */
 export async function createTransition(threadId: string, req: TransitionRequest): Promise<ThreadTransition> {
   const source = mustExist(threadId);
+  // Moving or forking a group thread waits for every agent in it to be idle (Q14).
+  const busyMembers = req.kind === 'reconfigure' ? null : busyAgents(threadId);
+  if (busyMembers) throw Object.assign(new Error(busyMembers), { status: 409 });
   switch (req.kind) {
     case 'reconfigure': {
       // The run the thread gets, which for a GPT reviewer is not always the one asked for.

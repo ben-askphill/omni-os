@@ -57,6 +57,7 @@ const { startDiskWatch } = await import('./disk-space.ts');
 const { startPush } = await import('./push-sender.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
 const { revokeAllThreadTokens } = await import('./thread-tokens.ts');
+const { convertRemoteAgents } = await import('./remote-agents.ts');
 const { computerName } = await import('./sync/devices.ts');
 const { onRestart, RESTART_EXIT_CODE, startUpdateCheck } = await import('./update.ts');
 
@@ -82,6 +83,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   if (unprepared) console.log(`[omni] ${unprepared} thread(s) were mid-setup: kept for Retry`);
   // No harness process outlives the server that spawned it, so no thread token from before is held by anything live.
   revokeAllThreadTokens();
+  // Hermes and the servers Ben connected become remote agents, and threads on them are led by their agent (ADR 0020).
+  const converted = convertRemoteAgents();
+  if (converted.agents.length || converted.threads) console.log(`[omni] remote agents: made ${converted.agents.join(', ') || 'none'}, ${converted.threads} thread(s) now led by theirs`);
   const interrupted = threads.failInterrupted();
   if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s) as failed`);
   // A handoff to another Mac the last server was still preparing never went out: its thread stays here.

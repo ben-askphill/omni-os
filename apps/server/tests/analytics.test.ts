@@ -104,6 +104,17 @@ describe('usage analytics', () => {
     expect(received.map((r) => r.body.api_key)).toEqual(['phc_from_secret']);
   });
 
+  it('marks a team, which is one thread, as a team', async () => {
+    process.env.OMNI_POSTHOG_KEY = 'phc_test_key';
+    for (const [id, name] of [['team-lead', 'Team Lead'], ['team-designer', 'Team Designer']]) {
+      expect((await app.request('/api/crew', json('POST', { id, fields: { name, harness: 'claude-code' }, charter: `You are ${name}.` }))).status).toBe(201);
+    }
+    const { thread } = await r.runner.createTeam({ channel: 'scratch', prompt: 'Plan the launch page', role: 'team-lead', tasks: [{ title: 'Visuals', prompt: 'make the visuals', role: 'team-designer' }] });
+    await r.untilResults(thread.id, 1);
+    await flushAnalytics();
+    expect(events().filter((e) => e.event === 'thread_created').map((e) => e.properties)).toEqual([expect.objectContaining({ source: 'conductor', team: true })]);
+  });
+
   it('takes from a client only the events a client reports', async () => {
     process.env.OMNI_POSTHOG_KEY = 'phc_test_key';
     expect((await clientEvent('thread_created', { harness: 'codex' })).status).toBe(400);

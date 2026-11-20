@@ -1,4 +1,4 @@
-import { eventSourceTransport, xhrUploadTransport, type BackgroundTask, type NeedsYou } from '@omni/client-core';
+import { eventSourceTransport, xhrUploadTransport, type BackgroundTask, type CrewRole, type NeedsYou } from '@omni/client-core';
 import { useIsFocused } from '@react-navigation/native';
 import { addNetworkStateListener } from 'expo-network';
 import * as SecureStore from 'expo-secure-store';
@@ -72,6 +72,13 @@ export function useStore<T>(store: Store<T>): T {
 /** Whether status words and run controls read technical: Show technical details, on until a server says otherwise. */
 export function useTechnical(): boolean {
   return useStore(useLiveHub().display)?.technical ?? true;
+}
+
+const NO_AGENTS: readonly CrewRole[] = [];
+
+/** This machine's agents, for names, avatars and mentions: empty until they load (hub.agents). */
+export function useAgents(): readonly CrewRole[] {
+  return useStore(useLiveHub().agents) ?? NO_AGENTS;
 }
 
 export function useChannels() {

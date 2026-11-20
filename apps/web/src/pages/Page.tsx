@@ -25,7 +25,7 @@ export function Page({ route }: { route: Route }) {
     case 'automations':
       return <AutomationsPage />;
     case 'settings':
-      return <SettingsPage section={route.section} focus={route.focus} />;
+      return <SettingsPage section={route.section} focus={route.focus} agent={route.agent} />;
     case 'artifacts':
       return <ArtifactsPage source={route.source} />;
     case 'prs':

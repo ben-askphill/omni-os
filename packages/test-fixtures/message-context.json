@@ -1,5 +1,5 @@
 {
-  "kinds": ["diff_selection", "terminal_excerpt", "browser_annotation", "thread_reference", "machine_mention"],
+  "kinds": ["diff_selection", "terminal_excerpt", "browser_annotation", "thread_reference", "machine_mention", "agent_mention"],
   "records": [
     {
       "name": "a diff selection",
@@ -275,6 +275,23 @@
         "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
         "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
         "note": "the cart fix I mean"
+      }
+    },
+    {
+      "name": "an agent mention",
+      "raw": {
+        "id": "b7c2d9e4-1f3a-4c5b-8d6e-0a9f2b4c6d8e",
+        "kind": "agent_mention",
+        "v": 1,
+        "label": "@Designer",
+        "note": "",
+        "body": { "agent": "designer", "name": "Designer" }
+      },
+      "expect": {
+        "as": "known",
+        "id": "b7c2d9e4-1f3a-4c5b-8d6e-0a9f2b4c6d8e",
+        "label": "@Designer",
+        "note": ""
       }
     },
     {

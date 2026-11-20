@@ -213,6 +213,8 @@ export interface McpInput {
   noBrowser?: boolean;
   /** A quick ask: no browser. Browsing is what turns it into a task. */
   quick?: boolean;
+  /** The lead of a team thread (runner/team.ts): it gets message_members. */
+  leadsTeam?: boolean;
 }
 
 let playwrightMcp: { bin: string; version: string } | undefined;
@@ -254,6 +256,8 @@ export const ASK_SERVER = 'omni-ask';
 export const THREADS_SERVER = 'omni-threads';
 /** The server with `remember` (crates/omni-mcp), for a crew role whose threads may propose lessons. The Conductor has it on `omni`. */
 export const MEMORY_SERVER = 'omni-memory';
+/** The server with `message_members` (crates/omni-mcp), for a team thread's lead alone (runner/team.ts). */
+export const TEAM_SERVER = 'omni-team';
 /** How long a harness lets an ask_user_question call wait for the user: a day. */
 export const ASK_TIMEOUT_SEC = 86_400;
 
@@ -270,7 +274,7 @@ export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, McpServer> = {};
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: threadTokenPath(input.threadId), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
-  // ask, render, steps, threads and memory run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
+  // ask, render, steps, threads, memory and team run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
   const helper = (key: string, name: NativeMcpServer): void => {
     const command = nativeMcpCommand(name);
     if (command) servers[key] = { ...command, env: api };
@@ -280,6 +284,8 @@ export function buildMcpConfig(input: McpInput) {
   helper(RENDER_SERVER, 'render');
   // set_steps: the plain step list the thread shows as its progress (@omni/shared/steps.ts).
   helper(STEPS_SERVER, 'steps');
+  // message_members: a team thread's lead gives its members their parts. A member's session is a thread of its own, with no team row.
+  if (input.leadsTeam && !input.quick) helper(TEAM_SERVER, 'team');
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly && !input.noBrowser && !input.quick) {

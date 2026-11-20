@@ -167,25 +167,32 @@ export function admitPending(): Promise<number> {
     again = true;
     return admitting;
   }
-  admitting = (async () => {
+  // Cleared in the same step as the last look at `again`, so a call that comes after it starts a pass of its own instead
+  // of getting this one's answer with its deliveries left waiting. A pass with nothing to await is over before it returns.
+  let running = true;
+  const pass = (async () => {
     let settled = 0;
-    do {
-      again = false;
-      const automations = loadAutomations();
-      // Each delivery waits for the machine that runs its automation; one with no automation here goes to the shared owner.
-      const pending = triggerDeliveries.pending().filter((d) => runsHere(automations.find((a) => a.id === d.automation)));
-      if (!pending.length) break;
-      for (const d of pending) {
-        if (!(await admit(d, automations))) continue;
-        settled++;
-        publishFeed({ type: 'automation_delivery', automation: d.automation });
-      }
-    } while (again);
+    try {
+      do {
+        again = false;
+        const automations = loadAutomations();
+        // Each delivery waits for the machine that runs its automation; one with no automation here goes to the shared owner.
+        const pending = triggerDeliveries.pending().filter((d) => runsHere(automations.find((a) => a.id === d.automation)));
+        if (!pending.length) break;
+        for (const d of pending) {
+          if (!(await admit(d, automations))) continue;
+          settled++;
+          publishFeed({ type: 'automation_delivery', automation: d.automation });
+        }
+      } while (again);
+    } finally {
+      running = false;
+      admitting = null;
+    }
     return settled;
-  })().finally(() => {
-    admitting = null;
-  });
-  return admitting;
+  })();
+  if (running) admitting = pass;
+  return pass;
 }
 
 /** How often to look for deliveries held here while another Mac ran automations, in case this one took them over. */

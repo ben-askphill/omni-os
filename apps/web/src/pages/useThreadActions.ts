@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { stepOf, type PRStep, type StepPrompts } from '@omni/shared/thread-glance.ts';
 import { api, errorText, type PendingMsg, type SendMode, type Thread } from '../api.ts';
 import { useApp } from '../store.tsx';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 
 /**
  * The page's own actions on a thread: ask the agent for a branch step (open a PR, fix conflicts or checks), restore it
@@ -19,6 +20,7 @@ export function useThreadActions({
   setQueued,
   setActionError,
   pin,
+  onOpenedPR,
 }: {
   id: string;
   thread: Thread | null;
@@ -33,6 +35,8 @@ export function useThreadActions({
   setQueued: (pending: PendingMsg[]) => void;
   setActionError: (e: string | null) => void;
   pin: () => void;
+  /** A remote-led thread's pull request was opened: the PRs read again. */
+  onOpenedPR?: () => void;
 }) {
   const { reloadChannels } = useApp();
   const markDone = useMarkDone();
@@ -60,6 +64,20 @@ export function useThreadActions({
   const [restoring, setRestoring] = useState(false);
 
   const ask = async (prompt: string) => {
+    // A remote agent that leads talks only, so Omni opens the pull request itself from the branch Ben committed (ADR 0020).
+    if (thread && isRemoteAgentHarness(thread.harness) && stepOf(prompt, prompts) === 'open') {
+      setActionError(null);
+      setSending(prompt);
+      try {
+        await api.post<{ url: string }>(`/threads/${encodeURIComponent(id)}/open-pr`, {});
+        onOpenedPR?.();
+      } catch (e) {
+        setActionError(errorText(e));
+      } finally {
+        setSending(null);
+      }
+      return;
+    }
     seen.current = false;
     setSending(prompt);
     setSent(false);

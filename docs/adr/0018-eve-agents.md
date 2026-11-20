@@ -1,5 +1,7 @@
 # eve agents: Omni speaks eve's own API
 
+> Parts superseded by [ADR 0020](0020-remote-agents-are-agents.md), decided 2026-11-20 and not built yet: an eve agent connects as a remote agent, not as a custom harness in the pickers. How Omni speaks eve's API is unchanged.
+
 Vercel's eve framework runs durable agents that each serve the same HTTP API (`/eve/v1`: sessions, an NDJSON event stream, cancel). Nomos, Ben's assistant, is one. Omni's Connect sheet found eve agents by their health route but could not run threads on them: custom harnesses spoke only the Runs API ([ADR 0017](0017-custom-harnesses.md)). Ben wanted to paste an eve agent's URL and connect it with one plain sign-in step, with no Vercel connector or API.
 
 ## Decision

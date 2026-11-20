@@ -1,0 +1,547 @@
+{
+  "scenarios": [
+    {
+      "name": "protocol: initialize and list the tool",
+      "server": "team",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-team",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "message_members",
+                  "description": "Give members of your team their parts. Only for the lead of a team thread, and only to the members seated in it: it seats no one. Plan first, then send each member its whole part in one message, both parts in one when a member has two, and end your turn. The members start at once and work at the same time in this thread's worktree, and only you commit. Omni wakes you once every member you messaged has finished, a failed or stopped one included, with their replies: then write your report. A member waiting on Ben keeps you waiting too. An @name in the message is plain text.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "to": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The members this message goes to, by agent id or name, as your brief names them. Usually one."
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The member's part: what to do, what done looks like and what to report back. It sees the thread so far as a catch-up."
+                      }
+                    },
+                    "required": [
+                      "to",
+                      "message"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a part to one member, then one to two members at once",
+      "server": "team",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "thread_id": "thread-1",
+            "sent": [
+              {
+                "agent": "designer",
+                "name": "Designer"
+              }
+            ]
+          }
+        },
+        {
+          "json": {
+            "thread_id": "thread-1",
+            "sent": [
+              {
+                "agent": "copywriter",
+                "name": "Copywriter"
+              },
+              {
+                "agent": "critic",
+                "name": "Critic"
+              }
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "message_members",
+              "arguments": {
+                "to": [
+                  "designer"
+                ],
+                "message": "Make the hero image."
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "message_members",
+              "arguments": {
+                "to": [
+                  "Copywriter",
+                  "critic"
+                ],
+                "message": "Write and check the copy."
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-team",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Sent to Designer, who started on it. Message the other members their parts, then end your turn: Omni wakes you with their replies once every member you messaged has finished."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Sent to Copywriter and Critic, who started on it. Message the other members their parts, then end your turn: Omni wakes you with their replies once every member you messaged has finished."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/team/messages",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "to": [
+                "designer"
+              ],
+              "message": "Make the hero image."
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/team/messages",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "to": [
+                "Copywriter",
+                "critic"
+              ],
+              "message": "Write and check the copy."
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "Omni refuses a name that is no member, and a thread that is no team",
+      "server": "team",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "status": 400,
+          "json": {
+            "error": "builder is not a member of this team. Members: Designer (designer). Pass each member by its agent id or name from your brief."
+          }
+        },
+        {
+          "status": 409,
+          "json": {
+            "error": "message_members works only in a team thread, from its lead."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "message_members",
+              "arguments": {
+                "to": [
+                  "builder"
+                ],
+                "message": "Build it."
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "message_members",
+              "arguments": {
+                "to": [
+                  "designer"
+                ],
+                "message": "Draw it."
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-team",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "builder is not a member of this team. Members: Designer (designer). Pass each member by its agent id or name from your brief."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "message_members works only in a team thread, from its lead."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/team/messages",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "to": [
+                "builder"
+              ],
+              "message": "Build it."
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/team/messages",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "to": [
+                "designer"
+              ],
+              "message": "Draw it."
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "an empty list or message is refused before any request",
+      "server": "team",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "message_members",
+              "arguments": {
+                "to": [],
+                "message": "Draw it."
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "message_members",
+              "arguments": {
+                "to": [
+                  "designer"
+                ],
+                "message": ""
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-team",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool message_members: Too small: expected array to have >=1 items at to"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool message_members: Too small: expected string to have >=1 characters at message"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    }
+  ]
+}

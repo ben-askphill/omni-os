@@ -11,7 +11,7 @@ const CWD = '/data/worktrees/src-thread';
 const REAL = `/private${CWD}`;
 
 let id = 0;
-const ev = (kind: string, p: unknown): EventRow => ({ id: ++id, thread_id: 'src', kind, payload: JSON.stringify(p), created_at: '' });
+const ev = (kind: string, p: unknown): EventRow => ({ id: ++id, thread_id: 'src', kind, payload: JSON.stringify(p), created_at: '', agent: null });
 const tool = (command: string, result: string, is_error = false) => {
   const use = ev('tool_use', { id: `call-${id + 1}`, name: 'Bash', input: { command } });
   return [use, ev('tool_result', { tool_use_id: JSON.parse(use.payload).id, text: result, is_error })];

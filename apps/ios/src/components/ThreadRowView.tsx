@@ -6,7 +6,7 @@ import { useChannelLook } from '../live/react';
 import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 import { Icon } from '../ui/Icon';
 import { ChannelAvatar } from './ChannelAvatar';
-import { glyphFor } from './StatusDot';
+import { MarkLine } from './MarkLine';
 
 /**
  * A thread in a list, as phone web's MoRow draws it: the channel's avatar with the thread's status on its corner, the
@@ -17,7 +17,7 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
   const home = useChannelLook(row.target.channelId);
   const channel = row.channel ? `#${row.channel}` : null;
   const marked = row.target.done ? 'Marked done' : null;
-  const glyph = row.target.done ? 'settled' : glyphFor(row.status);
+  const glyph = row.target.done ? 'settled' : row.glyph;
   const settled = !row.busy && (row.target.done || row.status !== 'failed');
   // The server stores no owner for the user's own threads, so any owner it names is someone else's (thread-owner.ts).
   const owner = row.owner ? `for ${row.owner}` : null;
@@ -25,7 +25,7 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[row.title, channel, row.pinned ? 'pinned' : null, marked ? 'marked done' : null, row.statusLabel, row.ago].filter(Boolean).join(', ')}
+      accessibilityLabel={[row.title, channel, row.pinned ? 'pinned' : null, marked ? 'marked done' : null, row.markLine ?? row.statusLabel, row.ago].filter(Boolean).join(', ')}
       accessibilityHint={onLongPress ? 'Swipe left for pin, done and archive. Hold for more.' : undefined}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -44,7 +44,10 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
           ) : null}
           <Text style={[styles.ago, { color: colors.fg3 }]}>{row.ago}</Text>
         </View>
-        {meta || row.statusLabel ? (
+        {/* A group thread at work says who on its second line, as phone web's row does (ADR 0019). */}
+        {row.markLine ? (
+          <MarkLine faces={row.faces} text={row.markLine} />
+        ) : meta || row.statusLabel ? (
           <Text numberOfLines={1} style={[styles.meta, { color: colors.fg3 }]}>
             {meta}
             {meta && row.statusLabel ? ' · ' : null}

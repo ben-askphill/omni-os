@@ -37,6 +37,8 @@ export interface Channel {
   connector_access?: string | null;
   /** What a channel with no access_level runs at on the machine that answered. */
   access_default?: string;
+  /** 1: remote agents can see this channel's work, its messages and its files (ADR 0020). Missing from an older server. */
+  remote_work?: number;
   archived: number;
   created_at: string;
 }

@@ -19,11 +19,13 @@ import {
   type ThreadQuestion,
 } from '@omni/shared/question.ts';
 import { bus } from '../bus.ts';
-import { events, threads } from '../db.ts';
+import { events, members, threads } from '../db.ts';
+import { transcriptOf } from '../db/repos/events.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
 import { remoteHolder } from '../ownership.ts';
 import { runningElsewhere, turnBlocked } from '../sync/guard.ts';
 import { runnerPorts } from './ports.ts';
+import { agentName } from '../member-view.ts';
 import { wakePrepared } from './api.ts';
 import { polled, settled } from './question-waits.ts';
 import { saveOwn } from './queue.ts';
@@ -51,11 +53,12 @@ const reply = (q: ThreadQuestion) => ({ state: q.state, text: resultText(q.quest
  * fix.
  */
 export function askQuestion(threadId: string, raw: unknown): { id: string } {
-  if (!threads.get(threadId)) throw refusal('thread not found', 404);
+  const thread = threads.get(threadId);
+  if (!thread) throw refusal('thread not found', 404);
   const parsed = parseQuestions(raw);
   if (!parsed.ok) throw refusal(parsed.error, 400);
   const id = randomUUID();
-  addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload);
+  addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload, thread.role ?? null);
   const home = threads.home(threadId);
   if (home !== threadId) threads.setDone(home, false);
   settled(threadId);
@@ -78,12 +81,19 @@ export function crewQuestions(threadId: string): CrewQuestion[] {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
   return continuedLine(threadId)
     .flatMap((id) => threads.descendants(id))
-    .filter((t) => !t.archived)
-    .flatMap((t) =>
-      questionsIn(events.questions(t.id))
+    // A member's session asks in its group thread's transcript, which is read once, there.
+    .filter((t) => !t.archived && t.source !== 'member')
+    .flatMap((t) => {
+      const rows = events.questions(t.id);
+      // A group thread's member asks in its transcript, as itself: the card names it (Q46).
+      const askedBy = new Map(rows.filter((r) => r.agent && r.agent !== (t.role ?? '')).map((r) => [r.id, r.agent!]));
+      return questionsIn(rows)
         .filter((q) => q.state === 'pending')
-        .map((question) => ({ thread_id: t.id, thread_title: t.title, task_id: t.task_id, channel_id: t.channel_id, question })),
-    )
+        .map((question) => {
+          const agent = askedBy.get(question.event_id);
+          return { thread_id: t.id, thread_title: t.title, task_id: t.task_id, channel_id: t.channel_id, question, ...(agent && { member: { agent, name: agentName(agent) } }) };
+        });
+    })
     .sort((a, b) => a.question.event_id - b.question.event_id);
 }
 
@@ -98,7 +108,7 @@ export async function awaitAnswer(threadId: string, id: string, waitSec: number,
   await new Promise<void>((resolve) => {
     const done = () => {
       clearTimeout(timer);
-      bus.off(`thread:${threadId}`, onEvent);
+      bus.off(`thread:${transcriptOf(threadId)}`, onEvent);
       signal?.removeEventListener('abort', done);
       resolve();
     };
@@ -106,10 +116,18 @@ export async function awaitAnswer(threadId: string, id: string, waitSec: number,
       if (e?.kind === ANSWER_EVENT && typeof e.payload === 'string' && (JSON.parse(e.payload) as AnswerPayload).id === id) done();
     };
     const timer = setTimeout(done, Math.min(waitSec, WAIT_MAX_SEC) * 1000);
-    bus.on(`thread:${threadId}`, onEvent);
+    // A member of a group thread asks there: the answer lands in that thread's transcript (db/repos/events.ts).
+    bus.on(`thread:${transcriptOf(threadId)}`, onEvent);
     signal?.addEventListener('abort', done, { once: true });
   });
   return reply(find(threadId, id));
+}
+
+/** The session that asked a question shown in `threadId`: a seated member's own, else the thread's. */
+function askedIn(threadId: string, q: ThreadQuestion): string {
+  const agent = events.agentOf(q.event_id);
+  const m = agent ? members.of(transcriptOf(threadId), agent) : undefined;
+  return m && !m.lead ? m.session_thread : threadId;
 }
 
 /** A tool call still waits on the question: its thread's turn runs here and the call polled lately. */
@@ -125,11 +143,13 @@ export type Answered = { state: QuestionState; via: AnswerPayload['via'] } | { c
  * returns. Between turns, the answer goes as a forwarded message to a machine that keeps the thread (remoteHolder), and
  * otherwise runs the thread here, as Ben's reply would.
  */
-export async function answerQuestion(threadId: string, id: string, raw: unknown): Promise<Answered> {
-  const q = find(threadId, id);
+export async function answerQuestion(cardThread: string, id: string, raw: unknown): Promise<Answered> {
+  const q = find(cardThread, id);
   const parsed = parseAnswers(q.questions, raw);
   if (!parsed.ok) throw refusal(parsed.error, 400);
   if (q.state !== 'pending') return { conflict: q.state };
+  // A card a member of a group thread asked is answered into that member's session (ADR 0019).
+  const threadId = askedIn(cardThread, q);
   const thread = threads.get(threadId)!;
   const holder = remoteHolder(thread);
   const via = waitedOn(threadId, id) || runningElsewhere(thread) ? 'tool' : 'message';
@@ -144,7 +164,8 @@ export async function answerQuestion(threadId: string, id: string, raw: unknown)
     const blocked = turnBlocked(thread, runsHere(threadId));
     if (blocked) throw refusal(blocked, 409);
   }
-  addEvent(threadId, ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload);
+  // Ben's answer, in the transcript the card shows in, as his row rather than the agent's.
+  addEvent(transcriptOf(threadId), ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload);
   polled.delete(id);
   if (via === 'message' && !holder) {
     // Ben's reply, delivered as one (run-on.ts does the same with a forwarded one): it runs the thread here even when

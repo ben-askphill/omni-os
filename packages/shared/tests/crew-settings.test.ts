@@ -77,6 +77,14 @@ describe('the editor', () => {
     expect(crewSaveBody({ ...d, icon: '', bg: '' }, detail(edited, builtIn)).fields.avatar).toBeNull();
   });
 
+  it('names a cleared icon or color as null, so the server drops it and keeps an uploaded image', () => {
+    const builtIn = role();
+    const edited = role({ kind: 'edited', avatar: { image: '/api/crew/builder/avatar?v=1', icon: 'icon:zap', bg: '#f5e6ba' } });
+    const d = crewDraftOf(detail(edited, builtIn));
+    expect(crewSaveBody({ ...d, bg: '' }, detail(edited, builtIn)).fields.avatar).toEqual({ icon: 'icon:zap', bg: null });
+    expect(crewSaveBody({ ...d, name: 'Builder 2' }, detail(edited, builtIn)).fields.avatar).toBeUndefined();
+  });
+
   it('sends No file edits as tools: full when turned off on a built-in that ships it, and drops the key when back to the default', () => {
     const builtIn = role({ id: 'reviewer', tools: 'no-edits' });
     const shipped = detail(builtIn, builtIn);

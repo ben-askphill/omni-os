@@ -57,8 +57,8 @@ function HandoffLink({ child, last, onNavigate }: { child: ThreadStub; last: boo
       className="hov relative z-[1] flex h-7 min-w-0 items-center gap-2 rounded-full pr-3 pl-2 text-[11.5px] text-fg-3 transition-colors hover:text-fg md:pr-3.5"
     >
       <span aria-hidden className={`pointer-events-none absolute -left-[9px] top-0 w-2 border-l border-line-strong ${last ? 'h-1/2 rounded-bl-[6px] border-b' : 'h-full'}`} />
-      <span className="grid w-2.5 shrink-0 place-items-center" aria-hidden="true">
-        <ThreadDot t={child} />
+      <span className="grid min-w-2.5 shrink-0 place-items-center" aria-hidden="true">
+        <ThreadDot t={child} faces={14} />
       </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
       <span className="max-w-[40%] shrink-0 truncate rounded-full bg-surface-2 px-1.5 text-[length:var(--fs-label)] leading-[18px] text-fg-3">#{channel}</span>

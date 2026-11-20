@@ -23,6 +23,7 @@
 //                     check finds it unmet that many times first, each a synthetic "Stop hook feedback" message and
 //                     another model call. `/goal` alone and `/goal clear` answer locally, as the real CLI does
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
+//   (catch-up)        text mode (Omni's catch-up or summary for a seated agent): "Fake catch-up of <n> messages."
 //   SUGGEST:<ms>      text mode (Omni's reply suggestion): take that long to answer
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   NEXT_THREAD       text mode (Omni's proposed follow-up thread): propose one; without it, answer NONE
@@ -37,6 +38,8 @@
 //   NEEDS_TASK:<title>  answer as a quick ask does when the work needs a task: `TASK: <title>` (dashes are spaces), then why
 //   RUN:<path>        before the answer, run that shell script in the cwd, like a Bash call that edits files or runs git
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
+//   TELL:<agent>=<part>  a team lead's message_members call (one per line, the part runs to the end of the line), as the
+//                     real CLI calls an MCP tool: start the omni-team server from --mcp-config and call it, before the answer
 //   RENDER:<title>    before the answer, show inline-page.html (an interactive chart) with Omni's html_render, as the real
 //                     CLI calls an MCP tool: start the omni-render server from --mcp-config and call it. Dashes in the title are spaces
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
@@ -521,6 +524,28 @@ async function renderPage(title) {
   }
 }
 
+/** One call of a tool on an Omni MCP server from --mcp-config, as html_render above, answered in the transcript. */
+async function callTool(serverName, tool, input) {
+  const id = `toolu_fake_${++seq}`;
+  const name = `mcp__${serverName}__${tool}`;
+  assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id, name, input }]);
+  const server = mcpEntry(serverName);
+  if (!server) return toolResult(id, `No such tool available: ${name}`, true);
+  let client = null;
+  try {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    client = new Client({ name: 'claude-code', version: VERSION });
+    await client.connect(new StdioClientTransport({ command: server.command, args: server.args ?? [], env: { ...process.env, ...server.env }, stderr: 'ignore' }));
+    const res = await client.callTool({ name: tool, arguments: input });
+    toolResult(id, res.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n'), !!res.isError);
+  } catch (err) {
+    toolResult(id, `MCP error: ${err.message}`, true);
+  } finally {
+    await client?.close().catch(() => {});
+  }
+}
+
 /** STEPS: the plan, the call each step makes, and what each call is. */
 const STEP_PLAN = ['Find candidate apps', 'Read the reviews', 'Compare prices'];
 const STEP_CALLS = [
@@ -620,6 +645,7 @@ async function runTurn() {
   let ask = null;
   const publishes = [];
   const renders = [];
+  const tells = [];
   const scripts = [];
   /** WRITE and CMD: tool calls that change something, each asked for first under --permission-prompt-tool. */
   const actions = [];
@@ -663,6 +689,7 @@ async function runTurn() {
       if (asks) ask = asks[1] ? QUESTIONS.slice(0, 1) : QUESTIONS;
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
       for (const x of m.text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
+      for (const x of m.text.matchAll(/^TELL:([^=\s]+)=(.+)$/gm)) tells.push({ to: [x[1]], message: x[2].trim() });
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
       for (const x of m.text.matchAll(/WRITE:(\S+)/g)) actions.push({ name: 'Write', input: { file_path: resolvePath(process.cwd(), x[1]), content: 'written by fake-claude' } });
       for (const x of m.text.matchAll(/CMD:(\S+)/g)) actions.push({ name: 'Bash', input: { command: x[1].replace(/_/g, ' '), description: 'Fake command' } });
@@ -759,6 +786,10 @@ async function runTurn() {
   for (const title of renders.splice(0)) {
     steps++;
     await renderPage(title);
+  }
+  for (const input of tells.splice(0)) {
+    steps++;
+    await callTool('omni-team', 'message_members', input);
   }
   if (stepMs !== null) {
     steps += await postSteps(t, stepMs, stepConnectors);
@@ -1214,6 +1245,13 @@ async function main() {
               'BLOCKER: The APNs key is missing from the secret store, so push alerts cannot be tested.\n'
           : 'NONE\n',
       );
+    }
+    if (outFmt === 'text' && /Write a (catch-up|summary) for an agent joining/.test(prompt)) {
+      // Omni's catch-up for an agent seated in a group thread, or its summary of the oldest messages past the budget.
+      // Counts the messages it was given, so a test sees what reached the small model.
+      const what = /Write a (catch-up|summary)/.exec(prompt)[1];
+      const n = (prompt.match(/^### /gm) ?? []).length;
+      return process.stdout.write(`Fake ${what} of ${n} messages.\n`);
     }
     if (outFmt === 'text' && prompt.includes('Predict the short reply')) {
       // Omni's reply suggestion. The agent's answer echoes the thread's message, so directives reach here too.

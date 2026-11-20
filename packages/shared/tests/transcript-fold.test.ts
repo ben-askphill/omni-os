@@ -3,7 +3,7 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { Span } from '../history.ts';
 import type { HandoverP, RunName, SwitchP } from '../run-switch.ts';
-import { buildItems, buildTasks, type SwitchItem, type TranscriptEvent } from '../transcript-fold.ts';
+import { buildItems, buildTasks, replyHeads, type SwitchItem, type TranscriptEvent } from '../transcript-fold.ts';
 import { projectFold } from './transcript-snapshot.ts';
 
 // One corpus for the transcript fold, which the web and iOS tests read too.
@@ -163,5 +163,68 @@ describe('transcript fold', () => {
       const items = fold([call('a'), ev('switch', sw(claude, codex, 'handover')), call('b')]);
       expect(items.map((it) => it.type)).toEqual(['tools', 'switch', 'tools']);
     });
+  });
+});
+
+describe('reply heads', () => {
+  const at = '2026-11-20T09:00:00.000Z';
+  const row = (id: number, kind: string, p: unknown, agent?: string): TranscriptEvent => ({ id, kind, payload: JSON.stringify(p), created_at: at, ...(agent && { agent }) });
+  const use = (id: number, agent?: string) => row(id, 'tool_use', { id: `c${id}`, name: 'Bash', input: { command: 'ls' } }, agent);
+
+  it('gives each run of replies one head, older rows read as the lead\'s', () => {
+    const { items } = buildItems([
+      row(1, 'user', { text: 'Fix the header.', source: 'ben' }),
+      row(2, 'assistant_text', { text: 'Looking.' }),
+      use(3),
+      row(4, 'assistant_text', { text: 'Fixed.' }),
+      row(5, 'result', { ok: true, subtype: 'success', turns: 2 }),
+      row(6, 'user', { text: 'Thanks. Ship it.', source: 'ben' }),
+      use(7),
+      row(8, 'assistant_text', { text: 'Shipped.' }),
+    ]);
+    expect([...replyHeads(items, 'builder')]).toEqual([
+      [2, 'builder'],
+      [7, 'builder'],
+    ]);
+  });
+
+  it('starts a new head where another agent replies, and keeps their text apart', () => {
+    const { items } = buildItems([
+      row(1, 'user', { text: 'Both of you, look.', source: 'ben' }),
+      row(2, 'assistant_text', { text: 'Builder here.' }, 'builder'),
+      row(3, 'assistant_text', { text: 'Reviewer here.' }, 'reviewer'),
+      use(4, 'reviewer'),
+      use(5, 'builder'),
+      row(6, 'assistant_text', { text: 'Done.' }, 'builder'),
+    ]);
+    expect(items.map((it) => it.type)).toEqual(['user', 'text', 'text', 'tools', 'tools', 'text']);
+    expect([...replyHeads(items, 'builder')]).toEqual([
+      [2, 'builder'],
+      [3, 'reviewer'],
+      [5, 'builder'],
+    ]);
+  });
+
+  it("keeps a team lead's turn under one head while it messages its members, and ends it at Ben's message", () => {
+    const msg = (id: number, to: string) => row(id, 'tool_use', { id: `c${id}`, name: 'mcp__omni-team__message_members', input: { to: [to], message: 'Your part' } }, 'builder');
+    const { items } = buildItems([
+      row(1, 'user', { text: 'Ship the page.', source: 'conductor' }),
+      row(2, 'assistant_text', { text: 'Splitting it three ways.' }, 'builder'),
+      msg(3, 'copywriter'),
+      row(4, 'user', { text: 'Write the copy.', source: 'lead', to: ['copywriter'] }, 'builder'),
+      msg(5, 'designer'),
+      row(6, 'user', { text: 'Draw the hero.', source: 'lead', to: ['designer'] }, 'builder'),
+      row(7, 'user', { text: 'Make it blue.', source: 'ben' }),
+      row(8, 'assistant_text', { text: 'Noted.' }, 'builder'),
+    ]);
+    expect([...replyHeads(items, 'builder')]).toEqual([
+      [2, 'builder'],
+      [8, 'builder'],
+    ]);
+  });
+
+  it('puts no head on replies in a thread with no agent', () => {
+    const { items } = buildItems([row(1, 'user', { text: 'Hi.' }), row(2, 'assistant_text', { text: 'Hello.' })]);
+    expect(replyHeads(items, null).size).toBe(0);
   });
 });

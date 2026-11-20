@@ -3,7 +3,7 @@ import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { DeliveryPhase } from '../delivery.ts';
 import { about } from '../about.ts';
 import { config } from '../config.ts';
-import { events, messageRequests, outbox, remoteCommands, threads, type DeliveryState, type MessageRequest } from '../db.ts';
+import { events, messageRequests, outbox, remoteCommands, threads, type DeliveryState, type EventRow, type MessageRequest, type ThreadStatus } from '../db.ts';
 import { bus, EVENT_ADDED, publishFeed, publishThread } from '../bus.ts';
 import type { Attachment } from '../uploads.ts';
 import { contextAttachments, harnessText } from '../message-context/project.ts';
@@ -114,7 +114,11 @@ export interface Msg {
   /** Harness commands the text names, for the adapter. */
   commands?: CommandUse[];
   /** Recorded when the CLI replays this uuid, so it lands exactly where the agent saw it. */
-  event: { kind: 'user' | 'crew_report'; payload: Record<string, unknown> };
+  /**
+   * `routed`: Ben's message as one agent of a group thread reads it, recorded hidden (runner/members.ts). `notice`:
+   * Omni telling an agent which files another agent changed (runner/collisions.ts), recorded hidden too.
+   */
+  event: { kind: 'user' | 'crew_report' | 'routed' | 'notice'; payload: Record<string, unknown> };
   /** Omni wrote it (a crew report, a team's go): Ben can resume or discard it, not edit or move it. */
   byOmni?: boolean;
 }
@@ -184,6 +188,21 @@ export interface ModStatus {
 }
 
 export const lives = new Map<string, Live>();
+/** Called once a thread's turn is over: ended, failed, stopped or refused before it started (runner/members.ts). */
+export const turnEnded: ((threadId: string, status: ThreadStatus) => void)[] = [];
+/** Cancel pending group starts and stop the member sessions (runner/members.ts). */
+export const groupStopping: ((threadId: string, stop: (sessionId: string) => void) => void)[] = [];
+export function endedTurn(threadId: string, status: ThreadStatus) {
+  for (const f of turnEnded) {
+    try {
+      f(threadId, status);
+    } catch (err) {
+      console.error(`[runner] after the turn of ${threadId}:`, err);
+    }
+  }
+}
+/** Called for every tool call a run records: (the session that ran it, its row, its payload) (runner/collisions.ts). */
+export const toolUsed: ((sessionThread: string, row: EventRow, payload: unknown) => void)[] = [];
 export const waiting: string[] = []; // thread ids waiting for a slot, FIFO
 export const waitingMsgs = new Map<string, Msg[]>();
 export const browserHolder = new Map<string, string>(); // channel id -> thread id whose process holds the profile
@@ -203,11 +222,23 @@ export function emitThread(id: string) {
   if (t) publishFeed({ type: 'thread', thread: t });
 }
 
-export function addEvent(threadId: string, kind: string, payload: unknown) {
-  const row = events.add(threadId, kind, payload);
-  publishThread(threadId, row);
+/** `agent`: the agent that wrote the row, on the rows a run of the thread writes. None on Ben's and Omni's own. */
+export function addEvent(threadId: string, kind: string, payload: unknown, agent: string | null = null) {
+  const row = events.add(threadId, kind, payload, undefined, agent);
+  // A member's session writes into its group thread's transcript (db/repos/events.ts), which the clients watch.
+  publishThread(row.thread_id, row);
   // The step a running thread is on may have moved (step-line.ts).
-  bus.emit(EVENT_ADDED, threadId, kind);
+  bus.emit(EVENT_ADDED, row.thread_id, kind);
+  if (row.thread_id !== threadId) bus.emit(EVENT_ADDED, threadId, kind);
+  if (kind === 'tool_use') {
+    for (const f of toolUsed) {
+      try {
+        f(threadId, row, payload);
+      } catch (err) {
+        console.error(`[runner] after a tool call in ${threadId}:`, err);
+      }
+    }
+  }
   return row;
 }
 
@@ -282,9 +313,14 @@ const pendingRow = (
   ...rest,
 });
 
-const pendingView = (m: Msg, state: PendingMsg['state']): PendingMsg => {
+/** A group agent's copy of Ben's message waits as his message (runner/members.ts). */
+const shownKind = (k: Exclude<Msg['event']['kind'], 'notice'>): PendingMsg['kind'] => (k === 'routed' ? 'user' : k);
+/** Omni's notices to an agent are no message of Ben's: they never show as pending. */
+const shown = (m: Msg): m is Msg & { event: { kind: Exclude<Msg['event']['kind'], 'notice'> } } => m.event.kind !== 'notice';
+
+const pendingView = (m: Msg & { event: { kind: Exclude<Msg['event']['kind'], 'notice'> } }, state: PendingMsg['state']): PendingMsg => {
   const p = m.event.payload as ShownPayload;
-  return pendingRow({ uuid: m.uuid, kind: m.event.kind, text: p.text ?? m.text, mode: m.mode, state }, p, {
+  return pendingRow({ uuid: m.uuid, kind: shownKind(m.event.kind), text: p.text ?? m.text, mode: m.mode, state }, p, {
     ...(m.requestId && { request_id: m.requestId, delivery: state }),
     ...(m.attachments?.length && { attachments: m.attachments }),
     ...(m.contexts?.length && { context: m.contexts }),
@@ -308,13 +344,13 @@ export const requestMsg = (r: MessageRequest): Msg => ({
 export function pendingFor(threadId: string): PendingMsg[] {
   const live = lives.get(threadId);
   return [
-    ...(live?.inflight ?? []).map((m) => pendingView(m, 'sent')),
-    ...(live?.held ?? []).map((m) => pendingView(m, 'held')),
-    ...(waitingMsgs.get(threadId) ?? []).map((m) => pendingView(m, 'waiting')),
+    ...(live?.inflight ?? []).filter(shown).map((m) => pendingView(m, 'sent')),
+    ...(live?.held ?? []).filter(shown).map((m) => pendingView(m, 'held')),
+    ...(waitingMsgs.get(threadId) ?? []).filter(shown).map((m) => pendingView(m, 'waiting')),
     // A worktree thread's first prompt while the worktree is made: saved, waiting for it.
     ...(threads.get(threadId)?.setup === 'preparing' ? messageRequests.unstarted(threadId) : []).map(
       (r): PendingMsg =>
-        pendingRow({ uuid: r.id, kind: r.kind, text: r.prompt, mode: r.mode, state: 'waiting' }, { source: r.source }, {
+        pendingRow({ uuid: r.id, kind: shownKind(r.kind), text: r.prompt, mode: r.mode, state: 'waiting' }, { source: r.source }, {
           request_id: r.request_id,
           delivery: r.state,
           ...(r.attachments?.length && { attachments: r.attachments }),
@@ -323,7 +359,7 @@ export function pendingFor(threadId: string): PendingMsg[] {
     ),
     ...messageRequests.parked(threadId).map(
       (r): PendingMsg =>
-        pendingRow({ uuid: r.id, kind: r.kind, text: (r.payload?.text as string | undefined) ?? r.prompt, mode: r.mode, state: 'held' }, { source: r.source, ...r.payload }, {
+        pendingRow({ uuid: r.id, kind: shownKind(r.kind), text: (r.payload?.text as string | undefined) ?? r.prompt, mode: r.mode, state: 'held' }, { source: r.source, ...r.payload }, {
           request_id: r.request_id,
           delivery: r.state,
           ...(r.attachments?.length && { attachments: r.attachments }),

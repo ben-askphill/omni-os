@@ -76,6 +76,7 @@ export function sessionParams(ctx: AdapterContext) {
     omniUrl: ctx.omniUrl,
     noBrowser: browserHeld(ctx.permission?.access),
     quick: readsOnly(thread),
+    leadsTeam: ctx.leadsTeam,
   });
   const policy = ctx.permission ? codexPolicy(ctx.permission.access) : null;
   // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask

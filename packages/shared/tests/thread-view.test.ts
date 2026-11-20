@@ -162,3 +162,32 @@ describe('threadView', () => {
     expect(v.turns[0].proseClipped).toBeNull();
   });
 });
+
+describe('threadView authors', () => {
+  it('keeps separately addressed, overlapping replies and results with their own agent', () => {
+    const events = [
+      user('Build it', 0),
+      { ...text('Builder starts.', 1), agent: 'builder' },
+      user('Review the design', 2, { to: ['designer'] }),
+      { ...text('Designer answers.', 3), agent: 'designer' },
+      { ...result(4, { duration_ms: 10 }), agent: 'designer' },
+      { ...text('Builder finishes.', 5), agent: 'builder' },
+      { ...result(6, { duration_ms: 20 }), agent: 'builder' },
+    ];
+    const view = threadView({ events, thread: { ...thread('done'), role: 'builder' }, artifacts: [], children: [] });
+    expect(view.turns.map((t) => [t.author, t.prompts.map((p) => p.text), t.prose, t.result?.duration_ms])).toEqual([
+      ['builder', ['Build it'], 'Builder finishes.', 20],
+      ['designer', ['Review the design'], 'Designer answers.', 10],
+    ]);
+    const running = threadView({ events: events.slice(0, 5), thread: { ...thread('running'), role: 'builder' }, artifacts: [], children: [] });
+    expect(running.turns.map((t) => [t.author, t.status])).toEqual([['builder', 'running'], ['designer', 'done']]);
+  });
+
+  it('names the agent that answered each turn: the row\'s, else the lead\'s, none without an agent', () => {
+    const events = [user('Fix it', 0), text('Fixed.', 1), result(2), user('Review it', 3), { ...text('Looks right.', 4), agent: 'reviewer' }];
+    const lead = threadView({ events, thread: { ...thread('done'), role: 'builder' }, artifacts: [], children: [] });
+    expect(lead.turns.map((t) => t.author)).toEqual(['builder', 'reviewer']);
+    const none = threadView({ events: events.slice(0, 3), thread: thread('done'), artifacts: [], children: [] });
+    expect(none.turns.map((t) => t.author)).toEqual([null]);
+  });
+});

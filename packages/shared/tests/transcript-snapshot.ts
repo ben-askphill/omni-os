@@ -67,6 +67,10 @@ function projectItem(it: Item) {
       return { type: 'question' as const, key: it.key, id: it.q.id, state: it.q.state };
     case 'ask':
       return { type: 'ask' as const, key: it.key, thread_id: it.p.thread_id, role: it.p.role, wake: it.p.wake };
+    case 'member':
+      return { type: 'member' as const, key: it.key, event: it.p.event, agent: it.p.agent };
+    case 'collision':
+      return { type: 'collision' as const, key: it.key, path: it.c.path, agents: it.c.agents, cleared: it.c.cleared };
     default: {
       const unreachable: never = it;
       return unreachable;

@@ -1,6 +1,6 @@
 # Message context
 
-A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), browser annotations (`browser_annotation`), an optional picked page element on that annotation, thread references (`thread_reference`) and machine mentions (`machine_mention`). The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
+A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), browser annotations (`browser_annotation`), an optional picked page element on that annotation, thread references (`thread_reference`), machine mentions (`machine_mention`) and agent mentions (`agent_mention`). The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
 
 ## The record
 
@@ -89,6 +89,15 @@ Annotate in the Browser panel works on the live page (`BrowserAnnotationOverlay.
 - **Text and chip agree.** Picking a machine row adds its record before the token goes in (once per machine); when the record can't be added, `@<name>` goes in as plain text and the composer shows why. After every edit `reconcileMachines` drops the record of a machine whose last token went and adds one for a token without a record (Undo, or a pasted token). It runs in the editor's change handler, never in a render.
 - **Stamped at send.** `stampMachineMentions` (`apps/server/message-context/machine-mention.ts`) runs after the thread-reference stamp in `POST /api/threads/:id/messages` and `POST /api/threads`, writes the machine's current name and Tailscale state, and refuses a machine this one does not know. An offline machine is not refused: `delegate` refuses to start a thread there (`run-on.ts targetFor`).
 - **The block.** The projector names the machine, its device id and its state when sent, says whether it is the machine the agent runs on (worked out when the text is written, so a Conductor that runs elsewhere reads the same id), and says to pass that id as `device` and never to run the task elsewhere. `GET /api/devices/pick?device=` resolves an id, a name or `here` for `delegate` and `continue_thread` (`packages/shared/machine-pick.ts`), this machine's own name included.
+
+## Agent mentions
+
+`agent_mention` seats an agent in a group thread and sends the message to it ([ADR 0019](../adr/0019-group-threads.md)). Body: `{ agent, name }` (`packages/shared/message-context-agent.ts`). The label is `@<name>`.
+
+- **The menu.** `MessageEditor` takes the thread's `agents` (`useThreadAgents`: the members, then every other agent but the Conductor and hidden ones) and the `@` menu shows them on its **Agents** tab, the one it opens on, beside Machines and Files (`mentionTabs`, `agentRows` in `packages/shared/mention-menu.ts`). A picked agent is a token of type `agent` (`agentToken` in `machine-tokens.ts`), and `reconcileMentions` keeps agent records and tokens in step the way it does for machines.
+- **Stamped at send.** `stampAgentMentions` (`apps/server/message-context/agent-mention.ts`) runs after the machine stamp and writes each agent's current name; `seatRefusal` refuses the Conductor and an agent this machine does not have. Only Ben sends one: a message from an agent with an agent mention gets a 403.
+- **Drawn.** In the text, as a pill in the agent's color (`MentionText`). An agent the text does not name (a message sent through the API, by the Conductor or by an Ask) shows on the line over the bubble, as "To" with each agent's avatar and name, never as a chip: `sentContext` in `packages/shared/message-context-machine.ts` splits a sent or queued message's records, and `SentTo` in `apps/web/src/message-context/agent-mention.tsx` draws the line. A queued message being edited is plain text, so its line names every agent.
+- **Routing, not a block.** The projector writes no block for the agent: the record only says who gets the message. `runner/members.ts` (`namedAgents`, `routeNamed`) seats each named agent, writes Ben's message once with `to`, and hands each one a hidden `routed` row in its own session, with its catch-up or the messages since its cursor in front (`preamble`).
 
 ## Review notes
 

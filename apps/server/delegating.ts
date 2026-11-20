@@ -13,7 +13,8 @@
 // sub-agent started there whose end has not arrived counts while its rows keep coming. One silent for
 // REMOTE_TASK_STALE_MS no longer does, so a machine that died mid-run does not pin the thread on the others.
 import { bus, publishFeed, SYNCED_TASK, type FeedEvent } from './bus.ts';
-import { assignments, events, outbox, threads } from './db.ts';
+import { assignments, events, outbox, threads, type Thread } from './db.ts';
+import { memberFields, type MemberView } from './member-view.ts';
 import { activeTasks, lives } from './runner/state.ts';
 import { isSubagent } from './stream.ts';
 import { machineNames, ranOnFields, type MachineNames } from './ran-on.ts';
@@ -22,7 +23,7 @@ import { stepField } from './step-line.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
 
 /** With `delegating`, where it runs or ran and when its run started (ran-on.ts), and the step it is on (step-line.ts), for the Inbox rows. */
-export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields> & StepField;
+export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields> & StepField & { members?: MemberView[]; read_only?: string };
 
 /** How long a sub-agent on another machine counts without a new row: its progress is stored every 20 s while it works. */
 export const REMOTE_TASK_STALE_MS = 15 * 60_000;
@@ -45,7 +46,8 @@ export const delegatingIds = (): ReadonlySet<string> => new Set(threads.delegati
 /** The thread as the clients get it. Pass `ids` and `names` to read many with one query each. */
 export const withDelegating = <T extends { id: string; status?: string }>(t: T, ids = delegatingIds(), names: MachineNames = machineNames()): WithDelegating<T> => {
   const delegating = ids.has(t.id);
-  return { ...t, delegating, ...ranOnFields(t, delegating, names), ...stepField(t) };
+  // A group thread's agents and whether it takes messages (member-view.ts), on the threads that have them.
+  return { ...t, delegating, ...ranOnFields(t, delegating, names), ...stepField(t), ...memberFields(t as unknown as Thread) };
 };
 
 /** Every thread as the clients get it, with one query. */

@@ -109,3 +109,8 @@ export function organizeItems(target: ThreadTarget): ThreadMenuItem[] {
 export function forkItem(target: ThreadTarget): ThreadMenuItem | null {
   return threadMenu(menuFacts(target)).find((g) => g.id === 'continue')?.items.find((i) => i.id === 'fork') ?? null;
 }
+
+/** Add an agent…, from the same list: it seats another agent in the thread (ADR 0019). Null where the list leaves it out. */
+export function addAgentItem(target: ThreadTarget): ThreadMenuItem | null {
+  return threadMenu(menuFacts(target)).find((g) => g.id === 'continue')?.items.find((i) => i.id === 'add-agent') ?? null;
+}

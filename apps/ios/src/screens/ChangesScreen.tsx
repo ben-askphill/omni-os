@@ -10,7 +10,7 @@ import { DiffPane } from '../changes/DiffPane';
 import { useBranchChanges, useTurnChanges } from '../changes/hooks';
 import { NotesBar, useReviewNotes } from '../changes/ReviewNotes';
 import { notesOnScreen } from '../changes/rows';
-import { useThreadLive, useThreadView } from '../live/react';
+import { useLiveHub, useThreadLive, useThreadView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { DiffCount, Loading } from '../review/parts';
 import { fontSize, lineHeight, mono, space, useOmniTheme, weight } from '../theme';
@@ -66,6 +66,7 @@ function useNotes(notes: PaneProps['notes'], groups: readonly ChangeGroupView[] 
 
 function BasePane({ thread, onAdded, notes }: PaneProps) {
   const headerOffset = useHeaderHeight();
+  const hub = useLiveHub();
   const q = useBranchChanges(thread.id, thread.status, true);
   const { data, view } = q;
   const placed = useNotes(notes, view?.groups, onAdded);
@@ -95,6 +96,11 @@ function BasePane({ thread, onAdded, notes }: PaneProps) {
       headerOffset={headerOffset}
       notes={placed.byFile}
       noteActions={notes.actions}
+      collisions={data.collisions}
+      onDismissCollision={async (id) => {
+        await hub.request((api) => api.dismissCollision(thread.id, id));
+        q.reload();
+      }}
       header={
         <Summary
           lines={[

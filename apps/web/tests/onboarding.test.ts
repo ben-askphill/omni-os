@@ -82,12 +82,12 @@ const labels = (row: Element) => [...row.querySelectorAll('span.w-12')].map((s) 
 const row = (el: HTMLElement, id: string) => el.querySelector(`[data-harness="${id}"]`)!;
 
 describe('Harnesses step', () => {
-  it('offers to connect your own harness, which opens the Connect a harness sheet', async () => {
+  it('offers to add a remote agent, which opens the Add remote agent sheet', async () => {
     harnesses = [{ id: 'claude-code', name: 'Claude Code', plan: 'Claude plan', available: true, models: [], running: 0, cap: 4 }];
     const el = await render(createElement(HarnessScreen));
     const own = el.querySelector('[data-connect-agent]')!;
-    expect(text(own)).toContain('Your own harness');
-    const button = [...own.querySelectorAll('button')].find((b) => b.textContent === 'Connect a harness')!;
+    expect(text(own)).toContain('A remote agent');
+    const button = [...own.querySelectorAll('button')].find((b) => b.textContent === 'Add remote agent')!;
     await act(async () => button.click());
     expect(text(document.querySelector('dialog'))).toContain('Address, link or code');
   });

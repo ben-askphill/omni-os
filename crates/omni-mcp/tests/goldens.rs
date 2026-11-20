@@ -414,6 +414,14 @@ fn memory_matches_its_record() {
     check(&scenarios);
 }
 
+/// Written for this binary too (`packages/test-fixtures/native/mcp/team.json`).
+#[test]
+fn team_matches_its_record() {
+    let scenarios = fixture("team");
+    assert_eq!(scenarios.len(), 4);
+    check(&scenarios);
+}
+
 #[test]
 fn threads_matches_the_record_of_the_node_server() {
     let scenarios = fixture("threads");
@@ -431,7 +439,7 @@ fn every_server_behind_the_lazy_front_still_matches_the_record() {
         field(scenario, "steps").and_then(JsValue::as_array).unwrap_or_default().iter().any(|step| field(step, "writeTokenFile").is_some())
     };
     let mut left_out = 0;
-    for server in ["ask", "render", "steps", "threads", "memory"] {
+    for server in ["ask", "render", "steps", "threads", "memory", "team"] {
         let all = fixture(server);
         let count = all.len();
         let behind: Vec<JsValue> = all
@@ -504,6 +512,6 @@ fn without_a_server_name_it_says_how_to_run_it() {
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(
         String::from_utf8_lossy(&out.stderr),
-        "usage: omni-mcp <ask|render|steps|threads|memory|lazy <answers.json> <command> [args...]>\n"
+        "usage: omni-mcp <ask|render|steps|threads|memory|team|lazy <answers.json> <command> [args...]>\n"
     );
 }

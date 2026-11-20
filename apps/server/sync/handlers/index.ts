@@ -17,3 +17,4 @@ import './crew-file.ts';
 import './harness-file.ts';
 import './mcp-client.ts';
 import './memory.ts';
+import './thread-member.ts';

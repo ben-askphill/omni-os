@@ -5,28 +5,35 @@ import { delimiter, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startFakeCursorApi, type FakeCursorApi } from '@omni/test-fixtures/fake-cursor-api.mjs';
 import { startRunner } from './runner-boot.ts';
+import { startFakeHermes, type FakeHermes } from './fake-hermes.ts';
 
 // A stand-in for `security`: the global CURSOR_API_KEY is a test double, every other secret is missing.
 const SECURITY = `#!/bin/sh
 if [ "$1" = "find-generic-password" ]; then
-  case "$*" in *" -a global/CURSOR_API_KEY "*) printf '%s\\n' 'test-cursor-key'; exit 0 ;; esac
+  case "$*" in
+    *" -a global/CURSOR_API_KEY "*) printf '%s\\n' 'test-cursor-key'; exit 0 ;;
+    *" -a global/HERMES_API_KEY "*) printf '%s\\n' 'test-hermes-key'; exit 0 ;;
+  esac
   exit 44
 fi
 exit 0
 `;
 
 let fake: FakeCursorApi;
+let hermes: FakeHermes;
 let bin: string;
 let H: Awaited<ReturnType<typeof startRunner>>;
 const savedPath = process.env.PATH;
 
 beforeAll(async () => {
   fake = await startFakeCursorApi();
+  hermes = await startFakeHermes('test-hermes-key');
   bin = mkdtempSync(join(tmpdir(), 'omni-security-'));
   writeFileSync(join(bin, 'security'), SECURITY, { mode: 0o755 });
   H = await startRunner({
     OMNI_CURSOR_API_URL: fake.url,
     OMNI_CURSOR_CLOUD_POLL_MS: '5',
+    OMNI_HERMES_URL: hermes.url,
     PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
   });
   const repo = join(H.tmp, 'repo');
@@ -35,13 +42,17 @@ beforeAll(async () => {
   H.db.channels.create({ id: 'acme', name: 'Acme', kind: 'client', use_worktree: 1, repo_path: repo, github_repo: 'acme/widgets' });
   H.db.channels.create({ id: 'notes', name: 'Notes', kind: 'internal', use_worktree: 0 });
   const svc = await import('../harness/catalog-service.ts');
+  (await import('../remote-agents.ts')).convertRemoteAgents();
   await svc.loadCatalog();
+  const { app } = await import('../app.ts');
+  const res = await app.request('/api/crew', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'cloud-review', fields: { name: 'Cloud Review', harness: 'cursor-cloud' }, charter: 'Review the work.' }) });
+  expect(res.status).toBe(201);
 });
 
-afterAll(() => {
+afterAll(async () => {
   process.env.PATH = savedPath;
   if (bin) rmSync(bin, { recursive: true, force: true });
-  return fake?.close();
+  await Promise.all([fake?.close(), hermes?.close()]);
 });
 
 describe('Cursor Cloud through the runner', () => {
@@ -104,7 +115,68 @@ describe('Cursor Cloud through the runner', () => {
     expect(fake.calls.filter((c) => c.method === 'POST' && c.path === `/v1/agents/bc-${t.id}/runs`)).toHaveLength(1);
   });
 
+  it('seats a Cursor Cloud member on its own branch with no PR, raises no collision, and asks the lead to pull the branch', { timeout: 30_000 }, async () => {
+    const json = (method: string, body?: unknown) => ({ method, headers: { 'content-type': 'application/json' }, ...(body !== undefined && { body: JSON.stringify(body) }) });
+    const { app } = await import('../app.ts');
+    for (const [id, name, harness] of [['planner', 'Planner', 'claude-code'], ['clouder', 'Clouder', 'cursor-cloud']]) {
+      const res = await app.request('/api/crew', json('POST', { id, fields: { name, harness, ...(harness === 'claude-code' && { model: 'sonnet' }) }, charter: `You are ${name}.` }));
+      expect(res.status).toBe(201);
+    }
+    // A repo with a commit, so the lead gets a worktree.
+    const repo = join(H.tmp, 'group-repo');
+    mkdirSync(repo);
+    execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+    writeFileSync(join(repo, 'README.md'), 'widgets\n');
+    execFileSync('git', ['-C', repo, '-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'start']);
+    H.db.channels.create({ id: 'acme-group', name: 'Acme group', kind: 'client', use_worktree: 1, repo_path: repo, github_repo: 'acme/widgets' });
+    const t = await H.runner.createThread({ channel: 'acme-group', prompt: 'plan it', role: 'planner' });
+    await H.untilResults(t.id, 1);
+    const mention = { id: 'm-clouder', kind: 'agent_mention', v: 1, label: '@Clouder', body: { agent: 'clouder', name: 'Clouder' } };
+    expect((await app.request(`/api/threads/${t.id}/messages`, json('POST', { prompt: 'build the toolbar', context: [mention] }))).status).toBe(200);
+    const sid = H.db.members.of(t.id, 'clouder')!.session_thread;
+    await H.until('the cloud member finished', () => H.byKind(t.id, 'cloud_agent').some((e) => e.p.status === 'FINISHED'), 15_000).catch((err) => {
+      throw new Error(`${err.message}: ${JSON.stringify(H.flow(t.id))} ${JSON.stringify(H.texts(t.id, 'error'))} member ${H.thread(sid).status}`);
+    });
+    // Its own branch, and no pull request of its own: only the lead opens one.
+    const create = fake.calls.filter((c) => c.method === 'POST' && c.path === '/v1/agents').at(-1)!;
+    expect((create.body as { autoCreatePR: boolean }).autoCreatePR).toBe(false);
+    const finished = H.byKind(t.id, 'cloud_agent').findLast((e) => e.p.status === 'FINISHED')!;
+    expect(finished.p.branch).toMatch(/^cursor\//);
+    expect(finished.p.pr_url).toBeUndefined();
+    // The lead is asked to pull it in, and runs a turn on it.
+    await H.until('the lead pulls it', () => H.texts(t.id, 'user').some((x) => x.startsWith('Pull Clouder')));
+    await H.untilResults(t.id, 3);
+    const toLead = H.claudeTexts(t.id).at(-1)!;
+    expect(toLead).toContain(`git fetch origin ${finished.p.branch}`);
+    expect(H.thread(sid).status).toBe('done');
+    expect(H.byKind(t.id, 'collision')).toHaveLength(0);
+  });
+
   it('refuses a cloud thread in a channel with no GitHub repo', async () => {
     await expect(H.runner.createThread({ channel: 'notes', prompt: 'go', harness: 'cursor-cloud' })).rejects.toThrow(/GitHub repo/);
+  });
+
+  it.each([0, 1])('keeps a cloud member’s completion visible and wakes a remote lead only with remote work enabled (%s)', { timeout: 30_000 }, async (remote_work) => {
+    const channel = `cloud-remote-${remote_work}`;
+    H.db.channels.create({ id: channel, name: channel, use_worktree: 0, github_repo: 'acme/widgets', remote_work });
+    const { app } = await import('../app.ts');
+    const post = (path: string, data: unknown) => app.request(`/api${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+    hermes.reset();
+    const t = await H.runner.createThread({ channel, prompt: 'plan the change', role: 'hermes' });
+    await H.untilResults(t.id, 1);
+    const mention = { id: 'm-cloud', kind: 'agent_mention', v: 1, label: '@Cloud Review', body: { agent: 'cloud-review', name: 'Cloud Review' } };
+    expect((await post(`/threads/${t.id}/messages`, { prompt: 'build the change', context: [mention] })).status).toBe(200);
+    await H.untilResults(t.id, 2);
+    const finished = H.byKind(t.id, 'cloud_agent').findLast((e) => e.p.status === 'FINISHED')!;
+    expect(finished.p).toMatchObject({ branch: expect.stringMatching(/^cursor\//), repo: 'acme/widgets' });
+    const member = H.db.members.of(t.id, 'cloud-review')!;
+    const reply = H.db.events.lastRunText(member.session_thread);
+    expect(reply).toBeTruthy();
+    expect(H.texts(t.id, 'assistant_text').join('\n')).toContain(reply);
+    if (remote_work) await H.untilResults(t.id, 3);
+    const inputs = hermes.calls.filter((c) => c.method === 'POST' && c.path === '/v1/runs').map((c) => (c.body as { input: string }).input);
+    expect(inputs).toHaveLength(remote_work ? 2 : 1);
+    if (remote_work) expect(inputs[1]).toContain(reply);
+    else expect(H.db.messageRequests.byRequestId(t.id, `cloud-pull:${member.session_thread}:${finished.p.run_id}`)).toBeFalsy();
   });
 });

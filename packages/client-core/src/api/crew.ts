@@ -1,15 +1,21 @@
 import { apiPath, type HttpClient } from '../http.ts';
 import type { CrewLocks } from '@omni/shared/crew-settings.ts';
+import type { RemoteServer } from '@omni/shared/remote-agent.ts';
 
 /** A crew role: a charter with the run it defaults to. A new thread can start as one (`createThread`'s `role`). */
 export interface CrewRole {
   id: string;
   name: string;
   description: string;
-  /** The role's own look: a shared icon (`icon:<name>`) or an emoji, and a hex background. Unset: its mark or monogram. */
-  avatar?: { icon?: string; bg?: string };
+  /**
+   * The role's own look: the path of an image Ben uploaded (`/api/crew/:id/avatar?v=…`, read with the token), else a
+   * shared icon (`icon:<name>`) or an emoji, and a hex background. Unset: a built-in's mark, else its initials disc.
+   */
+  avatar?: { image?: string; icon?: string; bg?: string };
   /** A harness id from the server's catalog. An open string, not a fixed list: outside runtimes join the catalog by id. */
   harness?: string;
+  /** A remote agent's server (ADR 0020): set exactly when the agent runs on Hermes or a server Ben connected. Never a key. */
+  server?: RemoteServer;
   model?: string;
   effort?: string;
   channel?: string;

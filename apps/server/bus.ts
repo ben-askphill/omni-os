@@ -49,7 +49,20 @@ export type FeedEvent =
    */
   | { type: 'alert'; alert: FeedAlert };
 
-export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
+/**
+ * The thread a hidden member thread's update shows on: its group thread's (apps/server/member-view.ts sets it). The
+ * clients never list a member thread; its state reaches them as the group thread's `members`.
+ */
+let shownThread: (t: { id: string; source?: string; parent_id?: string | null }) => unknown = (t) => t;
+export const setShownThread = (f: typeof shownThread) => void (shownThread = f);
+export const publishFeed = (e: FeedEvent) => {
+  if (e.type === 'thread' && (e.thread as { source?: string }).source === 'member') {
+    const shown = shownThread(e.thread as { id: string });
+    if (!shown) return;
+    return bus.emit('feed', { ...e, thread: shown });
+  }
+  return bus.emit('feed', e);
+};
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);
 
 /** A thread event was stored, by a run here (runner/state.ts addEvent) or synced in: (threadId, kind). The step line may have moved (step-line.ts). */

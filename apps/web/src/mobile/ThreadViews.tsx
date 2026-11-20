@@ -1,5 +1,6 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
 import { NO_CREW_ROLE } from '@omni/shared/thread-owner.ts';
+import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { OwnerField } from '../components/thread/OwnerField.tsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
@@ -490,7 +491,17 @@ export function DetailsScreen() {
     ['Channel', `#${channel(thread.channel_id)?.name ?? thread.channel_id}`],
     // Who it is for, beside the agent that does it: the crew role, as the quick card says (thread-owner.ts).
     ['Owner', <OwnerField thread={thread} />],
-    ['Agent', roleName ?? <span className="text-fg-3">{NO_CREW_ROLE}</span>],
+    [
+      'Agent',
+      roleName && thread.role ? (
+        <span className="inline-flex items-center gap-1.5">
+          <AgentAvatar agent={{ ...(roles.find((r) => r.id === thread.role) ?? { id: thread.role }), name: roleName }} size={18} />
+          {roleName}
+        </span>
+      ) : (
+        <span className="text-fg-3">{NO_CREW_ROLE}</span>
+      ),
+    ],
     [
       'Harness',
       <span className="inline-flex items-center gap-1.5">

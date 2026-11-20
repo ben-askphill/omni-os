@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { waitFor } from './support.ts';
 import { MemoryTransport } from '../sync/transport.ts';
+import { png } from './png.ts';
 
 // The whole story on two Macs in one process: each boots the real server (runner, API, sync worker, file hooks)
 // against its own data dir and home dir, with fake claude, and both talk to one in-memory relay. A channel, a
@@ -167,5 +168,26 @@ describe('a thread started on one Mac, continued on the other', () => {
     clean(await a.worker.syncNow());
     expect(await inbox(a)).toBeUndefined();
     expect(a.thread(threadId)).toEqual(before);
+  });
+
+  it('B shows the avatar A uploaded for an agent, which came with its crew file', async () => {
+    const img = png(96, 96);
+    const put = await a.app.request('/api/crew/builder/avatar', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: img.url }) });
+    expect(put.status).toBe(200);
+    clean(await a.worker.syncNow());
+    clean(await b.worker.syncNow());
+    const builder = ((await (await b.app.request('/api/crew')).json()) as { id: string; avatar?: { image?: string } }[]).find((r) => r.id === 'builder');
+    expect(builder?.avatar?.image).toMatch(/^\/api\/crew\/builder\/avatar\?v=/);
+    const served = await b.app.request(builder!.avatar!.image!);
+    expect(Buffer.from(await served.arrayBuffer()).equals(img.bytes)).toBe(true);
+  });
+
+  it("B keeps the agent that wrote each of A's rows", async () => {
+    const row = a.db.events.add(threadId, 'assistant_text', { text: 'From the builder.' }, undefined, 'builder');
+    clean(await a.worker.syncNow());
+    clean(await b.worker.syncNow());
+    const there = b.db.events.since(threadId).find((e) => e.payload === row.payload);
+    expect(there?.agent).toBe('builder');
+    expect(b.db.events.since(threadId).find((e) => e.kind === 'user')?.agent).toBeNull();
   });
 });

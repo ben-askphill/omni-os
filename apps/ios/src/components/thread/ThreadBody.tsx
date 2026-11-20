@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-
 import { Text } from '../../ui/Text';
 
 import type { ThreadLive, ThreadView } from '../../live/hub';
-import { useChannelLook, useMarkResultRead } from '../../live/react';
+import { useAgents, useChannelLook, useChannels, useLiveHub, useMarkResultRead } from '../../live/react';
 import { openArtifact } from '../../navigation/open-artifact';
 import type { RootStackParamList } from '../../navigation/types';
 import { CLOSED, type Disclosure, threadRows, type ThreadRow } from '../../thread/rows';
@@ -33,6 +33,10 @@ function useThreadRows(view: ThreadView, disclosure: Disclosure): ThreadRow[] {
   const { thread } = view;
   const conductor = thread?.channel_id === CONDUCTOR_CHANNEL;
   const look = useChannelLook(CONDUCTOR_CHANNEL);
+  const agents = useAgents();
+  // The listed channel follows a switch changed on another device; the detail's is as the thread opened.
+  const { channels } = useChannels();
+  const channel = useMemo(() => channels?.find((c) => c.id === thread?.channel_id) ?? view.channel, [channels, thread?.channel_id, view.channel]);
   const rows = useMemo(() => {
     if (!thread) return [];
     return threadRows(
@@ -46,10 +50,12 @@ function useThreadRows(view: ThreadView, disclosure: Disclosure): ThreadRow[] {
         conductor,
         conductorChannel: conductor && look.name ? { name: look.name, icon: look.icon, avatar_bg: look.avatarBg } : null,
         disclosure,
+        agents,
+        channel,
       },
       prev.current,
     ).rows;
-  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure]);
+  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure, agents, channel]);
   useEffect(() => {
     prev.current = rows;
   }, [rows]);
@@ -70,6 +76,8 @@ export function ThreadBody({ view, live }: { view: ThreadView; live: ThreadLive 
     liveRef.current = live;
   }, [live]);
   const cwd = view.thread?.cwd ?? null;
+  const hub = useLiveHub();
+  const channelId = view.thread?.channel_id ?? null;
   const actions = useMemo<RowActions>(
     () => ({
       threadId: view.threadId,
@@ -81,8 +89,14 @@ export function ThreadBody({ view, live }: { view: ThreadView; live: ThreadLive 
       loadOutput: (eventId, offset) => (liveRef.current ? liveRef.current.loadOutput(eventId, offset) : Promise.reject(new Error('Still connecting.'))),
       answer: ((questionId, answers) => (liveRef.current ? liveRef.current.answerQuestion(questionId, answers) : Promise.reject(new Error('Still connecting. Try again in a moment.')))) as SendAnswers,
       cwd,
+      pickLane: (turn, agent) => setDisclosure((d) => ({ ...d, lanes: new Map(d.lanes).set(turn, agent) })),
+      // The stream brings the clearing row, which redraws the flag as dismissed.
+      dismissCollision: async (id) => void (await hub.request((api) => api.dismissCollision(view.threadId, id))),
+      openChannelSettings: () => {
+        if (channelId) navigation.navigate('ChannelSettings', { id: channelId });
+      },
     }),
-    [navigation, cwd, view.threadId],
+    [navigation, cwd, view.threadId, hub, channelId],
   );
 
   const renderItem = useCallback(({ item }: { item: ThreadRow }) => <RowView row={item} />, []);

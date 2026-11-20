@@ -16,6 +16,12 @@ export interface RowActions {
   loadOutput(eventId: number, offset: number): Promise<OutputChunk>;
   answer: SendAnswers;
   cwd: string | null;
+  /** Shows that agent's lane of a turn in lanes. */
+  pickLane(turn: number, agent: string): void;
+  /** Takes a collision flag down. Rejects with why it could not. */
+  dismissCollision(id: number): Promise<void>;
+  /** Opens the thread's channel settings, where the switch for remote agents is. */
+  openChannelSettings(): void;
 }
 
 const idle = (): never => {
@@ -32,6 +38,9 @@ const NONE: RowActions = {
   loadOutput: idle,
   answer: idle,
   cwd: null,
+  pickLane: idle,
+  dismissCollision: idle,
+  openChannelSettings: idle,
 };
 
 export const RowActionsContext = createContext<RowActions>(NONE);

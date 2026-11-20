@@ -75,7 +75,7 @@ export const ANALYTICS_EVENTS = {
   screen_viewed: { surface, screen: oneOf(SCREENS), section: token },
   /** Any new thread: from the composer, the Conductor, an automation, a team or a capture. */
   thread_created: { harness: token, source: token, delegated: bool, team: bool, quick: bool, workspace: token, remote: bool },
-  /** A thread another thread started (the Conductor's delegate, a crew hand-off, a team member). */
+  /** A thread another thread started (the Conductor's delegate, a crew hand-off, a team's one thread). */
   thread_delegated: { harness: token, source: token, team: bool },
   /** A message sent to a thread, by the user or the Conductor. `step`: one of the branch steps' prompts (Open PR, Fix conflicts, Fix checks). */
   message_sent: { harness: token, mode: oneOf(['steer', 'queue', 'interrupt']), from: oneOf(['user', 'conductor']), attachments: count, step: oneOf(PR_STEPS) },

@@ -75,6 +75,7 @@
     "prompt_fix_checks": null,
     "scan_opt_out": 0,
     "remote_excerpts_off": 0,
+    "remote_work": 0,
     "access_level": null,
     "connector_access": null,
     "design_system_size": 0,
@@ -88,28 +89,32 @@
       "thread_id": "00000000-0000-4000-8000-000000000021",
       "kind": "init",
       "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[\"omni-ask:connected\",\"omni-render:connected\",\"omni-threads:connected\"]}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 73,
       "thread_id": "00000000-0000-4000-8000-000000000021",
       "kind": "user",
       "payload": "{\"text\":\"TOOL:30000 audit the checkout\",\"source\":\"manual\"}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 74,
       "thread_id": "00000000-0000-4000-8000-000000000021",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 30\",\"description\":\"Fake tool\"},\"parent\":null}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 75,
       "thread_id": "00000000-0000-4000-8000-000000000021",
       "kind": "task",
       "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"started\"}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     }
   ],
   "artifacts": [],

@@ -7,7 +7,8 @@ import { useSending } from '../sending.ts';
 import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../message-context/agent-mention.tsx';
 import { Attachments } from '../components/Transcript.tsx';
 import { Button, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { duration, plural } from '../format.ts';
@@ -46,13 +47,14 @@ export function MoProse({ text, event }: { text: string; event?: number | null }
 }
 
 /** `limit`: the thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped. */
-export function Outcome({ t, harness, limit }: { t: TurnView; harness: string; limit?: string | null }) {
+/** `harness`: named at the end, for a turn no agent wrote. An agent's turn shows it on its author line, behind Show technical details. */
+export function Outcome({ t, harness, limit }: { t: TurnView; harness: string | null; limit?: string | null }) {
   const took = duration(t.result?.duration_ms);
   const [word, after] = ENDED[t.status] ?? ['Ended', 'Ended after'];
   return (
     <div className="flex items-center gap-2 text-[12.5px] leading-[1.3] text-fg-3 tabular-nums">
       <StatusDot status={limit ? 'limited' : t.status} size={8} />
-      {[limit ?? (took ? `${after} ${took}` : word), t.progress ? stepsLabel(t.progress.steps.length) : null, harnessLabel(harness)].filter(Boolean).join(' · ')}
+      {[limit ?? (took ? `${after} ${took}` : word), t.progress ? stepsLabel(t.progress.steps.length) : null, harness && harnessLabel(harness)].filter(Boolean).join(' · ')}
     </div>
   );
 }
@@ -308,32 +310,38 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
   };
   return (
     <>
-      {items.map((m) => (
-        <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
-          <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
-          {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} lazy={false} /> : null}
-          <ContextChips records={chipRecords(m.text, m.context)} align="end" className="w-full max-w-[86%]" />
-          {(m.text || !hasContext(m.context)) && (
-            <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">
-              <MentionText text={m.text} records={m.context} />
-            </div>
-          )}
-          {(m.delivery === 'uncertain' || (m.delivery && isOmnis(m))) && (
-            <div className="flex gap-2">
-              {m.delivery === 'uncertain' && (
-                <Button size="sm" variant="secondary" icon="send" busy={busy === `again:${m.uuid}`} disabled={!!busy} onClick={() => void call(`again:${m.uuid}`, 'resume', [m.uuid])}>
-                  Send again
-                </Button>
-              )}
-              {isOmnis(m) && (
-                <Button size="sm" variant="ghost" icon="trash" busy={busy === `discard:${m.uuid}`} disabled={!!busy} onClick={() => void call(`discard:${m.uuid}`, 'discard', [m.uuid])}>
-                  Discard
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+      {items.map((m) => {
+        const sent = sentContext(m.text, m.context);
+        return (
+          <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
+            <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[12px] leading-[1.3] text-fg-3">
+              <span>{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
+              <SentTo agents={sent.to} />
+            </span>
+            {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} lazy={false} /> : null}
+            <ContextChips records={sent.chips} align="end" className="w-full max-w-[86%]" />
+            {(m.text || !hasContext(m.context)) && (
+              <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">
+                <MentionText text={m.text} records={m.context} />
+              </div>
+            )}
+            {(m.delivery === 'uncertain' || (m.delivery && isOmnis(m))) && (
+              <div className="flex gap-2">
+                {m.delivery === 'uncertain' && (
+                  <Button size="sm" variant="secondary" icon="send" busy={busy === `again:${m.uuid}`} disabled={!!busy} onClick={() => void call(`again:${m.uuid}`, 'resume', [m.uuid])}>
+                    Send again
+                  </Button>
+                )}
+                {isOmnis(m) && (
+                  <Button size="sm" variant="ghost" icon="trash" busy={busy === `discard:${m.uuid}`} disabled={!!busy} onClick={() => void call(`discard:${m.uuid}`, 'discard', [m.uuid])}>
+                    Discard
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </>
   );
 }

@@ -16,6 +16,7 @@ const row = (kind: string, payload: unknown) => ({
   kind,
   payload: typeof payload === 'string' ? payload : JSON.stringify(payload),
   created_at: '2026-01-05T09:00:00.000Z',
+  agent: null,
 });
 const text = (n: number) => 'abcdefghij'.repeat(Math.ceil(n / 10)).slice(0, n);
 
@@ -32,7 +33,7 @@ describe('clip', () => {
     expect(p).toEqual({ tool_use_id: 'c1', text: `${text(2048)}…`, is_error: false, truncated: true });
     expect(c.clipped).toEqual({ bytes: Buffer.byteLength(r.payload) });
     expect(encodedSize(c)).toBeLessThanOrEqual(4096);
-    expect(Object.keys(c)).toEqual(['id', 'thread_id', 'kind', 'payload', 'created_at', 'clipped']);
+    expect(Object.keys(c)).toEqual(['id', 'thread_id', 'kind', 'payload', 'created_at', 'agent', 'clipped']);
   });
 
   it('goes down the tiers, nested strings included', () => {

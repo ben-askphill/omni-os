@@ -14,6 +14,7 @@ export interface Probe {
   /** The stored payload's size, read from the record header. */
   bytes: number;
   payload: string | null;
+  agent: string | null;
 }
 
 /** Exclusive id bounds, like the stream's `after`. */
@@ -22,7 +23,7 @@ export interface Bounds {
   before?: number;
 }
 
-const PROBE = `SELECT id, thread_id, kind, created_at, octet_length(payload) AS bytes,
+const PROBE = `SELECT id, thread_id, kind, created_at, agent, octet_length(payload) AS bytes,
   CASE WHEN octet_length(payload) <= ? THEN payload END AS payload
   FROM events WHERE thread_id = ? AND id > ? AND id < ?`;
 const ids = (n: number) => Array(n).fill('?').join(', ');

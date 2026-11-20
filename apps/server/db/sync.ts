@@ -10,7 +10,8 @@ import { db, now, tx } from './connection.ts';
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'crew_file' | 'harness_file' | 'mcp_client' | 'memory';
+  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'crew_file' | 'harness_file' | 'mcp_client' | 'memory'
+  | 'thread_member';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -28,7 +29,7 @@ export interface OutboxRow {
  * the newest result read, whenever the write was (db/repos/needs-you.ts). A limit_stop is a thread's limit stop
  * alone, apart from the row, so a write to either never undoes the other.
  */
-const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file', 'crew_file', 'harness_file', 'memory']);
+const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file', 'crew_file', 'harness_file', 'memory', 'thread_member']);
 /** kv keys that stay on this machine: the sync cursor, machine id, switches and path map. */
 export const localKey = (key: string) => key.startsWith('sync.');
 

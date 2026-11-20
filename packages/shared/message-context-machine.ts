@@ -7,6 +7,7 @@ import type { Reachability } from './handoff.ts';
 import { ID_MAX, cutLabel, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
 import { cleanLine } from './message-context-thread.ts';
 import { plain } from './message-context-terminal.ts';
+import { agentMention, mentionedAgents, type AgentMention } from './message-context-agent.ts';
 
 export interface MachineMention {
   /** The machine's sync id. */
@@ -79,21 +80,22 @@ export const mentionsMachine = (records: readonly MessageContext[], id: string) 
 // ----- the mention as an inline pill -----
 // A sent message draws each `@<name>` it carries a record for as a pill inside the text, instead of as a chip over the
 // bubble, and a composer rebuilds its chips from them. The text and the records stay as they are: this only finds where
-// in the text each mention sits.
+// in the text each mention sits. Machine mentions and agent mentions (message-context-agent.ts) both draw this way.
 
-/** Where one machine mention sits in a message's text: `text.slice(start, end)` is its `@<name>`. */
-export interface MentionSpan {
-  start: number;
-  end: number;
-  /** The record's id. */
-  id: string;
-  mention: MachineMention;
-}
+/** Where one mention sits in a message's text: `text.slice(start, end)` is its `@<name>`. */
+export type MentionSpan = { start: number; end: number; /** The record's id. */ id: string } & (
+  | { kind: 'machine'; mention: MachineMention }
+  | { kind: 'agent'; agent: AgentMention }
+);
 
-const readMention = (r: unknown): { id: string; mention: MachineMention } | null =>
-  isObj(r) && r.kind === machineMention.kind && typeof r.id === 'string' && isObj(r.body) && typeof r.body.name === 'string' && typeof r.body.machine === 'string' && r.body.name
-    ? { id: r.id, mention: r.body as unknown as MachineMention }
-    : null;
+type Read = { id: string; name: string } & ({ kind: 'machine'; mention: MachineMention } | { kind: 'agent'; agent: AgentMention });
+
+const readMention = (r: unknown): Read | null => {
+  if (!isObj(r) || typeof r.id !== 'string' || !isObj(r.body) || typeof r.body.name !== 'string' || !r.body.name) return null;
+  if (r.kind === machineMention.kind && typeof r.body.machine === 'string') return { id: r.id, name: r.body.name, kind: 'machine', mention: r.body as unknown as MachineMention };
+  if (r.kind === agentMention.kind && typeof r.body.agent === 'string') return { id: r.id, name: r.body.name, kind: 'agent', agent: r.body as unknown as AgentMention };
+  return null;
+};
 
 /**
  * Every `@<name>` in `text` that one of `records` (read leniently: anything not a list holds none) is the mention of,
@@ -105,8 +107,9 @@ export function mentionSpans(text: string, records: unknown): MentionSpan[] {
   for (const r of records) {
     const m = readMention(r);
     if (!m) continue;
-    const re = new RegExp(`(?<![\\w@])@${escape(m.mention.name)}(?![\\w'])`, 'gi');
-    for (const hit of text.matchAll(re)) found.push({ start: hit.index, end: hit.index + hit[0].length, ...m });
+    const re = new RegExp(`(?<![\\w@])@${escape(m.name)}(?![\\w'])`, 'gi');
+    const { name: _name, ...span } = m;
+    for (const hit of text.matchAll(re)) found.push({ start: hit.index, end: hit.index + hit[0].length, ...span });
   }
   found.sort((a, b) => a.start - b.start || b.end - a.end);
   const out: MentionSpan[] = [];
@@ -127,11 +130,25 @@ export function mentionPieces(text: string, records: unknown): { text: string; s
   return pieces;
 }
 
-/** `records` (read leniently, as ContextChips does) without the machine mentions `text` shows inline: what still shows as chips over it. */
+/** `records` (read leniently, as ContextChips does) without the mentions `text` shows inline: what still shows as chips over it. */
 export function chipRecords<T>(text: string, records: readonly T[]): T[];
 export function chipRecords(text: string, records: unknown): unknown[];
 export function chipRecords(text: string, records: unknown): unknown[] {
   if (!Array.isArray(records) || !records.length) return [];
   const inline = new Set(mentionSpans(text, records).map((s) => s.id));
   return inline.size ? records.filter((r) => !(isObj(r) && typeof r.id === 'string' && inline.has(r.id))) : [...records];
+}
+
+/**
+ * A sent or queued message's context, as its bubble draws it: `chips` over the bubble, and `to`, each agent the
+ * message went to that its text does not name inline, once each. Those show by name on the line over the bubble, not
+ * as chips. An agent the text names keeps its pill in the text.
+ */
+export function sentContext(text: string, records: unknown): { chips: unknown[]; to: AgentMention[] } {
+  const left = chipRecords(text, records);
+  const named = new Set(mentionSpans(text, records).flatMap((s) => (s.kind === 'agent' ? [s.agent.agent] : [])));
+  return {
+    chips: left.filter((r) => !(isObj(r) && r.kind === agentMention.kind)),
+    to: mentionedAgents(left).filter((a) => !named.has(a.agent)),
+  };
 }

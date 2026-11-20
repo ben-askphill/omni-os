@@ -6,6 +6,7 @@ import type { SlashRecord } from './slash.ts';
 import { spanIndex, type Clipped, type Span } from './history.ts';
 import { shortPath } from './short-path.ts';
 import type { OutputMeta } from './tool-output.ts';
+import { collisionsIn, type Collision } from './collisions.ts';
 
 // The transcript fold. Pure: events in, rows out. The Web UI's Transcript.tsx and the phone's thread-view.ts render
 // the rows, and the iOS app folds with it too, so it imports no DOM, no React and no Node API.
@@ -19,6 +20,11 @@ export interface TranscriptEvent {
   thread_id?: string;
   /** The row was too big to page whole: its long strings are cut (`@omni/shared/history.ts`). */
   clipped?: Clipped;
+  /**
+   * The id of the agent that wrote the row. Ben's rows and Omni's own have none, and so do rows from before Omni
+   * recorded it: those read as the thread's lead's (`replyHeads`).
+   */
+  agent?: string | null;
 }
 
 /** A file on a user message. The same shape as the server's Attachment. */
@@ -33,6 +39,8 @@ export interface TranscriptAttachment {
 export interface UserP {
   text: string;
   source?: string;
+  /** The agents a message went to (ADR 0019): the ones Ben named, or a team lead's members (source `lead`). */
+  to?: string[];
   attachments?: TranscriptAttachment[];
   /** Message context records (packages/shared/message-context.ts), as stored: read them with `readContexts`. */
   context?: unknown;
@@ -160,21 +168,44 @@ export interface ToolCall {
 }
 
 export type Item =
-  | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped }
-  | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped }
-  | { type: 'tools'; key: number; calls: ToolCall[]; total: number }
-  | { type: 'result'; key: number; p: ResultP }
-  | { type: 'error'; key: number; p: TextP }
+  /** `agent`: the team lead that wrote it, on a lead's message to its members (source `lead`). Ben's have none. */
+  | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped; agent?: string }
+  | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped; agent?: string }
+  | { type: 'tools'; key: number; calls: ToolCall[]; total: number; agent?: string }
+  | { type: 'result'; key: number; p: ResultP; agent?: string }
+  | { type: 'error'; key: number; p: TextP; agent?: string }
   | { type: 'report'; key: number; at: string; p: ReportP }
   /** An Ask Ben sent from this thread to a crew role (ask.ts): his question, shown with the Ask's live state. */
   | { type: 'ask'; key: number; at: string; p: AskP }
   /** Mod log lines in a row. They do not end a group of calls, so a busy hook does not split it. */
   | { type: 'mod'; key: number; lines: ModLine[] }
   /** One Cursor cloud agent run, where its first row was, showing its newest state. */
-  | { type: 'cloud'; key: number; p: CloudAgentP }
+  | { type: 'cloud'; key: number; p: CloudAgentP; agent?: string }
   | SwitchItem
   /** A question the agent asked Ben, where it asked it. The card stands in for the ask_user_question call. */
-  | { type: 'question'; key: number; at: string; q: ThreadQuestion };
+  | { type: 'question'; key: number; at: string; q: ThreadQuestion; agent?: string }
+  /** An agent was seated in the thread or removed from it (ADR 0019): a quiet "Designer joined" or "Designer left" line. */
+  | { type: 'member'; key: number; at: string; p: MemberP }
+  /** A file two agents both edited (ADR 0019, packages/shared/collisions.ts), with whether it was cleared since. */
+  | { type: 'collision'; key: number; at: string; c: Collision };
+
+/** A `member` row (apps/server/runner/members.ts). */
+export interface MemberP {
+  /** An agent was seated or removed, or, in a thread a remote agent leads, Ben committed its members' edits (ADR 0020). */
+  event: 'joined' | 'left' | 'committed';
+  /** The agent, or '' for Ben's commit. */
+  agent: string;
+  /** The agent's name when it happened, or Ben's. */
+  name: string;
+  /** A commit's subject, sha and how many files it took. */
+  commit?: { sha: string; message: string; files: number };
+}
+
+/** The quiet line a member row reads as. */
+export const memberLine = (p: Pick<MemberP, 'event' | 'name' | 'commit'>) =>
+  p.event === 'committed'
+    ? `${p.name.charAt(0).toUpperCase()}${p.name.slice(1)} committed ${p.commit?.files ?? 0} file${p.commit?.files === 1 ? '' : 's'}${p.commit?.message ? `: ${p.commit.message}` : ''}`
+    : `${p.name} ${p.event === 'left' ? 'left' : 'joined'}`;
 
 /**
  * A run switch. A handover switch stays pending until its `handover` event fills `done`, or a later handover or back
@@ -260,6 +291,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
     }
   }
   const questions = new Map(questionsIn(events).map((q) => [q.event_id, q]));
+  const collisions = events.some((e) => e.kind === 'collision') ? new Map(collisionsIn(events).map((c) => [c.id, c])) : null;
 
   const items: Item[] = [];
   // Every call so far, not just this group's: a background agent's calls land after later text and turns.
@@ -303,8 +335,10 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         const parent = call.parent ? byId.get(call.parent) : undefined;
         let home = parent && groupOf.get(parent.id);
         if (!home) {
+          // Another agent's call opens a group of its own.
+          if (group && (group.agent ?? null) !== (e.agent ?? null)) group = null;
           if (!group) {
-            group = { type: 'tools', key: e.id, calls: [], total: 0 };
+            group = { type: 'tools', key: e.id, calls: [], total: 0, ...(e.agent && { agent: e.agent }) };
             items.push(group);
           }
           home = group;
@@ -326,15 +360,15 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       case 'user':
         group = null;
-        items.push({ type: 'user', key: e.id, at: e.created_at, p: payload<UserP>(e), ...(e.clipped && { clipped: e.clipped }) });
+        items.push({ type: 'user', key: e.id, at: e.created_at, p: payload<UserP>(e), ...(e.clipped && { clipped: e.clipped }), ...(e.agent && { agent: e.agent }) });
         break;
       case 'assistant_text':
         group = null;
         {
           const p = payload<TextP>(e);
           const last = items[items.length - 1];
-          if (last?.type === 'text' && !last.clipped && !e.clipped) last.p = { ...last.p, text: last.p.text + p.text };
-          else items.push({ type: 'text', key: e.id, at: e.created_at, p, ...(e.clipped && { clipped: e.clipped }) });
+          if (last?.type === 'text' && !last.clipped && !e.clipped && (last.agent ?? null) === (e.agent ?? null)) last.p = { ...last.p, text: last.p.text + p.text };
+          else items.push({ type: 'text', key: e.id, at: e.created_at, p, ...(e.clipped && { clipped: e.clipped }), ...(e.agent && { agent: e.agent }) });
         }
         break;
       case 'result': {
@@ -343,13 +377,20 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         // just before) or, in older threads, the CLI flushing a background task on resume.
         if (p.ok && !p.turns) break;
         group = null;
-        items.push({ type: 'result', key: e.id, p });
+        items.push({ type: 'result', key: e.id, p, ...(e.agent && { agent: e.agent }) });
         break;
       }
       case 'error':
         group = null;
-        items.push({ type: 'error', key: e.id, p: payload<TextP>(e) });
+        items.push({ type: 'error', key: e.id, p: payload<TextP>(e), ...(e.agent && { agent: e.agent }) });
         break;
+      case 'collision': {
+        const c = collisions?.get(e.id);
+        if (!c) break;
+        group = null;
+        items.push({ type: 'collision', key: e.id, at: e.created_at, c });
+        break;
+      }
       case 'crew_report':
         group = null;
         items.push({ type: 'report', key: e.id, at: e.created_at, p: payload<ReportP>(e) });
@@ -371,7 +412,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
           break;
         }
         group = null;
-        const item = { type: 'cloud' as const, key: e.id, p: p as CloudAgentP };
+        const item = { type: 'cloud' as const, key: e.id, p: p as CloudAgentP, ...(e.agent && { agent: e.agent }) };
         runs.set(id, item);
         items.push(item);
         break;
@@ -395,7 +436,16 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         const q = questions.get(e.id);
         if (!q) break;
         group = null;
-        items.push({ type: 'question', key: e.id, at: e.created_at, q });
+        items.push({ type: 'question', key: e.id, at: e.created_at, q, ...(e.agent && { agent: e.agent }) });
+        break;
+      }
+      case 'member': {
+        const p = payload<Partial<MemberP>>(e);
+        if ((p.event !== 'joined' && p.event !== 'left' && p.event !== 'committed') || typeof p.agent !== 'string') break;
+        group = null;
+        const c = p.event === 'committed' && p.commit && typeof p.commit === 'object' ? p.commit : null;
+        const commit = c && { sha: str(c.sha), message: str(c.message), files: typeof c.files === 'number' ? c.files : 0 };
+        items.push({ type: 'member', key: e.id, at: e.created_at, p: { event: p.event, agent: p.agent, name: str(p.name) || p.agent, ...(commit && { commit }) } });
         break;
       }
       case 'mod': {
@@ -416,6 +466,71 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   if (!spans) return { items, plan };
   // A gap after any span but the last may hold a newer TodoWrite.
   return { items: items.filter((it) => segOf(it.key) >= 0), plan: plan && segOf(plan.after) === spans.length - 1 ? plan : null };
+}
+
+/** The items an agent wrote: what a reply is made of. */
+export type ReplyItem = Extract<Item, { type: 'text' | 'tools' | 'question' | 'cloud' }>;
+const REPLY = new Set<Item['type']>(['text', 'tools', 'question', 'cloud']);
+export const isReply = (it: Item): it is ReplyItem => REPLY.has(it.type);
+/** Rows between two replies that do not part them: how a turn ended, and a mod's log lines. */
+const QUIET = new Set<Item['type']>(['result', 'mod']);
+
+/** When a reply item was written, for its author line: a group of calls by its first call. A cloud run has no one time. */
+export const replyAt = (it: ReplyItem): string | null => (it.type === 'tools' ? (it.calls[0]?.at ?? null) : it.type === 'cloud' ? null : it.at);
+
+/** Who wrote a reply item: the agent its row names, else the thread's lead (rows from before Omni recorded it). */
+export const authorOf = (it: ReplyItem, lead: string | null | undefined) => it.agent ?? lead ?? null;
+
+/**
+ * Where an author line goes (ADR 0019, How it looks): the key of each reply item that opens a run of replies from one
+ * agent, with that agent's id. Ben's message, a report, a switch or another agent's reply ends a run; a turn's result
+ * line and mod lines do not, nor does a team lead's own message to its members, which it sends from inside its turn.
+ * A reply with no author (no agent wrote it and the thread has no lead) gets no head.
+ */
+export function replyHeads(items: readonly Item[], lead: string | null | undefined): Map<number, string> {
+  const out = new Map<number, string>();
+  let run: string | null = null;
+  for (const it of items) {
+    if (QUIET.has(it.type)) continue;
+    if (it.type === 'user' && it.p.source === 'lead' && it.agent === run) continue;
+    if (!isReply(it)) {
+      run = null;
+      continue;
+    }
+    const author = authorOf(it, lead);
+    if (author && author !== run) out.set(it.key, author);
+    run = author;
+  }
+  return out;
+}
+
+/**
+ * Where a lock line goes (ADR 0020, How it looks): the key of the last reply item in each run of replies from an agent
+ * `talksOnly` names, a remote agent that could not read the thread's files. The run ends as replyHeads' does.
+ */
+export function replyTails(items: readonly Item[], lead: string | null | undefined, talksOnly: (agent: string) => boolean): Map<number, string> {
+  const out = new Map<number, string>();
+  let run: { author: string; key: number } | null = null;
+  const close = () => {
+    if (run && talksOnly(run.author)) out.set(run.key, run.author);
+    run = null;
+  };
+  for (const it of items) {
+    if (QUIET.has(it.type)) continue;
+    if (!isReply(it)) {
+      close();
+      continue;
+    }
+    const author = authorOf(it, lead);
+    if (!author) {
+      close();
+      continue;
+    }
+    if (run && run.author !== author) close();
+    run = { author, key: it.key };
+  }
+  close();
+  return out;
 }
 
 /** Structural equality, by identity first. Rows parse once, so the unchanged parts of two folds are mostly one object. */

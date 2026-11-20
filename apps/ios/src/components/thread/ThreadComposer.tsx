@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../../ui/Text';
 
@@ -7,9 +7,14 @@ import type { HarnessInfo, Thread } from '@omni/client-core';
 import { AttachControl, AttachNotice } from '../../attachments/AttachControl';
 import { AttachmentChips } from '../../attachments/AttachmentChips';
 import { clearStaged, getStaged, removeStagedFile, restoreStaged, useStaged } from '../../attachments/staged';
-import { removeDraftContext, useDraftContext } from '../../context/draft';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import type { FileMention, FileQuery } from '@omni/shared/mention-menu.ts';
+
+import { addDraftContext, removeDraftContext, useDraftContext } from '../../context/draft';
 import type { ThreadLive } from '../../live/hub';
-import { useStore, useTechnical, useThreadKey } from '../../live/react';
+import { useAgents, useStore, useTechnical, useThreadKey } from '../../live/react';
+import { agentMenu, composerRouting, pickAgent, threadAgents } from '../../thread/agents';
+import { AgentAvatar } from '../AgentAvatar';
 import { canStop, composerPlaceholder, sendLabel } from '../../send/rules';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { tap } from '../../ui/haptics';
@@ -52,17 +57,34 @@ export function ThreadComposer({
   const files = useStaged(key);
   const context = useDraftContext(key);
   const [attachNotice, setAttachNotice] = useState<string | null>(null);
+  const [caret, setCaret] = useState(0);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useFocusRequests(key, input);
+  const roster = useAgents();
+  const agents = useMemo(() => threadAgents(thread, roster), [thread, roster]);
+  // Who gets the message (ADR 0019): the lead in the placeholder, the agents an `@` names in the hint under the box.
+  const routing = composerRouting(thread, agents, draft, context);
+  const menu = routing.readOnly ? null : agentMenu(draft, Math.min(caret, draft.length), agents);
 
   const empty = draft.trim() === '' && context.length === 0;
   // The server takes files only with a message, so a file with no text says what is missing.
-  const placeholder = files.length > 0 && empty ? 'Add a message to send with the files' : composerPlaceholder(thread, catalog, technical);
+  const placeholder = files.length > 0 && empty ? 'Add a message to send with the files' : (routing.placeholder ?? composerPlaceholder(thread, catalog, technical));
   const slotTaken = outbox.item !== null;
   const showStop = empty && !slotTaken && canStop(thread);
+  // Agent mentions the text names show inline when sent; the rest stay chips here, each with a remove.
+  const chips = chipRecords(draft, context);
+
+  const pick = (at: FileQuery, row: FileMention) => {
+    tap();
+    const picked = pickAgent(draft, at, row, context);
+    const why = picked.record ? addDraftContext(key, picked.record) : null;
+    if (why) return setAttachNotice(why);
+    setDraft(key, picked.text);
+    setCaret(picked.caret);
+  };
 
   const send = async () => {
-    if (empty || slotTaken) return;
+    if (empty || slotTaken || routing.readOnly) return;
     tap();
     const text = draft;
     const attached = getStaged(key);
@@ -95,9 +117,10 @@ export function ThreadComposer({
           <AttachmentChips files={files} onRemove={(id) => removeStagedFile(key, id)} />
         </View>
       ) : null}
-      {context.length ? (
+      {menu ? <AgentMenu rows={menu.rows} onPick={(row) => pick(menu.at, row)} /> : null}
+      {chips.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.contextRow} accessibilityLabel="Added to this message">
-          {context.map((c) => (
+          {chips.map((c) => (
             <View key={c.id} style={[styles.contextChip, { backgroundColor: colors.surface2 }]}>
               <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.contextLabel, { color: colors.fg2 }]}>
                 {c.label}
@@ -115,8 +138,10 @@ export function ThreadComposer({
           ref={input}
           accessibilityLabel={placeholder}
           multiline
+          editable={!routing.readOnly}
           value={draft}
           onChangeText={(text) => setDraft(key, text)}
+          onSelectionChange={(e) => setCaret(e.nativeEvent.selection.end)}
           placeholder={placeholder}
           placeholderTextColor={colors.fg3}
           style={[styles.input, { color: colors.fg }]}
@@ -135,11 +160,44 @@ export function ThreadComposer({
             <Icon name="stop" size={13} color={colors.onInk} />
           </RoundButton>
         ) : (
-          <RoundButton label={sendLabel(thread, catalog)} busy={outbox.item?.phase === 'sending'} disabled={empty || slotTaken} onPress={() => void send()}>
+          <RoundButton label={routing.toOthers ? 'Send' : sendLabel(thread, catalog)} busy={outbox.item?.phase === 'sending'} disabled={empty || slotTaken || routing.readOnly} onPress={() => void send()}>
             <Icon name="arrowUp" size={16} color={colors.onInk} />
           </RoundButton>
         )}
       </View>
+      {routing.hint ? (
+        <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: colors.fg3 }]}>
+          {routing.hint}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** The `@` menu over the box: the thread's members, then the agents a mention would seat. */
+function AgentMenu({ rows, onPick }: { rows: FileMention[]; onPick: (row: FileMention) => void }) {
+  const { colors } = useOmniTheme();
+  return (
+    <View accessibilityLabel="Agents" style={[styles.menu, { backgroundColor: colors.elev, borderColor: colors.line }]}>
+      <ScrollView keyboardShouldPersistTaps="always" style={styles.menuList}>
+        {rows.map((r) => (
+          <Pressable
+            key={r.insert}
+            accessibilityRole="button"
+            accessibilityLabel={`${r.name}, ${r.detail}`}
+            onPress={() => onPick(r)}
+            style={({ pressed }) => [styles.menuRow, pressed && { backgroundColor: colors.surface2 }]}
+          >
+            <AgentAvatar agent={r.insert} size={24} />
+            <Text numberOfLines={1} style={[styles.menuName, { color: colors.fg }]}>
+              {r.name}
+            </Text>
+            <Text numberOfLines={1} style={[styles.menuDetail, { color: colors.fg3 }]}>
+              {r.detail}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -207,6 +265,34 @@ const styles = StyleSheet.create({
   notice: {
     fontSize: fontSize.meta,
     paddingHorizontal: space.s6,
+  },
+  hint: {
+    fontSize: fontSize.caption,
+    paddingHorizontal: space.s8,
+  },
+  menu: {
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: space.s2,
+  },
+  menuList: {
+    maxHeight: 44 * 4.5,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s5,
+    minHeight: 44,
+    paddingHorizontal: space.s6,
+  },
+  menuName: {
+    flexShrink: 1,
+    fontSize: fontSize.body,
+    fontWeight: weight.medium,
+  },
+  menuDetail: {
+    marginLeft: 'auto',
+    fontSize: fontSize.caption,
   },
   pill: {
     flexDirection: 'row',

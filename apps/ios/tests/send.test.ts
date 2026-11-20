@@ -8,7 +8,7 @@ import { addDraftContext, draftContext } from '../src/context/draft';
 import { createLiveHub } from '../src/live/hub';
 import type { OmniSession } from '../src/live/session';
 import { threadKey } from '../src/live/thread-key';
-import { composerPlaceholder, sendLabel, sendModeFor } from '../src/send/rules';
+import { canStop, composerPlaceholder, sendLabel, sendModeFor } from '../src/send/rules';
 
 const BASE = 'http://omni.test';
 
@@ -205,6 +205,16 @@ describe('steer or queue while a turn runs', () => {
     hub.close();
   });
 
+  it("sends a message only to other agents as a new turn of theirs, leaving the lead's running turn alone (ADR 0019)", async () => {
+    const { live, posts, hub } = await opened((req) => (req.method === 'POST' ? { body: accepted('x') } : undefined));
+    const mention = (agent: string) => ({ kind: 'agent_mention', v: 1, id: `m-${agent}`, label: `@${agent}`, note: '', body: { agent, name: agent } });
+    const running = thread({ status: 'running', role: 'builder' }) as never;
+    await live.send.submit(running, '@designer look', [], [mention('designer')] as never);
+    await live.send.submit(running, '@builder look', [], [mention('builder')] as never);
+    expect(posts().map((p) => p.body?.mode)).toEqual([undefined, 'steer']);
+    hub.close();
+  });
+
   it('decides from what the harness catalog says, not only the harness name', () => {
     const t = thread({ status: 'running', harness: 'cursor' }) as never;
     expect(sendModeFor(t, null)).toBe('queue');
@@ -220,6 +230,15 @@ describe('steer or queue while a turn runs', () => {
     expect(composerPlaceholder(cursor, null)).toBe('Queue for after this turn');
     expect(sendLabel(running, null)).toBe('Send to the running turn');
     expect(sendLabel(cursor, null)).toBe('Send after this turn');
+  });
+
+  it('offers Stop after the lead finishes while a member works or waits for an answer', () => {
+    const reviewer = { agent: 'reviewer', name: 'Reviewer', lead: false, harness: 'claude-code', model: null, effort: '', seated_at: '', status: 'running' };
+    const lead = { status: 'done', setup: null } as const;
+    expect(canStop({ ...lead, members: [{ ...reviewer, state: 'working' }] })).toBe(true);
+    expect(canStop({ ...lead, members: [{ ...reviewer, state: 'needs' }] })).toBe(true);
+    expect(canStop({ ...lead, members: [{ ...reviewer, status: 'queued', state: 'working' }] })).toBe(true);
+    expect(canStop({ ...lead, members: [{ ...reviewer, status: 'done', state: 'done' }] })).toBe(false);
   });
 });
 

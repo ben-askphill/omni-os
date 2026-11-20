@@ -100,3 +100,14 @@ describe('the icon', () => {
     expect(lastEmoji('  ')).toBe('');
   });
 });
+
+describe('Remote agents can see this channel’s work (ADR 0020)', () => {
+  it('reads the switch from the channel and saves it when it changes', () => {
+    const open = channel({ remote_work: 1 });
+    expect(channelForm(open).remoteWork).toBe(true);
+    expect(channelForm(channel()).remoteWork).toBe(false);
+    const form = { ...channelForm(channel()), remoteWork: true };
+    expect(formDirty(form, channel())).toBe(true);
+    expect(saveBody(form, channel())).toMatchObject({ remote_work: 1 });
+  });
+});

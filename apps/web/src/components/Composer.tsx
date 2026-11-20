@@ -16,8 +16,11 @@ import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { useCommands } from './composer/use-commands.ts';
-import { askOf } from '@omni/shared/ask.ts';
-import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from './AskCard.tsx';
+import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
+import { replyTo, routingHint } from '@omni/shared/members.ts';
+import { isRemoteAgentHarness, remoteLeadPlaceholder } from '@omni/shared/remote-agent.ts';
+import { CommitButton } from './thread/CommitButton.tsx';
+import { useThreadAgents } from '../thread-agents.ts';
 import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
@@ -267,7 +270,8 @@ export function NewThreadComposer({
         <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
           {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
           {showRole && <Picker label="Agent" value={role} options={roleOptions} onChange={onRole} />}
-          {harnesses && !toGrok && (
+          {/* A remote agent runs on its own server: no harness or model to pick for it (ADR 0020). */}
+          {harnesses && !toGrok && !roleObj?.server && (
             <ModelPicker
               harnesses={harnesses}
               onOpen={() => {
@@ -381,6 +385,7 @@ export function ReplyComposer({
   machine,
   asking = false,
   openPR,
+  commit,
 }: {
   thread: Thread;
   /**
@@ -396,6 +401,8 @@ export function ReplyComposer({
   stop?: { busy: boolean; run: () => void } | null;
   /** Set when the agent's last reply asks whether to open a PR: Open PR beside the Machine chip answers yes. */
   openPR?: { busy: boolean; prompt: string; run: () => void } | null;
+  /** Set in a remote-led thread while its worktree has changes no one committed: the Commit button (ADR 0020). */
+  commit?: { files: number; onDone: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
   /** Called as a message leaves the box, before the server has it: it shows in the thread from now on. */
   onSending?: () => void;
@@ -435,6 +442,8 @@ export function ReplyComposer({
   }, [key]);
 
   const busyThread = status === 'running' || status === 'queued';
+  // A remote agent leads: it talks only, so the box says who changes files (ADR 0020).
+  const remoteLead = isRemoteAgentHarness(thread.harness);
   const replying = asking && steers;
   // The server's guess at the next reply, shown in the empty box. Tab takes it.
   const suggestion = !busyThread && !text && thread.suggestion ? thread.suggestion : null;
@@ -448,34 +457,18 @@ export function ReplyComposer({
   };
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
-  // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts): the role answers, not this thread's agent.
-  const askRoles = useAskRoles(thread);
-  const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
-  const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
+  // The agents the message goes to (ADR 0019): the ones it names, else the lead. Once an `@` is typed, a line under the
+  // box says who gets it and who joins (Q50); with none, the placeholder names the lead.
+  const agents = useThreadAgents(thread);
+  const named = useMemo(() => mentionedAgents(context).map((a) => ({ agent: a.agent, name: a.name })), [context]);
+  const hint = routingHint(text, { agent: agents.lead.id, name: agents.lead.name }, named, agents.members.map((m) => m.id));
+  // A message to members only does not steer the lead's running turn: it starts theirs.
+  const toOthers = named.length > 0 && !named.some((a) => a.agent === agents.lead.id);
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
-  const canSend = ask ? !!ask.question : !!text.trim() || context.length > 0;
-  /** Send the Ask the message is. Files and context stay in the box: an Ask carries only the question and the excerpt. */
-  const submitAsk = async () => {
-    if (!ask?.question || busy) return;
-    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @agent.');
-    const raw = text;
-    setBusy(true);
-    setError(null);
-    drafts.delete(key);
-    setText('');
-    try {
-      await postAsk(threadId, ask.role.id, ask.question, askOptions);
-    } catch (e) {
-      if (!latest.current || latest.current === raw) update(raw);
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const canSend = !thread.read_only && (!!text.trim() || context.length > 0);
   /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
   const submit = async (mode?: SendMode, sendThere = false) => {
-    if (ask) return void submitAsk();
     const raw = text;
     const prompt = raw.trim();
     if (!canSend || busy) return;
@@ -558,7 +551,6 @@ export function ReplyComposer({
   return (
     <div ref={setFrame} className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
-      {ask && <AskChip threadId={threadId} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
       <ContextChips records={chipRecords(text, context)} onRemove={(id) => removeDraftContext(threadId, id)} className="px-3 pt-3 pb-0.5" />
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <MessageEditor
@@ -572,7 +564,7 @@ export function ReplyComposer({
         records={context}
         // `@` a machine: the Conductor (or a role with the omni tools) starts the task there.
         mentions={`thread=${encodeURIComponent(threadId)}`}
-        roles={askRoles}
+        agents={agents}
         commands={{ ...commands, where: 'reply' }}
         anchor={frame}
         onError={setError}
@@ -589,17 +581,25 @@ export function ReplyComposer({
           if (!key) return;
           if (omni) return void runOmni();
           const busyMode: SendMode = key === 'interrupt' ? 'interrupt' : steers ? 'steer' : 'queue';
-          void submit(busyThread ? busyMode : undefined);
+          void submit(busyThread && !toOthers ? busyMode : undefined);
         }}
         label="Message"
-        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? (technical ? 'Steer the agent. It reads this at its next step' : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')}
+        placeholder={
+          thread.read_only
+            ? thread.read_only
+            : suggestion
+              ? `${suggestion} · ⇥ to use`
+              : withKeys(!busyThread || replying ? (remoteLead ? remoteLeadPlaceholder(agents.lead.name) : replyTo(thread.role ? agents.lead.name : null)) : steers ? (technical ? `Steer ${agents.lead.name}. It reads this at its next step` : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')
+        }
         className="block max-h-[220px] min-h-[60px] w-full overflow-y-auto bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         <AttachButton onPick={att.add} disabled={busy} />
         <ForkThreadButton thread={thread} disabled={busy} />
-        <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
+        {/* A remote agent's run is its server: no harness or model to pick (ADR 0020). */}
+        {!remoteLead && <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />}
         {machine && <ThreadMachineChip thread={thread} held={machine} disabled={busy} onError={setError} />}
+        {commit && <CommitButton thread={thread} files={commit.files} onDone={commit.onDone} />}
         {openPR && (
           <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={openPR.prompt} onClick={openPR.run}>
             {openPR.busy ? STEP_WORKING.open : 'Open PR'}
@@ -610,11 +610,7 @@ export function ReplyComposer({
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
               {slash.label ?? 'Send'}
             </SendButton>
-          ) : ask ? (
-            <SendButton armed={canSend} busy={busy} onClick={() => void submitAsk()}>
-              Ask
-            </SendButton>
-          ) : replying ? (
+          ) : replying || toOthers ? (
             <SendButton armed={canSend} busy={busy} onClick={() => void submit('steer')}>
               Send
             </SendButton>
@@ -633,6 +629,11 @@ export function ReplyComposer({
       <div aria-live="polite">
         {slash.hint && !menuOpen && (
           <div className="px-4 pb-2.5 text-[12px] text-fg-3">{slash.hint}</div>
+        )}
+        {!slash.hint && hint && (
+          <div data-routing-hint className="px-4 pb-2.5 text-[12px] text-fg-3">
+            {hint}
+          </div>
         )}
       </div>
       {away && (

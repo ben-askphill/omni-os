@@ -1,4 +1,5 @@
 {
   "available": false,
-  "reason": "This thread's channel has no repository, so there are no branch changes to show."
+  "reason": "This thread's channel has no repository, so there are no branch changes to show.",
+  "collisions": []
 }

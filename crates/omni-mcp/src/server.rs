@@ -12,7 +12,7 @@ use tokio::sync::watch;
 
 use crate::protocol::{self, IdKey, Message};
 use crate::zod::{self, Field, Schema};
-use crate::{ask, memory, render, steps, threads};
+use crate::{ask, memory, render, steps, team, threads};
 
 #[derive(Clone, Copy)]
 pub enum Kind {
@@ -21,6 +21,7 @@ pub enum Kind {
     Steps,
     Threads,
     Memory,
+    Team,
 }
 
 /// What a tool call came to.
@@ -72,6 +73,7 @@ impl Server {
             Kind::Steps => ("omni-steps", steps::tool()),
             Kind::Threads => ("omni-threads", threads::tool()),
             Kind::Memory => ("omni-memory", memory::tool()),
+            Kind::Team => ("omni-team", team::tool()),
         };
         let input = Schema::Object(std::mem::take(&mut tool.input));
         Self { kind, name, tool, input, api: Api::from_env(), running: RefCell::default(), calls: Cell::new(0) }
@@ -174,6 +176,7 @@ impl Server {
                 Kind::Steps => steps::run(&arguments),
                 Kind::Threads => threads::run(&self.api, &arguments).await,
                 Kind::Memory => memory::run(&self.api, &arguments).await,
+                Kind::Team => team::run(&self.api, &arguments).await,
             }
         };
         let outcome = if self.tool.stops_when_cancelled {

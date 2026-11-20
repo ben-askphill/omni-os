@@ -16,6 +16,8 @@ interface Session {
   listeners: Set<() => void>;
   /** A turn waiting for Stop (the `hang` script). */
   hanging: string | null;
+  /** A read the turn parked on, waiting for Omni's input response. */
+  parked: { requestId: string; resolve: (text: string) => void } | null;
 }
 
 export interface FakeEve {
@@ -29,6 +31,13 @@ export interface FakeEve {
   code: string;
   /** What GET /v1/omni/pair offers; null serves no pairing route at all. */
   offer: Record<string, unknown> | null;
+  /**
+   * The next turns call the agent's own omni_worktree tool with these inputs, one at a time: each parks the turn with
+   * an input request Omni answers (docs/internals/remote-harness-protocol.md, the read call).
+   */
+  reads: unknown[] | null;
+  /** Omni's answers to those reads, in order. */
+  answers: { requestId: string; text: string }[];
   reset(): void;
   close(): Promise<void>;
 }
@@ -43,12 +52,16 @@ export async function startFakeEve(key = 'eve-key-0123456789'): Promise<FakeEve>
     calls: [],
     sessions: new Map(),
     hangNext: false,
+    reads: null,
+    answers: [],
     code: 'GB8Z-DP5J-0TGX-R608-WYSB-WV2T-G8SV',
     offer: { name: 'Nomos', description: 'An eve agent for tests.', code_url: '/omni' },
     reset() {
       fake.calls = [];
       fake.sessions.clear();
       fake.hangNext = false;
+      fake.reads = null;
+      fake.answers = [];
       fake.offer = { name: 'Nomos', description: 'An eve agent for tests.', code_url: '/omni' };
     },
     close: () => new Promise((r) => server.close(() => r())),
@@ -59,15 +72,41 @@ export async function startFakeEve(key = 'eve-key-0123456789'): Promise<FakeEve>
     for (const l of s.listeners) l();
   };
 
+  /** A turn that calls omni_worktree for each read, parking until Omni answers, then says how many it read. */
+  async function readTurn(s: Session, turnId: string, reads: unknown[]) {
+    push(s, 'step.started', { modelId: MODEL, stepIndex: 0, sequence: 0, turnId });
+    for (const [i, input] of reads.entries()) {
+      const callId = `rc${++seq}`;
+      const requestId = `req_${callId}`;
+      const action = { kind: 'tool-call', callId, toolName: 'omni_worktree', input };
+      push(s, 'actions.requested', { actions: [action], stepIndex: i, sequence: 0, turnId });
+      const answered = new Promise<string>((resolve) => (s.parked = { requestId, resolve }));
+      push(s, 'input.requested', { requests: [{ requestId, kind: 'question', prompt: 'omni_worktree', allowFreeform: true, action }], stepIndex: i, sequence: 0, turnId });
+      push(s, 'session.waiting', {});
+      const text = await answered;
+      push(s, 'action.result', { result: { kind: 'tool-result', callId, toolName: 'omni_worktree', output: text }, status: 'completed', stepIndex: i, sequence: 0, turnId });
+    }
+    const reply = `Read ${reads.length} times.`;
+    push(s, 'message.completed', { message: reply, finishReason: 'stop', stepIndex: reads.length, sequence: 0, turnId });
+    push(s, 'step.completed', { finishReason: 'stop', usage: { inputTokens: 40, outputTokens: 9 }, stepIndex: reads.length, sequence: 0, turnId });
+    push(s, 'turn.completed', { turnId, sequence: 0 });
+    push(s, 'session.waiting', {});
+  }
+
   function runTurn(s: Session, message: string) {
     const turnId = `turn_${++seq}`;
     const hang = fake.hangNext;
     fake.hangNext = false;
+    const reads = fake.reads;
     setTimeout(() => {
       push(s, 'message.received', { message, turnId });
       push(s, 'turn.started', { turnId, sequence: 0 });
       if (hang) {
         s.hanging = turnId;
+        return;
+      }
+      if (reads?.length) {
+        void readTurn(s, turnId, reads);
         return;
       }
       push(s, 'step.started', { modelId: MODEL, stepIndex: 0, sequence: 0, turnId });
@@ -116,7 +155,7 @@ export async function startFakeEve(key = 'eve-key-0123456789'): Promise<FakeEve>
 
     if (path === '/eve/v1/info') return send(res, 200, { model: { id: MODEL }, instructions: [] });
     if (path === '/eve/v1/session' && req.method === 'POST') {
-      const s: Session = { id: `wrun_${++seq}`, events: [], listeners: new Set(), hanging: null };
+      const s: Session = { id: `wrun_${++seq}`, events: [], listeners: new Set(), hanging: null, parked: null };
       fake.sessions.set(s.id, s);
       push(s, 'session.started', {});
       runTurn(s, String(b.message ?? ''));
@@ -155,6 +194,17 @@ export async function startFakeEve(key = 'eve-key-0123456789'): Promise<FakeEve>
       const listener = () => flush();
       s.listeners.add(listener);
       req.on('close', () => s.listeners.delete(listener));
+      return;
+    }
+    // An answer to the request a turn parked on: it never starts a turn.
+    if (req.method === 'POST' && Array.isArray(b.inputResponses)) {
+      const [r] = b.inputResponses as { requestId?: string; text?: string }[];
+      if (!s.parked || r?.requestId !== s.parked.requestId) return send(res, 409, { ok: false, error: 'No such request is waiting.' });
+      fake.answers.push({ requestId: r.requestId, text: String(r.text ?? '') });
+      const { resolve } = s.parked;
+      s.parked = null;
+      send(res, 202, { ok: true, sessionId: s.id, status: 'accepted' });
+      resolve(String(r.text ?? ''));
       return;
     }
     // A follow-up message.

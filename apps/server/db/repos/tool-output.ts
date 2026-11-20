@@ -6,14 +6,14 @@ import { db } from '../connection.ts';
 
 /** The stored text, pulled out once: a CTE that is not materialized would parse the payload for every use. */
 const TEXT = `WITH t AS MATERIALIZED (
-  SELECT id, thread_id, created_at, payload, json_extract(payload, '$.text') AS text
+  SELECT id, thread_id, created_at, agent, payload, json_extract(payload, '$.text') AS text
   FROM events WHERE id = ? AND kind = 'tool_result'
 )`;
 
 export const TOOL_OUTPUT_SQL = {
   /** The payload without its text, the text's first `?` code points, its length and its line breaks. */
   head: `${TEXT}
-  SELECT id, thread_id, created_at, json_remove(payload, '$.text') AS rest, substr(text, 1, ?) AS head,
+  SELECT id, thread_id, created_at, agent, json_remove(payload, '$.text') AS rest, substr(text, 1, ?) AS head,
     length(text) AS chars, length(text) - length(replace(text, char(10), '')) AS breaks
   FROM t WHERE text IS NOT NULL`,
   /** `?` code points of the text from the 1-based position `?`, with what a chunk reports about its row. */
@@ -28,6 +28,7 @@ export const TOOL_OUTPUT_SQL = {
 export interface StoredHead {
   id: number;
   thread_id: string;
+  agent: string | null;
   created_at: string;
   /** The payload's other fields, as JSON. */
   rest: string;

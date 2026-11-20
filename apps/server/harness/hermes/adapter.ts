@@ -18,6 +18,8 @@ import { HermesHttpError, sleep } from './client.ts';
 import { remoteClient, type RemoteClient } from '../remote.ts';
 import { userName } from '../../profile.ts';
 import { applyHermesEvent, emptyHermesNorm, eventFromRun, type HermesNormState } from './normalize.ts';
+import { READ_TOOL, READ_TOOL_DEF } from '../read-tool.ts';
+import { answerRead, closeRead, openRead, readOffered } from '../../worktree-read.ts';
 
 /** Hermes cannot read Mac paths, so attachments are described and explicitly not uploaded. */
 function composeInput(m: OutgoingMessage): string {
@@ -79,6 +81,11 @@ export const hermesAdapter: HarnessAdapter = {
     // True once this run has a terminal event, so a later end does not stop a finished run.
     let settled = true;
     let stopRequested = false;
+    // The worktree read (worktree-read.ts): each run's grant, closed when its turn ends, so a call that names an ended
+    // run is refused. The server never sees a grant.
+    const reads = new Map<string, string>();
+    // Cleared once the server answers a run's `tools` with a 400: it takes no client-side tools (protocol doc).
+    let serverTakesTools = true;
 
     const stopActive = () => {
       const id = activeRunId;
@@ -108,26 +115,46 @@ export const hermesAdapter: HarnessAdapter = {
 
     async function follow(id: string, ac: AbortController, startedAt: number, normIn: HermesNormState): Promise<void> {
       let norm = normIn;
-      const applyRaw = (evt: unknown) => {
+      const answered = new Set<string>();
+      /** Apply one event: 'seen' when a replay already applied it, 'done' when it ends the run. */
+      const applyRaw = (evt: unknown): 'seen' | 'done' | 'more' => {
         const seq = evt && typeof evt === 'object' && typeof (evt as { seq?: unknown }).seq === 'number' ? (evt as { seq: number }).seq : null;
         // A reconnect replays the buffer. The same seq must not become a second transcript row.
         if (seq != null) {
-          if (seenSeq.has(seq)) return false;
+          if (seenSeq.has(seq)) return 'seen';
           seenSeq.add(seq);
         }
         const applied = applyHermesEvent(norm, evt);
         norm = applied.state;
         for (const r of applied.records) emit(r, startedAt);
-        return applied.done;
+        return applied.done ? 'done' : 'more';
+      };
+
+      // A client-side tool call the run waits on: Omni answers it here, with the grant of the run that asked. The
+      // stream waits too, so the answer's row lands before what the run says next.
+      const answer = async (evt: { call_id?: unknown; name?: unknown; arguments?: unknown; run_id?: unknown }) => {
+        const callId = typeof evt.call_id === 'string' ? evt.call_id : '';
+        if (!callId || answered.has(callId)) return;
+        answered.add(callId);
+        const asker = typeof evt.run_id === 'string' && evt.run_id ? evt.run_id : id;
+        const a = evt.name === READ_TOOL ? await answerRead(reads.get(asker), evt.arguments) : { ok: false, output: `Refused: Omni offers no tool named ${String(evt.name)}.` };
+        applyRaw({ event: 'tool.answered', call_id: callId, output: a.output, is_error: !a.ok });
+        try {
+          await client!.toolResult(id, callId, a.output, !a.ok, ac.signal);
+        } catch {
+          if (!ended && !ac.signal.aborted) emit({ kind: 'status', payload: { text: `Could not hand the read back to ${target.name}` } }, startedAt);
+        }
       };
 
       const readOnce = async () => {
         for await (const evt of client!.events(id, ac.signal)) {
           if (ended) return true;
-          if (applyRaw(evt)) {
+          const step = applyRaw(evt);
+          if (step === 'done') {
             settled = true;
             return true;
           }
+          if (step === 'more' && (evt as { event?: unknown })?.event === 'tool.requested') await answer(evt as Record<string, unknown>);
         }
         return false;
       };
@@ -152,7 +179,7 @@ export const hermesAdapter: HarnessAdapter = {
         const run = await client!.getRun(id, ac.signal);
         const evt = eventFromRun(run);
         if (evt) {
-          if (applyRaw(evt)) settled = true;
+          if (applyRaw(evt) === 'done') settled = true;
           return;
         }
         await sleep(400, ac.signal);
@@ -174,6 +201,7 @@ export const hermesAdapter: HarnessAdapter = {
       runAbort = ac;
       const startedAt = Date.now();
       seenSeq.clear();
+      let read: string | null = null;
 
       void (async () => {
         try {
@@ -188,23 +216,33 @@ export const hermesAdapter: HarnessAdapter = {
           }
           let input = composeInput(m);
           if (sendPolicy) input = `${TOOL_FAILURE_POLICY}\n\n---\n\n${input}`;
-          const key = m.uuid || randomUUID();
+          let key = m.uuid || randomUUID();
+          // This turn's worktree read: offered where the channel opens its work to remote agents, refused elsewhere.
+          read = await openRead(thread, key);
+          let instructions = sendInstructions && ctx.systemPrompt ? ctx.systemPrompt : undefined;
+          let tools = serverTakesTools && readOffered(thread) ? [READ_TOOL_DEF] : undefined;
           let created;
-          if (sendInstructions && ctx.systemPrompt) {
+          for (;;) {
             try {
-              created = await client!.createRun({ input, session_id: sessionId, instructions: ctx.systemPrompt }, key, ac.signal);
-              sendInstructions = false;
+              created = await client!.createRun({ input, session_id: sessionId, ...(instructions && { instructions }), ...(tools && { tools }) }, key, ac.signal);
+              break;
             } catch (e) {
+              if (!(e instanceof HermesHttpError) || ac.signal.aborted) throw e;
               // Some builds reject the field. The prompt then rides on the first message only.
-              if (e instanceof HermesHttpError && e.instructionsRejected && !ac.signal.aborted) {
+              if (instructions && e.instructionsRejected) {
                 sendInstructions = false;
-                input = `${ctx.systemPrompt}\n\n---\n\n${input}`;
-                created = await client!.createRun({ input, session_id: sessionId }, `${key}:text`, ac.signal);
+                input = `${instructions}\n\n---\n\n${input}`;
+                instructions = undefined;
+                key = `${key}:text`;
+              } else if (tools && e.toolsRejected) {
+                // A server that takes no client-side tools still runs: without the read, as before (protocol doc).
+                serverTakesTools = false;
+                tools = undefined;
+                key = `${key}:notools`;
               } else throw e;
             }
-          } else {
-            created = await client!.createRun({ input, session_id: sessionId }, key, ac.signal);
           }
+          if (instructions) sendInstructions = false;
           sendPolicy = false;
           // An eve agent names its own session: the thread keeps that id, so the next turn and a restart continue it.
           if (created.session_id && created.session_id !== sessionId) {
@@ -214,6 +252,7 @@ export const hermesAdapter: HarnessAdapter = {
           runId = created.run_id;
           activeRunId = created.run_id;
           settled = false;
+          reads.set(created.run_id, read);
           if (ended) {
             stopActive();
             return;
@@ -226,6 +265,8 @@ export const hermesAdapter: HarnessAdapter = {
           emit({ kind: 'error', payload: { text: failText(e, target) } }, startedAt);
           emit({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } }, startedAt);
         } finally {
+          // The turn is over, so is its read: a call that names this run from now on is refused.
+          closeRead(read);
           if (runAbort === ac) runAbort = null;
           runId = null;
           turnActive = false;

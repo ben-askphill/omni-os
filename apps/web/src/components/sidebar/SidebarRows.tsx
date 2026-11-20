@@ -98,7 +98,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
           active ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
-        <span className="grid w-3 shrink-0 place-items-center">
+        <span className="grid min-w-3 shrink-0 place-items-center">
           <ThreadDot t={t} busy={busy} />
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
@@ -184,7 +184,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
         data-active={(active && home) || undefined}
         className={`item flex h-9 min-w-0 flex-1 items-center gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
       >
-        <span className="grid w-[15px] shrink-0 place-items-center">
+        <span className="grid min-w-[15px] shrink-0 place-items-center">
           <ThreadDot t={t} busy={busy} />
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>

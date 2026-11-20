@@ -114,5 +114,19 @@
       ],
       "truncated": false
     }
+  ],
+  "collisions": [
+    {
+      "id": 41,
+      "key": "00000000-0000-4000-8000-0000000000c1",
+      "path": "README.md",
+      "label": "README.md",
+      "agents": [
+        "builder",
+        "designer"
+      ],
+      "at": "2026-01-05T09:30:00.000Z",
+      "cleared": null
+    }
   ]
 }

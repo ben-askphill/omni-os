@@ -6,14 +6,17 @@ import { catalog, thread } from './fixtures';
 const harnesses = catalog();
 
 describe('model sheet rows', () => {
-  it('lists every harness the catalog reports, with no code for any of them', () => {
-    const model = runSheetModel(thread(), harnesses);
+  it("lists every local harness the catalog reports, with no code for any of them, and no remote agent's server", () => {
+    const down = { id: 'gemini', name: 'Gemini', plan: 'Google', available: false, fix: 'gemini login', cap: 1, running: 0, capabilities: {}, models: [] };
+    const remote = { ...down, id: 'custom:eve', name: 'Eve', available: true };
+    const model = runSheetModel(thread(), [...harnesses, down, remote] as never);
+    // Hermes and a connected server are remote agents now (ADR 0020): their server is the agent's, not a pick.
     expect(model.harnesses.map((h) => [h.id, h.name, h.available])).toEqual([
       ['claude', 'Claude Code', true],
       ['codex', 'Codex', true],
-      ['hermes', 'Hermes', false],
+      ['gemini', 'Gemini', false],
     ]);
-    expect(model.harnesses[2]).toMatchObject({ fix: 'hermes login', models: [] });
+    expect(model.harnesses[2]).toMatchObject({ fix: 'gemini login', models: [] });
   });
 
   it('checks the model the thread runs on', () => {

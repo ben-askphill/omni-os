@@ -99,7 +99,7 @@ export function connectorAccessOf(raw: unknown): ConnectorAccess {
 }
 
 /** Omni's own MCP servers. Their tools run at every level: Omni checks what they do itself. */
-export const OMNI_SERVERS = new Set(['omni', 'omni-ask', 'omni-render', 'omni-threads', 'omni-steps', 'omni-learn']);
+export const OMNI_SERVERS = new Set(['omni', 'omni-ask', 'omni-render', 'omni-threads', 'omni-steps', 'omni-memory', 'omni-team', 'omni-learn']);
 
 /** The MCP server a tool belongs to, or null for a built-in tool. Claude Code names them `mcp__<server>__<tool>`. */
 export function serverOf(tool: string): string | null {

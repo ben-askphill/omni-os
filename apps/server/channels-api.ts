@@ -17,6 +17,7 @@ import { baseOptions } from './worktree-base.ts';
 import { storedList, worktreeListProblem } from '@omni/shared/worktree-lists.ts';
 import { ACCESS_CONNECTORS } from '@omni/shared/access.ts';
 import { callerOf } from './automation-guard.ts';
+import { memberViews } from './member-view.ts';
 
 export const channelsApi = new Hono();
 
@@ -99,9 +100,12 @@ const connectorAccess = z
 const agentSetsAccess = (c: Context, body: { access_level?: unknown; connector_access?: unknown }) =>
   !!callerOf(c) && (body.access_level !== undefined || body.connector_access !== undefined);
 const AGENT_ACCESS_REFUSAL = 'Agents cannot change access levels. Ask the user to set them in Channel settings.';
-/** Whether thread excerpts may reach remote agents (ask.ts) is Ben's to say: no agent thread sets it, either way. */
-const agentSetsExcerpts = (c: Context, body: { remote_excerpts_off?: unknown }) => !!callerOf(c) && body.remote_excerpts_off !== undefined;
-const AGENT_EXCERPTS_REFUSAL = 'Agents cannot change whether thread excerpts reach remote agents. Ask the user to set it in Channel settings.';
+/**
+ * Whether remote agents can see this channel's work (messages and worktree reads, ADR 0020) is Ben's to say: no agent
+ * thread sets it, either way.
+ */
+const agentSetsRemoteWork = (c: Context, body: { remote_work?: unknown }) => !!callerOf(c) && body.remote_work !== undefined;
+const AGENT_REMOTE_WORK_REFUSAL = "Agents cannot change whether remote agents can see this channel's work. Ask the user to set it in Channel settings.";
 
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
@@ -128,7 +132,7 @@ const channelSchema = z.object({
   prompt_fix_conflicts: stepPrompt,
   prompt_fix_checks: stepPrompt,
   scan_opt_out: z.coerce.number().int().min(0).max(1).optional(),
-  remote_excerpts_off: z.coerce.number().int().min(0).max(1).optional(),
+  remote_work: z.coerce.number().int().min(0).max(1).optional(),
   access_level: accessLevel,
   connector_access: connectorAccess,
 });
@@ -141,9 +145,12 @@ const THREADS_PER_FOLDER = 50;
 
 /** A thread as the sidebar lists it. `delegating`: a thread it delegated still works (apps/server/delegating.ts). */
 /** A thread as the lists show it. `model` and `branch` are for the thread tree's child rows (tooltip and second line), `setup` for the Starting dot. */
-const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup }: Thread, delegating: ReadonlySet<string>) => ({
-  id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id),
-});
+const stub = (t: Thread, delegating: ReadonlySet<string>) => {
+  const { id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup } = t;
+  // A group thread's agents (member-view.ts): while any works or waits on the user, the row draws their faces.
+  const members = memberViews(t);
+  return { id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id), ...(members && { members }) };
+};
 
 /** Conductor jobs with their delegated child threads, including children in other channels. */
 function conductorHandoffs(delegating: ReadonlySet<string>) {
@@ -244,7 +251,7 @@ const withActive = (
   teams: ReturnType<typeof teamsByChannel>,
   delegating: ReadonlySet<string>,
 ) => {
-  const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
+  const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team' && t.source !== 'member');
   return {
     ...publicChannel(ch),
     running: mine.filter((t) => isWorking(t, delegating)).length,
@@ -279,7 +286,7 @@ channelsApi.post('/', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (agentSetsAccess(c, body)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
-  if (agentSetsExcerpts(c, body)) return c.json({ error: AGENT_EXCERPTS_REFUSAL }, 403);
+  if (agentSetsRemoteWork(c, body)) return c.json({ error: AGENT_REMOTE_WORK_REFUSAL }, 403);
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
   const runError = runDefaultsError(body) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
@@ -313,7 +320,7 @@ channelsApi.patch('/:id', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (agentSetsAccess(c, body)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
-  if (agentSetsExcerpts(c, body)) return c.json({ error: AGENT_EXCERPTS_REFUSAL }, 403);
+  if (agentSetsRemoteWork(c, body)) return c.json({ error: AGENT_REMOTE_WORK_REFUSAL }, 403);
   delete (body as any).id;
   const runError = runDefaultsError(body, current) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);

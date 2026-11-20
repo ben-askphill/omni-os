@@ -134,7 +134,7 @@ export function createSender(deps: SenderDeps): ThreadSender {
       void settleIfLanded(sight);
     },
     async submit(thread, text, files = [], context = []) {
-      const next = beginSend(state.get().outbox, text, sendModeFor(thread, deps.catalog()), deps.newId, files, context);
+      const next = beginSend(state.get().outbox, text, sendModeFor(thread, deps.catalog(), context), deps.newId, files, context);
       if (!next?.item) return null;
       patch({ outbox: next, notice: null });
       return transmit(next.item);

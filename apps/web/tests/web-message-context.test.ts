@@ -17,10 +17,12 @@ import { cantShowText, ContextChips, ContextInspector, NEWER_LABEL } from '../sr
 import { rangeText, sourceText } from '../src/message-context/diff-selection.tsx';
 import { CONTEXT_VIEWS } from '../src/message-context/kinds.ts';
 import { MentionText } from '../src/message-context/MentionText.tsx';
-import { editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMachines } from '../src/message-context/machine-tokens.ts';
+import { editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMentions } from '../src/message-context/machine-tokens.ts';
 import { referencesFor } from '../src/message-context/thread-picker.ts';
 import { newThreadScope } from '../src/components/composer/MessageEditor.tsx';
-import { chipRecords, machineMention, mentionBody, type MachineIdentity } from '@omni/shared/message-context-machine.ts';
+import { chipRecords, machineMention, mentionBody, sentContext, type MachineIdentity } from '@omni/shared/message-context-machine.ts';
+import { agentMention, agentMentionBody } from '@omni/shared/message-context-agent.ts';
+import { SentTo } from '../src/message-context/agent-mention.tsx';
 import { addDraftContext, draftContext, removeDraftContext, settleDraftContext } from '../src/message-context/draft.ts';
 import { sendKey } from '../src/requests.ts';
 import type { UserP } from '@omni/shared/transcript-fold.ts';
@@ -131,6 +133,9 @@ describe('context chips', () => {
     } else if ((c.raw as { kind: string }).kind === 'machine_mention') {
       expect(inspector).toContain('omarchy');
       expect(inspector).toContain('Asleep or offline, last seen');
+      expect(inspector).not.toContain('Update Omni');
+    } else if ((c.raw as { kind: string }).kind === 'agent_mention') {
+      expect(inspector).toContain('The message went to Designer.');
       expect(inspector).not.toContain('Update Omni');
     } else {
       expect(inspector).toContain('src/cart.ts');
@@ -285,18 +290,18 @@ describe('machine mentions in a composer', () => {
     pick(thread, machine('mac-1', 'MacBook Pro'));
     const [box, mac] = draftContext(thread);
     const both = [machineToken(machine('box-1', 'omarchy')), ' run the tests, ', machineToken(machine('mac-1', 'MacBook Pro')), ' build it'];
-    expect(reconcileMachines(both, draftContext(thread))).toEqual({ add: [], remove: [] });
-    expect(reconcileMachines([both[0], ' run the tests, build it'], draftContext(thread))).toEqual({ add: [], remove: [mac.id] });
-    expect(reconcileMachines(['', both[0], ' and ', both[0]], draftContext(thread)).remove).toEqual([mac.id]);
-    expect(reconcileMachines(['nothing left'], draftContext(thread)).remove).toEqual([box.id, mac.id]);
+    expect(reconcileMentions(both, draftContext(thread))).toEqual({ add: [], addAgents: [], remove: [] });
+    expect(reconcileMentions([both[0], ' run the tests, build it'], draftContext(thread))).toEqual({ add: [], addAgents: [], remove: [mac.id] });
+    expect(reconcileMentions(['', both[0], ' and ', both[0]], draftContext(thread)).remove).toEqual([mac.id]);
+    expect(reconcileMentions(['nothing left'], draftContext(thread)).remove).toEqual([box.id, mac.id]);
     settleDraftContext(thread, draftContext(thread).map((r) => r.id));
   });
 
   it('gives a chip with no record one, from what its token knew of the machine (Undo, or a paste)', () => {
     const thread = 'thread-machine-undo';
     const back = { ...machine('mac-1', 'MacBook Pro'), reachability: 'offline' as const, lastSeen: '2026-11-20T08:00:00.000Z' };
-    expect(reconcileMachines([machineToken(back), ' build it'], draftContext(thread))).toEqual({ add: [back], remove: [] });
-    expect(reconcileMachines([{ type: MACHINE_TOKEN, value: 'box-9', label: 'pasted' }], [])).toEqual({ add: [{ id: 'box-9', name: 'pasted', reachability: 'unknown', lastSeen: null }], remove: [] });
+    expect(reconcileMentions([machineToken(back), ' build it'], draftContext(thread))).toEqual({ add: [back], addAgents: [], remove: [] });
+    expect(reconcileMentions([{ type: MACHINE_TOKEN, value: 'box-9', label: 'pasted' }], [])).toEqual({ add: [{ id: 'box-9', name: 'pasted', reachability: 'unknown', lastSeen: null }], addAgents: [], remove: [] });
   });
 
   // Home's dashboard composer (NewThreadComposer, draft key `new:*`): the `@` menu asks for the machines with the role,
@@ -326,5 +331,27 @@ describe('machine mentions in a composer', () => {
     // Text that lost its @name keeps the chip.
     expect(chipRecords('run the ingest', records)).toHaveLength(1);
     settleDraftContext(thread, records.map((r) => r.id));
+  });
+});
+
+describe('agent mentions on a sent message', () => {
+  const ids = (() => {
+    let n = 0;
+    return { id: () => `a${++n}` };
+  })();
+  const builder = newContext(agentMention, agentMentionBody({ id: 'builder', name: 'Builder' }), '', ids);
+  // An agent this machine no longer lists keeps the name the message was sent with.
+  const gone = newContext(agentMention, agentMentionBody({ id: 'custom-7f3a', name: 'Copywriter' }), '', ids);
+
+  it('names the agents the text does not on the line over the bubble, and draws no chip for them', () => {
+    const sent = sentContext('Rework the cart drawer', [builder, gone]);
+    expect(renderToStaticMarkup(createElement(ContextChips, { records: sent.chips }))).toBe('');
+    const html = renderToStaticMarkup(createElement(SentTo, { agents: sent.to }));
+    expect(textOf(html).replace(/\s+/g, ' ').trim()).toBe('To Builder Copywriter');
+    expect(html).toContain('data-sent-to="builder"');
+  });
+
+  it('draws nothing when the text names every agent', () => {
+    expect(renderToStaticMarkup(createElement(SentTo, { agents: sentContext('@Builder go', [builder]).to }))).toBe('');
   });
 });

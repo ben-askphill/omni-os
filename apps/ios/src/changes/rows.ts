@@ -3,11 +3,15 @@ import { MAX_LINES, startsOpen, type DiffLine } from '@omni/shared/diff.ts';
 import type { LinePick } from '@omni/shared/diff-pick.ts';
 import { clampToHunk } from '@omni/shared/message-context-diff.ts';
 import { placeNotes, type NotePlace, type ReviewNote } from '@omni/shared/review-notes.ts';
+import type { Collision } from '@omni/shared/collisions.ts';
 
 export type ChangeRow =
+  /** A file two of the thread's agents both edited, while its flag is up (ADR 0019). Changes still credits no agent. */
+  | { type: 'collision'; id: string; c: Collision }
   | { type: 'group'; id: string; title: string; count: number }
   | { type: 'truncated'; id: string }
-  | { type: 'file'; id: string; file: ChangeFileView; open: boolean }
+  /** `flagged`: a collision flag still up names the file. */
+  | { type: 'file'; id: string; file: ChangeFileView; open: boolean; flagged?: true }
   | { type: 'line'; id: string; fileKey: string; index: number; line: DiffLine; width: number; noted?: true }
   | { type: 'reviewNote'; id: string; note: ReviewNote; place: NotePlace }
   | { type: 'note'; id: string; text: string }
@@ -59,15 +63,26 @@ export function notesOnScreen(notes: readonly ReviewNote[], groups: readonly Cha
   return { placed, byFile };
 }
 
-/** The rows on screen. A file with notes on it starts open and shows every line, so no note is hidden. */
-export function changeRows(groups: readonly ChangeGroupView[], total: number, state: RowsState, notes: ReadonlyMap<string, FileNotes> = new Map()): ChangeRow[] {
-  const rows: ChangeRow[] = [];
+/**
+ * The rows on screen: the collision flags still up, then the diff. A file with notes on it starts open and shows every
+ * line, so no note is hidden.
+ */
+export function changeRows(
+  groups: readonly ChangeGroupView[],
+  total: number,
+  state: RowsState,
+  notes: ReadonlyMap<string, FileNotes> = new Map(),
+  collisions: readonly Collision[] = [],
+): ChangeRow[] {
+  const up = collisions.filter((c) => !c.cleared);
+  const rows: ChangeRow[] = up.map((c) => ({ type: 'collision', id: `collision:${c.key}`, c }));
+  const flagged = new Set(up.map((c) => c.path));
   for (const g of groups) {
     rows.push({ type: 'group', id: `group:${g.kind}`, title: g.title, count: g.files.length });
     for (const f of g.files) {
       const fileNotes = notes.get(f.key);
       const open = isOpen(state, f, total, !!fileNotes);
-      rows.push({ type: 'file', id: `file:${f.key}`, file: f, open });
+      rows.push({ type: 'file', id: `file:${f.key}`, file: f, open, ...(flagged.has(f.diff.path) && { flagged: true as const }) });
       if (!open) continue;
       const lines = f.diff.lines;
       if (!lines.length) {
