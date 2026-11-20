@@ -508,6 +508,8 @@ function cloudFinished(m: MemberRow, status: ThreadStatus) {
   const session = threads.get(m.session_thread);
   const t = threads.get(m.thread_id);
   if (status !== 'done' || session?.harness !== 'cursor-cloud' || !t || m.lead) return;
+  // The cloud card and reply are already in the transcript for Ben. A closed channel sends no pull request to its remote lead.
+  if (isRemoteAgentHarness(t.harness) && !remoteSeesWork(t.channel_id)) return;
   const run = events
     .since(t.id)
     .filter((r) => r.kind === 'cloud_agent' && r.agent === m.agent)

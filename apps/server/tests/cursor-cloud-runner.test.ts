@@ -5,28 +5,35 @@ import { delimiter, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startFakeCursorApi, type FakeCursorApi } from '@omni/test-fixtures/fake-cursor-api.mjs';
 import { startRunner } from './runner-boot.ts';
+import { startFakeHermes, type FakeHermes } from './fake-hermes.ts';
 
 // A stand-in for `security`: the global CURSOR_API_KEY is a test double, every other secret is missing.
 const SECURITY = `#!/bin/sh
 if [ "$1" = "find-generic-password" ]; then
-  case "$*" in *" -a global/CURSOR_API_KEY "*) printf '%s\\n' 'test-cursor-key'; exit 0 ;; esac
+  case "$*" in
+    *" -a global/CURSOR_API_KEY "*) printf '%s\\n' 'test-cursor-key'; exit 0 ;;
+    *" -a global/HERMES_API_KEY "*) printf '%s\\n' 'test-hermes-key'; exit 0 ;;
+  esac
   exit 44
 fi
 exit 0
 `;
 
 let fake: FakeCursorApi;
+let hermes: FakeHermes;
 let bin: string;
 let H: Awaited<ReturnType<typeof startRunner>>;
 const savedPath = process.env.PATH;
 
 beforeAll(async () => {
   fake = await startFakeCursorApi();
+  hermes = await startFakeHermes('test-hermes-key');
   bin = mkdtempSync(join(tmpdir(), 'omni-security-'));
   writeFileSync(join(bin, 'security'), SECURITY, { mode: 0o755 });
   H = await startRunner({
     OMNI_CURSOR_API_URL: fake.url,
     OMNI_CURSOR_CLOUD_POLL_MS: '5',
+    OMNI_HERMES_URL: hermes.url,
     PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
   });
   const repo = join(H.tmp, 'repo');
@@ -35,13 +42,17 @@ beforeAll(async () => {
   H.db.channels.create({ id: 'acme', name: 'Acme', kind: 'client', use_worktree: 1, repo_path: repo, github_repo: 'acme/widgets' });
   H.db.channels.create({ id: 'notes', name: 'Notes', kind: 'internal', use_worktree: 0 });
   const svc = await import('../harness/catalog-service.ts');
+  (await import('../remote-agents.ts')).convertRemoteAgents();
   await svc.loadCatalog();
+  const { app } = await import('../app.ts');
+  const res = await app.request('/api/crew', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'cloud-review', fields: { name: 'Cloud Review', harness: 'cursor-cloud' }, charter: 'Review the work.' }) });
+  expect(res.status).toBe(201);
 });
 
-afterAll(() => {
+afterAll(async () => {
   process.env.PATH = savedPath;
   if (bin) rmSync(bin, { recursive: true, force: true });
-  return fake?.close();
+  await Promise.all([fake?.close(), hermes?.close()]);
 });
 
 describe('Cursor Cloud through the runner', () => {
@@ -143,5 +154,29 @@ describe('Cursor Cloud through the runner', () => {
 
   it('refuses a cloud thread in a channel with no GitHub repo', async () => {
     await expect(H.runner.createThread({ channel: 'notes', prompt: 'go', harness: 'cursor-cloud' })).rejects.toThrow(/GitHub repo/);
+  });
+
+  it.each([0, 1])('keeps a cloud member’s completion visible and wakes a remote lead only with remote work enabled (%s)', { timeout: 30_000 }, async (remote_work) => {
+    const channel = `cloud-remote-${remote_work}`;
+    H.db.channels.create({ id: channel, name: channel, use_worktree: 0, github_repo: 'acme/widgets', remote_work });
+    const { app } = await import('../app.ts');
+    const post = (path: string, data: unknown) => app.request(`/api${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+    hermes.reset();
+    const t = await H.runner.createThread({ channel, prompt: 'plan the change', role: 'hermes' });
+    await H.untilResults(t.id, 1);
+    const mention = { id: 'm-cloud', kind: 'agent_mention', v: 1, label: '@Cloud Review', body: { agent: 'cloud-review', name: 'Cloud Review' } };
+    expect((await post(`/threads/${t.id}/messages`, { prompt: 'build the change', context: [mention] })).status).toBe(200);
+    await H.untilResults(t.id, 2);
+    const finished = H.byKind(t.id, 'cloud_agent').findLast((e) => e.p.status === 'FINISHED')!;
+    expect(finished.p).toMatchObject({ branch: expect.stringMatching(/^cursor\//), repo: 'acme/widgets' });
+    const member = H.db.members.of(t.id, 'cloud-review')!;
+    const reply = H.db.events.lastRunText(member.session_thread);
+    expect(reply).toBeTruthy();
+    expect(H.texts(t.id, 'assistant_text').join('\n')).toContain(reply);
+    if (remote_work) await H.untilResults(t.id, 3);
+    const inputs = hermes.calls.filter((c) => c.method === 'POST' && c.path === '/v1/runs').map((c) => (c.body as { input: string }).input);
+    expect(inputs).toHaveLength(remote_work ? 2 : 1);
+    if (remote_work) expect(inputs[1]).toContain(reply);
+    else expect(H.db.messageRequests.byRequestId(t.id, `cloud-pull:${member.session_thread}:${finished.p.run_id}`)).toBeFalsy();
   });
 });
