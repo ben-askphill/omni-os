@@ -25,18 +25,22 @@ import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-ser
 import { resolveRun, reviewerEffort, setsRun } from '../harness/resolve.ts';
 import { reviewRun } from '../harness/review.ts';
 import type { CommandUse } from '../harness/adapter.ts';
-import { assembling, deliver, settleTeam } from './queue.ts';
+import { deliver } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, connectorsFor, declareConnectors, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
-import { hasMembers, namedAgents, preamble, readOnlyReason, routeNamed } from './members.ts';
+import { hasMembers, namedAgents, preamble, readOnlyReason, routeNamed, seat } from './members.ts';
+import { teamBrief, type TeamPart, type TeamRecord } from './team.ts';
+import { seatRefusal } from '../message-context/agent-mention.ts';
+import { agentName } from '../member-view.ts';
 import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { parseGoalCommand } from '@omni/shared/goal.ts';
 import { ownerName } from '@omni/shared/thread-owner.ts';
 import { userConfig } from '../user-config.ts';
+import { userName } from '../profile.ts';
 import { assignRouted, remoteHolder } from '../ownership.ts';
 import { sendUploads } from '../sync/files.ts';
 
@@ -134,6 +138,11 @@ export interface CreateThreadInput {
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
   files?: File[];
   /**
+   * Agents to seat as members before the first message (ADR 0019, Q45): each gets a joined line and no turn, and
+   * works when a later message names it. The first message goes to the lead. Only for a thread that runs here.
+   */
+  members?: string[];
+  /**
    * Records on the first message, already normalized (parseContexts), as on a message Ben posts. Only for a thread
    * that runs here: one sent to another machine is refused, since its first prompt travels as text.
    */
@@ -179,7 +188,7 @@ function askedRun(input: CreateThreadInput, role: CrewRole | undefined) {
   return r.run;
 }
 
-async function openThread(given: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false) {
+async function openThread(given: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false, opts: { team?: boolean } = {}) {
   // A quick ask has no charter, folder, parent or task id, runs here, and is on Auto unless a run was asked for.
   const input: CreateThreadInput = given.quick
     ? { ...given, role: null, folder: null, parent_id: null, task_id: null, review_of: null, base: null, device: null, ...(!given.harness && !given.model && { model: 'auto' }) }
@@ -223,6 +232,8 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   if (unenforced) throw refusal(unenforced, 400);
   // Its tools are taken away on this machine (harness adapters), which Hermes and Cursor Cloud do not run on.
   if (input.quick && isProviderHarness(harness)) throw refusal(quickAskRemoteRefusal(providerWhere(harness)), 409);
+  // A team's lead gives out the parts with an Omni tool (runner/team.ts), which a harness on another server never gets.
+  if (opts.team && isProviderHarness(harness)) throw refusal(`A team's lead gives its members their parts with an Omni tool, which a thread ${providerWhere(harness)} cannot get. Run the lead on a local harness.`, 409);
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
@@ -264,12 +275,25 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 
+/** The agents a new thread seats, each once, refused before anything is made when one cannot be seated. */
+function seatsFor(input: CreateThreadInput): string[] {
+  const agents = [...new Set((input.members ?? []).map((a) => a.trim()).filter(Boolean))];
+  if (agents.length && input.quick) throw refusal('A quick ask starts with no members. Seat agents in it once it has started.', 400);
+  for (const a of agents) {
+    const refused = seatRefusal(a);
+    if (refused) throw refusal(refused, a === 'conductor' ? 409 : 400);
+  }
+  return agents;
+}
+
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
+  const seats = seatsFor(input);
   // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
   // comes back to the parent (run-on.ts).
   const route = input.source === 'team' || input.quick ? null : await runnerPorts().routing.targetFor(input.device);
   const context = input.context?.length ? input.context : undefined;
   if (route && context) throw refusal(`A first message with attachments from Omni runs here, not on ${route.to.name}.`, 409);
+  if (route && seats.length) throw refusal(`A thread with members runs here, not on ${route.to.name}. Seat them once it runs there.`, 409);
   if (route) {
     // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
     const bodies = await Promise.all((input.files ?? []).map(async (f) => new Uint8Array(await f.arrayBuffer())));
@@ -290,6 +314,15 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     return threads.get(thread.id)!;
   }
   const { thread, harness, folder } = await openThread(input);
+  for (const a of seats) {
+    if (a !== thread.role) seat(thread.id, a, input.prompt);
+  }
+  return startThread(thread, harness, folder, input);
+}
+
+/** Send a new thread's first message: saved until its worktree is ready, else delivered now. */
+async function startThread(thread: Thread, harness: string, folder: string, input: CreateThreadInput): Promise<Thread> {
+  const context = input.context?.length ? input.context : undefined;
   const saved = await saveUploads(thread.id, input.files ?? []);
   const attachments = saved.length ? saved : undefined;
   if (thread.setup) {
@@ -321,8 +354,11 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
 export interface TeamTask {
   prompt: string;
   title?: string | null;
+  /** The agent with this part. Left out, the lead's: the lead does it itself. */
   role?: string | null;
+  /** Kept for callers from before one-thread teams. A team thread has one task id. */
   task_id?: string | null;
+  /** The member's run, over its agent's defaults. The first part of an agent that names one sets it. */
   harness?: string | null;
   model?: string | null;
   effort?: string | null;
@@ -330,59 +366,58 @@ export interface TeamTask {
 
 export interface CreateTeamInput {
   channel: string;
-  /** What the team is for. The lead gets it with every member's reply once the last one reports. */
+  /** What the team is for and what the combined answer should look like: the lead's brief, with every part under it. */
   prompt: string;
   title?: string | null;
-  /** The lead's role, and each member's unless the task names one. */
+  /** The lead's agent, which also does every part that names no agent. */
   role?: string | null;
   parent_id?: string | null;
   task_id?: string | null;
   source?: ThreadSource;
-  /** A sidebar folder of the channel for the lead, by id or name. Members sit under the lead, not in the folder. */
+  /** A sidebar folder of the channel for the team thread, by id or name. */
   folder?: string | null;
   tasks: TeamTask[];
 }
 
+/** A member a team seated, with the titles of its parts. */
+export interface TeamSeat {
+  agent: string;
+  name: string;
+  parts: string[];
+}
+
 /**
- * One lead thread in the channel with a member thread per task under it. The members run now; the lead
- * waits (shown as running) and runs once, when the last member reports, to combine their replies.
+ * A team as one thread (ADR 0019, slice 6): the lead and one member per agent with a part, seated before the brief.
+ * The brief, with every part under the agent that has it, is the thread's first message, and the lead plans on it
+ * first: it gives the members their parts with message_members (runner/team.ts). An agent with two parts gets one seat.
  */
-export async function createTeam(input: CreateTeamInput): Promise<{ lead: Thread; members: Thread[] }> {
-  if (!input.tasks.length) throw new Error('a team needs at least one task');
-  // Every member's role before the lead exists, so a bad one leaves nothing behind.
-  for (const t of input.tasks) roleFor(t.role ?? input.role, 'team');
-  const { thread: lead } = await openThread({ ...input, source: input.source ?? 'conductor' }, 'running');
-  addEvent(lead.id, 'user', { text: input.prompt, source: lead.source });
-  // Its brief is in the transcript already; it runs once its worktree and its team are both ready.
-  if (lead.setup) void setUpThread(lead.id);
-  if (!input.title) void generateTitle(lead.id, input.prompt);
-  const members: Thread[] = [];
-  // A member can finish before the last one is created; the lead settles once all of them exist.
-  assembling.add(lead.id);
-  try {
-    for (const [i, t] of input.tasks.entries()) {
-      members.push(
-        await createThread({
-          ...t,
-          channel: lead.channel_id,
-          role: t.role ?? input.role,
-          parent_id: lead.id,
-          task_id: t.task_id ?? (lead.task_id ? `${lead.task_id}.${i + 1}` : null),
-          source: 'team',
-        }),
-      );
-    }
-  } catch (err) {
-    // A member that could not start: the lead fails with the reason instead of waiting for it forever.
-    addEvent(lead.id, 'error', { text: `Could not start task ${input.tasks[members.length]?.title ?? members.length + 1}: ${(err as Error).message}` });
-    threads.update(lead.id, { status: members.length ? 'running' : 'failed' });
-    if (!members.length) throw err;
-  } finally {
-    assembling.delete(lead.id);
+export async function createTeam(input: CreateTeamInput): Promise<{ thread: Thread; members: TeamSeat[] }> {
+  if (!input.tasks.length) throw refusal('A team needs at least one part.', 400);
+  const lead = roleFor(input.role, input.source ?? 'conductor');
+  const leadAgent = lead?.id ?? '';
+  const parts: TeamPart[] = input.tasks.map((t, i) => ({ title: t.title?.trim() || `Part ${i + 1}`, prompt: t.prompt, agent: t.role?.trim() || leadAgent }));
+  const others = [...new Set(parts.map((p) => p.agent).filter((a) => a !== leadAgent))];
+  if (!others.length) {
+    throw refusal(`Every part goes to ${agentName(leadAgent || null)}, the lead. A team needs a part for another agent: name it in the part's role, or use delegate for one agent's work.`, 400);
   }
-  settleTeam(lead.id);
-  emitThread(lead.id);
-  return { lead: threads.get(lead.id)!, members };
+  // Every member before the thread exists, so a bad one leaves nothing behind.
+  for (const a of others) {
+    const refused = seatRefusal(a);
+    if (refused) throw refusal(refused, a === 'conductor' ? 409 : 400);
+    roleFor(a, 'team');
+  }
+  const brief = teamBrief(input.prompt, leadAgent, parts);
+  const first: CreateThreadInput = { ...input, prompt: brief, source: input.source ?? 'conductor', device: null };
+  const { thread, harness, folder } = await openThread(first, 'queued', false, { team: true });
+  addEvent(thread.id, 'team', { lead: leadAgent, parts: parts.map((p) => ({ title: p.title, agent: p.agent })) } satisfies TeamRecord);
+  const seats = others.map((agent): TeamSeat => {
+    const mine = input.tasks.filter((_t, i) => parts[i].agent === agent);
+    const run = mine.find((t) => t.harness || t.model || t.effort);
+    seat(thread.id, agent, mine.map((t) => t.prompt).join('\n\n'), run && { harness: run.harness, model: run.model, effort: run.effort });
+    return { agent, name: agentName(agent), parts: parts.filter((p) => p.agent === agent).map((p) => p.title) };
+  });
+  const started = await startThread(thread, harness, folder, { ...first, title: input.title });
+  return { thread: started, members: seats };
 }
 
 export function sendMessage(
@@ -500,8 +535,9 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
       deliver(r.thread_id, requestMsg(r));
       return;
     }
-    // Ben's message naming agents goes to them, seating the ones not in the thread yet (runner/members.ts).
-    const named = r.source === 'ben' ? namedAgents(r.thread_id, r.context ?? undefined) : null;
+    // Ben's message naming agents goes to them, seating the ones not in the thread yet (runner/members.ts). So does the
+    // Conductor's, which postMessage let through only where it may seat them.
+    const named = r.source === 'ben' || r.source === 'conductor' ? namedAgents(r.thread_id, r.context ?? undefined) : null;
     if (named) {
       const blocked = turnBlocked(thread, runsHere(r.thread_id));
       if (blocked) throw refusal(blocked, 409);
@@ -537,15 +573,22 @@ export function wakePrepared(r: MessageRequest): Promise<void> {
 export async function postMessage(
   threadId: string,
   prompt: string,
-  opts: Parameters<typeof sendMessage>[2] & { requestId?: string; fingerprint?: string; ifAway?: 'ask' | 'send' } = {},
+  opts: Parameters<typeof sendMessage>[2] & {
+    requestId?: string;
+    fingerprint?: string;
+    ifAway?: 'ask' | 'send';
+    /** The route checked that this sender may seat the agents the message mentions (thread-routes-api.ts seatingRefusal). */
+    seats?: boolean;
+  } = {},
 ): Promise<PostedThread> {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
-  // A thread whose lead agent is gone takes no new messages (Q59), and only Ben seats agents in this slice.
+  // A thread whose lead agent is gone takes no new messages (Q59). Ben seats agents anywhere; the Conductor only where
+  // the route allowed it (thread-routes-api.ts seatingRefusal).
   const readOnly = readOnlyReason(thread);
   if (readOnly) throw refusal(readOnly, 409);
   if (thread.source === 'member') throw refusal('Write in the thread this agent is seated in.', 409);
-  if ((opts.from ?? 'ben') !== 'ben' && mentionedAgents(opts.context).length) throw refusal('Only the user seats agents in a thread.', 403);
+  if ((opts.from ?? 'ben') !== 'ben' && mentionedAgents(opts.context).length && !opts.seats) throw refusal(`Only ${userName()} seats agents in a thread.`, 403);
   namedAgents(threadId, opts.context);
   const goal = goalSend(thread, prompt, opts.attachments?.length ?? 0);
   const mode = goal ? 'queue' : (opts.mode ?? 'steer');

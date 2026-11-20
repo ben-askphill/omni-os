@@ -17,7 +17,8 @@ import { stampNewThreadReferences, stampThreadReferences } from './message-conte
 import { stampMachineMentions } from './message-context/machine-mention.ts';
 import { stampAgentMentions } from './message-context/agent-mention.ts';
 import { getCrew } from './crew.ts';
-import { lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
+import { callerOf, lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
+import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { userName } from './profile.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
@@ -114,7 +115,23 @@ const createSchema = z.object({
   context: z.unknown().optional(),
   /** A quick ask (packages/shared/quick-ask.ts): answered in place, out of the lists but Recent asks. */
   quick: z.boolean().optional(),
+  /** Agents seated as members before the first message, which goes to the lead (ADR 0019, Q45). */
+  members: z.array(z.string().trim().min(1).max(64)).max(12).optional(),
 });
+
+/**
+ * Why an agent thread may not seat agents in this thread, or null when it may (ADR 0019, Q45). Only Ben's clients name
+ * no caller, and he seats agents anywhere. An agent thread (the Conductor) seats agents only in a thread it delegated,
+ * one whose parent is itself, and never in a #conductor thread. `seating` is the thread to be, or the thread a
+ * message goes to.
+ */
+function seatingRefusal(c: Context, seating: { channel: string; parent_id?: string | null }): string | null {
+  const caller = callerOf(c);
+  if (!caller) return null;
+  if (seating.channel === 'conductor') return 'Agents are never seated in a #conductor thread by an agent. Delegate the work to its channel and seat them there.';
+  if (seating.parent_id !== caller) return 'An agent seats agents only in a thread it delegated. Delegate a new thread, with members, instead.';
+  return null;
+}
 
 /** Recent asks: the quick asks of the last week, kept or turned into a task ones included (RECENT_ASKS_DAYS). */
 threadRoutesApi.get('/asks', (c) => c.json(allWithDelegating(threads.recentAsks(RECENT_ASKS_DAYS))));
@@ -157,6 +174,10 @@ threadRoutesApi.post('/', async (c) => {
   const { context: raw, ...body } = createSchema.parse(data);
   const filed = fileUnderCaller(c, body);
   if (filed) return filed;
+  if (body.members?.length) {
+    const no = seatingRefusal(c, { channel: body.channel || getCrew(body.role)?.channel || 'inbox', parent_id: body.parent_id });
+    if (no) return c.json({ error: no }, 403);
+  }
   checkUploads(files);
   const parsed = parseContexts(raw);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
@@ -219,13 +240,16 @@ function fileUnderCaller(c: Context, body: { parent_id?: string | null }) {
   return no ? c.json({ error: no }, 403) : null;
 }
 
-/** A lead thread in the channel and one member thread per task under it. */
+/** A team as one thread in the channel: its lead and a member per agent with a part (runner/api.ts createTeam). */
 threadRoutesApi.post('/team', async (c) => {
   const body = teamSchema.safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'invalid team' }, 400);
   const filed = fileUnderCaller(c, body.data);
   if (filed) return filed;
-  return c.json(await createTeam(body.data));
+  const no = seatingRefusal(c, { channel: body.data.channel, parent_id: body.data.parent_id });
+  if (no) return c.json({ error: no }, 403);
+  const { thread, members } = await createTeam(body.data);
+  return c.json({ thread: { ...thread, ...memberFields(thread) }, members });
 });
 
 threadRoutesApi.get('/:id', (c) => {
@@ -380,10 +404,17 @@ threadActionsApi.post('/:id/messages', async (c) => {
   if (!machines.ok) return c.json({ error: machines.error }, 400);
   const stamped = stampAgentMentions(machines.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
+  // An agent thread's agent mention seats agents only where it may (Q45), and only in a thread that runs here.
+  const seats = mentionedAgents(stamped.value).length > 0;
+  if (seats && callerOf(c)) {
+    const no = seatingRefusal(c, { channel: target.channel_id, parent_id: target.parent_id });
+    if (no) return c.json({ error: no }, 403);
+    if (remoteHolder(target)) return c.json({ error: 'This thread runs on another machine: seat agents in it there.' }, 409);
+  }
   const attachments = await saveUploads(id, files);
   // Ben's Fix checks step (the channel's own prompt or the built-in one) goes out with the failing checks and their log tails (fix-checks.ts), from any client.
   const text = from === 'ben' && stepOf(prompt, stepPrompts(channels.get(target.channel_id))) === 'checks' ? await fixChecksPrompt(target) : prompt;
-  const sent = await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away });
+  const sent = await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away, seats });
   // A group thread's members and read-only reason, as GET sends them: the client takes this thread as its new state.
   return c.json({ ...sent, ...memberFields(sent) });
 });

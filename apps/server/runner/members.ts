@@ -64,13 +64,13 @@ function leadRow(t: Thread): MemberRow {
  * The run a new member starts on: its agent's run defaults, then the channel's, then Auto on the message that seated
  * it (Q15). Any agent is seated, even one this machine cannot run: its turn fails when it runs, saying why (Q10).
  */
-function memberRun(t: Thread, agent: string, prompt: string): { harness: string; model: string | null; effort: string; auto_reason: string | null } {
+function memberRun(t: Thread, agent: string, prompt: string, own: MemberRunPick = {}): { harness: string; model: string | null; effort: string; auto_reason: string | null } {
   const role = getCrew(agent);
   const channel = channels.get(t.channel_id);
   const channelDefaults = channel ? { harness: channel.default_harness ?? undefined, model: channel.default_model ?? undefined, effort: channel.default_effort ?? undefined } : undefined;
   const cat = channelCatalog(getCatalog(), t.channel_id);
   // A quick ask's members stay on Claude Code with read-only tools, as its lead does (Q9).
-  const asked = t.quick ? { harness: 'claude-code' } : {};
+  const asked = t.quick ? { harness: 'claude-code' } : { harness: own.harness ?? undefined, model: own.model ?? undefined, effort: own.effort ?? undefined };
   const run = resolveRun(asked, setsRun(role) ? role : undefined, cat, channelDefaults);
   if (run.ok && !('auto' in run)) return { harness: run.harness, model: run.model || null, effort: run.effort ?? '', auto_reason: null };
   if (!run.ok) return { harness: role?.harness ?? t.harness, model: role?.model ?? null, effort: role?.effort ?? '', auto_reason: null };
@@ -78,10 +78,17 @@ function memberRun(t: Thread, agent: string, prompt: string): { harness: string;
   return { harness: auto.harness, model: auto.model || null, effort: auto.effort, auto_reason: auto.reason };
 }
 
+/** A run a seat asks for (a team part that names one), over its agent's defaults. */
+export interface MemberRunPick {
+  harness?: string | null;
+  model?: string | null;
+  effort?: string | null;
+}
+
 /** The member thread a seat runs in: hidden, under the group thread, in its folder and on its branch. */
-function memberThread(t: Thread, agent: string, prompt: string): Thread {
+function memberThread(t: Thread, agent: string, prompt: string, own?: MemberRunPick): Thread {
   const id = randomUUID();
-  const run = memberRun(t, agent, prompt);
+  const run = memberRun(t, agent, prompt, own);
   return threads.create({
     id,
     channel_id: t.channel_id,
@@ -109,7 +116,7 @@ function memberThread(t: Thread, agent: string, prompt: string): Thread {
  * Seat `agent` in the thread with a quiet joined line, or return its seat when it has one. Its first turn, when a
  * message names it, opens with the catch-up. Refused for the Conductor and an agent this machine does not have.
  */
-export function seat(threadId: string, agent: string, prompt = ''): MemberRow {
+export function seat(threadId: string, agent: string, prompt = '', run?: MemberRunPick): MemberRow {
   const t = threads.get(threadId);
   if (!t) throw refusal('thread not found', 404);
   if (t.source === 'member') throw refusal('A member thread has no members of its own.', 400);
@@ -121,7 +128,7 @@ export function seat(threadId: string, agent: string, prompt = ''): MemberRow {
   const had = members.of(threadId, agent);
   if (had && !had.removed_at) return had;
   leadRow(t);
-  const row = members.seat(threadId, agent, memberThread(t, agent, prompt).id);
+  const row = members.seat(threadId, agent, memberThread(t, agent, prompt, run).id);
   addEvent(threadId, 'member', { event: 'joined', agent, name: agentName(agent) }, agent);
   emitThread(threadId);
   return row;
@@ -186,10 +193,10 @@ function entriesFor(t: Thread, agent: string, after: number, before = Infinity):
     const p = JSON.parse(r.payload) as { text?: unknown; to?: unknown; dropped?: unknown };
     if (typeof p.text !== 'string' || !p.text.trim() || p.dropped === true) continue;
     if (r.kind === 'user') {
-      // A message that went to this agent is in its session already.
+      // A message that went to this agent is in its session already, and so is one it wrote (a team lead's part).
       const to = Array.isArray(p.to) ? (p.to as string[]) : [lead];
-      if (to.includes(agent)) continue;
-      out.push({ id: r.id, who: userName(), text: p.text });
+      if (to.includes(agent) || (r.agent !== null && r.agent === agent)) continue;
+      out.push({ id: r.id, who: r.agent !== null ? agentName(r.agent || null) : userName(), text: p.text });
     } else if (r.kind === 'assistant_text') {
       const by = r.agent ?? lead;
       if (by === agent) continue;
@@ -284,6 +291,8 @@ interface Step {
   prompt: string;
   attachments?: Attachment[];
   context?: MessageContext[];
+  /** Who sent it: Ben, or a team's lead (`team`). */
+  source?: 'ben' | 'team';
 }
 
 /**
@@ -333,12 +342,41 @@ export function routeNamed(
     ...(m.context?.length && { context: m.context }),
   });
   messageRequests.mark(m.request.id, 'delivered', row.id);
+  startRound(threadId, row, named, { request: m.request.request_id, prompt: m.prompt, attachments: m.attachments, context: m.context });
+}
+
+/**
+ * A team lead's message to members already seated (runner/team.ts): written once as the lead's, with `to`, and handed
+ * to each at once, as Ben's message naming them is. It seats no one: `agents` are checked members. Each reads it as
+ * `framed`, which says who sent it. The transcript keeps the lead's own words.
+ */
+export function routeFromLead(threadId: string, lead: string, agents: string[], text: string, framed: string): EventRow {
+  const row = addEvent(threadId, 'user', { text, source: 'lead', to: agents }, lead);
+  startRound(threadId, row, agents, { request: `lead:${randomUUID()}`, prompt: framed, source: 'team' });
+  return row;
+}
+
+/** Hand the message in `row` to every agent in `named` at once, as one round with one turn checkpoint. */
+function startRound(
+  threadId: string,
+  row: EventRow,
+  named: string[],
+  m: { request: string; prompt: string; attachments?: Attachment[]; context?: MessageContext[]; source?: Step['source'] },
+) {
   const round: Round = { row, pending: new Set(named), handed: new Set(), snap: null };
   rounds.set(threadId, [...(rounds.get(threadId) ?? []), round]);
-  const steps: Step[] = named.map((agent) => ({ agent, row, request: m.request.request_id, prompt: m.prompt, attachments: m.attachments, context: m.context }));
+  const steps: Step[] = named.map((agent) => ({ agent, row, request: m.request, prompt: m.prompt, attachments: m.attachments, context: m.context, source: m.source }));
   void start(threadId, round, steps);
   emitThread(threadId);
 }
+
+/** The agents a message was handed or is being handed to that have not answered it yet. */
+export function pendingAgents(threadId: string): Set<string> {
+  return new Set((rounds.get(threadId) ?? []).flatMap((r) => [...r.pending]));
+}
+
+/** Called once every agent a message named has answered it (runner/team.ts wakes a team's lead from here). */
+export const roundsSettled: ((threadId: string) => void)[] = [];
 
 /** Save the checkout for the message, then hand it to every named agent at once. */
 async function start(threadId: string, round: Round, steps: Step[]) {
@@ -371,9 +409,9 @@ async function handTo(threadId: string, round: Round, step: Step) {
     request_id: key,
     prompt: text,
     mode: 'steer',
-    source: 'ben',
+    source: step.source ?? 'ben',
     kind: 'routed',
-    payload: { text: step.prompt, source: 'ben' },
+    payload: { text: step.prompt, source: step.source ?? 'ben' },
     attachments: step.attachments ?? null,
     context: step.context ?? null,
     fingerprint: key,
@@ -386,7 +424,7 @@ async function handTo(threadId: string, round: Round, step: Step) {
     mode: 'steer',
     attachments: step.attachments,
     contexts: step.context,
-    event: { kind: 'routed', payload: { text: step.prompt, source: 'ben' } },
+    event: { kind: 'routed', payload: { text: step.prompt, source: step.source ?? 'ben' } },
     byOmni: true,
   };
   round.handed.add(step.agent);
@@ -415,6 +453,13 @@ function finishIfDone(threadId: string, round: Round) {
   else rounds.delete(threadId);
   finishMessageSnapshot(threadId, round.snap);
   afterNamed(threadId, round.row.id);
+  for (const f of roundsSettled) {
+    try {
+      f(threadId);
+    } catch (err) {
+      console.error(`[members] ${threadId}: after a round`, err);
+    }
+  }
   pump();
 }
 
