@@ -27,7 +27,7 @@ A thread with full tools and a place of its own to work, as opposed to a quick a
 _Avoid_: Job, ticket
 
 **Quick ask**:
-A question an agent answers in place with read-only tools, kept out of the thread lists until the user keeps it or makes it a task.
+A question an agent answers in place with read-only tools, kept out of the thread lists until the user keeps it or makes it a task. Members the user seats there get the same read-only tools.
 _Avoid_: Chat, quick thread, Ask (the older question to another agent)
 
 **Job**:
@@ -141,11 +141,11 @@ The short label, such as T-1A2B, that a delegated thread carries and its crew re
 _Avoid_: Ticket, job id
 
 **Team**:
-A delegation of several parts of one job as one thread: a lead and one member per agent with a part, where an agent with two parts gets both in one message and the lead writes the crew report once every member has replied.
+A delegation of several parts of one job as one thread: a lead that plans and then messages each member its part, and one member per agent with a part, where an agent with two parts gets both in one message and the lead writes the crew report once every member has finished.
 _Avoid_: Crew (every agent), swarm, member thread (the older form, one thread per part)
 
 **Crew report**:
-A delegated thread's final reply, delivered to the thread that delegated it when its turn ends. A team's is its lead's.
+A delegated thread's final reply, delivered to the thread that delegated it when its lead's turn ends, even if members still run. A team's is its lead's reply after every member has finished.
 _Avoid_: Result, callback
 
 **Ask**:
@@ -179,8 +179,8 @@ An agent seated in a thread beside its lead, with its own session there, which r
 _Avoid_: Participant, guest, collaborator, sub-agent (a helper inside one turn)
 
 **Seat**:
-To make an agent a member of a thread with an agent mention. Only the user seats agents, except the Conductor in a thread it delegates. The member starts from a catch-up and stays until the user removes it.
-_Avoid_: Invite, add, ask (the older question to another agent)
+To make an agent a member of a thread, with an agent mention or Add an agent in the member list. Only the user seats agents, except the Conductor in a thread it delegates. The member starts from a catch-up and stays until the user removes it.
+_Avoid_: Invite, ask (the older question to another agent)
 
 **Agent mention**:
 An `@` pill naming an agent in a message, which seats it the first time and makes it reply. A message with agent mentions goes only to the agents it names.
@@ -191,7 +191,7 @@ The summary of a thread so far that Omni writes with a small model for a newly s
 _Avoid_: Excerpt (what an Ask carried), carryover (what a session reads when work moves), recap, briefing
 
 **Collision**:
-A file that two agents in one thread both changed, which the thread flags. Omni then tells each agent still running which files the other changed.
+A file that two agents in one thread both changed, which the thread flags until the lead's next commit or until the user dismisses it. Omni then tells each agent still running which files the other changed.
 _Avoid_: Conflict (a git merge conflict), clash
 
 ### Messages and results
