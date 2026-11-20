@@ -2,7 +2,7 @@
 
 How to build [ADR 0019](../adr/0019-group-threads.md) (threads are group chats with agents) and [ADR 0020](../adr/0020-remote-agents-are-agents.md) (remote agents are agents, with worktree read gated per channel), as six slices in dependency order plus an iOS slice. Task T-9079.
 
-- Status: Ben settled the decisions on 2026-11-20, in a grilling session, and picked the UI the same day from a prototype (section 3.5). Later that day he answered 21 of the questions in section 5, then Q54, Q57 and Q59 to Q68. Each answered one says so. Q69 is the one his answers raised. Nothing is built.
+- Status: Ben settled the decisions on 2026-11-20, in a grilling session, and picked the UI the same day from a prototype (section 3.5). Later that day he answered 21 of the questions in section 5, then Q54, Q57 and Q59 to Q68. Each answered one says so. He then answered Q69, the one his answers raised. Nothing is built.
 - Surveyed: `main` at `0ce9873b` (desktop 0.1.43). Paths below are on that commit.
 - Words: [GLOSSARY.md](../../GLOSSARY.md) as this change leaves it: **lead**, **member**, **seat**, **catch-up**, **agent mention**, **collision** and **remote agent** are new. "Custom harness" stays the code's word for a remote agent's server.
 
@@ -212,7 +212,7 @@ Slice 4 needs only 1 and 2, so it can run beside slice 3.
 
 - **Goal.** In a channel Ben opens to it, a remote agent can read the thread's files.
 - **Scope.**
-  - One per-channel switch in Channel settings, **Remote agents can see this channel's work**, covering thread excerpts and worktree reads (Q36). It replaces "No thread excerpts to remote agents". Channels that send excerpts to remote agents today start with it on, and every other channel starts off, new ones included (Q69 covers which channels count). Only Ben sets it: an agent thread gets a 403, as it does for `remote_excerpts_off`.
+  - One per-channel switch in Channel settings, **Remote agents can see this channel's work**, covering thread excerpts and worktree reads (Q36). It replaces "No thread excerpts to remote agents". It starts on only in channels where an Ask actually sent an excerpt to a remote agent: an `ask` event with `remote` set and an `excerpt` (`apps/server/ask.ts:168-175`) in one of the channel's threads. Every other channel starts off, new ones included (Q69). Only Ben sets it: an agent thread gets a 403, as it does for `remote_excerpts_off`.
   - The read tool: list, read and search inside one thread's worktree. It has no writes and no paths outside the worktree, and it never follows a symlink out of it.
   - Its credential: scoped to one thread's worktree and one turn, revoked when the turn ends, and never a thread token (Q39).
   - Its transport to a server that is not on this machine (Q38).
@@ -298,7 +298,7 @@ Raised while writing this plan. Those Ben answered on 2026-11-20 say so, and the
 
 ### Remote worktree read (slice 5)
 
-- **Q36.** One switch or two? "No thread excerpts to remote agents" is off by default today, so excerpts flow, while worktree read must start off. Inverting that switch into "Remote agents may read" with two parts (messages, files) changes the default for messages. A second switch keeps it. **Answered 2026-11-20:** one switch, **Remote agents can see this channel's work**, covering thread excerpts and worktree reads. Channels that send excerpts to remote agents today start with it on, and every other channel starts off (Q69).
+- **Q36.** One switch or two? "No thread excerpts to remote agents" is off by default today, so excerpts flow, while worktree read must start off. Inverting that switch into "Remote agents may read" with two parts (messages, files) changes the default for messages. A second switch keeps it. **Answered 2026-11-20:** one switch, **Remote agents can see this channel's work**, covering thread excerpts and worktree reads. It starts on only in channels where an Ask actually sent an excerpt to a remote agent, and off everywhere else (Q69).
 - **Q37.** Can a remote agent be seated, or lead, in a channel with **Remote agents can see this channel's work** off? As a member it reads every message since its last turn (ADR 0019).
 - **Q38.** Transport: does the remote server call back to Omni (an MCP endpoint reachable over Tailscale or Omni Connect), or does Omni carry the tool through the protocol (a client-side tool in the Runs API and in eve's API)? The Runs API has no tool callback today.
 - **Q39.** The read credential: per turn or per thread, and how it is bound to one worktree and revoked.
@@ -347,4 +347,4 @@ The parts of a question his answers left open, and the gaps they opened. Each na
 - **Q66.** What size caps does the read tool put on large or binary tracked files? From Q40. (Slice 5) **Answered 2026-11-20:** text only, with a 1 MB cap. Binary files are refused, and larger text comes back truncated with a note.
 - **Q67.** Does removing a member write a line too ("Hermes left")? From Q52. (Slice 2) **Answered 2026-11-20:** yes, a quiet "Designer left" line.
 - **Q68.** Failed now ranks above Working, but the desktop list draws avatars as the mark while any agent works. When one agent failed and another still works, does the failed agent's face lead with the Failed mark on it, as Needs you does, or does the plain Failed mark show? From Q34. (Slice 3) **Answered 2026-11-20:** the mark shows the working avatar, and the row adds a red dot for the failure. Failed outranks Working in the order only, not in the mark.
-- **Q69.** Excerpts reach remote agents by default today: `remote_excerpts_off` starts at 0, so every channel sends them unless Ben turned the switch on. Read literally, "channels that send excerpts today start with it on" turns worktree reads on in nearly every existing channel, client channels included. Does it mean every channel with `remote_excerpts_off` at 0, or only channels where an Ask actually carried an excerpt to a remote agent? (Slice 5)
+- **Q69.** Excerpts reach remote agents by default today: `remote_excerpts_off` starts at 0, so every channel sends them unless Ben turned the switch on. Read literally, "channels that send excerpts today start with it on" turns worktree reads on in nearly every existing channel, client channels included. Does it mean every channel with `remote_excerpts_off` at 0, or only channels where an Ask actually carried an excerpt to a remote agent? (Slice 5) **Answered 2026-11-20:** only channels where an Ask actually sent an excerpt to a remote agent start with the switch on. Every other channel starts off.
