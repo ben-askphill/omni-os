@@ -99,6 +99,8 @@ export const config = {
   },
   /** How often event automations (`on:` in automations/*.yaml) poll GitHub. */
   automationPollSeconds: Math.max(15, Number(env.OMNI_AUTOMATION_POLL_SECONDS ?? 120)),
+  /** The merge-risk gate (merge-risk/gate.ts): rates each PR a builder thread opens in Omni's own repo. It polls at automationPollSeconds. */
+  mergeRisk: (env.OMNI_MERGE_RISK ?? '1') !== '0',
   /** How long a thread on a merged branch sits idle before its worktree is eligible for cleanup (worktree-inventory.ts). */
   worktreeIdleDays: Number(env.OMNI_WORKTREE_IDLE_DAYS ?? 7),
   /** How long after startup the first retention pass runs (worktree-cleanup.ts). Tests shorten it. */
