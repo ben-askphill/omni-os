@@ -1,19 +1,35 @@
-// Machine mentions drawn inline in a sent or queued message (packages/shared/message-context-machine.ts
+// Machine and agent mentions drawn inline in a sent or queued message (packages/shared/message-context-machine.ts
 // `mentionPieces`), the way the composer shows them as chips (components/composer/MessageEditor.tsx). The records are
 // untouched: this is how a mention looks, not what the message carries.
 import { Fragment, useMemo, useState } from 'react';
-import { mentionPieces, type MachineMention, type MentionSpan } from '@omni/shared/message-context-machine.ts';
+import { mentionPieces, type MentionSpan } from '@omni/shared/message-context-machine.ts';
 import { readContexts } from '@omni/shared/message-context-kinds.ts';
 import { Icon } from '../components/ui.tsx';
 import { ContextInspector } from './ContextChips.tsx';
 import { reachLine } from './machine-mention.tsx';
+import { agentColor } from './agent-mention.tsx';
+import { AgentAvatar, useAgent } from '../components/AgentAvatar.tsx';
 
-/** A mention in a sent message: the monitor icon and the name. A tap opens what was recorded about the machine. */
+/**
+ * A mention in a sent message: a machine's monitor icon, or an agent's avatar in its own color, and the name. A tap
+ * opens what was recorded about it.
+ */
 function SentPill({ name, span, open, onToggle }: { name: string; span: MentionSpan; open: boolean; onToggle: () => void }) {
-  const m: MachineMention = span.mention;
+  if (span.kind === 'agent') return <AgentPill name={name} agentId={span.agent.agent} open={open} onToggle={onToggle} />;
+  const m = span.mention;
   return (
     <button type="button" onClick={onToggle} aria-expanded={open} title={`${m.name}: ${reachLine(m.reachability, m.last_seen)} when sent`} className="mention-pill mention-pill-sent">
       <Icon name="monitor" size={12} strokeWidth={2} className="mention-icon" />
+      {name}
+    </button>
+  );
+}
+
+function AgentPill({ name, agentId, open, onToggle }: { name: string; agentId: string; open: boolean; onToggle: () => void }) {
+  const agent = useAgent(agentId) ?? { id: agentId, name };
+  return (
+    <button type="button" onClick={onToggle} aria-expanded={open} title={`Sent to ${name}`} className="mention-pill mention-pill-agent mention-pill-sent" style={{ '--agent': agentColor(agent) } as React.CSSProperties}>
+      <AgentAvatar agent={agent} size={14} />
       {name}
     </button>
   );

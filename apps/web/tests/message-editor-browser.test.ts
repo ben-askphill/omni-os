@@ -4,7 +4,7 @@ import { executablePath, startFixture, type Browser, type Page } from './chromiu
 // The composer's text box (components/composer/MessageEditor.tsx) in a real Chromium, on
 // tests/fixtures/message-editor-page: ui-sdk's Token Input with the `@` and `/` Trigger Menu, typed with real keys.
 
-type State = { text: string; records: { kind: string; body: { machine: string; name: string; reachability: string } }[]; keys: string[]; errors: string[]; menu: boolean };
+type State = { text: string; records: { kind: string; body: { machine?: string; agent?: string; name: string; reachability?: string } }[]; keys: string[]; errors: string[]; menu: boolean };
 
 describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
   let fixture: Awaited<ReturnType<typeof startFixture>>;
@@ -37,13 +37,16 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     expect(await check()).toBe(true);
   };
   const menuOpen = () => page.evaluate(() => !!document.querySelector('[data-slot="trigger-menu-content"][data-open]'));
+  const tabs = () => page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((t) => (t.getAttribute('aria-selected') === 'true' ? `[${t.textContent}]` : t.textContent)));
   const chips = () => page.evaluate(() => [...document.querySelectorAll('[data-slot="token-input-editor"] .mention-pill')].map((c) => c.textContent));
 
-  it('@ opens the picker, the arrows and Enter put the machine in as one chip with its record', async () => {
+  it('@ opens the picker on Agents, the arrows and Enter put the machine in as one chip with its record', async () => {
     await load();
     await page.keyboard.type('@');
-    await until(async () => (await options()).length === 5);
-    expect((await options()).map((o) => o.text)).toEqual(expect.arrayContaining([expect.stringContaining('Reviewer'), expect.stringContaining('omarchy'), expect.stringContaining('report.html')]));
+    // Tabs Machines | Agents | Files, opening on Agents (Q11). Typing searches them all, and the tab with hits shows.
+    await until(async () => (await tabs()).length === 3);
+    expect(await tabs()).toEqual(['Machines', '[Agents]', 'Files']);
+    expect((await options()).map((o) => o.text)).toEqual([expect.stringContaining('Reviewer')]);
     await page.keyboard.type('Mac');
     await until(async () => (await options()).length === 1);
     expect((await options())[0].text).toContain('MacBook-Pro');
@@ -67,7 +70,10 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
   it('ArrowDown moves the highlight and Escape closes the menu, keeping the text', async () => {
     await load();
     await page.keyboard.type('hi @');
-    await until(async () => (await options()).length === 4);
+    await until(async () => (await tabs()).length === 3);
+    // A press on a tab keeps the caret in the box.
+    await page.click('[role="tab"]:has-text("Machines")');
+    await until(async () => (await options()).length === 2);
     const first = await options();
     expect(first[0].highlighted).toBe(true);
     expect(first.map((o) => o.text).join()).not.toContain('Reviewer');
@@ -101,18 +107,19 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     expect(await chips()).toEqual(['omarchy']);
   });
 
-  it('a file and an agent go in as plain text', async () => {
+  it('an agent goes in as a chip with its record, anywhere in the message; a file as plain text', async () => {
     await load();
-    await page.keyboard.type('@rev');
+    await page.keyboard.type('ask @rev');
     await until(async () => (await options()).length === 1);
     await page.keyboard.press('Enter');
-    await until(async () => (await state()).text === '@reviewer ');
-    await page.keyboard.type('look at @main');
+    await until(async () => (await state()).text === 'ask @Reviewer ');
+    expect((await state()).records).toEqual([expect.objectContaining({ kind: 'agent_mention', body: { agent: 'reviewer', name: 'Reviewer' } })]);
+    expect(await chips()).toEqual([expect.stringContaining('Reviewer')]);
+    await page.keyboard.type('to look at @main');
     await until(async () => (await options()).length === 1);
     await page.keyboard.press('Enter');
-    await until(async () => (await state()).text === '@reviewer look at @apps/web/src/main.tsx ');
-    expect((await state()).records).toEqual([]);
-    expect(await chips()).toEqual([]);
+    await until(async () => (await state()).text === 'ask @Reviewer to look at @apps/web/src/main.tsx ');
+    expect((await state()).records).toHaveLength(1);
   });
 
   it('/ at the start lists the commands and picks one', async () => {

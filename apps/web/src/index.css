@@ -1343,6 +1343,38 @@
     height: 0.85em;
     flex-shrink: 0;
   }
+  /* An agent @mention: its avatar, in the agent's own color (--agent, set inline) instead of the machine pill's blue. */
+  .mention-pill-agent {
+    padding-left: 0.15em;
+    /* Agent colors are light pastels: the color sits in the fill, and the name keeps the text color. */
+    color: var(--fg);
+    background: color-mix(in srgb, var(--agent) 55%, transparent);
+    border-radius: 999px;
+  }
+  .mention-pill-agent[data-selected] {
+    background: var(--agent);
+  }
+  .mention-pill-agent.mention-pill-sent:focus-visible {
+    outline-color: var(--agent);
+  }
+
+  /* A group thread's member avatars (components/thread/Members.tsx): a ring while the agent works, a still one while it
+     waits on you. The ring breathes unless motion is reduced. */
+  .member-ring-working,
+  .member-ring-needs {
+    box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--ring);
+  }
+  .member-ring-working {
+    --ring: var(--live);
+  }
+  .member-ring-needs {
+    --ring: var(--needs);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .member-ring-working {
+      animation: member-ring 1.6s ease-in-out infinite;
+    }
+  }
 }
 
 @layer components {
@@ -2231,5 +2263,11 @@ html:active-view-transition-type(push, pop)::view-transition-new(root) {
     .transition-all {
       transition-property: color, background-color, border-color, opacity, box-shadow;
     }
+  }
+}
+
+@keyframes member-ring {
+  50% {
+    box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px color-mix(in srgb, var(--live) 35%, transparent);
   }
 }

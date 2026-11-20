@@ -748,6 +748,22 @@ export function migrate() {
   // ones, and each one's start.
   db.exec(`CREATE INDEX IF NOT EXISTS events_task_at ON events(created_at) WHERE kind = 'task';
     CREATE INDEX IF NOT EXISTS events_task ON events(thread_id, json_extract(payload, '$.task_id')) WHERE kind = 'task';`);
+  // The agents seated in a thread (group threads slice 2, ADR 0019): one row per agent per thread, the lead included
+  // once a member is seated (db/repos/members.ts). `session_thread` is the hidden thread whose session the agent runs
+  // in, the thread itself for the lead. `cursor` is the uid of the last transcript row the agent has read. Removing a
+  // member keeps its row with `removed_at`. Synced, last writer wins on the whole row (sync/handlers/thread-member.ts).
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_members (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    agent TEXT NOT NULL,
+    lead INTEGER NOT NULL DEFAULT 0,
+    session_thread TEXT NOT NULL,
+    cursor TEXT,
+    seated_at TEXT NOT NULL,
+    removed_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS thread_members_agent ON thread_members(thread_id, agent);`);
   // Older builds counted every sync's retry of an unsigned change waiting in sync_deferred as one more change applied
   // without a valid signature (sync/apply.ts): two rows on one Mac passed 12 million. The real number is lost, so those
   // counts start over at one; each row keeps its machine, entity, reason and time. Refusals and held actions

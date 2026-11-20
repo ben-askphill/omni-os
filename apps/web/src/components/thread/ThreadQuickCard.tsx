@@ -23,6 +23,7 @@ import { CAPTION, CARD_PAD, DIVIDER, ROW } from './panel/inset.ts';
 import { NO_CREW_ROLE } from '@omni/shared/thread-owner.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { OwnerField } from './OwnerField.tsx';
+import { MembersLine } from './Members.tsx';
 import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { markLabel, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../../display.ts';
@@ -156,6 +157,8 @@ export function ThreadQuickCard({
   // Who it is for and who does it, as separate rows (thread-owner.ts); the harness has its own row below.
   const agent = crewRoleName(thread.role, crew);
   const look = useAgent(thread.role);
+  // A group thread (ADR 0019): the thread's own agent leads, and the Members row names the others.
+  const group = (thread.members ?? []).some((m) => !m.lead);
 
   return (
     <section
@@ -187,10 +190,16 @@ export function ThreadQuickCard({
         <OwnerField thread={thread} className="flex-1" />
       </QuickRow>
       <QuickRow icon="delegate">
-        <span className="shrink-0 text-fg-3">Agent</span>
+        <span className="shrink-0 text-fg-3">{group ? 'Lead' : 'Agent'}</span>
         {look && agent && <AgentAvatar agent={{ ...look, name: agent }} size={18} />}
         <span className={`min-w-0 truncate ${agent ? '' : 'text-fg-3'}`}>{agent ?? NO_CREW_ROLE}</span>
       </QuickRow>
+      {group && (
+        <QuickRow icon="user">
+          <span className="shrink-0 text-fg-3">Members</span>
+          <MembersLine thread={thread} />
+        </QuickRow>
+      )}
       <QuickRow icon="info" label={term('harnessAndModel', technical)}>
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />

@@ -32,6 +32,8 @@ import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
 import { MoEmpty, MoHeader, MoRound } from './parts.tsx';
+import { MemberButton, MemberSheet } from './MemberSheet.tsx';
+import { MARK } from '@omni/shared/status.ts';
 import { useShell, useThread } from './shell.tsx';
 import { Pending, Sending } from './ThreadCards.tsx';
 import { MenuSheet } from './ThreadMenuSheet.tsx';
@@ -82,6 +84,7 @@ export function ThreadScreen() {
   const display = useDisplay();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
+  const [members, setMembers] = useState(false);
   const [machineSheet, setMachineSheet] = useState(false);
   const spans = history.history.spans;
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
@@ -230,7 +233,9 @@ export function ThreadScreen() {
         }
         right={
           <>
-            <StatusPill mark={pill.mark} label={pill.label} />
+            {/* A group thread shows its agents, a ring on each one that works, and no Working label (ADR 0019). */}
+            {thread.members?.length ? <MemberButton thread={thread} onOpen={() => (setQuick(false), setMembers(true))} /> : null}
+            {!(thread.members?.length && MARK[pill.mark].glyph === 'running') && <StatusPill mark={pill.mark} label={pill.label} />}
             {/* The quick card shows in every channel: Show technical details only changes which rows it lists. */}
             <MoRound
               icon="panel"
@@ -374,6 +379,7 @@ export function ThreadScreen() {
           onFind={find.show}
         />
       )}
+      {members && <MemberSheet thread={thread} onClose={() => setMembers(false)} />}
       {machineSheet && held && (
         <RunOnSheet
           rows={held.rows}

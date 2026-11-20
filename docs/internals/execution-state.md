@@ -24,6 +24,15 @@ fails `npm run typecheck`.
 row and the thread feed), scheduling (timers) and persistence (the status write that claims a turn). A test builds one
 with fakes (`tests/thread-controller.test.ts`).
 
+## Several agents in one thread
+
+A group thread ([ADR 0019](../adr/0019-group-threads.md)) runs one session per agent. Each member's session lives in a hidden thread row of its own (`source: 'member'`, `parent_id` the group thread, `role` the agent, the same cwd and branch), so the controller, spawn, limits and questions above work per member unchanged. The `thread_members` table (`db/repos/members.ts`) lists who sits where: one row per agent, with its session thread, the lead flag and its cursor (the last transcript row it read). It syncs as the signed `thread_member` entity (`sync/handlers/thread-member.ts`).
+
+- **One transcript.** `events.add` writes a member thread's rows into the group thread with `agent` set to the member, and the runner's own reads (`scopeOf`, `transcriptOf` in `db/repos/events.ts`) see only that agent's rows. The thread feed shows a member thread's updates as the group thread's (`setShownThread`).
+- **Routing.** `runner/members.ts` sends a message that names agents to each one in turn: a chain kept in memory, moved on by the `turnEnded` hook each turn end fires (`state.ts endedTurn`). A parent gets its report when the lead's turn ends, even while members still run. The follow-up suggestion comes from the lead's reply when it answered, else from the last agent to finish.
+- **Removal.** A member removed mid-turn is marked leaving: its turn finishes, its waiting and held messages drop, and the left line and session close follow.
+- **Moving.** Handoff, Take over, Fork and Continue are refused while `busyAgents` names an agent still working, then move every member session with the thread.
+
 ## A process
 
 There is one per thread while the thread is warm. `[*]` on the left is `launch`; on the right the controller is forgotten (`teardown`).

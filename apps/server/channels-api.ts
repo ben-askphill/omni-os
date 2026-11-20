@@ -244,7 +244,7 @@ const withActive = (
   teams: ReturnType<typeof teamsByChannel>,
   delegating: ReadonlySet<string>,
 ) => {
-  const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
+  const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team' && t.source !== 'member');
   return {
     ...publicChannel(ch),
     running: mine.filter((t) => isWorking(t, delegating)).length,

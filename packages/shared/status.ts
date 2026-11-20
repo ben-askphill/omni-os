@@ -1,5 +1,6 @@
 // One status vocabulary for every client: the web and phone layouts (apps/web/src/components/ui/status.tsx) and the
 // iOS app (apps/ios/src/components/glyph.ts) read their labels and tones here. Pure.
+import { groupGlyph, groupMark, type ThreadMember } from './members.ts';
 
 /**
  * What a status dot draws. The five states a person reads (running, needs, limited, failed, done) plus the quiet
@@ -47,7 +48,12 @@ export const statusLabel = (status: string | null | undefined) => STATUS[glyphFo
  * (apps/server/runner/records.ts limitStop): that reads Limited, not Failed. A thread whose own turn ended while
  * threads or sub-agents it delegated still work reads Running.
  */
-export function threadGlyph(t: { status: string; delegating?: boolean; limit_state?: string | null }): Glyph {
+export function threadGlyph(t: { status: string; delegating?: boolean; limit_state?: string | null; members?: readonly Pick<ThreadMember, 'lead' | 'state'>[] }): Glyph {
+  return groupGlyph(ownGlyph(t), t.members);
+}
+
+/** The lead's own glyph, before a group thread's members count (packages/shared/members.ts). */
+function ownGlyph(t: { status: string; delegating?: boolean; limit_state?: string | null }): Glyph {
   if (t.delegating && t.status !== 'queued') return 'running';
   if (t.limit_state && t.status !== 'running' && t.status !== 'queued') return 'limited';
   return glyphFor(t.status);
@@ -222,13 +228,18 @@ export interface MarkContext {
  * reads Ready for review.
  */
 export function threadMark(t: Parameters<typeof threadGlyph>[0] & { setup?: string | null }, ctx: MarkContext = {}): Mark {
+  // A group thread shows the busiest of its agents (ADR 0019): the lead's own mark, then each member's.
+  return groupMark(ownMark(t, ctx), t.members);
+}
+
+function ownMark(t: Parameters<typeof threadGlyph>[0] & { setup?: string | null }, ctx: MarkContext): Mark {
   const b = ctx.need?.blockers[0];
   if (b) return blockerMark(b);
   const phase = threadPhase(t, ctx.turn);
   if (phase) return phase;
   if (t.setup === 'failed') return 'setup_failed';
   if (t.setup === 'signin') return 'signin';
-  const glyph = threadGlyph(t);
+  const glyph = ownGlyph(t);
   if (glyph === 'done' && ctx.pr?.state === 'OPEN' && !ctx.pr.isDraft) return 'review';
   return markOf(glyph);
 }

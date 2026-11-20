@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ContextMenuHost } from './components/ContextMenu.tsx';
 import { ContinueSheetHost } from './components/ContinueSheet.tsx';
-import { AskSheetHost } from './components/AskCard.tsx';
+import { AddAgentHost } from './components/thread/Members.tsx';
 import { Onboarding } from './lazy.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
@@ -156,7 +156,7 @@ function Shell() {
       <BrowserNotifier />
       <ContextMenuHost />
       <ContinueSheetHost />
-      <AskSheetHost />
+      <AddAgentHost />
       <FolderDeleteDialog />
     </div>
   ) : (
@@ -177,7 +177,7 @@ function Shell() {
       <BrowserNotifier />
       <ContextMenuHost />
       <ContinueSheetHost />
-      <AskSheetHost />
+      <AddAgentHost />
       <FolderDeleteDialog />
     </div>
   );

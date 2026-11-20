@@ -72,7 +72,7 @@ function Page() {
           draft={DRAFT}
           records={records}
           mentions="thread=t1"
-          roles={[{ id: 'reviewer', name: 'Reviewer', remote: false, harness: 'claude-code' }]}
+          agents={{ members: [], others: [{ id: 'reviewer', name: 'Reviewer' }] }}
           commands={{ list: commands, load: () => {}, where: 'reply' }}
           anchor={anchor}
           below={below}

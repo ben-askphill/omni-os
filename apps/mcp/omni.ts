@@ -747,7 +747,8 @@ server.registerTool(
     description:
       'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
       'its last model activity and the minutes since. `waits_for_sign_in`, when present, says which account it needs signed in before it starts. `open_items`, when present, lists what its last turn left for the user to resolve ' +
-      '(questions, decisions with options, blockers), only while the Open items card setting is on. Reading it never wakes the thread.',
+      '(questions, decisions with options, blockers), only while the Open items card setting is on. `members`, on a group thread, lists its agents: ' +
+      'the lead, the others seated in it, and each one\'s run and state. Only the user seats or removes an agent. Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },
   },
   async ({ thread_id }) => text(await call(`/threads/${await threadId(thread_id)}/summary`)),
@@ -756,7 +757,7 @@ server.registerTool(
 server.registerTool(
   'list_threads',
   {
-    description: 'Recent threads, optionally filtered by channel or status (queued, running, done, failed, stopped).',
+    description: 'Recent threads, optionally filtered by channel or status (queued, running, done, failed, stopped). `members` names the agents in a group thread.',
     inputSchema: { channel: z.string().optional(), status: z.string().optional(), limit: z.number().optional() },
   },
   async ({ channel, status, limit }) => {
@@ -765,7 +766,13 @@ server.registerTool(
     if (status) q.set('status', status);
     q.set('limit', String(limit ?? 20));
     const list = await call(`/threads?${q}`);
-    return text(list.map((t: any) => ({ id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, delegating: t.delegating, task_id: t.task_id, updated_at: t.updated_at })));
+    return text(
+      list.map((t: any) => ({
+        id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, delegating: t.delegating, task_id: t.task_id, updated_at: t.updated_at,
+        // A group thread's agents (ADR 0019), by name, the lead first.
+        ...(t.members?.length && { members: t.members.map((m: { name: string }) => m.name) }),
+      })),
+    );
   },
 );
 

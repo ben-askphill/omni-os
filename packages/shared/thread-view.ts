@@ -73,6 +73,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   items: Item[];
   /** Run switches Ben made after the turn ended, shown under it. */
   switches: SwitchItem[];
+  /** Agents seated in the thread or removed from it after the turn's reply (ADR 0019), shown under it. */
+  members: Extract<Item, { type: 'member' }>[];
   /** The harness the turn ran on, which a switch can change from one turn to the next. */
   harness: string;
   /** The agent that answered: the author of its first reply. Null when no agent wrote it (a thread with no agent). */
@@ -160,7 +162,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness, author: null };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], members: [], harness, author: null };
     turns.push(t);
     return t;
   };
@@ -206,6 +208,10 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
       // A thread always starts with a message, so a switch has a turn before it.
       cur?.switches.push(it);
       harness = it.p.to.harness;
+      continue;
+    } else if (it.type === 'member') {
+      // A thread always starts with a message, so an agent joins after a turn.
+      cur?.members.push(it);
       continue;
     }
     if (cur && !cur.author && isReply(it)) cur.author = authorOf(it, thread.role);

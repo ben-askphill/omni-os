@@ -22,7 +22,7 @@ import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
-import { useAgent, type AgentLook } from './AgentAvatar.tsx';
+import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
 import { OmniMark } from './brand.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
@@ -32,7 +32,7 @@ import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
-import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
@@ -247,6 +247,21 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
   );
 }
 
+/** An agent joined or left a group thread (ADR 0019): a quiet line, with its avatar. */
+export function MemberLine({ p }: { p: MemberP }) {
+  const look = useAgent(p.agent) ?? { id: p.agent, name: p.name };
+  return (
+    <div data-member-line={p.event} className="flex items-center gap-3 py-1 text-[12px] font-medium text-fg-3">
+      <div className="h-px flex-1 bg-line" />
+      <span className="inline-flex min-w-0 items-center gap-1.5">
+        <AgentAvatar agent={{ ...look, name: p.name }} size={16} />
+        <span className="min-w-0 break-words">{memberLine(p)}</span>
+      </span>
+      <div className="h-px flex-1 bg-line" />
+    </div>
+  );
+}
+
 /** Mod log lines: dim system rows, each with the plugin that wrote it, in the status line's quiet style. */
 function ModLog({ lines }: { lines: ModLine[] }) {
   return (
@@ -408,6 +423,8 @@ const ItemRow = memo(
           return <SwitchLine key={it.key} it={it} running={running} />;
         case 'question':
           return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+        case 'member':
+          return <MemberLine key={it.key} p={it.p} />;
         case 'ask':
           return <AskItem key={it.key} p={it.p} byId={byId} reports={reports} answer={answers?.[it.p.thread_id]} />;
         default:

@@ -2,6 +2,7 @@
 // (apps/server/message-context/kinds.ts) and the Web UI's views (apps/web/src/message-context/kinds.ts) are typed
 // over this table, so a kind listed here without them fails typecheck.
 import { parseContextsWith, readContextsWith, type ContextLimits, type FallbackWhy, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
+import { agentMention } from './message-context-agent.ts';
 import { browserAnnotation } from './message-context-browser.ts';
 import { diffSelection } from './message-context-diff.ts';
 import { machineMention } from './message-context-machine.ts';
@@ -14,6 +15,7 @@ export const CONTEXT_KINDS = {
   browser_annotation: browserAnnotation,
   thread_reference: threadReference,
   machine_mention: machineMention,
+  agent_mention: agentMention,
 } as const;
 
 export type KindName = keyof typeof CONTEXT_KINDS;

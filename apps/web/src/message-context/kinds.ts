@@ -1,4 +1,5 @@
 // Each kind's view in the Web UI: one line per kind in packages/shared/message-context-kinds.ts.
+import { agentMentionView } from './agent-mention.tsx';
 import { browserAnnotationView } from './browser-annotation.tsx';
 import { diffSelectionView } from './diff-selection.tsx';
 import { machineMentionView } from './machine-mention.tsx';
@@ -12,4 +13,5 @@ export const CONTEXT_VIEWS: WebViews = {
   browser_annotation: browserAnnotationView,
   thread_reference: threadReferenceView,
   machine_mention: machineMentionView,
+  agent_mention: agentMentionView,
 };

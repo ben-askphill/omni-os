@@ -23,7 +23,7 @@ bindRunner({
     reporting: {
       event: (threadId, kind, payload) => {
         const row = events.add(threadId, kind, payload);
-        publishThread(threadId, row);
+        publishThread(row.thread_id, row);
         return row;
       },
       thread: (threadId) => {

@@ -15,6 +15,7 @@ import { displayPrefs } from './display.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { stampMachineMentions } from './message-context/machine-mention.ts';
+import { stampAgentMentions } from './message-context/agent-mention.ts';
 import { getCrew } from './crew.ts';
 import { lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
 import { userName } from './profile.ts';
@@ -29,6 +30,7 @@ import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
 import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
+import { memberFields } from './member-view.ts';
 import { machineNames } from './ran-on.ts';
 import { coldRefusal, sessionWarmth } from './session-warmth.ts';
 import {
@@ -284,6 +286,15 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   return { ...detail, ...(blocked && { blocked }), ...(takeover && { takeover }) };
 }
 
+/** A group thread's members for the Conductor: each one's run and state, and why the thread is read-only when it is. */
+function memberSummary(t: Thread) {
+  const { members, read_only } = memberFields(t);
+  return {
+    ...(members && { members: members.map((m) => ({ agent: m.agent, name: m.name, lead: m.lead, state: m.state, harness: m.harness, model: m.model, effort: m.effort })) }),
+    ...(read_only && { read_only }),
+  };
+}
+
 /** Compact view for the conductor MCP. */
 threadRoutesApi.get('/:id/summary', (c) => {
   const t = threads.get(c.req.param('id'));
@@ -304,6 +315,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     ...(t.open_items && displayPrefs().openItems && { open_items: readOpenItems(t.open_items) }),
     // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
     session: sessionWarmth(t),
+    // A group thread's agents (ADR 0019): who leads, who else is seated and how each one stands. Only the user seats or removes one.
+    ...memberSummary(t),
     // The agents it spawned that still run, as the thread panel's Running subagents list shows them.
     running_subagents: activeTasks()
       .filter((k) => k.thread_id === t.id && k.subagent)
@@ -359,12 +372,16 @@ threadActionsApi.post('/:id/messages', async (c) => {
   // After the retry check, and the fingerprint is of what Ben sent: a retry after a rename or a delete still gets its first answer.
   const referenced = stampThreadReferences(id, context.value);
   if (!referenced.ok) return c.json({ error: referenced.error }, 400);
-  const stamped = await stampMachineMentions(referenced.value);
+  const machines = await stampMachineMentions(referenced.value);
+  if (!machines.ok) return c.json({ error: machines.error }, 400);
+  const stamped = stampAgentMentions(machines.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const attachments = await saveUploads(id, files);
   // Ben's Fix checks step (the channel's own prompt or the built-in one) goes out with the failing checks and their log tails (fix-checks.ts), from any client.
   const text = from === 'ben' && stepOf(prompt, stepPrompts(channels.get(target.channel_id))) === 'checks' ? await fixChecksPrompt(target) : prompt;
-  return c.json(await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away }));
+  const sent = await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away });
+  // A group thread's members and read-only reason, as GET sends them: the client takes this thread as its new state.
+  return c.json({ ...sent, ...memberFields(sent) });
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });

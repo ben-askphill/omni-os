@@ -25,21 +25,61 @@ export function indexEvent(threadId: string, kind: string, payload: unknown, eve
   if (text) db.prepare('INSERT INTO search_fts (body, thread_id, event_id) VALUES (?, ?, ?)').run(text, threadId, eventId);
 }
 
-/** The assistant text of the most recent run, oldest first: after the last message the agent actually saw, and after `after`. */
+/**
+ * Where a thread's rows live (ADR 0019). A member's session runs in a hidden thread (source `member`, db/repos/members.ts)
+ * whose rows go into the group thread it sits in, written as the member's agent, so every transcript reader finds them
+ * there. The mapping never changes once the member thread exists.
+ */
+const homes = new Map<string, { thread: string; agent: string | null } | null>();
+function homeOf(threadId: string): { thread: string; agent: string | null } | null {
+  if (homes.has(threadId)) return homes.get(threadId)!;
+  const row = db.prepare(`SELECT parent_id, role FROM threads WHERE id = ? AND source = 'member'`).get(threadId) as { parent_id: string | null; role: string | null } | undefined;
+  const home = row?.parent_id ? { thread: row.parent_id, agent: row.role } : null;
+  // A thread row that is not there yet (a synced row on its way) is looked up again next time.
+  if (row) homes.set(threadId, home);
+  return home;
+}
+
+/** The thread whose transcript holds `threadId`'s rows: its group thread for a member's session, else itself. */
+export const transcriptOf = (threadId: string) => homeOf(threadId)?.thread ?? threadId;
+
+/**
+ * The rows one agent's session wrote in a transcript: a member's own, or, in a thread with members, the lead's and
+ * Ben's (every row no member wrote). `sql` goes after a WHERE on thread_id.
+ */
+function scopeOf(threadId: string): { thread: string; sql: string; args: (string | null)[]; member: boolean } {
+  const home = homeOf(threadId);
+  if (home) return { thread: home.thread, sql: 'AND agent IS ?', args: [home.agent], member: true };
+  const seated = db.prepare('SELECT 1 FROM thread_members WHERE thread_id = ? AND lead = 0 LIMIT 1').get(threadId);
+  if (!seated) return { thread: threadId, sql: '', args: [], member: false };
+  return { thread: threadId, sql: 'AND (agent IS NULL OR agent NOT IN (SELECT agent FROM thread_members WHERE thread_id = ? AND lead = 0))', args: [threadId], member: false };
+}
+
+/**
+ * The assistant text of the most recent run, oldest first: after the last message the agent actually saw, and after
+ * `after`. In a thread with members, only the rows of the session `threadId` runs (scopeOf): a message to members only
+ * (one with `to`) is not one its lead saw.
+ */
 function runTexts(threadId: string, after: number): string[] {
+  const s = scopeOf(threadId);
+  const seen = s.member ? '' : `AND (kind != 'user' OR json_extract(payload, '$.to') IS NULL)`;
   const rows = db
     .prepare(
-      `SELECT payload FROM events WHERE thread_id = ? AND kind = 'assistant_text'
-       AND id > MAX(COALESCE((SELECT MAX(id) FROM events WHERE thread_id = ? AND kind IN ('user', 'crew_report')
+      `SELECT payload FROM events WHERE thread_id = ? AND kind = 'assistant_text' ${s.sql}
+       AND id > MAX(COALESCE((SELECT MAX(id) FROM events WHERE thread_id = ? AND kind IN ('user', 'crew_report', 'routed') ${s.sql} ${seen}
          AND json_extract(payload, '$.dropped') IS NOT 1), 0), ?) ORDER BY id`,
     )
-    .all(threadId, threadId, after) as { payload: string }[];
+    .all(s.thread, ...s.args, s.thread, ...s.args, after) as { payload: string }[];
   return rows.map((r) => JSON.parse(r.payload).text as string);
 }
 
 export const events = {
   /** `agent`: the agent that wrote the row, for a row a run of the thread wrote (runner/state.ts addEvent). */
-  add(threadId: string, kind: string, payload: unknown, createdAt?: string, agent: string | null = null): EventRow {
+  add(given: string, kind: string, payload: unknown, createdAt?: string, writer: string | null = null): EventRow {
+    // A member's session writes into its group thread, as its agent (homeOf).
+    const home = homeOf(given);
+    const threadId = home?.thread ?? given;
+    const agent = writer ?? home?.agent ?? null;
     const json = JSON.stringify(payload);
     const ts = createdAt ?? now();
     const uid = randomUUID();
@@ -62,11 +102,12 @@ export const events = {
         .get(parentId, childId) as { payload: string } | undefined
     )?.payload ?? null,
   /** The thread's newest event id, 0 for none: where a run stood when it ended. */
-  lastId: (threadId: string) => Number((db.prepare('SELECT MAX(id) AS id FROM events WHERE thread_id = ?').get(threadId) as { id: number | null }).id ?? 0),
+  lastId: (threadId: string) => Number((db.prepare('SELECT MAX(id) AS id FROM events WHERE thread_id = ?').get(transcriptOf(threadId)) as { id: number | null }).id ?? 0),
+  /** The transcript after `afterId`: a member's session reads its group thread's. */
   since: (threadId: string, afterId = 0) =>
     db
       .prepare(`SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND id > ? ORDER BY id`)
-      .all(threadId, afterId) as unknown as EventRow[],
+      .all(transcriptOf(threadId), afterId) as unknown as EventRow[],
   /** Whether the thread has a message, reply or tool call after this event id: something a session there never saw. */
   hasContentAfter: (threadId: string, afterId: number) =>
     !!db
@@ -74,14 +115,16 @@ export const events = {
         `SELECT 1 FROM events WHERE thread_id = ? AND id > ? AND kind IN ('user', 'crew_report', 'assistant_text', 'tool_use', 'tool_result')
          AND json_extract(payload, '$.dropped') IS NOT 1 LIMIT 1`,
       )
-      .get(threadId, afterId),
+      .get(transcriptOf(threadId), afterId),
   /** When the thread's model last did anything (a reply, a tool call or result, a turn's end), null if never. */
-  lastModelAt: (threadId: string) =>
-    (
+  lastModelAt: (threadId: string) => {
+    const s = scopeOf(threadId);
+    return (
       db
-        .prepare(`SELECT MAX(created_at) AS at FROM events WHERE thread_id = ? AND kind IN ('assistant_text', 'tool_use', 'tool_result', 'result')`)
-        .get(threadId) as { at: string | null }
-    ).at,
+        .prepare(`SELECT MAX(created_at) AS at FROM events WHERE thread_id = ? AND kind IN ('assistant_text', 'tool_use', 'tool_result', 'result') ${s.sql}`)
+        .get(s.thread, ...s.args) as { at: string | null }
+    ).at;
+  },
   /**
    * The tasks with a stored event since `since` whose newest event is not their end, each with its start's payload
    * (null when that row is missing). For the sub-agents another machine runs (apps/server/delegating.ts).
@@ -99,11 +142,15 @@ export const events = {
          WHERE json_extract(e.payload, '$.event') IS NOT 'ended'`,
       )
       .all(since) as { thread_id: string; task_id: string; started: string | null }[],
+  /** The agent that wrote a row, by its id. */
+  agentOf: (id: number) => (db.prepare('SELECT agent FROM events WHERE id = ?').get(id) as { agent: string | null } | undefined)?.agent ?? null,
+  idOf: (uid: string) => (db.prepare('SELECT id FROM events WHERE uid = ?').get(uid) as { id: number } | undefined)?.id ?? null,
   uidOf: (id: number) => (db.prepare('SELECT uid FROM events WHERE id = ?').get(id) as { uid: string } | undefined)?.uid ?? null,
   lastAssistantText(threadId: string): string | null {
+    const s = scopeOf(threadId);
     const row = db
-      .prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'assistant_text' ORDER BY id DESC LIMIT 1`)
-      .get(threadId) as { payload: string } | undefined;
+      .prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'assistant_text' ${s.sql} ORDER BY id DESC LIMIT 1`)
+      .get(s.thread, ...s.args) as { payload: string } | undefined;
     return row ? (JSON.parse(row.payload).text as string) : null;
   },
   /** All assistant text produced by the most recent run (after the last message the agent actually saw, and after `after`). */
@@ -119,13 +166,13 @@ export const events = {
     const one = id ? `AND json_extract(payload, '$.id') = ?` : '';
     return db
       .prepare(`SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind IN ('question', 'question_answer') ${one} ORDER BY id`)
-      .all(threadId, ...(id ? [id] : [])) as unknown as EventRow[];
+      .all(transcriptOf(threadId), ...(id ? [id] : [])) as unknown as EventRow[];
   },
   /** The payload of a thread's tool_use event, by the tool call's id. */
   toolUse(threadId: string, toolUseId: string): { id: string; name: string; input: unknown; parent?: string | null } | null {
     const row = db
       .prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'tool_use' AND json_extract(payload, '$.id') = ? ORDER BY id DESC LIMIT 1`)
-      .get(threadId, toolUseId) as { payload: string } | undefined;
+      .get(transcriptOf(threadId), toolUseId) as { payload: string } | undefined;
     return row ? JSON.parse(row.payload) : null;
   },
   /** Every Artifact tool call that has a result, oldest first, for linking what was published before Omni tracked it. */

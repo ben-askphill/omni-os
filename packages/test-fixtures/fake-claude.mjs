@@ -23,6 +23,7 @@
 //                     check finds it unmet that many times first, each a synthetic "Stop hook feedback" message and
 //                     another model call. `/goal` alone and `/goal clear` answer locally, as the real CLI does
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
+//   (catch-up)        text mode (Omni's catch-up or summary for a seated agent): "Fake catch-up of <n> messages."
 //   SUGGEST:<ms>      text mode (Omni's reply suggestion): take that long to answer
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   NEXT_THREAD       text mode (Omni's proposed follow-up thread): propose one; without it, answer NONE
@@ -1214,6 +1215,13 @@ async function main() {
               'BLOCKER: The APNs key is missing from the secret store, so push alerts cannot be tested.\n'
           : 'NONE\n',
       );
+    }
+    if (outFmt === 'text' && /Write a (catch-up|summary) for an agent joining/.test(prompt)) {
+      // Omni's catch-up for an agent seated in a group thread, or its summary of the oldest messages past the budget.
+      // Counts the messages it was given, so a test sees what reached the small model.
+      const what = /Write a (catch-up|summary)/.exec(prompt)[1];
+      const n = (prompt.match(/^### /gm) ?? []).length;
+      return process.stdout.write(`Fake ${what} of ${n} messages.\n`);
     }
     if (outFmt === 'text' && prompt.includes('Predict the short reply')) {
       // Omni's reply suggestion. The agent's answer echoes the thread's message, so directives reach here too.

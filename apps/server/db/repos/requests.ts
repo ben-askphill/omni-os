@@ -61,7 +61,8 @@ export interface MessageRequest {
   source: 'ben' | 'conductor' | 'crew' | 'team' | 'limit' | 'handoff' | 'pr-watch';
   attachments: Attachment[] | null;
   /** The transcript row it becomes: `user`, or `crew_report` for a child's report. */
-  kind: 'user' | 'crew_report';
+  /** `routed`: Ben's message as one agent of a group thread reads it (apps/server/members.ts). Hidden in the transcript. */
+  kind: 'user' | 'crew_report' | 'routed';
   /**
    * For a message Omni wrote itself (a crew report, a team's go), the transcript payload, which is not the text the
    * harness gets. Null for a message sent through the API. These are resumed or discarded, never edited or moved.

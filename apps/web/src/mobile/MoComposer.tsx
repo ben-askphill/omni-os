@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { askLabel, askOf } from '@omni/shared/ask.ts';
+import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
+import { replyTo, routingHint } from '@omni/shared/members.ts';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
@@ -19,7 +20,7 @@ import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { bottomInset, MoDiff, MoRound } from './parts.tsx';
-import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from '../components/AskCard.tsx';
+import { useThreadAgents } from '../thread-agents.ts';
 
 export interface ComposerChip {
   label: string;
@@ -88,45 +89,28 @@ export function MoComposer({
     drafts.set(thread.id, v);
   };
   const mic = useDictation((p) => update(withPhrase(latest.current, p)));
-  // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts), as in the desktop reply box.
-  const askRoles = useAskRoles(thread);
+  // The agents the message goes to (ADR 0019): the ones it names, else the lead, as in the desktop reply box.
+  const agents = useThreadAgents(thread);
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
   useEffect(() => {
     if (!takeover) setAway((a) => (a?.livesOn ? null : a));
   }, [takeover]);
 
-  const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
-  const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
-  const submitAsk = async () => {
-    if (!ask?.question || busy) return;
-    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @agent.');
-    const raw = text;
-    setBusy(true);
-    setError(null);
-    setText('');
-    drafts.delete(thread.id);
-    try {
-      await postAsk(thread.id, ask.role.id, ask.question, askOptions);
-    } catch (e) {
-      const now = latest.current;
-      if (!now || now === raw) update(raw);
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const named = useMemo(() => mentionedAgents(context).map((a) => ({ agent: a.agent, name: a.name })), [context]);
+  const routing = routingHint(text, { agent: agents.lead.id, name: agents.lead.name }, named, agents.members.map((m) => m.id));
+  // A message only to other agents leaves the lead's turn alone, so it never steers or queues behind it.
+  const toOthers = named.length > 0 && !named.some((a) => a.agent === agents.lead.id);
 
   const busyThread = thread.status === 'running' || thread.status === 'queued';
   // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
   const steers = canSteer(thread.harness, harnesses) && !thread.queued_harness;
-  const hint = typeof placeholder === 'function' ? placeholder(steers) : placeholder;
-  const canSend = ask ? !!ask.question : !!text.trim() || context.length > 0;
+  const hint = thread.read_only ?? (!busyThread && thread.role ? replyTo(agents.lead.name) : typeof placeholder === 'function' ? placeholder(steers) : placeholder);
+  const canSend = !thread.read_only && (!!text.trim() || context.length > 0);
   /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
   const submit = async (sendThere = false) => {
-    if (ask) return void submitAsk();
     const prompt = text.trim();
     if (!canSend || busy) return;
-    const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
+    const mode: SendMode | undefined = busyThread && !toOthers ? (steers ? 'steer' : 'queue') : undefined;
     setBusy(true);
     setError(null);
     setAway(null);
@@ -227,7 +211,6 @@ export function MoComposer({
       )}
       {(att.error || error) && <ErrorNote className="mb-2">{att.error ?? error}</ErrorNote>}
       <div ref={setFrame} className="relative flex flex-col rounded-[26px] bg-surface">
-        {ask && <AskChip threadId={thread.id} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
         <ContextChips records={chipRecords(text, context)} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
@@ -241,7 +224,7 @@ export function MoComposer({
             records={context}
             // The `@` menu: files, and in a thread that can delegate, the machines a task can be sent to.
             mentions={`thread=${encodeURIComponent(thread.id)}`}
-            roles={askRoles}
+            agents={agents}
             anchor={frame}
             onError={setError}
             onPaste={att.onPaste}
@@ -252,12 +235,19 @@ export function MoComposer({
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />
-          ) : canSend || !mic.supported || ask ? (
-            <MoRound ink icon="send" label={ask ? askLabel(ask.role) : !busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
+          ) : canSend || !mic.supported ? (
+            <MoRound ink icon="send" label={!busyThread || toOthers ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
           ) : (
             <MoRound quiet={!mic.on} ink={mic.on} icon={mic.on ? 'stop' : 'mic'} label={mic.on ? 'Stop dictating' : 'Dictate'} onClick={mic.toggle} />
           )}
         </div>
+      </div>
+      <div aria-live="polite">
+        {routing && (
+          <div data-routing-hint className="px-4 pt-1.5 text-[12px] text-fg-3">
+            {routing}
+          </div>
+        )}
       </div>
       <input
         ref={file}

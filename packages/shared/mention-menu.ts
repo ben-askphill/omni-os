@@ -1,8 +1,9 @@
 // The composer's `@` menu as pure functions: the file being typed at the caret, and what picking a
 // row does to the text. Which files exist is the server's to say (apps/server/mentions.ts). In a thread that can
-// delegate, the synced machines come first (apps/server/machine-pick.ts): picking one also adds a machine_mention
-// record to the message (message-context-machine.ts). At the start of a message the menu also lists the crew roles
-// Ben can ask (ask.ts): picking one makes the message an Ask.
+// delegate, the synced machines are listed (apps/server/machine-pick.ts): picking one also adds a machine_mention
+// record to the message (message-context-machine.ts). In a thread the menu also lists agents (members.ts): picking one
+// adds an agent_mention record (message-context-agent.ts), and the message goes to that agent. The menu shows them in
+// tabs, Machines | Agents | Files, and opens on Agents (ADR 0019).
 import type { Reachability } from './handoff.ts';
 
 /** The `@name` being typed, with the caret in it. `end` is where the name ends. */
@@ -21,10 +22,8 @@ export interface FileMention {
   name: string;
   /** Where it lives, shown quiet: the thread, or the folder inside the repo. For a machine, whether it is up. */
   detail: string;
-  /** `role`: a crew role to ask, listed by the client (ask.ts roleRows), never by the server. */
-  kind: 'artifact' | 'file' | 'role' | 'machine';
-  /** A role on a server outside Omni. */
-  remote?: boolean;
+  /** `agent`: an agent to send the message to, listed by the client (agentRows), never by the server. */
+  kind: 'artifact' | 'file' | 'agent' | 'machine';
   /** A machine row's machine. */
   machine?: MentionedMachine;
 }
@@ -37,8 +36,36 @@ export interface MentionedMachine {
   lastSeen: string | null;
 }
 
-/** Whether the `@` being typed starts the message, where a role can be asked (ask.ts askOf). */
-export const startsMessage = (text: string, at: FileQuery) => !text.slice(0, at.start).trim();
+/** The `@` menu's tabs, in Ben's order (Q11). The menu opens on Agents; a tab with nothing in it does not show. */
+export type MentionTab = 'machines' | 'agents' | 'files';
+export const MENTION_TABS: readonly { id: MentionTab; label: string }[] = [
+  { id: 'machines', label: 'Machines' },
+  { id: 'agents', label: 'Agents' },
+  { id: 'files', label: 'Files' },
+];
+export const tabOf = (r: Pick<FileMention, 'kind'>): MentionTab => (r.kind === 'machine' ? 'machines' : r.kind === 'agent' ? 'agents' : 'files');
+
+/** The tabs with rows in them, and the one to show: `want` if it has rows, else Agents, else the first that has any. */
+export function mentionTabs(rows: readonly Pick<FileMention, 'kind'>[], want: MentionTab | null): { tabs: MentionTab[]; open: MentionTab | null } {
+  const tabs = MENTION_TABS.map((t) => t.id).filter((t) => rows.some((r) => tabOf(r) === t));
+  const open = want && tabs.includes(want) ? want : tabs.includes('agents') ? 'agents' : (tabs[0] ?? null);
+  return { tabs, open };
+}
+
+/** An agent the `@` menu offers: the thread's members first (the lead among them), then the agents a mention would seat. */
+export interface MentionAgent {
+  id: string;
+  name: string;
+}
+
+/** The agent rows for `query`: an id or a word of the name that starts with it, members first, each once. */
+export function agentRows(members: readonly MentionAgent[], others: readonly MentionAgent[], query: string): FileMention[] {
+  const q = query.toLowerCase();
+  const hit = (a: MentionAgent) => !q || a.id.startsWith(q) || a.name.toLowerCase().split(/[^a-z0-9]+/).some((w) => w.startsWith(q));
+  const seen = new Set<string>();
+  const row = (a: MentionAgent, detail: string): FileMention[] => (seen.has(a.id) || !hit(a) ? [] : (seen.add(a.id), [{ insert: a.id, name: a.name, detail, kind: 'agent' }]));
+  return [...members.flatMap((a) => row(a, 'In this thread')), ...[...others].sort((a, b) => a.name.localeCompare(b.name)).flatMap((a) => row(a, 'Joins this thread'))];
+}
 
 const TYPING = /(?<![\w@/.-])@([A-Za-z0-9._\-/]*)$/;
 const NAME_REST = /^[A-Za-z0-9._\-/]*/;

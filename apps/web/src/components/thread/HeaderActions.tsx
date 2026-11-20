@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
-import type { TurnPhase } from '@omni/shared/status.ts';
+import { MARK, type TurnPhase } from '@omni/shared/status.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { useNeedOf, useNow } from '../../store.tsx';
 import { threadPill } from './thread-state.ts';
@@ -72,9 +72,12 @@ export function HeaderActions({
           Restore
         </Button>
       )}
-      <span className="inline-flex" title={reconnecting ? 'Reconnecting to the live stream. The thread keeps running on the server.' : undefined}>
-        <StatusPill mark={pill.mark} label={pill.label} />
-      </span>
+      {/* A group thread's members wear a ring while they work (Members.tsx), so it shows no Working label (ADR 0019). */}
+      {!(thread.members?.length && MARK[pill.mark].glyph === 'running') && (
+        <span className="inline-flex" title={reconnecting ? 'Reconnecting to the live stream. The thread keeps running on the server.' : undefined}>
+          <StatusPill mark={pill.mark} label={pill.label} />
+        </span>
+      )}
       {onFind && <IconButton icon="search" label={`Find in thread (${MOD_KEY}F)`} active={findOpen} onClick={onFind} />}
       <IconButton
         icon="more"

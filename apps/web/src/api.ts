@@ -33,6 +33,7 @@ export type HarnessWithRunning = HarnessInfo & { running: number; /** How to ins
 export type CommandList = HarnessCommands & { recent?: string[] };
 
 // ---------- response shapes ----------
+import type { ThreadMember } from '@omni/shared/members.ts';
 
 /** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
 /** `access_default`: what a channel with no access_level runs at on the machine that answered (access-default.ts). */
@@ -42,7 +43,13 @@ export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: 
  * A thread as the API sends it. `delegating`: a thread it delegated, at any depth, still runs or queues
  * (apps/server/delegating.ts). Read running state through @omni/shared/delegate-count.ts, not `status` alone.
  */
-export type Thread = ThreadRow & { delegating?: boolean } & RanOnFields & StepField;
+export type Thread = ThreadRow & {
+  delegating?: boolean;
+  /** A group thread's agents, the lead first, while an agent besides the lead is seated (packages/shared/members.ts). */
+  members?: ThreadMember[];
+  /** Why it takes no new messages: its lead agent was deleted or is hidden (apps/server/member-view.ts). */
+  read_only?: string;
+} & RanOnFields & StepField;
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &

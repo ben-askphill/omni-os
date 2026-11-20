@@ -1,7 +1,7 @@
 import { PHASE, type TurnPhase } from '@omni/shared/status.ts';
 import { Fragment, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
-import { Attachments, SwitchLine } from '../components/Transcript.tsx';
+import { Attachments, MemberLine, SwitchLine } from '../components/Transcript.tsx';
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { QuestionCard } from '../components/thread/QuestionCard.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
@@ -211,6 +211,9 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     </Reply>
     {t.switches.map((it) => (
       <SwitchLine key={it.key} it={it} running={thread.status === 'running'} />
+    ))}
+    {t.members.map((it) => (
+      <MemberLine key={it.key} p={it.p} />
     ))}
     </>
   );

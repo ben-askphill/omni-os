@@ -179,7 +179,20 @@ export type Item =
   | { type: 'cloud'; key: number; p: CloudAgentP; agent?: string }
   | SwitchItem
   /** A question the agent asked Ben, where it asked it. The card stands in for the ask_user_question call. */
-  | { type: 'question'; key: number; at: string; q: ThreadQuestion; agent?: string };
+  | { type: 'question'; key: number; at: string; q: ThreadQuestion; agent?: string }
+  /** An agent was seated in the thread or removed from it (ADR 0019): a quiet "Designer joined" or "Designer left" line. */
+  | { type: 'member'; key: number; at: string; p: MemberP };
+
+/** A `member` row (apps/server/runner/members.ts). */
+export interface MemberP {
+  event: 'joined' | 'left';
+  agent: string;
+  /** The agent's name when it happened. */
+  name: string;
+}
+
+/** The quiet line a member row reads as. */
+export const memberLine = (p: Pick<MemberP, 'event' | 'name'>) => `${p.name} ${p.event === 'left' ? 'left' : 'joined'}`;
 
 /**
  * A run switch. A handover switch stays pending until its `handover` event fills `done`, or a later handover or back
@@ -403,6 +416,13 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         if (!q) break;
         group = null;
         items.push({ type: 'question', key: e.id, at: e.created_at, q, ...(e.agent && { agent: e.agent }) });
+        break;
+      }
+      case 'member': {
+        const p = payload<Partial<MemberP>>(e);
+        if ((p.event !== 'joined' && p.event !== 'left') || typeof p.agent !== 'string') break;
+        group = null;
+        items.push({ type: 'member', key: e.id, at: e.created_at, p: { event: p.event, agent: p.agent, name: str(p.name) || p.agent } });
         break;
       }
       case 'mod': {

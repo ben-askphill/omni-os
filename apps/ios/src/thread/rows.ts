@@ -75,6 +75,8 @@ export const ITEM_ROWS: Record<Item['type'], readonly RowKind[]> = {
   cloud: ['cloud'],
   switch: ['switch'],
   question: ['question'],
+  // The joined and left lines of a group thread come with slice 7 (#905): the app shows no member rows yet.
+  member: [],
   // No row of its own: an Ask's thread is one of the turn's children (thread-view.ts), on the turn's delegation card.
   ask: [],
 };

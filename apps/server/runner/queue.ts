@@ -203,6 +203,8 @@ export function wake(r: MessageRequest) {
  */
 export function reportToParent(childId: string, status: string, text: string, completion = events.lastId(childId)) {
   const child = threads.get(childId)!;
+  // A member's session reports to no one: its replies are in the group thread already (runner/members.ts).
+  if (child.source === 'member') return;
   const parent = threads.get(child.parent_id!);
   if (!parent) return;
   // An Ask Ben sent from the parent (ask.ts): its event there says whether the answer wakes the parent.

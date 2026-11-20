@@ -27,6 +27,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   harness_file: 'custom harnesses you added in Omni',
   mcp_client: 'MCP clients and which you approved',
   memory: 'channel learnings',
+  thread_member: 'agents seated in threads',
   kv: 'settings (kv)',
 };
 

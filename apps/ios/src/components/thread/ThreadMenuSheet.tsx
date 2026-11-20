@@ -27,6 +27,7 @@ const ICON: Record<ThreadActionIcon, IconName> = {
   branch: 'fork',
   message: 'message',
   grok: 'sparkle',
+  user: 'user',
 };
 
 type MenuPage = 'menu' | 'move' | 'machine' | 'takeover';

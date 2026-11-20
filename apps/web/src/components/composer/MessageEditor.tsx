@@ -13,8 +13,8 @@ import {
   type TriggerMenuDataItem,
   type TriggerMenuSelectDetails,
 } from '@ui-sdk/react/trigger-menu';
-import type { FileMention } from '@omni/shared/mention-menu.ts';
-import { roleRows, type AskRole } from '@omni/shared/ask.ts';
+import { agentRows, MENTION_TABS, mentionTabs, tabOf, type FileMention, type MentionAgent, type MentionTab } from '@omni/shared/mention-menu.ts';
+import { agentMention, agentMentionBody, mentionsAgent } from '@omni/shared/message-context-agent.ts';
 import { mentionSections, menuSections, SOURCE_TAG, type MenuSection } from '@omni/shared/slash-menu.ts';
 import { menuCommands } from '@omni/shared/composer-slash.ts';
 import { machineMention, mentionBody, mentionsMachine } from '@omni/shared/message-context-machine.ts';
@@ -24,7 +24,9 @@ import { api, type CommandList } from '../../api.ts';
 import { useTechnical } from '../../display.ts';
 import { addDraftContext, draftContext, removeDraftContext } from '../../message-context/draft.ts';
 import { reachLine } from '../../message-context/machine-mention.tsx';
-import { editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMachines, tokenCodec } from '../../message-context/machine-tokens.ts';
+import { AGENT_TOKEN, agentToken, editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMentions, tokenCodec } from '../../message-context/machine-tokens.ts';
+import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
+import { agentColor } from '../../message-context/agent-mention.tsx';
 import { Icon, Loader, StatusDot } from '../ui.tsx';
 import { KbdFooter, MENU_SURFACE, overlayRow } from '../ui/overlay.tsx';
 
@@ -58,8 +60,11 @@ export interface MessageEditorProps {
   records: readonly MessageContext[];
   /** The `@` menu's scope: `thread=<id>`, or newThreadScope's `channel=<id>[&role=<id>]`. */
   mentions: string;
-  /** The agents a message can start by asking (packages/shared/ask.ts), listed first while the `@` starts the message. */
-  roles?: readonly AskRole[];
+  /**
+   * The agents the `@` menu's Agents tab lists in a thread (ADR 0019): its members, the lead among them, then the agents
+   * a mention would seat. Picking one sends the message to it. Without them the menu has no Agents tab.
+   */
+  agents?: { members: readonly MentionAgent[]; others: readonly MentionAgent[] };
   /** The `/` menu's commands. Without them `/` is plain text, as in the phone composers. */
   commands?: { list: CommandList | null; load: () => void | Promise<void>; where: 'reply' | 'new-thread' };
   /** Opens the menus below the box, for a composer near the top of the page. */
@@ -87,7 +92,7 @@ export interface MessageEditorProps {
  * through a menu; Enter or Tab picks, Esc closes it.
  */
 export function MessageEditor(props: MessageEditorProps) {
-  const { text, onText, draft, records, mentions, roles, commands, below, anchor, onError, onMenuOpen } = props;
+  const { text, onText, draft, records, mentions, agents, commands, below, anchor, onError, onMenuOpen } = props;
   const technical = useTechnical();
   const controller = useMemo(() => createTokenInputController(), []);
   const box = useRef<HTMLDivElement>(null);
@@ -105,10 +110,14 @@ export function MessageEditor(props: MessageEditorProps) {
     const t = editorText(next);
     setValue(next);
     setShown(t);
-    const fix = reconcileMachines(next, draftContext(draft));
+    const fix = reconcileMentions(next, draftContext(draft));
     for (const id of fix.remove) removeDraftContext(draft, id);
     for (const m of fix.add) {
       const why = addDraftContext(draft, newContext(machineMention, mentionBody(m, new Date()), ''));
+      if (why) onError?.(why);
+    }
+    for (const a of fix.addAgents) {
+      const why = addDraftContext(draft, newContext(agentMention, agentMentionBody(a), ''));
       if (why) onError?.(why);
     }
     onText(t);
@@ -125,6 +134,8 @@ export function MessageEditor(props: MessageEditorProps) {
     const m = menu.getMatch();
     return !!m && !plainOf(value).slice(0, m.start).trim();
   };
+  // The `@` menu's tab Ben picked, until it closes: it opens on Agents (mentionTabs).
+  const [tab, setTab] = useState<MentionTab | null>(null);
 
   // `@`: the rows with the search they answer, so a slower reply for an older search never shows.
   const atQuery = match?.trigger === AT ? match.query : null;
@@ -151,11 +162,10 @@ export function MessageEditor(props: MessageEditorProps) {
   }, [mentions, atQuery]);
   // Until the search for the new text answers, the last rows stay, so typing doesn't flicker the menu.
   const files = got?.rows ?? [];
-  const asks: FileMention[] =
-    atQuery !== null && roles?.length && startsMessage()
-      ? roleRows(roles, atQuery).map((r) => ({ insert: r.id, name: r.name, detail: r.remote ? 'Ask a remote agent' : 'Ask an agent', kind: 'role', remote: r.remote }))
-      : [];
-  const rows = asks.length ? [...asks, ...files] : files;
+  const agentList = atQuery !== null && agents ? agentRows(agents.members, agents.others, atQuery) : [];
+  const all = [...agentList, ...files];
+  const tabs = mentionTabs(all, tab);
+  const rows = tabs.open ? all.filter((r) => tabOf(r) === tabs.open) : all;
   const rowsLoading = atKey !== null && got?.key !== atKey && !got;
 
   // `/`: a fresh list each time the menu opens, or gets another list while open. The server only probes a list older
@@ -190,6 +200,7 @@ export function MessageEditor(props: MessageEditorProps) {
       insert: (item: TriggerMenuDataItem) => {
         const r = byKey.current.get(String(item.value));
         if (r?.kind === 'machine' && r.machine) return machineToken({ id: r.machine.id, name: r.name, reachability: r.machine.reachability, lastSeen: r.machine.lastSeen });
+        if (r?.kind === 'agent') return agentToken({ id: r.insert, name: r.name });
         return `@${r?.insert ?? item.label} `;
       },
     },
@@ -200,6 +211,14 @@ export function MessageEditor(props: MessageEditorProps) {
   const onSelect = (picked: unknown, details: TriggerMenuSelectDetails<unknown>) => {
     if (details.trigger !== AT) return;
     const r = byKey.current.get(String(picked));
+    // An agent goes on the message as an agent_mention record: the message goes to it (ADR 0019).
+    if (r?.kind === 'agent') {
+      if (mentionsAgent(draftContext(draft), r.insert)) return;
+      const why = addDraftContext(draft, newContext(agentMention, agentMentionBody({ id: r.insert, name: r.name }), ''));
+      if (!why) return;
+      onError?.(why);
+      return details.insert(`@${r.name} `);
+    }
     const m = r?.kind === 'machine' ? r.machine : undefined;
     if (!r || !m || mentionsMachine(draftContext(draft), m.id)) return;
     const why = addDraftContext(draft, newContext(machineMention, mentionBody({ id: m.id, name: r.name, reachability: m.reachability, lastSeen: m.lastSeen }, new Date()), ''));
@@ -220,8 +239,8 @@ export function MessageEditor(props: MessageEditorProps) {
       codec={tokenCodec}
       copy="label"
       tokenDeletion="whole"
-      getTokenDescription={(t) => (t.type === MACHINE_TOKEN ? 'machine' : t.type)}
-      renderToken={(t) => <MachineChip token={t} />}
+      getTokenDescription={(t) => (t.type === MACHINE_TOKEN ? 'machine' : t.type === AGENT_TOKEN ? 'agent' : t.type)}
+      renderToken={(t) => (t.type === AGENT_TOKEN ? <AgentChip token={t} /> : <MachineChip token={t} />)}
     >
       <TokenInputEditor
         ref={box}
@@ -247,6 +266,7 @@ export function MessageEditor(props: MessageEditorProps) {
         onSelect={onSelect}
         onOpenChange={(next, details) => {
           setOpen(next);
+          if (!next) setTab(null);
           setMatch(next && details.trigger ? { trigger: details.trigger, query: menu.getQuery() } : null);
         }}
         onQueryChange={(query, details) => setMatch({ trigger: details.trigger, query })}
@@ -263,7 +283,10 @@ export function MessageEditor(props: MessageEditorProps) {
           {match?.trigger === SLASH ? (
             <SlashRows list={list} sections={sections} loading={slashLoading} technical={technical} />
           ) : (
-            <MentionRows rows={rows} loading={rowsLoading} />
+            <>
+              {tabs.tabs.length > 1 && <MentionTabs tabs={tabs.tabs} open={tabs.open} onPick={setTab} />}
+              <MentionRows rows={rows} loading={rowsLoading} />
+            </>
           )}
         </TriggerMenuContent>
       </TriggerMenu>
@@ -284,26 +307,78 @@ function MachineChip({ token }: { token: Token }) {
   );
 }
 
-function MentionRows({ rows, loading }: { rows: FileMention[]; loading: boolean }) {
+/** An agent inline: its avatar in its own color and its name, deleted, crossed and copied as one piece (Q53). */
+function AgentChip({ token }: { token: Token }) {
+  const agent = useAgent(token.value) ?? { id: token.value, name: token.label };
   return (
-    <TriggerMenuList aria-label={rows.some((r) => r.kind === 'role') ? (rows.some((r) => r.kind === 'machine') ? 'Agents, machines and files' : 'Files and agents') : rows.some((r) => r.kind === 'machine') ? 'Machines and files' : 'Files'} className="scroll-thin min-h-0 flex-1 overflow-y-auto p-1.5">
+    <TokenInputToken className="mention-pill mention-pill-agent" title={`${token.label}: the message goes to this agent`} style={{ '--agent': agentColor(agent) } as React.CSSProperties}>
+      <AgentAvatar agent={agent} size={14} />
+      {token.label}
+    </TokenInputToken>
+  );
+}
+
+/** The `@` menu's tabs, Machines | Agents | Files, the ones with rows in them (Q11). A press keeps focus in the box. */
+function MentionTabs({ tabs, open, onPick }: { tabs: readonly MentionTab[]; open: MentionTab | null; onPick: (t: MentionTab) => void }) {
+  return (
+    <div role="tablist" aria-label="Mention" className="flex shrink-0 gap-1 border-b border-[var(--line)] px-2 pt-2 pb-1.5">
+      {MENTION_TABS.filter((t) => tabs.includes(t.id)).map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={open === t.id}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onPick(t.id)}
+          className={`press h-7 rounded-full px-3 text-[12.5px] font-medium ${open === t.id ? 'bg-surface-2 text-fg' : 'text-fg-3 hov'}`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MentionRow({ r }: { r: FileMention }) {
+  const agent = useAgent(r.kind === 'agent' ? r.insert : null);
+  return (
+    <TriggerMenuItem value={rowKey(r)} label={r.name} keywords={[r.insert]} className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-2xl px-3 py-1.5 data-highlighted:bg-[var(--wash)]">
+      {agent ? <AgentAvatar agent={agent} size={20} /> : <Icon name={r.kind === 'machine' ? 'monitor' : 'file'} size={14} className="shrink-0 text-fg-3" />}
+      <span className="flex min-w-0 flex-1 items-baseline gap-2">
+        <span className="shrink-0 text-[13px] font-medium text-fg">{r.name}</span>
+        <span className="truncate text-[11.5px] text-fg-3">{r.machine && !r.machine.here ? reachLine(r.machine.reachability, r.machine.lastSeen) : r.detail}</span>
+      </span>
+      {r.machine && <StatusDot status={MACHINE_DOT[r.machine.reachability]} size={7} className="shrink-0" />}
+    </TriggerMenuItem>
+  );
+}
+
+function MentionRows({ rows, loading }: { rows: FileMention[]; loading: boolean }) {
+  const kind = rows[0] ? tabOf(rows[0]) : 'files';
+  // Artifacts sit in the Files tab under a heading of their own (Q11).
+  const groups =
+    kind === 'files' && rows.some((r) => r.kind === 'artifact')
+      ? [{ label: 'Files', rows: rows.filter((r) => r.kind !== 'artifact') }, { label: 'Artifacts', rows: rows.filter((r) => r.kind === 'artifact') }].filter((g) => g.rows.length)
+      : [{ label: null, rows }];
+  return (
+    <TriggerMenuList aria-label={MENTION_TABS.find((t) => t.id === kind)?.label ?? 'Files'} className="scroll-thin min-h-0 flex-1 overflow-y-auto p-1.5">
       {loading && !rows.length && (
         <div className="flex items-center gap-2 px-3 py-2.5 text-[12.5px] text-fg-3">
           <Loader size={13} /> Looking
         </div>
       )}
-      {rows.map((r) => (
-        <TriggerMenuItem key={rowKey(r)} value={rowKey(r)} label={r.name} keywords={[r.insert]} className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-2xl px-3 py-1.5 data-highlighted:bg-[var(--wash)]">
-          <Icon name={r.kind === 'role' ? 'message' : r.kind === 'machine' ? 'monitor' : 'file'} size={14} className="shrink-0 text-fg-3" />
-          <span className="flex min-w-0 flex-1 items-baseline gap-2">
-            <span className="shrink-0 text-[13px] font-medium text-fg">{r.name}</span>
-            <span className="truncate text-[11.5px] text-fg-3">{r.machine && !r.machine.here ? reachLine(r.machine.reachability, r.machine.lastSeen) : r.detail}</span>
-          </span>
-          {r.kind === 'artifact' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">artifact</span>}
-          {r.remote && <span className="shrink-0 rounded-full px-2 py-px text-[11px] text-fg-3 shadow-[inset_0_0_0_1px_var(--line-strong)]">Remote</span>}
-          {r.machine && <StatusDot status={MACHINE_DOT[r.machine.reachability]} size={7} className="shrink-0" />}
-        </TriggerMenuItem>
-      ))}
+      {groups.map((g) =>
+        g.label ? (
+          <TriggerMenuGroup key={g.label}>
+            <TriggerMenuGroupLabel className="caption px-3 pt-2 pb-1">{g.label}</TriggerMenuGroupLabel>
+            {g.rows.map((r) => (
+              <MentionRow key={rowKey(r)} r={r} />
+            ))}
+          </TriggerMenuGroup>
+        ) : (
+          g.rows.map((r) => <MentionRow key={rowKey(r)} r={r} />)
+        ),
+      )}
     </TriggerMenuList>
   );
 }

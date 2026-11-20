@@ -32,6 +32,8 @@ import { bindResume, connectorsFor, declareConnectors, retrySetup, saveStart, se
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
+import { hasMembers, namedAgents, preamble, readOnlyReason, routeNamed } from './members.ts';
+import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { parseGoalCommand } from '@omni/shared/goal.ts';
 import { ownerName } from '@omni/shared/thread-owner.ts';
 import { userConfig } from '../user-config.ts';
@@ -396,6 +398,7 @@ export function sendMessage(
     source?: string;
     /** Records Ben attached, already normalized (thread-routes-api.ts). */
     context?: MessageContext[];
+    preamble?: string;
   } = {},
 ): Thread {
   const thread = threads.get(threadId);
@@ -411,7 +414,11 @@ export function sendMessage(
 export function messageFor(
   thread: Thread,
   prompt: string,
-  opts: { uuid: string; requestId?: string; from?: 'ben' | 'conductor'; source?: string; mode?: SendMode; attachments?: Attachment[]; context?: MessageContext[] },
+  opts: {
+    uuid: string; requestId?: string; from?: 'ben' | 'conductor'; source?: string; mode?: SendMode; attachments?: Attachment[]; context?: MessageContext[];
+    /** What the lead of a group thread reads first: the messages since its last turn (runner/members.ts preamble). */
+    preamble?: string;
+  },
 ): Msg {
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
   const context = opts.context?.length ? opts.context : undefined;
@@ -419,7 +426,7 @@ export function messageFor(
   return {
     uuid: opts.uuid,
     requestId: opts.requestId,
-    text: withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
+    text: (opts.preamble ?? '') + withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
     mode: opts.mode ?? 'steer',
     attachments,
     contexts: context,
@@ -493,10 +500,21 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
       deliver(r.thread_id, requestMsg(r));
       return;
     }
+    // Ben's message naming agents goes to them, seating the ones not in the thread yet (runner/members.ts).
+    const named = r.source === 'ben' ? namedAgents(r.thread_id, r.context ?? undefined) : null;
+    if (named) {
+      const blocked = turnBlocked(thread, runsHere(r.thread_id));
+      if (blocked) throw refusal(blocked, 409);
+      routeNamed(r.thread_id, named, { request: r, prompt: r.prompt, source: r.source, attachments: r.attachments ?? undefined, context: r.context ?? undefined });
+      return;
+    }
     await warmCommands(ready.harness, ready.cwd, r.prompt, r.thread_id);
     // Without a payload it came through the API, from Ben or the Conductor, or it is a worktree thread's first prompt.
     const source = r.request_id === START_REQUEST ? ready.source : undefined;
-    sendMessage(r.thread_id, r.prompt, { from: r.source as 'ben' | 'conductor', source, mode: r.mode, attachments: r.attachments ?? undefined, context: r.context ?? undefined, request: r });
+    // In a group thread the lead reads what the other agents said since its last turn first. Not before a command,
+    // which the harness reads only at the start of a message.
+    const pre = hasMembers(r.thread_id) && !r.prompt.trimStart().startsWith('/') ? await preamble(r.thread_id, thread.role ?? '') : '';
+    sendMessage(r.thread_id, r.prompt, { from: r.source as 'ben' | 'conductor', source, mode: r.mode, attachments: r.attachments ?? undefined, context: r.context ?? undefined, request: r, preamble: pre || undefined });
   } catch (err) {
     if (isShuttingDown()) messageRequests.park(r.id);
     else undo();
@@ -523,6 +541,12 @@ export async function postMessage(
 ): Promise<PostedThread> {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
+  // A thread whose lead agent is gone takes no new messages (Q59), and only Ben seats agents in this slice.
+  const readOnly = readOnlyReason(thread);
+  if (readOnly) throw refusal(readOnly, 409);
+  if (thread.source === 'member') throw refusal('Write in the thread this agent is seated in.', 409);
+  if ((opts.from ?? 'ben') !== 'ben' && mentionedAgents(opts.context).length) throw refusal('Only the user seats agents in a thread.', 403);
+  namedAgents(threadId, opts.context);
   const goal = goalSend(thread, prompt, opts.attachments?.length ?? 0);
   const mode = goal ? 'queue' : (opts.mode ?? 'steer');
   const source = opts.from ?? 'ben';

@@ -185,6 +185,9 @@ const NAMES = [
   // A thread whose agent posted its plan with set_steps, on its second step: its `step` line and the calls the step
   // view reads (@omni/shared/steps.ts). Last, so its ids number after the others'.
   'thread-steps.json',
+  // A group thread (ADR 0019) after Add an agent: its `members`, as the header's avatars and the member list read them.
+  // After the steps thread, so the ids recorded before it stay put.
+  'thread-members.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -1007,6 +1010,11 @@ async function scenario() {
     }, `the steps thread on "${onStep}"`),
   );
   await eventually(async () => (await detail(planned.id)).thread.status === 'done', 'the steps thread to finish');
+
+  const grouped = (await call('POST', '/threads', { channel: 'acme', prompt: 'plan the sale', title: 'Plan the sale', role: 'builder' })) as Thread;
+  await eventually(async () => (await detail(grouped.id)).thread.status === 'done', 'the group thread to finish its first turn');
+  const seated = keep('thread-members.json', await call('POST', `/threads/${grouped.id}/members`, { agent: 'reviewer' })) as { members: { agent: string }[] };
+  expect(seated.members.map((m) => m.agent)).toEqual(['builder', 'reviewer']);
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

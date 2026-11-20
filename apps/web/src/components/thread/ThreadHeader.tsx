@@ -9,6 +9,7 @@ import { threadAccountLabel, type ThreadAccount } from '@omni/shared/harness-acc
 import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
 import { HeaderActions } from './HeaderActions.tsx';
+import { MemberAvatars } from './Members.tsx';
 
 /** The status lines the thread's mods pinned with $.ui.status, one per plugin, while its process runs. */
 function ModStatusLines({ lines }: { lines: ModStatus[] }) {
@@ -104,6 +105,7 @@ export function ThreadHeader({
         {modLines.length > 0 && <ModStatusLines lines={modLines} />}
       </div>
       <ChannelStack threads={delegated} own={thread.channel_id} to={href.threadView(thread.id, 'details')} className="mr-1" />
+      <MemberAvatars thread={thread} />
       <HeaderActions {...actions} />
     </div>
   );
