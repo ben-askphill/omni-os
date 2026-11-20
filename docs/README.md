@@ -12,7 +12,7 @@
 - [Sync between two Macs](user/sync.md): signed changes, first-key trust for Omni Connect machines ([ADR 0013](adr/0013-paired-machines-are-trusted.md)), handoff and repo clone on a machine without the checkout
 - [Remote access and security](user/remote-access.md), including the phone layout, home-screen setup and pairing the native iOS app
 - [Omni Connect](user/omni-connect.md): open any machine from a phone through your relay, without Tailscale
-- [claude.ai Artifacts](user/claude-artifacts.md): the list of your Artifacts on claude.ai beside the files threads made
+- [Claude Artifacts](user/claude-artifacts.md): the list of your Artifacts on claude.ai beside the Files threads made, on the Artifacts page
 - [Notion](user/notion.md): threads use a Notion connection's token (`OMNI_NOTION_TOKEN`) and the shipped helper instead of the OAuth-only plugin, and which pages to share with it
 - [Link previews](user/link-previews.md)
 - [Mods](user/mods.md)
@@ -37,7 +37,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Rust port](internals/rust-port.md): the audit of every module, which move to Rust and in what order, which stay in TypeScript and why, and how parity is checked
 - [Glossary](../GLOSSARY.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, desktop pairing with a one-time nonce, install token rotation, capabilities, and push token registration
-- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md): Activity as Inbox (with machine tiles), Library with claude.ai Artifacts, thinking line, the Open items card, push alerts with a reply preview, Settings and Channel Settings (Accounts, Branch steps, worktree copy/shared directories), Changes review notes, PR steps (Open PR offer, working Fix conflicts / Fix checks, Auto-merge, Rerun failed checks) and forwarded-message rows, shared icons, first build, TestFlight, and the EAS workflow on `main` (native build or EAS Update)
+- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md): Activity as Inbox (with machine tiles), Artifacts with Files and Claude Artifacts, thinking line, the Open items card, push alerts with a reply preview, Settings and Channel Settings (Accounts, Branch steps, worktree copy/shared directories), Changes review notes, PR steps (Open PR offer, working Fix conflicts / Fix checks, Auto-merge, Rerun failed checks) and forwarded-message rows, shared icons, first build, TestFlight, and the EAS workflow on `main` (native build or EAS Update)
 - [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, the bridge contract and the macOS Activity Monitor · [Desktop release](../apps/desktop/RELEASE.md): signing, notarization and the release workflow
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages (including the Activity Monitor sampler)
 - [Screenshots on PRs](pr-screenshots.md)

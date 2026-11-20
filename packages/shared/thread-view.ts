@@ -251,7 +251,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   return {
     turns,
     // A cloud agent works on Cursor's machines: its run's status is all there is to say.
-    now: asking ? null : open ? nowDoing(open, thread.cwd) : latest.cloud ? { verb: `Cursor cloud agent: ${cloudStatus(latest.cloud.status).label.toLowerCase()}`, target: '' } : { verb: 'Thinking', target: '' },
+    now: asking ? null : open ? nowDoing(open, thread.cwd) : latest.cloud ? { verb: `Cursor Cloud: ${cloudStatus(latest.cloud.status).label.toLowerCase()}`, target: '' } : { verb: 'Thinking', target: '' },
     asking,
   };
 }

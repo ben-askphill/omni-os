@@ -52,7 +52,7 @@ function ClaudeLibrary() {
       <MoHeader left={<span className="w-10" />} right={<HeaderActions />} />
       <MoScroll tabBar>
         <div>
-          <MoTitle title="Library" sub="Your Artifacts on claude.ai" />
+          <MoTitle title="Artifacts" sub="Your Artifacts on claude.ai" />
           <div className="px-4">
             <ArtifactSourceSwitch source="claude" />
           </div>
@@ -78,7 +78,7 @@ function FilesLibrary() {
       <MoHeader left={<span className="w-10" />} right={<HeaderActions />} />
       <MoScroll tabBar>
         <div>
-          <MoTitle title="Library" sub="Reports, pages and files your threads made" />
+          <MoTitle title="Artifacts" sub="Reports, pages and files your threads made" />
           <div className="mb-2.5 px-4">
             <ArtifactSourceSwitch source="files" />
           </div>

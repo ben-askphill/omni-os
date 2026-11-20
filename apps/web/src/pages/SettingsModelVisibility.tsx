@@ -89,7 +89,7 @@ export function ModelVisibilityCard() {
     <Card
       entry="model-visibility"
       title="Models in the picker"
-      subtitle="Omni asks each harness for its models, so a new one shows up without an update. Hidden models still run where a thread, crew role, channel or automation already uses one, and Auto still picks from all of them."
+      subtitle="Omni asks each harness for its models, so a new one shows up without an update. Hidden models still run where a thread, agent, channel or automation already uses one, and Auto still picks from all of them."
       actions={
         <>
           {checked && <span className="text-[12.5px] text-fg-3">{checked}</span>}

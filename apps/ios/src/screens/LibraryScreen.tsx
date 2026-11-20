@@ -23,7 +23,7 @@ const GAP = space.s4 + space.s2 / 2;
 type Source = 'files' | 'claude';
 const SOURCES = [
   { value: 'files', label: 'Files' },
-  { value: 'claude', label: 'claude.ai' },
+  { value: 'claude', label: 'Claude Artifacts' },
 ] as const;
 
 /**

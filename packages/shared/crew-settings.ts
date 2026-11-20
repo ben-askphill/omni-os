@@ -93,12 +93,12 @@ export function crewChips(r: Pick<CrewListed, 'kind' | 'hidden' | 'builtInChange
       tone: 'default',
       title: r.charterMode === 'append' ? 'A built-in with your edits. Your text is added to its charter, so release fixes still reach it.' : 'A built-in with your edits. Your charter replaces the built-in one.',
     });
-  else chips.push({ label: 'Yours', tone: 'default', title: 'A role of your own, in data/crew/.' });
+  else chips.push({ label: 'Yours', tone: 'default', title: 'An agent of your own, in data/crew/.' });
   if (r.hidden) chips.push({ label: 'Hidden', tone: 'outline', title: 'Hidden on this machine: no new thread starts as it.' });
   if (r.builtInChanged) chips.push({ label: 'Built-in charter changed', tone: 'default', title: 'Your charter replaces a built-in one that changed since. Compare to see what you are missing.' });
   if (r.error) chips.push({ label: "Can't run here", tone: 'needs', title: r.error });
   if (r.memoryWaiting)
-    chips.push({ label: `${r.memoryWaiting} ${r.memoryWaiting === 1 ? 'lesson waits' : 'lessons wait'}`, tone: 'needs', title: 'Its threads proposed lessons for its memory. Open the role to approve or dismiss them.' });
+    chips.push({ label: `${r.memoryWaiting} ${r.memoryWaiting === 1 ? 'lesson waits' : 'lessons wait'}`, tone: 'needs', title: 'Its threads proposed lessons for its memory. Open the agent to approve or dismiss them.' });
   return chips;
 }
 
@@ -178,9 +178,9 @@ export function blankCrewDraft(): CrewDraft {
 
 /** Why the form cannot be saved yet, or null. */
 export function crewDraftProblem(d: CrewDraft, id?: string): string | null {
-  if (!d.name.trim()) return 'Give the role a name.';
+  if (!d.name.trim()) return 'Give the agent a name.';
   if (id !== undefined && !CREW_ID_PATTERN.test(id)) return 'The id takes lowercase letters, digits and dashes.';
-  if (d.delegateOnly && !d.conductorTools) return 'A role that only routes work needs the conductor tools to hand it on.';
+  if (d.delegateOnly && !d.conductorTools) return 'An agent that only routes work needs the conductor tools to hand it on.';
   return null;
 }
 
@@ -321,8 +321,8 @@ export const CHANGED_CHARTER_ACTIONS = {
  * (Addendum A.4 of docs/plans/2026-11-18-user-defined-crew.md): it runs its own tools on its own server.
  */
 export function remoteRoleNote(harness: string): string {
-  const where = harness === 'cursor-cloud' ? 'a Cursor cloud agent' : 'a server outside Omni';
-  return `This role runs on ${where}, with its own tools and secrets. Omni cannot hold it to Only routes work, so that is refused; a review on it is only what its charter asks. It gets none of this machine's secrets, no browser, no worktree and no Omni tools, and its replies come back as data, not instructions.`;
+  const where = harness === 'cursor-cloud' ? 'Cursor Cloud' : 'a server outside Omni';
+  return `This agent runs on ${where}, with its own tools and secrets. Omni cannot hold it to Only routes work, so that is refused; a review on it is only what its charter asks. It gets none of this machine's secrets, no browser, no worktree and no Omni tools, and its replies come back as data, not instructions.`;
 }
 
 /** The choices for a role's memory, as Settings > Crew offers them. */

@@ -29,7 +29,7 @@ const PR_DOT = { live: 'running', done: 'done', needs: 'needs', outline: 'idle' 
 const TABS: { id: PanelTab; icon: IconName; name: string; title: string }[] = [
   { id: 'details', icon: 'info', name: 'Details', title: 'Details' },
   { id: 'prs', icon: 'pr', name: 'PRs', title: 'PRs' },
-  { id: 'artifacts', icon: 'layers', name: 'Artifacts', title: 'Artifacts' },
+  { id: 'artifacts', icon: 'layers', name: 'Files', title: 'Files' },
   { id: 'changes', icon: 'diff', name: 'Changes', title: 'Changes' },
   { id: 'browser', icon: 'browser', name: 'Browser', title: "Browser: the agent's browser and what it saw" },
   { id: 'web', icon: 'globe', name: 'Web', title: 'Web: your own browser on this Mac. The agent cannot see it' },

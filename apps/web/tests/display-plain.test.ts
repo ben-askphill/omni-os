@@ -62,7 +62,7 @@ describe('the quick card with Show technical details off', () => {
     expect(html).toContain('>Owner<');
     expect(html).toContain('>Agent<');
     expect(html).toContain('Claude Code');
-    expect(html).toContain('2 artifacts');
+    expect(html).toContain('2 files');
     expect(html).toContain('All details');
   });
 

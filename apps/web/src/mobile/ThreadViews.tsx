@@ -509,7 +509,7 @@ export function DetailsScreen() {
   const agentUrl = thread.harness === 'cursor-cloud' ? cloudAgentUrl(thread.session_id) : null;
   if (agentUrl)
     rows.push([
-      'Cloud agent',
+      'Cursor Cloud',
       <a href={agentUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-fg">
         Open in Cursor
       </a>,
@@ -530,7 +530,7 @@ export function DetailsScreen() {
         </MoGroup>
         <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">
           {thread.harness === 'cursor-cloud'
-            ? "This thread runs as a Cursor cloud agent on Cursor's Linux cloud, on its own clone of the channel repo. Another message goes to it as a follow-up."
+            ? "This thread runs on Cursor Cloud, Cursor's Linux machines, on its own clone of the channel repo. Another message goes to it as a follow-up."
             : 'The session id, working directory and resume command are on the desktop, under Details in the thread panel.'}
         </p>
       </Body>

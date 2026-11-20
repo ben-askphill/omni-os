@@ -55,7 +55,7 @@ export function ConnectSection() {
     <Card
       entry="connect"
       title="Omni Connect"
-      subtitle="Reach this Omni from any device through a Cloudflare tunnel your relay sets up. Devices still sign in with Google."
+      subtitle="Reach this Omni from anywhere through a Cloudflare tunnel your relay sets up. Every browser and phone still signs in with Google."
       actions={
         s.enabled ? (
           <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">

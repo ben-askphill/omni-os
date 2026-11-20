@@ -14,7 +14,7 @@
     },
     {
       "id": "devices",
-      "title": "Devices"
+      "title": "Machines"
     },
     {
       "id": "developer",
@@ -57,22 +57,22 @@
       "group": "assistant",
       "title": "Models",
       "icon": "layers",
-      "blurb": "Which agents can run, their models, and the model a new thread starts on.",
+      "blurb": "Which harnesses can run, their models, and the model a new thread starts on.",
       "scoped": true
     },
     {
       "id": "crew",
       "group": "assistant",
-      "title": "Crew",
+      "title": "Agents",
       "icon": "delegate",
-      "blurb": "The roles threads run as: their charters, run defaults and powers."
+      "blurb": "The agents threads run as: their charters, run defaults and powers."
     },
     {
       "id": "accounts",
       "group": "assistant",
       "title": "Accounts",
       "icon": "user",
-      "blurb": "Which account each agent is signed in to, on each of your machines."
+      "blurb": "Which account each harness is signed in to, on each of your machines."
     },
     {
       "id": "threads",
@@ -311,8 +311,8 @@
         "custom harness",
         "remote",
         "runs api",
-        "connect an agent",
-        "own agent",
+        "connect a harness",
+        "own harness",
         "pairing code",
         "pair",
         "install",
@@ -382,8 +382,10 @@
     {
       "id": "crew-roles",
       "section": "crew",
-      "title": "Crew roles",
+      "title": "Agents",
       "keywords": [
+        "crew",
+        "crew roles",
         "role",
         "roles",
         "charter",
@@ -397,6 +399,7 @@
         "persona",
         "prompt",
         "instructions",
+        "new agent",
         "new role",
         "duplicate",
         "hide",

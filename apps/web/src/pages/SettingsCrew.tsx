@@ -53,11 +53,11 @@ export function CrewSection() {
     <>
       <Card
         entry="crew-roles"
-        title="Crew roles"
-        subtitle="A thread started as a role runs with its charter. The Conductor hands work to the ones it may delegate to."
+        title="Agents"
+        subtitle="A thread started as an agent runs with its charter. The Conductor hands work to the ones it may delegate to."
         actions={
           <Button size="sm" icon="plus" onClick={() => setEditing({ id: null })}>
-            New role
+            New agent
           </Button>
         }
       >
@@ -66,7 +66,7 @@ export function CrewSection() {
         ) : !roles.data ? (
           <Loading />
         ) : (
-          <ul className="-mx-1 divide-y divide-line" aria-label="Crew roles">
+          <ul className="-mx-1 divide-y divide-line" aria-label="Agents">
             {roles.data.map((r) => (
               <li key={r.id}>
                 <button type="button" onClick={() => setEditing({ id: r.id })} className="hov group flex w-full min-w-0 items-start gap-3 rounded-[14px] px-1 py-2.5 text-left [--hov:var(--surface-2)]">
@@ -134,7 +134,7 @@ function CrewEditor({
   useEffect(() => setView('edit'), [id]);
   // Settings' list has hidden roles too; the app's crew list, which pickers use, leaves them out.
   const name = id ? ((roles ?? crew).find((r) => r.id === id)?.name ?? crew.find((r) => r.id === id)?.name ?? id) : null;
-  const title = !id ? 'New role' : view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : `Edit ${name}`;
+  const title = !id ? 'New agent' : view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : `Edit ${name}`;
   // From the list, which reloads when a lesson is proposed or decided anywhere.
   const waiting = (id && roles?.find((r) => r.id === id)?.memoryWaiting) || 0;
   return (
@@ -337,7 +337,7 @@ function EditorBody({
         {role && (
           <div>
             {Object.values(can).some(Boolean) && (
-              <div className="flex flex-wrap gap-1.5" aria-label="Role actions">
+              <div className="flex flex-wrap gap-1.5" aria-label="Agent actions">
                 {can.duplicate && (
                   <Button type="button" size="sm" variant="ghost" icon="copy" onClick={() => setView('duplicate')} disabled={busy}>
                     Duplicate
@@ -356,7 +356,7 @@ function EditorBody({
                 {can.edited && (
                   <InlineConfirm label="Reset to built-in" icon="undo" confirmLabel="Reset" busyLabel="Resetting" onConfirm={() => act(() => api.post(path('/reset')))} />
                 )}
-                {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete role" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()))} />}
+                {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete agent" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()))} />}
               </div>
             )}
             {refusedActions.duplicate && <LockNote>{refusedActions.duplicate}</LockNote>}
@@ -398,7 +398,7 @@ function EditorBody({
         {memoryTab && role ? (
           <RoleMemory role={role} />
         ) : mode === 'markdown' ? (
-          <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole role: frontmatter and charter. Saved as written.'}>
+          <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole agent: frontmatter and charter. Saved as written.'}>
             <textarea id="crew-md" aria-describedby={fieldHintId('crew-md')} className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
           </Field>
         ) : (
@@ -412,7 +412,7 @@ function EditorBody({
                   <input id="crew-id" aria-describedby={fieldHintId('crew-id')} {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
                 </Field>
               )}
-              <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick a role for a task.">
+              <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick an agent for a task.">
                 <textarea id="crew-desc" aria-describedby={fieldHintId('crew-desc')} className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
               </Field>
               <Field label="Avatar" hint={builtIn ? 'Without one, the built-in mark.' : 'Without one, its initials.'}>
@@ -420,14 +420,14 @@ function EditorBody({
                   inputId="crew-icon"
                   svg={false}
                   value={draft.icon}
-                  name={draft.name || theId || 'Role'}
+                  name={draft.name || theId || 'Agent'}
                   avatarBg={draft.bg}
                   onChange={(v) => set('icon', v)}
-                  preview={<CrewAvatar role={{ id: theId, name: draft.name || theId || 'Role', avatar: draft.icon || draft.bg ? { icon: draft.icon || undefined, bg: draft.bg || undefined } : undefined }} size={36} />}
+                  preview={<CrewAvatar role={{ id: theId, name: draft.name || theId || 'Agent', avatar: draft.icon || draft.bg ? { icon: draft.icon || undefined, bg: draft.bg || undefined } : undefined }} size={36} />}
                 />
               </Field>
               <Field label="Avatar background">
-                <AvatarColorPicker icon={draft.icon} name={draft.name || theId || 'Role'} value={draft.bg} manual={!!draft.bg} onChange={(v) => set('bg', v)} onAuto={() => set('bg', '')} />
+                <AvatarColorPicker icon={draft.icon} name={draft.name || theId || 'Agent'} value={draft.bg} manual={!!draft.bg} onChange={(v) => set('bg', v)} onAuto={() => set('bg', '')} />
               </Field>
             </Section>
 
@@ -459,7 +459,7 @@ function EditorBody({
                 label={builtIn ? (draft.charterMode === 'append' ? 'Your additions' : 'Your charter') : 'Charter'}
                 hint={
                   builtIn && draft.charterMode === 'append'
-                    ? 'Added after the built-in charter, so release fixes to it still reach this role. {{user}} and the other placeholders are filled in.'
+                    ? 'Added after the built-in charter, so release fixes to it still reach this agent. {{user}} and the other placeholders are filled in.'
                     : builtIn
                       ? 'Replaces the built-in charter. Omni says when a release changes the one you replaced.'
                       : '{{user}} and the other placeholders are filled in when a thread starts.'
@@ -481,14 +481,14 @@ function EditorBody({
             </Section>
 
             <Section title="Where">
-              <Field label="Default channel" hint="Where a thread starts as this role when no channel is named.">
+              <Field label="Default channel" hint="Where a thread starts as this agent when no channel is named.">
                 <Picker size="field" label="Default channel" value={draft.channel} onChange={(v) => set('channel', v)} options={channelOptions} searchable />
               </Field>
             </Section>
 
             <Section title="Powers">
-              <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the role pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} locked={locked.delegatable} />
-              <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other roles." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
+              <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the agent pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} locked={locked.delegatable} />
+              <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other agents." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
               <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
               <Switch
                 label="No file edits"
@@ -581,7 +581,7 @@ function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDeta
         </div>
         {detail.role.builtInChanged && (
           <div className="space-y-2 rounded-[14px] bg-surface-2 p-3.5">
-            <p className="text-[12.5px] text-fg-2">The built-in changed since you replaced it. Pick what this role runs with:</p>
+            <p className="text-[12.5px] text-fg-2">The built-in changed since you replaced it. Pick what this agent runs with:</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="sm" disabled={busy} onClick={() => onPick(CHANGED_CHARTER_ACTIONS.keep(own))} title="Keep your charter and stop the notice until the next change">
                 Keep mine
@@ -619,7 +619,7 @@ function DuplicateView({ from, busy, error, onBack, onDuplicate }: { from: CrewR
     >
       <div className="space-y-4 px-6 pb-5">
         <p className="text-[12.5px] text-fg-3">
-          A new role of your own with everything {from.name} has now: its fields and its whole charter.{from.kind !== 'own' && ' Unlike the built-in, it does not change with a release.'}
+          A new agent of your own with everything {from.name} has now: its fields and its whole charter.{from.kind !== 'own' && ' Unlike the built-in, it does not change with a release.'}
         </p>
         <Field id="dup-name" label="Name">
           <input id="dup-name" className="field" value={name} onChange={(e) => setName(e.target.value)} autoFocus />

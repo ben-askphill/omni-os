@@ -21,5 +21,5 @@ export const ownedByOther = (owner: string | null | undefined, user: string | nu
 /** The owner in words: "You" for the user's own, else the name. */
 export const ownerLabel = (owner: string | null | undefined, user: string | null | undefined) => (ownedByOther(owner, user) ? owner!.trim() : 'You');
 
-/** The Agent row of a thread that runs as no crew role, muted like No branch. */
-export const NO_CREW_ROLE = 'No crew role';
+/** The Agent row of a thread that runs as no agent, muted like No branch. */
+export const NO_CREW_ROLE = 'No agent';

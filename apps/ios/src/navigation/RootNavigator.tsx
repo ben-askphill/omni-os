@@ -65,7 +65,7 @@ export function RootNavigator() {
         }}
       />
       <Tab.Screen name="ChannelsTab" component={ChannelsStack} options={{ title: 'Channels', icon: 'hash' }} />
-      <Tab.Screen name="LibraryTab" component={LibraryStack} options={{ title: 'Library', icon: 'layers' }} />
+      <Tab.Screen name="LibraryTab" component={LibraryStack} options={{ title: 'Artifacts', icon: 'layers' }} />
     </Tab.Navigator>
   );
 }
@@ -91,9 +91,9 @@ function LibraryStack() {
       <Stack.Screen
         name="Library"
         component={LibraryScreen}
-        options={({ navigation }) => ({ title: 'Library', ...rootHeader(navigation) })}
+        options={({ navigation }) => ({ title: 'Artifacts', ...rootHeader(navigation) })}
       />
-      {detailScreens({ backTitle: 'Library' })}
+      {detailScreens({ backTitle: 'Artifacts' })}
     </Stack.Navigator>
   );
 }

@@ -21,7 +21,7 @@ describe('the list', () => {
       ['Built-in charter changed', 'default'],
     ]);
     expect(crewChips(role({ kind: 'own', error: 'unknown harness "vps"' })).map((c) => [c.label, c.title])).toEqual([
-      ['Yours', 'A role of your own, in data/crew/.'],
+      ['Yours', 'An agent of your own, in data/crew/.'],
       ["Can't run here", 'unknown harness "vps"'],
     ]);
   });
@@ -132,7 +132,7 @@ describe('the editor', () => {
   });
 
   it('says why a form cannot be saved', () => {
-    expect(crewDraftProblem(blankCrewDraft())).toBe('Give the role a name.');
+    expect(crewDraftProblem(blankCrewDraft())).toBe('Give the agent a name.');
     expect(crewDraftProblem({ ...blankCrewDraft(), name: 'X' }, 'Bad Id')).toBe('The id takes lowercase letters, digits and dashes.');
     expect(crewDraftProblem({ ...blankCrewDraft(), name: 'X', delegateOnly: true })).toMatch(/needs the conductor tools/);
     expect(crewDraftProblem({ ...blankCrewDraft(), name: 'X' }, 'x')).toBeNull();
@@ -165,8 +165,8 @@ describe('Compare', () => {
 
 describe('remoteRoleNote', () => {
   it('says what a role on a remote harness gives up, naming where it runs', () => {
-    expect(remoteRoleNote('custom:hermes-box')).toMatch(/^This role runs on a server outside Omni, with its own tools and secrets\./);
+    expect(remoteRoleNote('custom:hermes-box')).toMatch(/^This agent runs on a server outside Omni, with its own tools and secrets\./);
     expect(remoteRoleNote('custom:hermes-box')).toMatch(/Only routes work, so that is refused/);
-    expect(remoteRoleNote('cursor-cloud')).toMatch(/^This role runs on a Cursor cloud agent/);
+    expect(remoteRoleNote('cursor-cloud')).toMatch(/^This agent runs on Cursor Cloud/);
   });
 });

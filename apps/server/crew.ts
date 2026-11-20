@@ -372,9 +372,9 @@ export function crewForNewThread(id: string | null | undefined, delegated: boole
       .filter((r) => !r.hidden && (!delegated || r.delegatable))
       .map((r) => r.id)
       .join(', ');
-  if (!role) return { refused: `No crew role "${id}". Roles: ${valid()}.`, status: 400 };
-  if (role.hidden) return { refused: `The crew role "${id}" is hidden on this machine. Show it in Settings, or pick one of: ${valid()}.`, status: 409 };
-  if (delegated && !role.delegatable) return { refused: `The crew role "${id}" cannot be delegated to. Roles: ${valid()}.`, status: 409 };
+  if (!role) return { refused: `No agent "${id}". Agents: ${valid()}.`, status: 400 };
+  if (role.hidden) return { refused: `The agent "${id}" is hidden on this machine. Show it in Settings > Agents, or pick one of: ${valid()}.`, status: 409 };
+  if (delegated && !role.delegatable) return { refused: `The agent "${id}" cannot be delegated to. Agents: ${valid()}.`, status: 409 };
   return { role };
 }
 

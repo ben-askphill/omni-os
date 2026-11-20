@@ -67,16 +67,24 @@ A standalone HTML page set on a channel that its threads follow whenever they ma
 _Avoid_: Theme, style guide
 
 **Artifact**:
-A file a thread makes for the user, shown in the thread and in Claude Artifacts.
+A file a thread makes for the user, shown in the thread and in Files.
 _Avoid_: Output, attachment, render
 
 **Published artifact**:
 A page a thread published to claude.ai, linked to its local file and updated at the same address each time.
 _Avoid_: Artifact (alone: a local file), share link
 
+**Artifacts**:
+The page that holds two lists, Files and Claude Artifacts, behind the Artifacts disc on the channel rail and the Artifacts tab on a phone.
+_Avoid_: Library, gallery
+
+**Files**:
+The list of every artifact the user's threads made, across channels on the Artifacts page, or one thread's own and its delegated threads' in that thread's Files tab.
+_Avoid_: Artifacts (the page that holds Files and Claude Artifacts), outputs, downloads
+
 **Claude Artifacts**:
-The place that lists every artifact across channels and, behind a switch, the user's Artifacts on claude.ai.
-_Avoid_: Library, Artifacts (alone: one thread's files), Artifacts page
+The list of the user's Artifacts on claude.ai, on the Artifacts page beside Files.
+_Avoid_: Library, claude.ai artifacts, Artifacts (the page that holds both lists)
 
 **Review note**:
 A note the user pins to lines in a thread's diff, kept with those lines until it is sent, resolved or deleted.
@@ -94,7 +102,7 @@ _Avoid_: Team (one delegation)
 
 **Agent**:
 A charter with run defaults and powers that gives a thread its job, either shipped with Omni or the user's own.
-_Avoid_: Crew role (in anything the user reads; the code still says it), persona, bot
+_Avoid_: Crew role, role (in anything the user reads; the code still says crew role), persona, bot
 
 **Charter**:
 The instructions an agent gives every thread started as it.
@@ -222,11 +230,11 @@ _Avoid_: Spinner, badge
 
 **Harness**:
 The AI tool a thread runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent, Cursor Cloud, Hermes or a custom harness.
-_Avoid_: Provider, engine, backend, runtime, agent (what a thread runs as)
+_Avoid_: Agent (what a thread runs as), provider, engine, backend, runtime
 
 **Custom harness**:
 A remote AI service the user registered on a server of their own, which Omni reaches the same way it reaches Hermes.
-_Avoid_: Provider, engine, plugin
+_Avoid_: Agent, remote agent (an agent bound to one), provider, engine, plugin
 
 **Account**:
 Who a harness is signed in as on one machine, with its plan.
@@ -378,7 +386,7 @@ The browser client, on a desktop browser or a phone, and inside the desktop app.
 _Avoid_: Frontend, dashboard
 
 **Phone layout**:
-The Web UI's own shell at phone width, with Activity, Channels, Claude Artifacts and PRs tabs.
+The Web UI's own shell at phone width, with Activity, Channels, Artifacts and PRs tabs.
 _Avoid_: Mobile site, iOS app
 
 **Desktop app**:

@@ -196,7 +196,7 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
   return (
     <Screen
       caption="Harnesses"
-      title="The agents Omni can run"
+      title="The harnesses Omni can run"
       body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex and Cursor Agent are optional."
     >
       <ul className="space-y-2">
@@ -229,13 +229,13 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
               <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg-3">
                 <Icon name="plus" size={13} />
               </span>
-              <span className="text-[13.5px] font-medium">Your own agent</span>
+              <span className="text-[13.5px] font-medium">Your own harness</span>
               <span className="text-[12px] text-fg-3">Optional</span>
               <Button size="sm" className="ml-auto" onClick={() => setConnecting(true)}>
-                Connect an agent
+                Connect a harness
               </Button>
             </div>
-            <p className="mt-2.5 pl-[34px] text-[12px] leading-relaxed text-fg-3">Hermes, or another agent on a server of yours. Threads run on it like a harness; it bills its own account.</p>
+            <p className="mt-2.5 pl-[34px] text-[12px] leading-relaxed text-fg-3">Hermes, or another AI service on a server of yours. Threads run on it like any harness; it bills its own account.</p>
           </li>
         )}
         {!list && <li className="py-6 text-center text-[13px] text-fg-3">Checking…</li>}
@@ -606,7 +606,7 @@ export function RoutinesScreen({ value, onChange }: { value: string[]; onChange:
     <Screen
       caption="Routines"
       title="Start with a routine or two"
-      body="Each runs on a schedule as the Admin role and answers in General. They start off: turn one on and it becomes an automation you can change or turn off in Automations."
+      body="Each runs on a schedule as the Admin agent and answers in General. They start off: turn one on and it becomes an automation you can change or turn off in Automations."
     >
       {STARTER_AUTOMATIONS.map((s) => {
         const saved = have.includes(s.id);

@@ -78,4 +78,4 @@ Without `OMNI_URL`, the command talks to this machine's Omni on its port and fir
 
 ## Scope
 
-The command has the six areas above (`threads` and `show` count as one) and no more. Everything else (automations, secrets, PRs, devices, updates) stays with the Web UI and the Conductor's MCP tools. A new feature does not get a command; see [ADR 0014](../adr/0014-omni-command-line.md).
+The command has the six areas above (`threads` and `show` count as one) and no more. Everything else (automations, secrets, PRs, machines, updates) stays with the Web UI and the Conductor's MCP tools. A new feature does not get a command; see [ADR 0014](../adr/0014-omni-command-line.md).

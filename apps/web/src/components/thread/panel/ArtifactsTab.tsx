@@ -10,7 +10,7 @@ import { Empty, Icon } from '../../ui.tsx';
 export function ArtifactsTab({ artifacts, crew, selected, onSelect }: { artifacts: Artifact[]; crew: ArtifactWithThread[]; selected: Artifact | ArtifactWithThread | undefined; onSelect: (id: number) => void }) {
   if (!artifacts.length && !crew.length) {
     return (
-      <Empty icon="layers" title="No artifacts yet">
+      <Empty icon="layers" title="No files yet">
         Files the agent writes to its artifacts folder show up here and render inline, with those of the threads it delegates to.
       </Empty>
     );

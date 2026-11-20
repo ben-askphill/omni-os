@@ -42,7 +42,7 @@ export function ModelsSection() {
   return (
     <SettingsPage onRefresh={harnesses.reload}>
       {harnesses.data ? (
-        <Group title="Harnesses" footer="The agents Omni can start a thread on. Install and log in on the server's machine.">
+        <Group title="Harnesses" footer="The harnesses Omni can start a thread on. Install and log in on the server's machine.">
           {harnessRows(harnesses.data).map((h, i) => (
             <View key={h.id} style={[styles.harness, i > 0 && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
               <View style={styles.head}>
@@ -61,7 +61,7 @@ export function ModelsSection() {
       )}
       <Group
         title="Default model for new threads"
-        footer={`Without one, Auto picks from the prompt. A thread or crew role that picks its own wins. ${own ? `${own} of ${listed.length} channels set one.` : 'Auto everywhere.'}`}
+        footer={`Without one, Auto picks from the prompt. A thread or agent that picks its own wins. ${own ? `${own} of ${listed.length} channels set one.` : 'Auto everywhere.'}`}
       >
         {listed.map((c, i) => (
           <ListRow key={c.id} first={i === 0} title={channelTitle(c)} value={runLabel(channelForm(c).run, harnesses.data)} chevron onPress={() => navigation.navigate('ChannelSettings', { id: c.id })} />

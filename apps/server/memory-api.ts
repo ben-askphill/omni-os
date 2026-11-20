@@ -22,7 +22,7 @@ export const memoryApi = new Hono();
 /** Why an agent may not settle a fact: a channel's learning waits in the channel's settings, a role's lesson in Settings > Crew. */
 const agentWrite = (id: string) =>
   memories.get(id)?.role
-    ? `Only ${userName()} approves, edits or deletes a role's lesson. Propose one with remember instead; it waits in Settings > Crew.`
+    ? `Only ${userName()} approves, edits or deletes a role's lesson. Propose one with remember instead; it waits in Settings > Agents.`
     : 'Only the user approves, edits or deletes a learning. Propose one instead; it waits in the channel settings.';
 
 memoryApi.get('/', (c) => {
@@ -87,7 +87,7 @@ const CONDUCTOR = 'conductor';
 
 crewMemoryApi.get('/crew/:id/memory', (c) => {
   const role = getCrew(c.req.param('id'));
-  if (!role) return c.json({ error: 'No crew role with this id.' }, 404);
+  if (!role) return c.json({ error: 'No agent with this id.' }, 404);
   const list = sortLearnings(memories.byRole(role.id));
   return c.json({ memories: list, waiting: list.filter((m) => m.status === 'proposed').length });
 });
@@ -104,7 +104,7 @@ crewMemoryApi.get('/crew/:id/memory', (c) => {
  */
 crewMemoryApi.post('/crew/:id/memory', async (c) => {
   const role = getCrew(c.req.param('id'));
-  if (!role) return c.json({ error: 'No crew role with this id.' }, 404);
+  if (!role) return c.json({ error: 'No agent with this id.' }, 404);
   const body = (await c.req.json().catch(() => null)) as { text?: unknown; channel?: unknown } | null;
   const parsed = parseMemoryText(body?.text);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
@@ -119,11 +119,11 @@ crewMemoryApi.post('/crew/:id/memory', async (c) => {
   let status: 'proposed' | 'approved' = 'approved';
   if (from) {
     if (role.memory !== 'read-write') {
-      return c.json({ error: `${role.name}'s memory is ${role.memory === 'off' ? 'off' : 'read only'}: only ${who} adds to it, in Settings > Crew.` }, 403);
+      return c.json({ error: `${role.name}'s memory is ${role.memory === 'off' ? 'off' : 'read only'}: only ${who} adds to it, in Settings > Agents.` }, 403);
     }
     const conductor = from.role === CONDUCTOR;
     if (!conductor && from.role !== role.id) {
-      return c.json({ error: from.role ? `A thread proposes lessons for its own role (${from.role}) only.` : 'This thread runs as no crew role, so it has no role memory to add to.' }, 403);
+      return c.json({ error: from.role ? `A thread proposes lessons for its own role (${from.role}) only.` : 'This thread runs as no agent, so it has no agent memory to add to.' }, 403);
     }
     if (conductor) channel = asked ?? null;
     else if (asked === undefined) channel = from.channel_id;

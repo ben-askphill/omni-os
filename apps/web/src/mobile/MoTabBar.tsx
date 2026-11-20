@@ -6,7 +6,7 @@ import type { Tab } from './screens.ts';
 const TABS: { id: Tab; icon: IconName; label: string }[] = [
   { id: 'activity', icon: 'inbox', label: 'Activity' },
   { id: 'channels', icon: 'hash', label: 'Channels' },
-  { id: 'library', icon: 'layers', label: 'Library' },
+  { id: 'library', icon: 'layers', label: 'Artifacts' },
   { id: 'prs', icon: 'pr', label: 'PRs' },
 ];
 

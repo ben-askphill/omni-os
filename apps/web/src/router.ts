@@ -225,7 +225,7 @@ export const href = {
   /** One Settings section: General, Workspace, Machines or Secrets. */
   settingsSection: (section: SettingsSection, focus?: string) => settingsHash(section, focus),
   artifacts: () => '#/artifacts',
-  /** The claude.ai list on the Artifacts page (the phone's Library). */
+  /** The Claude Artifacts list on the Artifacts page. */
   claudeArtifacts: () => '#/artifacts/claude',
   /** Every channel's PRs. One channel's is `prs(id)`. */
   pullRequests: () => '#/prs',

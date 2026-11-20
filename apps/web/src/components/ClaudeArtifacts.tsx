@@ -289,7 +289,7 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
           </>
         }
       >
-        <SearchField value={q} onChange={setQ} placeholder="Search claude.ai artifacts" label="Search claude.ai artifacts" />
+        <SearchField value={q} onChange={setQ} placeholder="Search Claude Artifacts" label="Search Claude Artifacts" />
         <Segmented
           label="Whose"
           value={scope}
@@ -327,14 +327,14 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
         <ul
           className="grid gap-3 md:gap-4"
           style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${compact ? GRID_MIN_CARD.compact : GRID_MIN_CARD.wide}px, 1fr))` }}
-          aria-label="claude.ai artifacts"
+          aria-label="Claude Artifacts"
         >
           {list.map((a) => (
             <ClaudeArtifactCard key={a.id} a={a} now={now} compact={compact} />
           ))}
         </ul>
       ) : (
-        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-[var(--r-xl)] bg-surface" aria-label="claude.ai artifacts">
+        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-[var(--r-xl)] bg-surface" aria-label="Claude Artifacts">
           {list.map((a) => (
             <ClaudeArtifactRow key={a.id} a={a} now={now} />
           ))}
@@ -364,7 +364,7 @@ export function ArtifactSourceSwitch({ source, className = '' }: { source: 'file
       className={className}
       options={[
         { id: 'files', label: 'Files', icon: 'layers', href: href.artifacts() },
-        { id: 'claude', label: 'claude.ai', icon: 'globe', href: href.claudeArtifacts() },
+        { id: 'claude', label: 'Claude Artifacts', icon: 'globe', href: href.claudeArtifacts() },
       ]}
     />
   );

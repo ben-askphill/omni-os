@@ -279,7 +279,7 @@ export function NewThreadComposer({
         />
         <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
           {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
-          {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
+          {showRole && <Picker label="Agent" value={role} options={roleOptions} onChange={onRole} />}
           {harnesses && !toGrok && (
             <ModelPicker
               harnesses={harnesses}
@@ -476,7 +476,7 @@ export function ReplyComposer({
   /** Send the Ask the message is. Files and context stay in the box: an Ask carries only the question and the excerpt. */
   const submitAsk = async () => {
     if (!ask?.question || busy) return;
-    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @role.');
+    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @agent.');
     const raw = text;
     setBusy(true);
     setError(null);

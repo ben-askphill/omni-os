@@ -36,7 +36,7 @@ describe('the rail More menu', () => {
     disc().focus();
     key(disc(), 'ArrowDown');
     expect(disc().getAttribute('aria-expanded')).toBe('true');
-    expect([...menu()!.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Pull requests', 'Library', 'Automations']);
+    expect([...menu()!.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Pull requests', 'Artifacts', 'Automations']);
     expect(document.activeElement?.textContent).toBe('Pull requests');
     act(() => disc().click());
     expect(menu()).toBeNull();

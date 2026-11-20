@@ -87,7 +87,7 @@ beforeEach(async () => {
   await act(async () => root.render(createElement(CrewSection)));
   await flush();
   // Open Builder's editor.
-  const row = [...host.querySelectorAll<HTMLButtonElement>('ul[aria-label="Crew roles"] button')].find((b) => b.textContent?.includes('Builder'))!;
+  const row = [...host.querySelectorAll<HTMLButtonElement>('ul[aria-label="Agents"] button')].find((b) => b.textContent?.includes('Builder'))!;
   await act(async () => row.click());
   await flush();
 });

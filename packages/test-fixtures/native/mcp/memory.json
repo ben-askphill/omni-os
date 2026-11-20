@@ -69,7 +69,7 @@
               "tools": [
                 {
                   "name": "remember",
-                  "description": "Propose a lesson for this crew role's later threads: a correction Ben made to how this role works, or a step it missed that every later thread of it should take. One short sentence that still makes sense in a new thread, about how to work, never about this one task. Never put secrets, credentials or personal data in it. It holds in this channel only, unless you pass everywhere: true for a lesson about the role that holds in every channel. It waits for Ben's approval in Settings > Crew, unless Ben lets this role keep its lessons at once; the answer says which.",
+                  "description": "Propose a lesson for this crew role's later threads: a correction Ben made to how this role works, or a step it missed that every later thread of it should take. One short sentence that still makes sense in a new thread, about how to work, never about this one task. Never put secrets, credentials or personal data in it. It holds in this channel only, unless you pass everywhere: true for a lesson about the role that holds in every channel. It waits for Ben's approval in Settings > Agents, unless Ben lets this role keep its lessons at once; the answer says which.",
                   "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -219,7 +219,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Proposed for this role's later threads in #acme only. It waits for Ben to approve it in Settings > Crew."
+                  "text": "Proposed for this role's later threads in #acme only. It waits for Ben to approve it in Settings > Agents."
                 }
               ]
             },
@@ -282,7 +282,7 @@
         {
           "status": 403,
           "json": {
-            "error": "Reviewer's memory is read only: only Ben adds to it, in Settings > Crew."
+            "error": "Reviewer's memory is read only: only Ben adds to it, in Settings > Agents."
           }
         }
       ],
@@ -346,7 +346,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Reviewer's memory is read only: only Ben adds to it, in Settings > Crew."
+                  "text": "Reviewer's memory is read only: only Ben adds to it, in Settings > Agents."
                 }
               ],
               "isError": true
@@ -439,7 +439,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "This thread runs as no crew role, so there is no role memory to add to."
+                  "text": "This thread runs as no agent, so there is no agent memory to add to."
                 }
               ],
               "isError": true

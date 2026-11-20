@@ -1,6 +1,6 @@
-# claude.ai Artifacts
+# Claude Artifacts
 
-The Artifacts page has two lists: **Files** (what threads wrote on this machine) and **claude.ai** (your Artifacts on claude.ai, the same list as the Artifacts tab of the Claude app). On a phone, the Library tab has the same switch. Open it from the switch, `#/artifacts/claude`, or "claude.ai artifacts" in the command menu. The Conductor reaches the list with `list_claude_artifacts` and `refresh_claude_artifacts`.
+The Artifacts page (the rail's Artifacts disc, and the Artifacts tab on a phone and in the iOS app) has two lists: **Files** (what threads wrote on this machine) and **Claude Artifacts** (your Artifacts on claude.ai, the same list as the Artifacts tab of the Claude app). Open Claude Artifacts from the switch, `#/artifacts/claude`, or "Claude Artifacts" in the command menu. The Conductor reaches the list with `list_claude_artifacts` and `refresh_claude_artifacts`.
 
 ## How the list is made
 

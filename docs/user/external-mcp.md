@@ -9,7 +9,7 @@ Agents outside Omni can use it through MCP: Claude Desktop, claude.ai, ChatGPT, 
 | `list_pull_requests` | PRs across every channel's GitHub repo, open first, newest first, with labels. Takes the PRs page's search (`label:bug`) |
 | `get_thread` | Status and last reply. `wait_seconds` (up to 50) waits for a running thread to finish |
 | `read_thread` | The conversation a page at a time, without tool calls |
-| `start_thread` | A new thread in a channel, as any crew role. It runs in the background |
+| `start_thread` | A new thread in a channel, as any agent. It runs in the background |
 | `message_thread`, `stop_thread` | Steer, queue or interrupt a thread, or stop its turn |
 | `update_thread` | Rename, file in a folder, pin, archive or mark done |
 | `switch_thread_run` | Move a thread to another harness, model or effort for its next message |

@@ -11,20 +11,20 @@ export function CloudAgentCard({ p }: { p: CloudAgentP }) {
   const st = cloudStatus(p.status);
   const pr = prNumber(p.pr_url);
   return (
-    <section aria-label="Cursor cloud agent" className="rounded-[22px] bg-surface px-4 py-3">
+    <section aria-label="Cursor Cloud" className="rounded-[22px] bg-surface px-4 py-3">
       <div className="flex min-w-0 items-start gap-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg">
           <HarnessLogo harness="cursor-cloud" size={15} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate text-[13.5px] font-medium text-fg">{p.name || 'Cursor cloud agent'}</span>
+            <span className="min-w-0 truncate text-[13.5px] font-medium text-fg">{p.name || 'Cursor Cloud'}</span>
             <span className="ml-auto shrink-0">
               <StatusPill status={st.status} label={st.label} />
             </span>
           </div>
           <div className="mt-0.5 truncate text-[12.5px] text-fg-3">
-            Cursor cloud agent
+            Cursor Cloud
             {p.repo && (
               <>
                 {' · '}
