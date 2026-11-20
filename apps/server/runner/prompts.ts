@@ -6,6 +6,8 @@ import { artifacts, memories, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import { doesOwnWork, type CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
+import { writtenCharter } from '../remote-agents.ts';
 import { harnessName } from '../harness/registry.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { userConfig } from '../user-config.ts';
@@ -209,6 +211,7 @@ const SESSION_CACHE_RULE =
 /** `secretNames` are the names of the secrets in the thread's environment, never their values. */
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false, secretNames: readonly string[] = []) {
   const remote = isProviderHarness(thread.harness);
+  const remoteAgent = isRemoteAgentHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
@@ -221,7 +224,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     cloud
       ? `You are a Cursor cloud agent that Omni OS, ${userPossessive()} agent workspace on their own machine, started through the Cursor API. You run on a Linux machine of Cursor's, on your own clone of the repo; Omni, its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you.`
       : remote
-      ? `You are ${harnessName(thread.harness)}, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
+      ? `You are ${role?.name ?? harnessName(thread.harness)}, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
     getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
     ...profileLines(name),
@@ -231,7 +234,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     shopify && channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
     shopify && channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
     channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
-    remote
+    remoteAgent
+      ? `- You talk only in this thread. Its files are in Omni's checkout on ${name}'s machine, which you cannot read or change from your server: local agents seated in the thread change them, and ${name} commits. What you do with your own tools on your own server is up to you, as before.`
+      : remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
       : thread.branch
         ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.`
@@ -314,6 +319,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work. Their replies are all you get: read_referenced_thread cannot open member threads.',
     );
   }
-  if (role) lines.push('', `## Your agent: ${role.name}`, role.charter);
+  // A remote agent gets a charter only when Ben wrote one in its file; otherwise its server's own instructions lead (Q28).
+  const charter = role ? (remoteAgent ? writtenCharter(role) : role.charter) : '';
+  if (role && charter) lines.push('', `## Your agent: ${role.name}`, charter);
   return lines.filter((l) => l !== '').join('\n').replace(/\n## /g, '\n\n## ');
 }

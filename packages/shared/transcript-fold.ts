@@ -185,14 +185,21 @@ export type Item =
 
 /** A `member` row (apps/server/runner/members.ts). */
 export interface MemberP {
-  event: 'joined' | 'left';
+  /** An agent was seated or removed, or, in a thread a remote agent leads, Ben committed its members' edits (ADR 0020). */
+  event: 'joined' | 'left' | 'committed';
+  /** The agent, or '' for Ben's commit. */
   agent: string;
-  /** The agent's name when it happened. */
+  /** The agent's name when it happened, or Ben's. */
   name: string;
+  /** A commit's subject, sha and how many files it took. */
+  commit?: { sha: string; message: string; files: number };
 }
 
 /** The quiet line a member row reads as. */
-export const memberLine = (p: Pick<MemberP, 'event' | 'name'>) => `${p.name} ${p.event === 'left' ? 'left' : 'joined'}`;
+export const memberLine = (p: Pick<MemberP, 'event' | 'name' | 'commit'>) =>
+  p.event === 'committed'
+    ? `${p.name} committed ${p.commit?.files ?? 0} file${p.commit?.files === 1 ? '' : 's'}${p.commit?.message ? `: ${p.commit.message}` : ''}`
+    : `${p.name} ${p.event === 'left' ? 'left' : 'joined'}`;
 
 /**
  * A run switch. A handover switch stays pending until its `handover` event fills `done`, or a later handover or back
@@ -420,9 +427,11 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
       }
       case 'member': {
         const p = payload<Partial<MemberP>>(e);
-        if ((p.event !== 'joined' && p.event !== 'left') || typeof p.agent !== 'string') break;
+        if ((p.event !== 'joined' && p.event !== 'left' && p.event !== 'committed') || typeof p.agent !== 'string') break;
         group = null;
-        items.push({ type: 'member', key: e.id, at: e.created_at, p: { event: p.event, agent: p.agent, name: str(p.name) || p.agent } });
+        const c = p.event === 'committed' && p.commit && typeof p.commit === 'object' ? p.commit : null;
+        const commit = c && { sha: str(c.sha), message: str(c.message), files: typeof c.files === 'number' ? c.files : 0 };
+        items.push({ type: 'member', key: e.id, at: e.created_at, p: { event: p.event, agent: p.agent, name: str(p.name) || p.agent, ...(commit && { commit }) } });
         break;
       }
       case 'mod': {
@@ -476,6 +485,35 @@ export function replyHeads(items: readonly Item[], lead: string | null | undefin
     if (author && author !== run) out.set(it.key, author);
     run = author;
   }
+  return out;
+}
+
+/**
+ * Where a lock line goes (ADR 0020, How it looks): the key of the last reply item in each run of replies from an agent
+ * `talksOnly` names, a remote agent that could not read the thread's files. The run ends as replyHeads' does.
+ */
+export function replyTails(items: readonly Item[], lead: string | null | undefined, talksOnly: (agent: string) => boolean): Map<number, string> {
+  const out = new Map<number, string>();
+  let run: { author: string; key: number } | null = null;
+  const close = () => {
+    if (run && talksOnly(run.author)) out.set(run.key, run.author);
+    run = null;
+  };
+  for (const it of items) {
+    if (QUIET.has(it.type)) continue;
+    if (!isReply(it)) {
+      close();
+      continue;
+    }
+    const author = authorOf(it, lead);
+    if (!author) {
+      close();
+      continue;
+    }
+    if (run && run.author !== author) close();
+    run = { author, key: it.key };
+  }
+  close();
   return out;
 }
 

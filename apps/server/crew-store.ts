@@ -7,6 +7,7 @@
 // outside agent, say) survives an edit from this one. `harness` is checked against this machine's harness catalog,
 // never against a fixed list of ids.
 
+import { createHash } from 'node:crypto';
 import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
@@ -21,6 +22,7 @@ import { asksAuto } from './harness/auto.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { capabilitiesOf, providerWhere } from './harness/registry.ts';
 import { updateUserConfig } from './user-config.ts';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 
 const refused = (message: string, status: 400 | 404 | 409 = 400) => Object.assign(new Error(message), { status });
 
@@ -224,7 +226,7 @@ function check(id: string, role: CrewRole, builtIn: CrewRole | null, ctx: CrewSa
  * adds to the shipped charter unless the save says `replace`. A save that sets the charter or its mode records the
  * shipped charter it was written against (`based_on`), which is how a replacing overlay notices a release changed it.
  */
-export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts: { create?: boolean } = {}): CrewDetail {
+export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts: { create?: boolean; server?: boolean } = {}): CrewDetail {
   if (!CREW_ID.test(id)) throw refused('An agent id is lowercase letters, digits and dashes, up to 64 characters.');
   const { shipped, own } = crewTexts(id);
   if (opts.create) {
@@ -238,8 +240,24 @@ export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts:
   const role = roleIn(id, shipped, text);
   if (shipped === null && !splitCrewFile(text).meta.name) throw refused('Give the agent a name.');
   check(id, role, shipped === null ? null : parseCrewFile(id, shipped), ctx);
+  const server = serverRefusal(role, getCrew(id), opts.server);
+  if (server) throw refused(server);
   writeOwn(id, text);
   return crewDetail(id)!;
+}
+
+/**
+ * Why a save cannot bind or unbind a remote agent's server (ADR 0020), or null. A remote agent's server is set when the
+ * agent is made (by connecting it, or a new file that names it), so no save points a local agent at one or moves a
+ * remote agent off its own, and the pickers that would offer it list local harnesses only.
+ */
+function serverRefusal(role: CrewRole, before: CrewRole | undefined, connecting = false): string | null {
+  // A new agent's file may name a server another agent runs on: it is a remote agent of its own on that server.
+  if (connecting || !before || role.harness === before.harness) return null;
+  if (isRemoteAgentHarness(role.harness))
+    return `${role.name} is a local agent, and a local agent does not run on a remote agent's server. Add the server as its own agent with Add remote agent in Settings > Agents, and seat it in a thread beside ${role.name}.`;
+  if (isRemoteAgentHarness(before?.harness)) return `${role.name} is a remote agent: it runs on its own server. Remove it and add it again to point it at another server.`;
+  return null;
 }
 
 /** The user's file a save leaves: `own` with the save's keys and charter, or the save's markdown as written. */
@@ -308,6 +326,34 @@ export function draftCrew(id: string | undefined, save: CrewSave, own?: string |
 
 /** Set or remove a role's uploaded image (`null`), keeping its icon and background: Settings' Avatar card. */
 export const saveCrewAvatar = (id: string, image: string | null, ctx: CrewSaveContext): CrewDetail => saveCrew(id, { fields: { avatar: { image } } }, ctx);
+
+/** What `avatar_offered:` records of an image: enough to tell the offered one from one Ben set. */
+const imageMark = (image: string) => createHash('sha256').update(image).digest('hex').slice(0, 12);
+
+/**
+ * Put the avatar a remote agent's server offers on it (ADR 0020, Q29), and record in `avatar_offered:` that it was
+ * offered. With `unlessOwn`, an avatar Ben set stays: an upload of his, or an icon or color he picked. A later offer
+ * replaces only an offered one. Null when nothing changed.
+ */
+export function saveOfferedAvatar(id: string, image: string, ctx: CrewSaveContext, opts: { unlessOwn?: boolean } = {}): CrewDetail | null {
+  const role = getCrew(id);
+  if (!role) throw refused(`No agent "${id}".`, 404);
+  const { own } = crewTexts(id);
+  const meta = own === null ? {} : splitCrewFile(own).meta;
+  const offered = typeof meta.avatar_offered === 'string' ? meta.avatar_offered : null;
+  const mark = imageMark(image);
+  if (opts.unlessOwn) {
+    const now = role.avatar;
+    const bens = !!now && !(now.image && imageMark(now.image) === offered && !now.icon);
+    if (bens || offered === mark) return null;
+  }
+  const { doc, body } = openOwn(own);
+  setAvatar(doc, { image });
+  doc.set('avatar_offered', mark);
+  void ctx;
+  writeOwn(id, serialize(doc, body));
+  return crewDetail(id);
+}
 
 /** What a duplicate never copies: how an overlay joins the built-in, which a whole role of its own has no use for. */
 const OVERLAY_KEYS = ['charter_mode', 'based_on'];

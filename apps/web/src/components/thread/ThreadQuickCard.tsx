@@ -30,6 +30,7 @@ import { useTechnical } from '../../display.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 import { runElapsed } from '@omni/shared/ran-on.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { isRemoteAgentHarness, REMOTE_FILES, remoteLedCheckout } from '@omni/shared/remote-agent.ts';
 
 function QuickRow({
   icon,
@@ -140,7 +141,10 @@ export function ThreadQuickCard({
   className?: string;
 }) {
   const cloud = thread.harness === 'cursor-cloud';
-  const remote = isRemoteHarnessId(thread.harness);
+  // A remote agent leads (ADR 0020): its rows match a local thread's, its checkout's folder and branch filled in from
+  // the start (Q31), and the ones that do not apply to it, its model, empty (Q57).
+  const remoteLead = isRemoteAgentHarness(thread.harness) && !!thread.role;
+  const remote = isRemoteHarnessId(thread.harness) && !remoteLedCheckout(thread);
   const cloudUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const model = thread.model || init?.model;
   const now = useNow(60_000);
@@ -200,12 +204,26 @@ export function ThreadQuickCard({
           <MembersLine thread={thread} />
         </QuickRow>
       )}
-      <QuickRow icon="info" label={term('harnessAndModel', technical)}>
-        <span className="shrink-0 whitespace-nowrap">
-          <HarnessMark harness={thread.harness} withLabel />
-        </span>
-        {!technical ? null : model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
-      </QuickRow>
+      {remoteLead ? (
+        <>
+          <QuickRow icon="info" label={term('harnessAndModel', technical)}>
+            <span className="shrink-0 text-fg-3">{technical ? 'Model' : 'Runs on'}</span>
+          </QuickRow>
+          <QuickRow icon="lock" label="Files">
+            <span className="shrink-0 text-fg-3">Files</span>
+            <span className="min-w-0 truncate" data-files-row>
+              {REMOTE_FILES}
+            </span>
+          </QuickRow>
+        </>
+      ) : (
+        <QuickRow icon="info" label={term('harnessAndModel', technical)}>
+          <span className="shrink-0 whitespace-nowrap">
+            <HarnessMark harness={thread.harness} withLabel />
+          </span>
+          {!technical ? null : model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
+        </QuickRow>
+      )}
       {technical && ran && (
         <QuickRow icon="user">
           <span className="min-w-0 truncate" title={`${harnessLabel(ran.harness)} ran as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>

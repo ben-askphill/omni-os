@@ -12,6 +12,7 @@ import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { ModelPicker } from '../ModelPicker.tsx';
 import { Button, ErrorNote, Icon, Modal, ModalFooter, StatusDot } from '../ui.tsx';
 import { useAnchoredPopover } from '../ui/use-anchored-popover.ts';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 
 const STATE_LABEL: Record<ThreadMember['state'], string> = {
   needs: 'Waiting on you',
@@ -156,7 +157,8 @@ function MemberRow({
         )}
       </div>
       {/* The lead's run is the thread's own, switched from the composer's model pill (Q51). */}
-      {!member.lead && <MemberRun thread={thread} member={member} onError={onError} onChanged={onChanged} />}
+      {/* A remote agent's run is its server, not a run to switch (ADR 0020). */}
+      {!member.lead && !isRemoteAgentHarness(member.harness) && <MemberRun thread={thread} member={member} onError={onError} onChanged={onChanged} />}
       {confirming && (
         <div className="mb-2 rounded-[16px] bg-bg p-3 shadow-[var(--shadow-card)]">
           <p className="text-[12.5px] leading-[1.45] text-fg-2">

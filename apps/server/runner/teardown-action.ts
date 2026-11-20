@@ -6,7 +6,7 @@
 import { startRunHeld, stopRun } from '../actions.ts';
 import { config } from '../config.ts';
 import { channelActions, type Thread } from '../db.ts';
-import { isProviderHarness } from '../harness/types.ts';
+import { filesOffMachine } from '../thread-files.ts';
 
 const limit = (ms: number) => (ms >= 60_000 && ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} seconds`);
 
@@ -15,7 +15,7 @@ const limit = (ms: number) => (ms >= 60_000 && ms % 60_000 === 0 ? `${ms / 60_00
  * or been stopped at the time limit: null when it succeeded or the channel has none, else what went wrong. Never throws.
  */
 export async function runTeardownAction(t: Thread, dir: string, timeoutMs = config.teardownTimeoutMs): Promise<string | null> {
-  if (isProviderHarness(t.harness)) return null;
+  if (filesOffMachine(t)) return null;
   const action = channelActions.teardownFor(t.channel_id);
   if (!action) return null;
   const name = `The teardown action "${action.name}"`;

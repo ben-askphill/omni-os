@@ -9,7 +9,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { pairHelperCommand } from '@omni/shared/connect-agent.ts';
 import { about } from './about.ts';
-import { connectAgent, findAgent, pairAgent, removeAgent, testConnection, testSaved } from './agent-connect.ts';
+import { connectAgent, findAgent, pairAgent, removeAgent, removeAgentServer, testAgentServer, testConnection, testSaved } from './agent-connect.ts';
 import { callerOf } from './automation-guard.ts';
 import { channels } from './db.ts';
 import { checkCustomHarness, getCatalog } from './harness/catalog-service.ts';
@@ -47,6 +47,28 @@ customHarnessApi.post('/harnesses/custom/:slug/test', async (c) => {
   if (refusal) return refusal;
   try {
     return c.json(await testSaved(c.req.param('slug')));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+// ---------- a remote agent's Server card (ADR 0020): Test connection and Remove, for Hermes and connected servers ----------
+
+customHarnessApi.post('/crew/:id/server/test', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  try {
+    return c.json(await testAgentServer(c.req.param('id')));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+customHarnessApi.delete('/crew/:id/server', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  try {
+    return c.json(await removeAgentServer(c.req.param('id'), () => ({ catalog: getCatalog(), channelExists: (id) => !!channels.get(id) })));
   } catch (err) {
     return failed(c, err);
   }
@@ -116,7 +138,7 @@ customHarnessApi.post('/harnesses/connect', async (c) => {
 
 /** A 403 for a write that is not Ben's own. */
 function guard(c: Context) {
-  if (callerOf(c)) return c.json({ error: `Only ${userName()} adds, changes or removes custom harnesses.` }, 403);
+  if (callerOf(c)) return c.json({ error: `Only ${userName()} adds, changes or removes remote agents.` }, 403);
   if (!shellAllowed(c))
     return c.json({ error: "A custom harness sends a secret from this machine to its server, so changing one needs the install's token or a browser paired with it." }, 403);
   return null;

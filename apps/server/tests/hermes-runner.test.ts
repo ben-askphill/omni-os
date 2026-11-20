@@ -42,6 +42,8 @@ beforeAll(async () => {
   H.db.channels.create({ id: 'repo', name: 'Repo', kind: 'client', use_worktree: 1, repo_path: repo, github_repo: 'acme/widgets', notes: 'ship it' });
   const svc = await import('../harness/catalog-service.ts');
   await svc.loadCatalog();
+  // As boot does: Hermes becomes the remote agent `hermes` (ADR 0020).
+  (await import('../remote-agents.ts')).convertRemoteAgents();
 });
 
 afterAll(() => {
@@ -64,7 +66,7 @@ describe('Hermes through the runner', () => {
     expect(H.runner.slotsByHarness().hermes.cap).toBe(12);
   });
 
-  it('accepts a conductor delegate, skips the worktree, and continues the remote session', async () => {
+  it('accepts a conductor delegate led by Hermes, makes its worktree at the start, and continues the remote session', async () => {
     const t = await H.runner.createThread({
       channel: 'repo',
       prompt: 'say hi',
@@ -75,13 +77,15 @@ describe('Hermes through the runner', () => {
     });
     expect(t.harness).toBe('hermes');
     expect(t.model).toBe('hermes');
-    expect(t.branch).toBeNull();
+    expect(t.role).toBe('hermes');
     expect(t.source).toBe('conductor');
-    expect(t.cwd).toBe(join(H.paths.threads, t.id));
-    expect(existsSync(join(H.paths.worktrees, t.id))).toBe(false);
+    // A remote-led thread gets its worktree at the start, for the local agents seated in it (Q31). Hermes reads none of it.
+    expect(t.branch).toBe(`omni/${t.id.slice(0, 8)}`);
+    expect(t.cwd).toBe(join(H.paths.worktrees, t.id));
     expect(existsSync(join(H.paths.browsers, 'repo'))).toBe(false);
 
     await H.untilResults(t.id, 1);
+    expect(existsSync(join(H.paths.worktrees, t.id, 'README'))).toBe(true);
     expect(H.thread(t.id).session_id).toBe(`omni-${t.id}`);
     expect(H.thread(t.id).status).toBe('done');
     const first = creates(`omni-${t.id}`);
@@ -89,7 +93,7 @@ describe('Hermes through the runner', () => {
     const instructions = (first[0].body as { instructions: string }).instructions;
     expect(instructions).toContain('OMNI_ARTIFACTS_DIR does not exist');
     expect(instructions).toContain('acme/widgets');
-    expect(instructions).toContain('own clone');
+    expect(instructions).toContain('You talk only in this thread');
     expect(instructions).toContain('ship it');
     expect(H.texts(t.id, 'user').join('\n')).toBe('say hi');
     expect(H.texts(t.id, 'user').join('\n')).not.toContain('OMNI_ARTIFACTS_DIR');
@@ -105,7 +109,8 @@ describe('Hermes through the runner', () => {
   });
 
   it('delivers two messages sent while the thread starts, both of them, and ends the turn (F5)', async () => {
-    const t = await H.runner.createThread({ channel: 'repo', prompt: 'first of two', harness: 'hermes', model: 'hermes', source: 'conductor', task_id: 'T-10' });
+    // In a channel with no worktree: a worktree thread takes no message while its worktree is prepared.
+    const t = await H.runner.createThread({ channel: 'scratch', prompt: 'first of two', harness: 'hermes', model: 'hermes', source: 'conductor', task_id: 'T-10' });
     // Before the process is up: the message joins the first one in flight, and both go in as the session starts.
     H.runner.sendMessage(t.id, 'second of two');
     await H.untilResults(t.id, 2, 15000);
@@ -128,15 +133,12 @@ describe('Hermes through the runner', () => {
     }
   });
 
-  it('refuses the delegate-only conductor on Hermes before it makes a thread, and still runs a crew role there', async () => {
+  it('refuses a local agent on Hermes, the Conductor included, before it makes a thread', async () => {
     const before = H.db.threads.list({}).length;
-    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'fix the cart', role: 'conductor', harness: 'hermes', model: 'hermes' })).rejects.toThrow(
-      /Conductor only routes work, with Omni's delegate tools, and a thread that runs on the Hermes server does not get them/,
-    );
+    // A local agent never runs on a remote agent's server (ADR 0020): it is seated beside Hermes instead.
+    for (const role of ['conductor', 'researcher'])
+      await expect(H.runner.createThread({ channel: 'scratch', prompt: 'fix the cart', role, harness: 'hermes', model: 'hermes' })).rejects.toThrow(/is a local agent, and a local agent no longer runs on a remote agent's server/);
     expect(H.db.threads.list({}).length).toBe(before);
-    const t = await H.runner.createThread({ channel: 'repo', prompt: 'look into it', role: 'researcher', harness: 'hermes', model: 'hermes' });
-    await H.untilResults(t.id, 1);
-    expect(H.thread(t.id).status).toBe('done');
   });
 
   it('rejects an effort Hermes does not have', async () => {

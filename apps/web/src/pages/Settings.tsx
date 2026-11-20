@@ -69,9 +69,9 @@ export function SettingsPage({ section, focus, agent }: { section?: SettingsSect
   const def = sectionDef(current);
   // The pages Settings replaced (#/sync, #/storage, #/secrets) and old section names land here; the address becomes the section's own.
   const hash = useHash();
-  // A pairing link (#/connect-agent?...) lands on Models with it kept, as #/settings/models?connect=<link>.
+  // A pairing link (#/connect-agent?...) lands on Agents with it kept, as #/settings/crew?connect=<link>.
   const route = useRoute();
-  const connect = route.name === 'settings' && current === 'models' ? route.connect : undefined;
+  const connect = route.name === 'settings' && current === 'crew' ? route.connect : undefined;
   // An agent's page is its own address. The phone keeps the Agents list mounted under it, so the list reads the
   // address too and must not take it back.
   const atAgent = agent ?? (route.name === 'settings' ? route.agent : undefined);

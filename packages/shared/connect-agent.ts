@@ -2,7 +2,7 @@
 // remote agent, read the same way by every client and the server. A pairing link is
 // `omni://connect-agent?url=<runs url>&code=<code>[&pair=<pairing address>][&name=<name>]`
 // (docs/internals/remote-harness-protocol.md, Pairing). The desktop app opens it as the page `#/connect-agent?...`, and
-// a browser takes it as `#/settings/models?connect=<the link>`. Pure: no I/O.
+// a browser takes it as `#/settings/crew?connect=<the link>` (Add remote agent, ADR 0020). Pure: no I/O.
 
 /** The desktop app's page for an omni://connect-agent link (apps/desktop/src/options.ts linkRoute). */
 export const CONNECT_ROUTE = 'connect-agent';
@@ -46,7 +46,8 @@ function linkQuery(text: string): URLSearchParams | null {
 }
 
 /**
- * What Ben pasted in the Connect sheet: a pairing link, an Omni page carrying one (`#/settings/models?connect=` or
+ * What Ben pasted in the Connect sheet: a pairing link, an Omni page carrying one (`#/settings/crew?connect=`, an older
+ * `#/settings/models?connect=`, or
  * `#/connect-agent?`, as a whole URL or a hash), a bare address, or a code on its own. Null for empty text.
  */
 export function parseConnectInput(raw: string): ConnectInput | null {
@@ -65,7 +66,7 @@ export function parseConnectInput(raw: string): ConnectInput | null {
     const hash = u.hash.slice(1);
     const page = linkQuery(`#${hash}`);
     if (page) return fromQuery(page);
-    const settings = /^\/settings\/models\?(.*)$/.exec(hash);
+    const settings = /^\/settings\/(?:crew|models)\?(.*)$/.exec(hash);
     const inner = settings ? new URLSearchParams(settings[1]).get('connect') : null;
     if (inner) return parseConnectInput(inner);
     return { url: text };
@@ -77,7 +78,7 @@ export function parseConnectInput(raw: string): ConnectInput | null {
 }
 
 /** The page that opens the Connect sheet with a pairing link filled in. */
-export const connectPageHash = (link: string) => `#/settings/models?connect=${encodeURIComponent(link)}`;
+export const connectPageHash = (link: string) => `#/settings/crew?connect=${encodeURIComponent(link)}`;
 
 /** The pairing link a `#/connect-agent?...` page stands for. */
 export const linkOfConnectPage = (query: string) => `omni://${CONNECT_ROUTE}?${query}`;
@@ -118,6 +119,11 @@ export interface FoundAgent {
   /** Untrusted: shown with `host`, never alone. */
   name: string;
   description?: string;
+  /**
+   * The avatar its offer carries (an eve agent's pairing offer, a Runs API server's capabilities), as a PNG, JPEG or WebP
+   * data URL Omni checked: square, at most 256px and 256 KB (ADR 0020, Q29). The agent Connect makes wears it.
+   */
+  avatar?: string;
   kind: AgentKind;
   /** This build can connect it. A2A agents need a later slice. */
   supported: boolean;

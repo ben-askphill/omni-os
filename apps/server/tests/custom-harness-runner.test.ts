@@ -104,9 +104,9 @@ describe('custom harnesses through the API and the runner', () => {
     expect(runsOn(fakeB)).toHaveLength(1);
     expect(runA).toMatchObject({ authorization: 'Bearer key-a', body: { input: 'hello A', session_id: `omni-${ta.id}` } });
     expect(runB).toMatchObject({ authorization: 'Bearer key-b', body: { input: 'hello B', session_id: `omni-${tb.id}` } });
-    // The prompt names the harness, and no secret value or name goes to a server Omni does not control (E9).
+    // The prompt names the agent, and no secret value or name goes to a server Omni does not control (E9).
     const instructions = (runA.body as { instructions: string }).instructions;
-    expect(instructions).toContain('You are Agent A, running on your own server');
+    expect(instructions).toContain('You are remote-a, running on your own server');
     expect(instructions).toContain('You are remote-a.');
     const sent = JSON.stringify([...fakeA.calls, ...fakeB.calls]);
     for (const leak of ['plain-value', 'PLAIN_SECRET', 'hermes-key', 'key-b']) expect(JSON.stringify(fakeA.calls)).not.toContain(leak);
@@ -129,8 +129,9 @@ describe('custom harnesses through the API and the runner', () => {
 
   it('refuses the delegate-only conductor on a custom harness before it makes a thread', async () => {
     const before = H.db.threads.list({}).length;
+    // A local agent never runs on a remote agent's server (ADR 0020).
     await expect(H.runner.createThread({ channel: 'agents', prompt: 'route this', role: 'conductor', harness: 'custom:agent-a', model: 'default' })).rejects.toThrow(
-      /Conductor only routes work.*on Agent A's own server/,
+      /Conductor is a local agent, and a local agent no longer runs on a remote agent's server/,
     );
     expect(H.db.threads.list({}).length).toBe(before);
   });

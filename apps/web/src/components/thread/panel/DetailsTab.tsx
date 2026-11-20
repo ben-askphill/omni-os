@@ -16,6 +16,7 @@ import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
 import { CAPTION, CARD_PAD, ROW_X, ROW_X_BLEED } from './inset.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { remoteLedCheckout } from '@omni/shared/remote-agent.ts';
 import { connectorFor } from '@omni/shared/connectors.ts';
 import { ConnectorMark } from '../../ConnectorMark.tsx';
 
@@ -140,7 +141,8 @@ export function DetailsTab({
   const technical = useTechnical();
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
-  const remote = isRemoteHarnessId(thread.harness);
+  // A remote-led thread has its checkout here since slice 4 (ADR 0020, Q31), so its folder reads as a local thread's.
+  const remote = isRemoteHarnessId(thread.harness) && !remoteLedCheckout(thread);
   const agentUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,

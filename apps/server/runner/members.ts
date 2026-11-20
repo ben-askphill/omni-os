@@ -29,6 +29,8 @@ import { closeLive } from './session.ts';
 import { addEvent, drop, emitThread, lives, refusal, turnEnded, waiting, waitingMsgs, type Msg } from './state.ts';
 import { config } from '../config.ts';
 import { agentName, readOnlyReason } from '../member-view.ts';
+import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
+import { remoteSeesWork } from '../remote-agents.ts';
 
 /** How long a catch-up or summary call may take before the turn goes on without it. */
 const SIDECAR_MS = 45_000;
@@ -243,9 +245,18 @@ export async function preamble(threadId: string, agent: string, before = Infinit
   const end = events.lastId(threadId);
   const lead = agentName(leadAgent(t) || null);
   const you = agentName(agent || null);
+  const remote = isRemoteAgentHarness(threads.get(m.session_thread)?.harness);
+  // A remote agent in a channel closed to remote agents gets only the message addressed to it (ADR 0020, Q37).
+  if (remote && !remoteSeesWork(t.channel_id)) {
+    members.setCursor(m.id, events.uidOf(end));
+    return '';
+  }
+  const remoteLead = isRemoteAgentHarness(t.harness);
   const who = m.lead
-    ? `You are ${you}, the lead of this thread. Other agents are seated here too; ${userName()}'s messages that name them go to them, not to you.`
-    : `You are ${you}, an agent seated in this thread. ${lead} leads it and is the only one that commits; you edit files only. Messages go to the agents they name.`;
+    ? `You are ${you}, the lead of this thread. Other agents are seated here too; ${userName()}'s messages that name them go to them, not to you.${remote ? ' You talk only: local agents seated here change the files.' : ''}`
+    : remote
+      ? `You are ${you}, a remote agent seated in this thread. ${lead} leads it. You talk only: local agents seated here change the files. Messages go to the agents they name.`
+      : `You are ${you}, an agent seated in this thread. ${remoteLead ? `${lead}, a remote agent, leads it and talks only, so ${userName()} commits` : `${lead} leads it and is the only one that commits`}; you edit files only. Messages go to the agents they name.`;
   let block: string;
   if (!m.lead && m.cursor === null) {
     const all = entriesFor(t, agent, 0, before);

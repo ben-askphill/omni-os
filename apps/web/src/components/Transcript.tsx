@@ -22,6 +22,7 @@ import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
+import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
 import { OmniMark } from './brand.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
@@ -32,7 +33,7 @@ import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
-import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
@@ -247,14 +248,17 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
   );
 }
 
-/** An agent joined or left a group thread (ADR 0019): a quiet line, with its avatar. */
+/**
+ * An agent joined or left a group thread (ADR 0019), or Ben committed a remote-led thread's changes (ADR 0020): a
+ * quiet line, with the agent's avatar or a commit mark.
+ */
 export function MemberLine({ p }: { p: MemberP }) {
-  const look = useAgent(p.agent) ?? { id: p.agent, name: p.name };
+  const look = useAgent(p.agent || null) ?? { id: p.agent, name: p.name };
   return (
     <div data-member-line={p.event} className="flex items-center gap-3 py-1 text-[12px] font-medium text-fg-3">
       <div className="h-px flex-1 bg-line" />
-      <span className="inline-flex min-w-0 items-center gap-1.5">
-        <AgentAvatar agent={{ ...look, name: p.name }} size={16} />
+      <span className="inline-flex min-w-0 items-center gap-1.5" title={p.commit?.sha ? p.commit.sha.slice(0, 12) : undefined}>
+        {p.event === 'committed' ? <Icon name="check" size={13} className="shrink-0" /> : <AgentAvatar agent={{ ...look, name: p.name }} size={16} />}
         <span className="min-w-0 break-words">{memberLine(p)}</span>
       </span>
       <div className="h-px flex-1 bg-line" />
@@ -465,8 +469,11 @@ export const Transcript = memo(function Transcript({
   lead = null,
   harness,
   model,
+  channelId,
 }: {
   threadId: string;
+  /** The thread's channel, which a remote agent's lock line names and links (ADR 0020). */
+  channelId?: string;
   /** The agent the thread runs as: its replies carry its author line, and rows from before Omni recorded one read as its. */
   lead?: string | null;
   /** The thread's run now, for the author line's harness and model on replies after its last switch. */
@@ -532,6 +539,8 @@ export const Transcript = memo(function Transcript({
   }, [items, heads, run]);
   const leadLook = useAgent(lead);
   const { crew: agents, channel } = useApp();
+  // Where each run of a remote agent's replies ends: a lock line, since it could not read the thread's files.
+  const tails = useMemo(() => (channelId ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId]);
   // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
   const conductorLook = channel(CONDUCTOR_CHANNEL);
   const faceOf = (look: AgentLook) =>
@@ -613,6 +622,7 @@ export const Transcript = memo(function Transcript({
               defer={defers(idx, items.length, LIVE_ROWS)}
               indent={!!lead && isReply(it)}
             />,
+            tails.has(it.key) && channelId ? <RemoteLockLine key={`lock${it.key}`} channelId={channelId} className={REPLY_INDENT} /> : null,
           ])}
           {edgeRow(-1)}
           {liveHead && leadLook && (liveSteps || !asking) && (

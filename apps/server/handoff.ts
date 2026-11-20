@@ -15,7 +15,8 @@ import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { assignments, channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
 import { holderOf, remoteHolder } from './ownership.ts';
-import { HARNESS_META, isHarnessId, isProviderHarness, type HarnessId } from './harness/types.ts';
+import { HARNESS_META, isHarnessId } from './harness/types.ts';
+import { offMachineHarness } from './thread-files.ts';
 import { needsWorktree, plannedWorktree } from './sandbox.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
 import { handoffView, inFlight, moving, offerOf, offers, phaseOf, replyOf, requestOf, requests, writeOffer, writeReply, writeRequest } from './handoff/records.ts';
@@ -333,7 +334,7 @@ function restoreFresh(offer: Offered) {
     if (row) messageRequests.park(row.id);
   });
   const channel = channels.get(t.channel_id);
-  const worktree = !!t.branch && !!channel && needsWorktree(channel, { remote: isProviderHarness(t.harness as HarnessId) });
+  const worktree = !!t.branch && !!channel && needsWorktree(channel, { remote: offMachineHarness(t.harness) });
   if (worktree) failSetup(offer.thread, `${reason} Retry runs it on this machine.`);
   else threads.update(offer.thread, { status: 'stopped', updated_at: t.updated_at });
   publishFeed({ type: 'needs_you', thread_id: offer.thread });
@@ -457,7 +458,7 @@ async function take(offer: Offered, worker: SyncWorker) {
     }
     // A new thread's worktree is cut here by its setup, which then sends the first prompt. The hub made none.
     const channel = channels.get(t.channel_id);
-    const setUp = !!offer.fresh && !!t.branch && !!channel && needsWorktree(channel, { remote: isProviderHarness(t.harness as HarnessId) });
+    const setUp = !!offer.fresh && !!t.branch && !!channel && needsWorktree(channel, { remote: offMachineHarness(t.harness) });
     // In this machine's own worktrees folder, wherever the hub keeps its data.
     if (setUp) threads.update(id, { cwd: plannedWorktree(id).cwd, updated_at: t.updated_at });
     else await prepareTurn(threads.get(id)!, false, true);

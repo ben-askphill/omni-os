@@ -1,22 +1,25 @@
 import { useMemo, useState } from 'react';
 import { api, errorText, useApi } from '../api.ts';
 import { agentKeyName, groupedCode, KIND_LABEL, NETWORK_LABEL, normalizeCode, parseConnectInput, slugFrom, type AgentTest, type FoundAgent, type PairedAgent } from '@omni/shared/connect-agent.ts';
-import { Button, CheckItem, Chip, CopyButton, ErrorNote, Label, LinkButton, Modal, ModalFooter, Picker, Toggle, type PickerOption } from './ui.tsx';
+import { Button, CheckItem, Chip, CopyButton, ErrorNote, Label, LinkButton, Modal, ModalFooter, Picker, type PickerOption } from './ui.tsx';
 import { href } from '../router.ts';
+import { AgentAvatar } from './AgentAvatar.tsx';
 
-// Connect an agent (docs/plans/2026-11-18-connect-an-agent.md, C1): Find, Sign in, Test, then Connect. The same
-// sheet on desktop web, the phone layout and the desktop app, opened from Settings > Models > Harnesses, from an
-// omni://connect-agent link (the page #/connect-agent?...), or #/settings/models?connect=<link>. A link only fills the
+// Add remote agent (docs/plans/2026-11-18-connect-an-agent.md, C1; ADR 0020): Find, Sign in, Test, then Connect, which
+// always makes the remote agent, wearing the avatar its server offers. The same sheet on desktop web, the phone layout
+// and the desktop app, opened from Settings > Agents, from an omni://connect-agent link (the page
+// #/connect-agent?...), or #/settings/crew?connect=<link> (#/settings/models?connect= from older links). A link only fills the
 // sheet in: nothing is saved until the test turn passed and Ben presses Connect. The agent's key never reaches this
 // page: a paired key stays on the server under a draft id, and a manual one is a secret's name. An eve agent that pairs
 // offers its own Connect Omni page (`codeUrl`): Get a code opens it, Ben copies the code back and presses Pair.
 
 interface Connected {
   harness: { id: string; name: string; host: string };
-  role: { id: string; name: string } | null;
+  /** The remote agent Connect made: connecting always makes one (ADR 0020). */
+  role: { id: string; name: string };
 }
 
-/** What a remote harness can do on Omni, and what it cannot: chips, the cannots outlined. */
+/** What a remote agent can do on Omni, and what it cannot: chips, the cannots outlined. */
 export function CapabilityChips({ can, cannot }: { can: readonly string[]; cannot: readonly string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5" aria-label="What a thread on it can do">
@@ -24,7 +27,7 @@ export function CapabilityChips({ can, cannot }: { can: readonly string[]; canno
         <Chip key={c}>{c}</Chip>
       ))}
       {cannot.map((c) => (
-        <Chip key={c} tone="outline" title={`Threads on a remote harness have no ${c.toLowerCase()} on this machine`}>
+        <Chip key={c} tone="outline" title={`A remote agent has no ${c.toLowerCase()} on this machine`}>
           No {c.toLowerCase()}
         </Chip>
       ))}
@@ -32,7 +35,7 @@ export function CapabilityChips({ can, cannot }: { can: readonly string[]; canno
   );
 }
 
-/** The mark every remote harness carries next to its name: it runs on a server outside Omni, at this host. */
+/** The Remote tag a remote agent carries next to its name: it runs on a server outside Omni, at this host when shown. */
 export function RemoteMark({ host }: { host?: string }) {
   return (
     <Chip tone="outline" title={host ? `Runs on ${host}, a server outside Omni` : 'Runs on a server outside Omni'}>
@@ -45,7 +48,7 @@ type Step = 'pending' | 'in_progress' | 'completed';
 
 export function ConnectAgentSheet({ open, initial, onClose, onConnected }: { open: boolean; initial?: string; onClose: () => void; onConnected?: (c: Connected) => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Connect a harness" roomy>
+    <Modal open={open} onClose={onClose} title="Add remote agent" roomy>
       {open && <ConnectBody key={initial ?? ''} initial={initial} onClose={onClose} onConnected={onConnected} />}
     </Modal>
   );
@@ -63,7 +66,6 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
-  const [role, setRole] = useState(true);
   const [busy, setBusy] = useState<'find' | 'pair' | 'test' | 'connect' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Connected | null>(null);
@@ -127,7 +129,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
     setBusy('connect');
     setError(null);
     try {
-      const c = await api.post<Connected>('/harnesses/connect', { slug, name, role, ...(paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }) });
+      const c = await api.post<Connected>('/harnesses/connect', { slug, name, ...(paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }) });
       setDone(c);
       onConnected?.(c);
     } catch (e) {
@@ -155,23 +157,14 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
       <>
         <div className="space-y-3 px-6 pb-5" role="status">
           <p className="text-[14px]">
-            <strong className="font-medium">{done.harness.name}</strong> on {done.harness.host} is connected. Threads can run on it now
-            {done.role ? (
-              <>
-                , and the agent <strong className="font-medium">{done.role.name}</strong> is bound to it.
-              </>
-            ) : (
-              '.'
-            )}
+            <strong className="font-medium">{done.role.name}</strong> is connected, on {done.harness.host}. Start a thread as {done.role.name}, or seat it in one with @{done.role.name}.
           </p>
-          <p className="text-[13px] text-fg-3">Its key is in Secrets on this machine only. In a thread, start a message with @{done.role?.id ?? 'its-id'} to ask it something.</p>
+          <p className="text-[13px] text-fg-3">It talks only: a local agent seated beside it changes files. Its key is in Secrets on this machine only.</p>
         </div>
         <ModalFooter>
-          {done.role && (
-            <a className="mr-auto text-[13px] text-fg-2 underline underline-offset-2" href={href.settingsSection('crew', 'crew-roles')} onClick={onClose}>
-              Edit the agent
-            </a>
-          )}
+          <a className="mr-auto text-[13px] text-fg-2 underline underline-offset-2" href={href.agent(done.role.id)} onClick={onClose}>
+            Open {done.role.name}
+          </a>
           <Button variant="primary" onClick={onClose}>
             Done
           </Button>
@@ -298,7 +291,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
                 <input id="connect-name" className="field w-full" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="connect-slug" hint={`Its harness id: custom:${slug || '…'}`}>
+                <Label htmlFor="connect-slug" hint="The agent's id, and its server's">
                   Id
                 </Label>
                 <input
@@ -312,13 +305,6 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
                   }}
                 />
               </div>
-            </div>
-            <div className="flex items-start justify-between gap-3">
-              <span className="min-w-0">
-                <span className="block text-[12.5px] font-medium text-fg-2">Make an agent for it</span>
-                <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">An agent bound to this harness, so you can ask it from a thread with @ and the Conductor can delegate to it.</span>
-              </span>
-              <Toggle checked={role} onChange={setRole} label="Make an agent for it" />
             </div>
           </section>
         )}
@@ -383,9 +369,13 @@ function CodeEntry({ found, code, onCode, ready, busy, disabled, onPair }: { fou
 function FoundCard({ found }: { found: FoundAgent }) {
   return (
     <section className="space-y-2 rounded-[14px] bg-bg p-3" aria-label="Found">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="min-w-0 text-[14px] font-medium break-words">{found.name}</span>
-        <span className="min-w-0 text-[12.5px] break-all text-fg-3">{found.host}</span>
+      <div className="flex min-w-0 items-center gap-2.5">
+        {/* The face the agent will wear: the avatar its server offers, else its initials. */}
+        <AgentAvatar agent={{ id: slugFrom(found.name), name: found.name, ...(found.avatar && { avatar: { image: found.avatar } }) }} size={32} />
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="min-w-0 text-[14px] font-medium break-words">{found.name}</span>
+          <span className="min-w-0 text-[12.5px] break-all text-fg-3">{found.host}</span>
+        </div>
       </div>
       {found.description && <p className="text-[12.5px] text-fg-2">{found.description}</p>}
       <div className="flex flex-wrap gap-1.5">

@@ -1,22 +1,32 @@
 // Connect an agent (docs/plans/2026-11-18-connect-an-agent.md, C1): find what answers at an address, sign in to it
-// with a pairing code (or a key already in Secrets), run one test turn, and only then save it as a custom harness
-// (harness/custom.ts), with its key in the secret store and, by default, a starter crew role bound to it.
+// with a pairing code (or a key already in Secrets), run one test turn, and only then save it: its key in the secret
+// store, its server as a custom harness (harness/custom.ts), and the remote agent bound to it (ADR 0020), which wears the
+// avatar the server offers and has no charter of Omni's, so the server's own instructions lead.
 //
 // - Every call to the agent is a GET or POST with a 5-second timeout (60 for the test turn) and no redirects followed,
 //   to the host Ben typed or the link named. Plain http:// only to this machine or the tailnet (custom.ts urlProblem).
 // - A paired key stays on the server: it is held in memory under a draft id between Sign in and Connect, written
 //   straight to the secret store on Connect, and never sent to a client.
 // - What the agent says (its name, its reply) is untrusted text: cut to printable characters and a length cap.
-// - Connect saves the secret, then the harness file, then the role. A failure at any step undoes the steps before it
+// - Connect saves the secret, then the harness file, then the agent. A failure at any step undoes the steps before it
 //   and revokes a key the agent can revoke, so nothing half-made stays.
+// - An offered avatar is image data in the offer (Q29): checked as an uploaded one is (agent-avatar.ts) and at most
+//   256 KB. Test connection reads it again, and puts it on the agent unless Ben set one of his own.
 import { randomUUID } from 'node:crypto';
 import { CUSTOM_HARNESS_SLUG } from '@omni/shared/custom-harness.ts';
 import { agentKeyName, groupedCode, normalizeCode, type AgentTest, type ConnectInput, type FoundAgent, type PairedAgent } from '@omni/shared/connect-agent.ts';
 import { about } from './about.ts';
-import { outbox } from './db.ts';
+import { channels, outbox } from './db.ts';
 import { crewTexts } from './crew.ts';
-import { deleteCrew, saveCrew, type CrewSaveContext } from './crew-store.ts';
-import { checkCustomHarness } from './harness/catalog-service.ts';
+import { deleteCrew, saveCrew, saveOfferedAvatar, type CrewSaveContext } from './crew-store.ts';
+import { parseAvatarImage } from './agent-avatar.ts';
+import { OFFERED_AVATAR_MAX_BYTES } from '@omni/shared/remote-agent.ts';
+import { remoteAgentFor } from './remote-agents.ts';
+import { checkCustomHarness, getCatalog, loadCatalog } from './harness/catalog-service.ts';
+import { config } from './config.ts';
+import { getCrew } from './crew.ts';
+import { isRemoteAgent } from './remote-agents.ts';
+import { updateUserConfig } from './user-config.ts';
 import { customHarness, customHarnesses, loopback, secretProblem, tailnet, urlProblem, type CustomHarness } from './harness/custom.ts';
 import { deleteCustomHarness, saveCustomHarness } from './harness/custom-store.ts';
 import { EveClient } from './harness/eve/client.ts';
@@ -25,6 +35,9 @@ import { probeRemote, probeRoute, remoteClient, type RemoteKind } from './harnes
 import { deleteSecret, globalSecret, hasSecret, setSecret } from './secrets.ts';
 
 const refused = (message: string, status: 400 | 404 | 409 | 502 = 400) => Object.assign(new Error(message), { status });
+
+/** What an agent save is checked against, for a save no request carries a context for. */
+const defaultCtx = (): CrewSaveContext => ({ catalog: getCatalog(), channelExists: (id) => !!channels.get(id) });
 
 const PROBE_MS = 5000;
 const TEST_MS = 60_000;
@@ -63,6 +76,8 @@ const base = (url: string) => url.trim().replace(/\/+$/, '');
 
 /** The most of an answer's body Omni reads: an agent's card or pairing answer is a few hundred bytes. */
 const BODY_CAP = 64 * 1024;
+/** An offer or a capabilities answer, which can carry an avatar of up to 256 KB as base64. */
+const OFFER_CAP = Math.ceil((OFFERED_AVATAR_MAX_BYTES * 4) / 3) + BODY_CAP;
 
 /**
  * An answer's body as text, read only up to `cap` bytes: null once it passes that (the rest is not read) or when it
@@ -99,10 +114,11 @@ export async function readCapped(res: Response, cap = BODY_CAP): Promise<string 
  * A GET with no credentials, a short timeout and no redirects. Null when nothing answered. The body is read for a 200,
  * and for a 405 when `body405` (a pairing route's offer, below).
  */
-async function get(url: string, timeoutMs = PROBE_MS, body405 = false): Promise<{ status: number; json: unknown; location: string } | null> {
+async function get(url: string, timeoutMs = PROBE_MS, body405 = false, key?: string): Promise<{ status: number; json: unknown; location: string } | null> {
   try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(timeoutMs), redirect: 'manual' });
-    const text = res.status === 200 || (body405 && res.status === 405) ? await readCapped(res) : (await res.body?.cancel().catch(() => {}), '');
+    const res = await fetch(url, { headers: { Accept: 'application/json', ...(key && { Authorization: `Bearer ${key}` }) }, signal: AbortSignal.timeout(timeoutMs), redirect: 'manual' });
+    // An answer that can carry an avatar is read up to the avatar's cap and room for the rest.
+    const text = res.status === 200 || (body405 && res.status === 405) ? await readCapped(res, OFFER_CAP) : (await res.body?.cancel().catch(() => {}), '');
     let json: unknown = null;
     try {
       json = text ? JSON.parse(text) : null;
@@ -120,6 +136,35 @@ const vercelWall = (r: { status: number; location: string } | null) => !!r && r.
 
 const VERCEL_WALL =
   "This deployment is behind Vercel's login wall (Vercel Authentication), so nothing outside Vercel can reach it. In the Vercel project, open Settings > Deployment Protection and turn Vercel Authentication off for production, so the agent's own sign-in guards it instead. Then press Find again.";
+
+// ---------- the offered avatar ----------
+
+/**
+ * The avatar an offer carries, checked: a PNG, JPEG or WebP data URL of at most 256 KB, square and at most 256px a side
+ * (agent-avatar.ts). `problem` says why one was offered and not taken; nothing at all when none was offered.
+ */
+export function offeredAvatar(raw: unknown): { avatar?: string; problem?: string } {
+  if (raw === undefined || raw === null || raw === '') return {};
+  if (typeof raw !== 'string') return { problem: 'It offered an avatar Omni could not read, so it gets the initials disc.' };
+  const parsed = parseAvatarImage(raw);
+  if ('problem' in parsed) return { problem: `It offered an avatar Omni did not take (${parsed.problem.replace(/\.$/, '')}), so it gets the initials disc.` };
+  if (parsed.bytes.length > OFFERED_AVATAR_MAX_BYTES) return { problem: `It offered an avatar over ${OFFERED_AVATAR_MAX_BYTES / 1024} KB, so it gets the initials disc.` };
+  return { avatar: raw };
+}
+
+/**
+ * Read a server's offer again for its avatar: an eve agent's pairing offer (GET /v1/omni/pair, no key), or a Runs API
+ * server's signed-in GET /v1/capabilities. Undefined when it offers none or did not answer.
+ */
+export async function readOfferedAvatar(kind: RemoteKind, url: string, key: string | null, pair?: string): Promise<string | undefined> {
+  if (kind === 'eve') {
+    const offer = await get(`${pair || url}/v1/omni/pair`, PROBE_MS, true);
+    return offer?.status === 405 ? offeredAvatar(objOf(offer.json).avatar).avatar : undefined;
+  }
+  if (!key) return undefined;
+  const caps = await get(`${url}/v1/capabilities`, PROBE_MS, false, key);
+  return caps?.status === 200 ? offeredAvatar(objOf(caps.json).avatar).avatar : undefined;
+}
 
 // ---------- find ----------
 
@@ -200,7 +245,8 @@ export async function findAgent(given: ConnectInput): Promise<FoundAgent> {
     // Pairs at its own address when it serves the route, or at the helper the link named.
     const pairsHere = !pair && (await get(`${url}/v1/omni/pair`))?.status === 405;
     const name = plain(given.name, 80) || runsApiName(caps.json, host);
-    return { ...empty, name, kind: 'runs-api', supported: true, signIn: hasCode && (pair || pairsHere) ? 'pairing' : 'key', can: RUNS_CAN, warnings };
+    const face = caps.status === 200 ? offeredAvatar(objOf(caps.json).avatar) : {};
+    return { ...empty, name, ...(face.avatar && { avatar: face.avatar }), kind: 'runs-api', supported: true, signIn: hasCode && (pair || pairsHere) ? 'pairing' : 'key', can: RUNS_CAN, warnings: [...warnings, ...(face.problem ? [face.problem] : [])] };
   }
   // An eve agent: its public health route. It pairs at its own address when it serves the pairing route there.
   const eve = url ? await get(`${url}/eve/v1/health`) : null;
@@ -224,17 +270,21 @@ export async function findAgent(given: ConnectInput): Promise<FoundAgent> {
  * its route auth takes as a bearer.
  */
 async function eveAgent(empty: FoundAgent, url: string, pair: string | undefined, given: ConnectInput, warnings: string[]): Promise<FoundAgent> {
+  warnings = [...warnings];
   const at = pair ?? url;
   const offer = await get(`${at}/v1/omni/pair`, PROBE_MS, true);
   const pairs = offer?.status === 405;
   const o = pairs ? objOf(offer.json) : {};
   const codeUrl = pairs ? codePage(o.code_url, at) : undefined;
   const description = plain(o.description, 300);
+  const face = offeredAvatar(o.avatar);
+  if (face.problem) warnings = [...warnings, face.problem];
   return {
     ...empty,
     kind: 'eve',
     name: plain(given.name, 80) || plain(o.name, 80) || `eve agent on ${empty.host}`,
     ...(description && { description }),
+    ...(face.avatar && { avatar: face.avatar }),
     supported: true,
     signIn: pairs ? 'pairing' : 'key',
     ...(codeUrl && { codeUrl }),
@@ -487,13 +537,14 @@ export interface ConnectRequest {
   /** The protocol a manual connection speaks. A paired draft knows its own. */
   kind?: RemoteKind;
   bills?: string;
-  /** Make a crew role bound to it (decision F8, on by default). */
-  role: boolean;
+  /** Before slice 4 the sheet could leave the agent out. Connect always makes it now (ADR 0020), so this is ignored. */
+  role?: boolean;
 }
 
 export interface Connected {
   harness: CustomHarness;
-  role: { id: string; name: string } | null;
+  /** The remote agent Connect made for it. */
+  role: { id: string; name: string };
 }
 
 /** A role id that is free: the slug, else the slug with a number. */
@@ -503,12 +554,8 @@ function freeRoleId(slug: string): string {
     const { shipped, own } = crewTexts(id);
     if (shipped === null && own === null) return id;
   }
-  throw refused('Could not find a free id for the agent. Untick Make an agent for it, or remove some agents.', 409);
+  throw refused('Could not find a free id for the agent. Pick another id, or remove some agents.', 409);
 }
-
-/** The starter role's charter. {{user}} is filled in when a thread starts. */
-const starterCharter = (name: string) =>
-  `You are ${name}, a remote agent working for {{user}} through Omni. Your replies go back to the thread that asked: answer the question in it, say what you checked, and keep it short.`;
 
 /**
  * Save a connected agent, only after its test passed: the key into the secret store (a paired one, as
@@ -540,13 +587,13 @@ export async function connectAgent(req: ConnectRequest, ctx: () => CrewSaveConte
     made.harness = req.slug;
     // The catalog lists it once probed, which a role bound to it is checked against.
     await checkCustomHarness(harness.id);
-    let role: Connected['role'] = null;
-    if (req.role) {
-      const id = freeRoleId(req.slug);
-      const saved = saveCrew(id, { fields: { name, description: `${name}, a remote agent on ${harness.host}.`, harness: harness.id, model: 'default', delegatable: true }, charter: starterCharter(name) }, ctx(), { create: true });
-      made.role = id;
-      role = { id, name: saved.role.name };
-    }
+    // The agent is what connecting is for. It has no charter of Omni's: the server's own instructions lead (Q28).
+    const id = freeRoleId(req.slug);
+    const saved = saveCrew(id, { fields: { name, description: `${name}, a remote agent on ${harness.host}.`, harness: harness.id, model: 'default', delegatable: true } }, ctx(), { create: true, server: true });
+    made.role = id;
+    const avatar = await readOfferedAvatar(harness.kind, harness.url, d ? d.key : m!.key, d?.pair);
+    if (avatar) saveOfferedAvatar(id, avatar, ctx());
+    const role: Connected['role'] = { id, name: saved.role.name };
     if (d) drafts.delete(d.id);
     else testedManual.delete(m!.tested);
     return { harness, role };
@@ -621,5 +668,71 @@ export async function testSaved(slug: string): Promise<AgentTest> {
   if (!key) return { ok: false, failed: 'probe', detail: `Key not on this machine: set ${h.secret} in Secrets.` };
   const r = await testAgent(h.url, key, h.kind);
   await checkCustomHarness(h.id);
+  if (r.ok) await refreshOfferedAvatar(h.id, h.kind, h.url, key, h.pairing?.at);
   return r;
+}
+
+/**
+ * After a passed Test connection, the avatar the server offers now goes on its agent, unless Ben set one of his own
+ * there (crew-store.ts saveOfferedAvatar). An offer that went away leaves the last one.
+ */
+export async function refreshOfferedAvatar(harness: string, kind: RemoteKind, url: string, key: string | null, pair?: string, ctx?: () => CrewSaveContext) {
+  const agent = remoteAgentFor(harness);
+  if (!agent) return;
+  const avatar = await readOfferedAvatar(kind, url, key, pair).catch(() => undefined);
+  if (!avatar) return;
+  try {
+    saveOfferedAvatar(agent.id, avatar, (ctx ?? defaultCtx)(), { unlessOwn: true });
+  } catch {
+    // An agent file that no longer saves keeps its avatar: Test connection still reports the test.
+  }
+}
+
+// ---------- an agent's Server card ----------
+
+/** The remote agent `id`, or a 404. */
+function remoteAgentOf(id: string) {
+  const role = getCrew(id);
+  if (!role || !isRemoteAgent(role)) throw refused(`No remote agent "${id}".`, 404);
+  return role;
+}
+
+/**
+ * Test connection on a remote agent's Server card: a signed-in probe and one test turn on its server, with the key on
+ * this machine. A pass reads the server's offered avatar again (Q29).
+ */
+export async function testAgentServer(id: string): Promise<AgentTest> {
+  const role = remoteAgentOf(id);
+  if (role.harness !== 'hermes') return testSaved(role.harness!.slice('custom:'.length));
+  const url = config.hermesUrl;
+  if (!url) return { ok: false, failed: 'probe', detail: "Set Hermes's address first: it is under Show technical details on this card." };
+  const key = await globalSecret('HERMES_API_KEY').catch(() => null);
+  if (!key) return { ok: false, failed: 'probe', detail: 'Key not on this machine: set HERMES_API_KEY in Secrets.' };
+  const r = await testAgent(url, key, 'runs-api');
+  await loadCatalog(['hermes']);
+  if (r.ok) await refreshOfferedAvatar('hermes', 'runs-api', url, key);
+  return r;
+}
+
+/**
+ * Remove on a remote agent's Server card: its server (a connected one as Remove did before: key revoked where the
+ * server can, the secret Connect made deleted, the file gone everywhere; Hermes's address cleared on this machine, its
+ * key left in Secrets) and the agent itself. A built-in an overlay bound to the server goes back to its local run.
+ * Its threads stay readable.
+ */
+export async function removeAgentServer(id: string, ctx: () => CrewSaveContext): Promise<Removed & { agent: string }> {
+  const role = remoteAgentOf(id);
+  let removed: Removed;
+  if (role.harness === 'hermes') {
+    updateUserConfig({ integrations: { hermesUrl: '' } });
+    await loadCatalog(['hermes']).catch(() => {});
+    removed = { deleted: true, revoked: null, secret: null };
+  } else {
+    const slug = role.harness!.slice('custom:'.length);
+    removed = customHarness(role.harness as `custom:${string}`) ? await removeAgent(slug) : { deleted: true, revoked: null, secret: null };
+  }
+  const { shipped } = crewTexts(id);
+  if (shipped === null) deleteCrew(id);
+  else saveCrew(id, { fields: { harness: '', model: '' } }, ctx(), { server: true });
+  return { ...removed, agent: id };
 }

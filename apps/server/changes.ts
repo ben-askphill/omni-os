@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import type { BranchChanges, ChangeGroup, ChangeKind, ChangedFile, ChangeStatus, DiffOmitted } from '@omni/shared/changes.ts';
 import { channels, threadBases, type Thread, type ThreadBase } from './db.ts';
 import { plannedWorktree, worktreeProblem } from './sandbox.ts';
-import { isProviderHarness } from './harness/types.ts';
+import { filesOffMachine } from './thread-files.ts';
 import { providerWhere } from './harness/registry.ts';
 
 const run = promisify(execFile);
@@ -48,7 +48,7 @@ export const gitOr = (dir: string, args: string[]) => git(dir, args).then((s) =>
  * worktree, checked to be on its branch; a thread with worktrees off reads the channel's repo when it runs there.
  */
 export async function changesCheckout(t: Thread): Promise<{ dir: string } | { reason: string }> {
-  if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.` };
+  if (filesOffMachine(t)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.` };
   if (t.setup === 'preparing') return { reason: "Omni is still preparing this thread's worktree." };
   if (t.setup === 'failed') return { reason: "This thread's worktree could not be prepared, so there are no changes to show." };
   if (t.setup === 'signin') return { reason: 'This thread waits for a sign-in, so it has not started.' };

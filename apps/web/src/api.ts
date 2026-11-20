@@ -34,6 +34,7 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 
 // ---------- response shapes ----------
 import type { ThreadMember } from '@omni/shared/members.ts';
+import type { RemoteServer } from '@omni/shared/remote-agent.ts';
 
 /** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
 /** `access_default`: what a channel with no access_level runs at on the machine that answered (access-default.ts). */
@@ -210,6 +211,8 @@ export interface CrewRole {
   avatar?: { image?: string; icon?: string; bg?: string };
   /** A harness id from the server's catalog. An open string, not a fixed list: outside runtimes join the catalog by id. */
   harness?: string;
+  /** A remote agent's server (ADR 0020): set exactly when the agent runs on Hermes or a server Ben connected. Never a key. */
+  server?: RemoteServer;
   model?: string;
   effort?: string;
   channel?: string;
