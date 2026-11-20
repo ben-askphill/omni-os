@@ -174,7 +174,7 @@ const isDelegated = (source: ThreadSource | undefined) => source === 'conductor'
  * The agent a new thread starts as. A thread asked for on a remote agent's server with no agent named is led by that
  * server's agent, so an older client's Hermes thread still starts. A local agent asked to run on one is refused.
  */
-function leadFor(input: CreateThreadInput): CrewRole | undefined {
+function leadFor(input: Pick<CreateThreadInput, 'role' | 'harness' | 'source'>): CrewRole | undefined {
   const named = roleFor(input.role, input.source);
   const asked = input.harness;
   if (!isRemoteAgentHarness(asked)) return named;
@@ -441,19 +441,21 @@ export async function createTeam(input: CreateTeamInput): Promise<{ thread: Thre
     throw refusal(`Every part goes to ${agentName(leadAgent || null)}, the lead. A team needs a part for another agent: name it in the part's role, or use delegate for one agent's work.`, 400);
   }
   // Every member before the thread exists, so a bad one leaves nothing behind.
-  for (const a of others) {
+  const assignments = others.map((a) => {
     const refused = seatRefusal(a);
     if (refused) throw refusal(refused, a === 'conductor' ? 409 : 400);
-    roleFor(a, 'team');
-  }
+    const mine = input.tasks.filter((_t, i) => parts[i].agent === a);
+    const prompt = mine.map((t) => t.prompt).join('\n\n');
+    const run = mine.find((t) => t.harness || t.model || t.effort);
+    leadFor({ role: a, harness: run?.harness, source: 'team' });
+    return { agent: a, prompt, run };
+  });
   const brief = teamBrief(input.prompt, leadAgent, parts);
   const first: CreateThreadInput = { ...input, prompt: brief, source: input.source ?? 'conductor', device: null };
   const { thread, harness, folder } = await openThread(first, 'queued', false, { team: true });
   addEvent(thread.id, 'team', { lead: leadAgent, parts: parts.map((p) => ({ title: p.title, agent: p.agent })) } satisfies TeamRecord);
-  const seats = others.map((agent): TeamSeat => {
-    const mine = input.tasks.filter((_t, i) => parts[i].agent === agent);
-    const run = mine.find((t) => t.harness || t.model || t.effort);
-    seat(thread.id, agent, mine.map((t) => t.prompt).join('\n\n'), run && { harness: run.harness, model: run.model, effort: run.effort });
+  const seats = assignments.map(({ agent, prompt, run }): TeamSeat => {
+    seat(thread.id, agent, prompt, run);
     return { agent, name: agentName(agent), parts: parts.filter((p) => p.agent === agent).map((p) => p.title) };
   });
   const started = await startThread(thread, harness, folder, { ...first, title: input.title });

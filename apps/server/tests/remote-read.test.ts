@@ -309,6 +309,17 @@ describe('a remote agent reads the worktree where the channel allows it', () => 
   });
 });
 
+it('keeps a team part on its agent’s side of the remote binding', T, async () => {
+  expect((await call('/crew', json('POST', { id: 'local-part', fields: { name: 'Local Part', harness: 'claude-code', model: 'sonnet' }, charter: 'Do your part.' }))).status).toBe(201);
+  const create = (role: string, harness: string) => call('/threads/team', json('POST', { channel: 'scratch', prompt: 'plan the work', tasks: [{ role, harness, prompt: 'do your part' }] }));
+  const local = await create('local-part', 'custom:nomos');
+  const remote = await create('nomos', 'claude-code');
+  expect(remote.status).toBe(200);
+  await H.untilResults(remote.json.thread.id, 1);
+  expect({ local: local.status, remote: H.thread(H.db.members.of(remote.json.thread.id, 'nomos')!.session_thread).harness }).toEqual({ local: 400, remote: 'custom:nomos' });
+  expect(local.json.error).toMatch(/local agent/);
+});
+
 describe('an eve agent reads through its own tool', () => {
   const nomosReads = async (...reads: unknown[]) => {
     eve.reads = reads;

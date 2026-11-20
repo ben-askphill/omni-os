@@ -34,7 +34,8 @@ import { addEvent, drop, emitThread, lives, refusal, turnEnded, waiting, waiting
 import { config } from '../config.ts';
 import { agentName, readOnlyReason } from '../member-view.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
-import { remoteSeesWork } from '../remote-agents.ts';
+import { localCatalog, remoteSeesWork } from '../remote-agents.ts';
+import { DEFAULT_HARNESS } from '../harness/types.ts';
 
 /** How long a catch-up or summary call may take before the turn goes on without it. */
 const SIDECAR_MS = 45_000;
@@ -69,13 +70,17 @@ function leadRow(t: Thread): MemberRow {
 function memberRun(t: Thread, agent: string, prompt: string, own: MemberRunPick = {}): { harness: string; model: string | null; effort: string; auto_reason: string | null } {
   const role = getCrew(agent);
   const channel = channels.get(t.channel_id);
-  const channelDefaults = channel ? { harness: channel.default_harness ?? undefined, model: channel.default_model ?? undefined, effort: channel.default_effort ?? undefined } : undefined;
-  const cat = channelCatalog(getCatalog(), t.channel_id);
+  const remote = isRemoteAgentHarness(role?.harness);
+  const channelDefaults = channel && !remote && !isRemoteAgentHarness(channel.default_harness)
+    ? { harness: channel.default_harness ?? undefined, model: channel.default_model ?? undefined, effort: channel.default_effort ?? undefined }
+    : undefined;
+  const catalog = channelCatalog(getCatalog(), t.channel_id);
+  const cat = remote ? catalog : localCatalog(catalog);
   // A quick ask's members stay on Claude Code with read-only tools, as its lead does (Q9).
-  const asked = t.quick ? { harness: 'claude-code' } : { harness: own.harness ?? undefined, model: own.model ?? undefined, effort: own.effort ?? undefined };
+  const asked = remote ? { harness: role!.harness } : t.quick ? { harness: DEFAULT_HARNESS } : own;
   const run = resolveRun(asked, setsRun(role) ? role : undefined, cat, channelDefaults);
   if (run.ok && !('auto' in run)) return { harness: run.harness, model: run.model || null, effort: run.effort ?? '', auto_reason: null };
-  if (!run.ok) return { harness: role?.harness ?? t.harness, model: role?.model ?? null, effort: role?.effort ?? '', auto_reason: null };
+  if (!run.ok) return { harness: role?.harness ?? (isRemoteAgentHarness(t.harness) ? DEFAULT_HARNESS : t.harness), model: role?.model ?? null, effort: role?.effort ?? '', auto_reason: null };
   const auto = routeTask(profileTask(prompt || t.title), { catalog: cat, usage: usageByHarness(), images: false });
   return { harness: auto.harness, model: auto.model || null, effort: auto.effort, auto_reason: auto.reason };
 }
