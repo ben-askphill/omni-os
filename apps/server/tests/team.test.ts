@@ -268,6 +268,12 @@ describe('seating by an agent thread', () => {
     expect(inConductor.status).toBe(403);
     expect(inConductor.json.error).toMatch(/never seated in a #conductor thread/);
     expect((await call('POST', '/threads', { channel: 'conductor', prompt: 'x', role: 'lead', members: ['designer'] }, as)).status).toBe(403);
+    // Left empty, the channel is the lead's own, and the rule holds for that one too.
+    expect((await call('POST', '/crew', { id: 'router', fields: { name: 'Router', harness: 'claude-code', model: 'sonnet', channel: 'conductor' }, charter: 'You route.' })).status).toBe(201);
+    const ownChannel = await call('POST', '/threads/team', { channel: '', title: 'x', prompt: 'x', role: 'router', tasks: PARTS.slice(0, 1) }, as);
+    expect(ownChannel.status).toBe(403);
+    expect(ownChannel.json.error).toMatch(/never seated in a #conductor thread/);
+    expect((await call('POST', '/threads', { channel: '', prompt: 'x', role: 'router', members: ['designer'] }, as)).status).toBe(403);
     expect(H.db.threads.children(conductor.id)).toEqual([]);
 
     // delegate with members: seated with no turn; the brief goes to the lead, whose report comes back as before.
