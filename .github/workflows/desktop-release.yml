@@ -5,7 +5,9 @@
 #
 # No dependency's code runs where a credential is. The build jobs run npm code with no secret, no token and read-only
 # access. The sign job holds the Developer ID and Apple's notarization key and runs only Apple's tools and the repo's
-# own dependency-free script. The publish job is the only one that can write, and it runs no npm code either.
+# own dependency-free scripts: it signs, notarizes, then packs the DMG, the zip and the update feed itself, so a release
+# waits for a Mac runner twice, not three times. The publish job is the only one that can write, and it runs no npm
+# code either.
 # Jobs hand each other one tarball each, uploaded as it is (archive: false). A job with a credential downloads it packed
 # (skip-decompress) and checks its checksum and its names before it unpacks it.
 # apps/desktop/tests/release-workflow.test.ts holds this file to that (scripts/release-policy.ts).
@@ -40,9 +42,11 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       sha: ${{ steps.version.outputs.sha }}
     steps:
+      # A release is always main. A build-only run signs and publishes nothing, so it builds the commit it was started
+      # from, which is how a change to the build is tried on a branch.
       - uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ inputs.mode == 'build-only' && github.sha || 'main' }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v5
@@ -87,7 +91,7 @@ jobs:
       # Electron fetches its binary the first time stage.ts starts it.
       - run: npm ci --include=dev --ignore-scripts
       # identity=null builds it unsigned. The zip target is what has electron-builder write app-update.yml into the app.
-      # Only the app goes on from here, so that zip is stored, not compressed: the Mac package job makes the one that ships.
+      # Only the app goes on from here, so that zip is stored, not compressed: the sign job makes the one that ships.
       - name: Build
         working-directory: apps/desktop
         run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --native required -- -c.mac.identity=null -c.mac.target=zip -c.compression=store
@@ -99,6 +103,23 @@ jobs:
           tarball="$RUNNER_TEMP/omni-mac-unsigned.tar.gz"
           COPYFILE_DISABLE=1 tar --no-mac-metadata --options gzip:compression-level=1 -czf "$tarball" -C apps/desktop/release/mac-universal Omni.app
           echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      # A build-only run stops before the sign job, which is where a release is packed. So it packs the unsigned app
+      # here with the same script, to try the DMG, the zip and the feed without a secret.
+      - name: Try the release packaging
+        if: inputs.mode == 'build-only'
+        run: |
+          app=apps/desktop/release/mac-universal/Omni.app
+          out="$RUNNER_TEMP/package-test"
+          node apps/desktop/scripts/mac-release-package.ts --version "$VERSION" --out "$out" "$app"
+          cat "$out/latest-mac.yml"
+          ditto -x -k "$out/Omni-$VERSION-mac-universal.zip" "$RUNNER_TEMP/from-zip"
+          diff -r "$app" "$RUNNER_TEMP/from-zip/Omni.app" >/dev/null 2>&1 || { echo '::error::The app in the zip is not the app that was built'; exit 1; }
+          mkdir -p "$RUNNER_TEMP/dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$out/Omni-$VERSION-mac-universal.dmg"
+          ls -la "$RUNNER_TEMP/dmg"
+          diff -r "$app" "$RUNNER_TEMP/dmg/Omni.app" >/dev/null 2>&1 || { echo '::error::The app in the DMG is not the app that was built'; exit 1; }
+          [[ "$(readlink "$RUNNER_TEMP/dmg/Applications")" == /Applications ]] || { echo '::error::The DMG has no link to /Applications'; exit 1; }
+          hdiutil detach "$RUNNER_TEMP/dmg"
       - uses: actions/upload-artifact@v7
         with:
           path: ${{ runner.temp }}/omni-mac-unsigned.tar.gz
@@ -109,12 +130,14 @@ jobs:
           overwrite: true
 
   mac-sign:
-    name: Mac sign and notarize
+    name: Mac sign, notarize and package
     needs: [prepare, mac-build]
     if: inputs.mode != 'build-only'
     runs-on: macos-15
     outputs:
-      sha256: ${{ steps.pack.outputs.sha256 }}
+      sha256: ${{ steps.collect.outputs.sha256 }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       # The build ran package code, so its tarball stays packed until its checksum checks out and every name in it is
       # inside Omni.app. macOS tar then refuses .., absolute paths and writing through a link it made, and the signing
@@ -249,64 +272,17 @@ jobs:
           codesign -dvv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
           spctl --assess --type execute --verbose=2 "$APP"
           xcrun stapler validate "$APP"
-      # The signatures and the stapled ticket are inside the bundle's files, so the tarball needs no extended attributes.
-      - name: Pack the signed app
-        id: pack
-        run: |
-          tarball="$RUNNER_TEMP/omni-mac-signed.tar.gz"
-          COPYFILE_DISABLE=1 tar --no-mac-metadata --options gzip:compression-level=1 -czf "$tarball" -C "$RUNNER_TEMP/app" Omni.app
-          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
-        with:
-          path: ${{ runner.temp }}/omni-mac-signed.tar.gz
-          archive: false
-          if-no-files-found: error
-          retention-days: 7
-          # A re-run uploads again under the same name.
-          overwrite: true
+      # Signing is over, so the Developer ID goes before anything else runs. The step at the end covers a failed run.
       - name: Remove the keychain
-        if: always() && env.KEYCHAIN != ''
-        run: security delete-keychain "$KEYCHAIN"
-
-  mac-package:
-    name: Mac DMG, zip and update feed
-    needs: [prepare, mac-sign]
-    runs-on: macos-15
-    outputs:
-      sha256: ${{ steps.collect.outputs.sha256 }}
-    env:
-      VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.prepare.outputs.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-      - name: Set the version
-        run: node apps/desktop/scripts/version.ts "$VERSION"
-      - run: npm ci --include=dev --ignore-scripts
-      - uses: actions/download-artifact@v8
-        with:
-          name: omni-mac-signed.tar.gz
-          path: ${{ runner.temp }}/in
-          skip-decompress: true
-      - name: Unpack the signed app
-        env:
-          SHA256: ${{ needs.mac-sign.outputs.sha256 }}
         run: |
-          cd "$RUNNER_TEMP/in"
-          echo "$SHA256  omni-mac-signed.tar.gz" | shasum -a 256 -c
-          mkdir -p "$RUNNER_TEMP/signed"
-          tar -xzf omni-mac-signed.tar.gz -C "$RUNNER_TEMP/signed"
-      # electron-builder packs the signed app as it is: no build, no signing, nothing changed inside it.
+          security delete-keychain "$KEYCHAIN"
+          echo "KEYCHAIN=" >> "$GITHUB_ENV"
+      # The repo's own script on plain Node, with Apple's ditto and hdiutil: no npm package runs in this job. It packs
+      # the signed app as it is and changes nothing inside it.
       - name: Pack the DMG, the zip and latest-mac.yml
-        working-directory: apps/desktop
-        run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --prepackaged "$RUNNER_TEMP/signed/Omni.app"
+        run: node apps/desktop/scripts/mac-release-package.ts --version "$VERSION" --out "$RUNNER_TEMP/release" "$APP"
       - name: Check the app in the zip and the DMG
-        working-directory: apps/desktop/release
+        working-directory: ${{ runner.temp }}/release
         run: |
           check() {
             codesign --verify --deep --strict --verbose=2 "$1"
@@ -321,7 +297,7 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/dmg"
       - name: Collect the release files
         id: collect
-        working-directory: apps/desktop/release
+        working-directory: ${{ runner.temp }}/release
         run: |
           tarball="$RUNNER_TEMP/omni-mac-release.tar"
           COPYFILE_DISABLE=1 tar --no-mac-metadata -cf "$tarball" "Omni-$VERSION-mac-universal.dmg" "Omni-$VERSION-mac-universal.dmg.blockmap" \
@@ -336,6 +312,9 @@ jobs:
           retention-days: 7
           # A re-run uploads again under the same name.
           overwrite: true
+      - name: Remove the keychain after a failure
+        if: always() && env.KEYCHAIN != ''
+        run: security delete-keychain "$KEYCHAIN"
 
   linux-build:
     name: Linux (AppImage)
@@ -387,7 +366,7 @@ jobs:
 
   publish:
     name: Publish the release
-    needs: [prepare, mac-package, linux-build]
+    needs: [prepare, mac-sign, linux-build]
     if: inputs.mode == 'release' || inputs.mode == 'draft'
     runs-on: ubuntu-latest
     permissions:
@@ -412,7 +391,7 @@ jobs:
           skip-decompress: true
       - name: Unpack the release files
         env:
-          MAC_SHA256: ${{ needs.mac-package.outputs.sha256 }}
+          MAC_SHA256: ${{ needs.mac-sign.outputs.sha256 }}
           LINUX_SHA256: ${{ needs.linux-build.outputs.sha256 }}
         run: |
           assets="$RUNNER_TEMP/assets"
