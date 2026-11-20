@@ -37,11 +37,18 @@ function removeRunDir(cwd: string) {
   }
 }
 
+/** The model and effort of a one-shot call: Haiku at its default effort unless the caller names others. */
+interface OneShotRun {
+  model: string;
+  effort?: string;
+}
+
 /**
- * One Haiku call with no tools and no session. `done` gets its trimmed output once, or null when it failed, timed out
- * or could not start (without a private folder the call is skipped: titles keep their placeholder, no suggestion).
+ * One Claude call with no tools and no session, on Haiku unless `run` names another model. `done` gets its trimmed
+ * output once, or null when it failed, timed out or could not start (without a private folder the call is skipped:
+ * titles keep their placeholder, no suggestion).
  */
-function haiku(entrypoint: string, prompt: string, done: (out: string | null) => void, timeoutMs = 45_000) {
+function haiku(entrypoint: string, prompt: string, done: (out: string | null) => void, timeoutMs = 45_000, run: OneShotRun = { model: 'haiku' }) {
   let settled = false;
   const finish = (out: string | null) => {
     if (settled) return;
@@ -63,7 +70,7 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
   try {
     child = spawn(
       config.claudeBin,
-      ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
+      ['-p', '--model', run.model, ...(run.effort ? ['--effort', run.effort] : []), '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
       { cwd, env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: entrypoint }), stdio: ['pipe', 'pipe', 'ignore'] },
     );
   } catch (err) {
@@ -88,16 +95,22 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
   });
 }
 
-/** One Haiku call as a promise: its trimmed output, or null when it failed or ran past `timeoutMs`. For the usage scan's labels. */
-export function askHaiku(entrypoint: string, prompt: string, timeoutMs: number): Promise<string | null> {
+/**
+ * One no-tools call as a promise: its trimmed output, or null when it failed or ran past `timeoutMs`. For the
+ * merge-risk gate (merge-risk/gate.ts), which names its own model and effort.
+ */
+export function askClaude(entrypoint: string, prompt: string, timeoutMs: number, run: OneShotRun): Promise<string | null> {
   return new Promise((resolve, reject) => {
     try {
-      haiku(entrypoint, prompt, resolve, timeoutMs);
+      haiku(entrypoint, prompt, resolve, timeoutMs, run);
     } catch (err) {
       reject(err);
     }
   });
 }
+
+/** One Haiku call as a promise: its trimmed output, or null when it failed or ran past `timeoutMs`. For the usage scan's labels. */
+export const askHaiku = (entrypoint: string, prompt: string, timeoutMs: number) => askClaude(entrypoint, prompt, timeoutMs, { model: 'haiku' });
 
 /** Drop the thread's suggested reply, proposed follow-up thread and open items, and any answer still on its way. */
 export function clearSuggestion(threadId: string) {

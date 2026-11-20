@@ -340,6 +340,16 @@ An open PR can merge by itself once its required checks and reviews pass (`gh pr
 - A PR that can already merge may merge at once.
 - The state lives on GitHub, so every Mac and client sees the same.
 
+## Merge risk
+
+Omni rates each PR a builder thread opens in Omni's own repo, so you can tell which PRs are safe to merge without reading them. It rates only: it never merges, never turns on auto-merge and blocks nothing.
+
+- A fresh Claude call with no tools reads the PR's title, body and diff and nothing else, and rates five areas good, decent or poor: Alignment, Impact, Verification, Rollback cost and Error detection. The rubric is `.agents/skills/merge-risk/SKILL.md` as `main` has it on GitHub, fetched before each rating, so a PR cannot loosen the rules it is rated by.
+- Code, not the model, turns the ratings into low, medium or high, with the weights and thresholds the rubric lists (`apps/server/merge-risk/level.ts`).
+- The PR gets one comment, `**Merge risk: <level>**` with a line for each area not rated good, and one label. `merge-ready` means an `omni/` branch with every area good. Anything else, including a low rating with one decent area, gets `needs-<your first name>` from the name in Settings > General (`needs-review` with no name set). A rating call that fails twice leaves a "not rated" comment and that same label.
+- A new push is rated again once the builder's turn has ended: the same comment is edited and the label swapped, and `merge-ready` comes off while the new push waits for its rating.
+- Only open, non-draft PRs whose branch belongs to a builder thread count, polled at the pace of event automations (`OMNI_AUTOMATION_POLL_SECONDS`). With sync on, only the machine that runs automations rates. Until `main` has the rubric, nothing is rated. `OMNI_MERGE_RISK=0` turns it off.
+
 ## Send to Grok Bot
 
 Send to Grok Bot in the thread's menu (the header's ⋯ or a right-click) sends the title and the messages. On a phone, Thread options has the same action. Omni sends the channel id and the thread id as context. The Conductor tool is `send_to_grok_bot`. The action shows only on a server with a Grok Bot webhook URL. For where the webhook URL and Authorization value go, see [Configuration](configuration.md#grok-bot).

@@ -42,6 +42,7 @@ const { startDraftExpiry } = await import('./automation-drafts.ts');
 const { watchDelegating } = await import('./delegating.ts');
 const { watchSteps } = await import('./step-line.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
+const { startMergeRisk } = await import('./merge-risk/gate.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { flushSync, startSync } = await import('./sync/worker.ts');
 const { startConnect, stopConnect } = await import('./connect/service.ts');
@@ -103,6 +104,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   watchDelegating();
   watchSteps();
   startPRWatch();
+  // Rates each PR a builder thread opens in Omni's own repo: one comment and one label, never a merge. Off with OMNI_MERGE_RISK=0.
+  startMergeRisk();
   startCatalogRefresh();
   // With this Mac's retention policy on (Settings > Worktrees), removes idle worktrees that hold nothing unsaved, now and daily.
   startWorktreeRetention();
