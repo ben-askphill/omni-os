@@ -19,7 +19,9 @@ import { deleteCrew, saveCrew, type CrewSaveContext } from './crew-store.ts';
 import { checkCustomHarness } from './harness/catalog-service.ts';
 import { customHarness, customHarnesses, loopback, secretProblem, tailnet, urlProblem, type CustomHarness } from './harness/custom.ts';
 import { deleteCustomHarness, saveCustomHarness } from './harness/custom-store.ts';
-import { HermesClient, HermesHttpError, probeRunsApi } from './harness/hermes/client.ts';
+import { EveClient } from './harness/eve/client.ts';
+import { HermesHttpError } from './harness/hermes/client.ts';
+import { probeRemote, probeRoute, remoteClient, type RemoteKind } from './harness/remote.ts';
 import { deleteSecret, globalSecret, hasSecret, setSecret } from './secrets.ts';
 
 const refused = (message: string, status: 400 | 404 | 409 | 502 = 400) => Object.assign(new Error(message), { status });
@@ -93,27 +95,58 @@ export async function readCapped(res: Response, cap = BODY_CAP): Promise<string 
   return Buffer.concat(parts).toString('utf8');
 }
 
-/** A GET with no credentials, a short timeout and no redirects. Null when nothing answered. */
-async function get(url: string, timeoutMs = PROBE_MS): Promise<{ status: number; json: unknown } | null> {
+/**
+ * A GET with no credentials, a short timeout and no redirects. Null when nothing answered. The body is read for a 200,
+ * and for a 405 when `body405` (a pairing route's offer, below).
+ */
+async function get(url: string, timeoutMs = PROBE_MS, body405 = false): Promise<{ status: number; json: unknown; location: string } | null> {
   try {
     const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(timeoutMs), redirect: 'manual' });
-    const text = res.status === 200 ? await readCapped(res) : (await res.body?.cancel().catch(() => {}), '');
+    const text = res.status === 200 || (body405 && res.status === 405) ? await readCapped(res) : (await res.body?.cancel().catch(() => {}), '');
     let json: unknown = null;
     try {
       json = text ? JSON.parse(text) : null;
     } catch {
       // Not JSON: the status alone says what answered.
     }
-    return { status: res.status, json };
+    return { status: res.status, json, location: res.headers.get('location') ?? '' };
   } catch {
     return null;
   }
 }
 
+/** Vercel's own login wall (Vercel Authentication on a deployment): every path redirects to its sign-in. */
+const vercelWall = (r: { status: number; location: string } | null) => !!r && r.status >= 300 && r.status < 400 && /^https:\/\/vercel\.com\/sso-api/.test(r.location);
+
+const VERCEL_WALL =
+  "This deployment is behind Vercel's login wall (Vercel Authentication), so nothing outside Vercel can reach it. In the Vercel project, open Settings > Deployment Protection and turn Vercel Authentication off for production, so the agent's own sign-in guards it instead. Then press Find again.";
+
 // ---------- find ----------
 
 const RUNS_CAN = ['Steer', 'Stop', 'Tool rows', 'Token counts'];
 const REMOTE_CANNOT = ['Worktree', 'Browser', 'Omni tools'];
+/** An eve agent: Omni queues a message sent mid-turn (eve's steer restarts the turn), and cannot answer its approvals. */
+const EVE_CAN = ['Stop', 'Tool rows', 'Token counts'];
+const EVE_CANNOT = ['Steering', 'Approvals', ...REMOTE_CANNOT];
+
+const objOf = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+
+/**
+ * The page where the agent's owner gets a pairing code, from a pairing route's offer (`code_url`, relative or
+ * absolute): only on the agent's own host, and only an address a key could go to (urlProblem). Undefined otherwise.
+ */
+function codePage(raw: unknown, at: string): string | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) return undefined;
+  let u: URL;
+  try {
+    u = new URL(raw.trim(), `${at}/`);
+  } catch {
+    return undefined;
+  }
+  if (u.hostname !== new URL(at).hostname || u.username || u.password) return undefined;
+  const page = `${u.origin}${u.pathname}`;
+  return urlProblem(u.origin) ? undefined : page;
+}
 
 const unreachable = (host: string) =>
   `Could not reach ${host} from this machine. On the tailnet, check this machine is on it too; outside it, the agent needs https (Tailscale Funnel, a tunnel or a proxy).`;
@@ -162,12 +195,17 @@ export async function findAgent(given: ConnectInput): Promise<FoundAgent> {
   if (/\/\.well-known\/agent-card\.json$/.test(new URL(at).pathname)) return a2a(empty, await get(at), warnings);
 
   const caps = url ? await get(`${url}/v1/capabilities`) : null;
+  if (vercelWall(caps)) return { ...empty, problem: VERCEL_WALL };
   if (caps && [200, 401, 403].includes(caps.status)) {
     // Pairs at its own address when it serves the route, or at the helper the link named.
     const pairsHere = !pair && (await get(`${url}/v1/omni/pair`))?.status === 405;
     const name = plain(given.name, 80) || runsApiName(caps.json, host);
     return { ...empty, name, kind: 'runs-api', supported: true, signIn: hasCode && (pair || pairsHere) ? 'pairing' : 'key', can: RUNS_CAN, warnings };
   }
+  // An eve agent: its public health route. It pairs at its own address when it serves the pairing route there.
+  const eve = url ? await get(`${url}/eve/v1/health`) : null;
+  if (vercelWall(eve)) return { ...empty, problem: VERCEL_WALL };
+  if (eve?.status === 200) return eveAgent(empty, url, pair, given, warnings);
   // A pairing address on its own (the helper's "Address"): runs go where its answer says.
   const pairOnly = await get(`${at}/v1/omni/pair`);
   if (pairOnly?.status === 405) {
@@ -175,10 +213,35 @@ export async function findAgent(given: ConnectInput): Promise<FoundAgent> {
   }
   const card = await get(`${at}/.well-known/agent-card.json`);
   if (card?.status === 200 && card.json && typeof card.json === 'object') return a2a(empty, card, warnings);
-  const eve = await get(`${at}/eve/v1/health`);
-  if (eve?.status === 200) return { ...empty, kind: 'eve', name: plain(given.name, 80) || `eve agent on ${host}`, problem: 'This is an eve agent. Omni connects eve agents through A2A or a Runs API template in a later version.' };
   if (!caps && !pairOnly && !card && !eve) return { ...empty, problem: unreachable(host) };
-  return { ...empty, problem: `${host} answered, but not as an agent Omni can run threads on (no Runs API at /v1/capabilities, no A2A card).` };
+  if (caps && caps.status >= 300 && caps.status < 400) return { ...empty, problem: `${host} answered with a redirect${caps.location ? ` to ${hostOf(caps.location) || 'another address'}` : ''}. Omni never follows one, so a key never reaches another host: give the address it redirects to, if that is the agent.` };
+  return { ...empty, problem: `${host} answered, but not as an agent Omni can run threads on (no Runs API at /v1/capabilities, no eve health route, no A2A card).` };
+}
+
+/**
+ * An eve agent (eve's /eve/v1 API). It signs in with a pairing code when it serves POST /v1/omni/pair on its own host
+ * (a GET there answers 405, and may offer `{ name, description, code_url }`); otherwise with a key from Secrets that
+ * its route auth takes as a bearer.
+ */
+async function eveAgent(empty: FoundAgent, url: string, pair: string | undefined, given: ConnectInput, warnings: string[]): Promise<FoundAgent> {
+  const at = pair ?? url;
+  const offer = await get(`${at}/v1/omni/pair`, PROBE_MS, true);
+  const pairs = offer?.status === 405;
+  const o = pairs ? objOf(offer.json) : {};
+  const codeUrl = pairs ? codePage(o.code_url, at) : undefined;
+  const description = plain(o.description, 300);
+  return {
+    ...empty,
+    kind: 'eve',
+    name: plain(given.name, 80) || plain(o.name, 80) || `eve agent on ${empty.host}`,
+    ...(description && { description }),
+    supported: true,
+    signIn: pairs ? 'pairing' : 'key',
+    ...(codeUrl && { codeUrl }),
+    can: EVE_CAN,
+    cannot: EVE_CANNOT,
+    warnings: [...warnings, ...(!pairs ? ['It offers no pairing code, so it signs in with a key its route auth takes as a bearer token.'] : [])],
+  };
 }
 
 function a2a(empty: FoundAgent, card: { status: number; json: unknown } | null, warnings: string[]): FoundAgent {
@@ -198,6 +261,7 @@ function a2a(empty: FoundAgent, card: { status: number; json: unknown } | null, 
 
 interface Draft {
   id: string;
+  kind: RemoteKind;
   url: string;
   name: string;
   key: string;
@@ -241,7 +305,7 @@ const client = () => ({ client_id: outbox.machineId() ?? `omni-${about.name}`, c
  * Redeem a pairing code at the agent (POST /v1/omni/pair), server to server. The key it answers with stays in memory
  * here under a draft id; the answer's `url`, when it names one, must be on the pairing address's own host.
  */
-export async function pairAgent(given: { url?: string; pair?: string; code: string; name?: string }): Promise<PairedAgent> {
+export async function pairAgent(given: { url?: string; pair?: string; code: string; name?: string; kind?: RemoteKind }): Promise<PairedAgent> {
   const url = given.url ? base(given.url) : '';
   const pair = given.pair ? base(given.pair) : url;
   if (!pair) throw refused("Add the agent's address.");
@@ -281,6 +345,8 @@ export async function pairAgent(given: { url?: string; pair?: string; code: stri
   if (hostnameOf(runs) !== hostnameOf(pair)) throw refused(`The agent named ${hostOf(runs)} for its runs, another host than the one it paired on, so Omni did not keep the key.`, 502);
   const d: Draft = {
     id: randomUUID(),
+    // The agent's answer or the find says eve: only which protocol threads speak, checked by the test turn.
+    kind: a.kind === 'eve' || given.kind === 'eve' ? 'eve' : 'runs-api',
     url: runs,
     name: plain(a.name, 80) || plain(given.name, 80) || `Agent on ${hostOf(runs)}`,
     key,
@@ -319,16 +385,17 @@ async function revokeAt(url: string, key: string, keyId: string): Promise<boolea
  * A signed-in probe, then one short turn on a session of its own, ended after. The reply, the model it named and the
  * time it took come back; a failure says which step and what came back.
  */
-export async function testAgent(url: string, key: string, timeoutMs = TEST_MS): Promise<AgentTest> {
-  const probe = await probeRunsApi(url, key);
+export async function testAgent(url: string, key: string, kind: RemoteKind = 'runs-api', timeoutMs = TEST_MS): Promise<AgentTest> {
+  const probe = await probeRemote(kind, url, key);
   if (probe.state === 'rejected') return { ok: false, failed: 'probe', detail: `${hostOf(url)} refused the key (HTTP 401 or 403).` };
-  if (probe.state === 'status') return { ok: false, failed: 'probe', detail: `${hostOf(url)} answered HTTP ${probe.status} to GET /v1/capabilities.` };
+  if (probe.state === 'status') return { ok: false, failed: 'probe', detail: `${hostOf(url)} answered HTTP ${probe.status} to ${probeRoute(kind)}.` };
   if (probe.state === 'unreachable') return { ok: false, failed: 'probe', detail: unreachable(hostOf(url)) };
   const started = Date.now();
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
-  const api = new HermesClient(url, key);
+  const api = remoteClient(kind, url, key);
   let runId = '';
+  let sessionId = '';
   let reply = '';
   let ended = false;
   let firstEventMs: number | undefined;
@@ -336,6 +403,7 @@ export async function testAgent(url: string, key: string, timeoutMs = TEST_MS): 
   try {
     const run = await api.createRun({ input: TEST_PROMPT, session_id: `omni-test-${randomUUID()}` }, randomUUID(), ac.signal);
     runId = run.run_id;
+    sessionId = run.session_id ?? '';
     for await (const raw of api.events(runId, ac.signal)) {
       firstEventMs ??= Date.now() - started;
       const e = (raw ?? {}) as Record<string, unknown>;
@@ -374,34 +442,37 @@ export async function testAgent(url: string, key: string, timeoutMs = TEST_MS): 
     });
   } finally {
     clearTimeout(timer);
-    // Never leave the test's run going on the agent.
+    // Never leave the test's run going on the agent, nor, on eve, its session open.
     if (runId && !ended) await api.stop(runId).catch(() => {});
+    if (api instanceof EveClient && sessionId) await api.endSession(sessionId).catch(() => {});
   }
+  if (out.ok && !out.model && probe.state === 'ok' && probe.model) out.model = plain(probe.model, 120);
   return { ...out, ...(firstEventMs !== undefined && { firstEventMs }), totalMs: Date.now() - started };
 }
 
 /** Test a paired draft, or a URL with a key already in Secrets. A pass is what Connect waits for. */
-export async function testConnection(given: { draft?: string; url?: string; secret?: string }): Promise<AgentTest> {
+export async function testConnection(given: { draft?: string; url?: string; secret?: string; kind?: RemoteKind }): Promise<AgentTest> {
   if (given.draft) {
     const d = draftOf(given.draft);
-    const r = await testAgent(d.url, d.key);
+    const r = await testAgent(d.url, d.key, d.kind);
     d.tested = r.ok;
     return r;
   }
-  const { url, key, tested } = await manual(given.url, given.secret);
-  const r = await testAgent(url, key);
+  const { url, key, tested, kind } = await manual(given.url, given.secret, given.kind);
+  const r = await testAgent(url, key, kind);
   if (r.ok) testedManual.set(tested, Date.now());
   return r;
 }
 
 /** A URL and a secret from Secrets, checked, with the key read from this machine's store. */
-async function manual(rawUrl: string | undefined, secret: string | undefined) {
+async function manual(rawUrl: string | undefined, secret: string | undefined, kind: RemoteKind = 'runs-api') {
   const url = base(rawUrl ?? '');
   const bad = urlProblem(url) ?? secretProblem(secret ?? '');
   if (bad) throw refused(bad);
   const key = await globalSecret(secret!).catch(() => null);
   if (!key) throw refused(`${secret} is not set in Secrets on this machine. Add the agent's key there first.`);
-  return { url, key, tested: `${url}\n${secret}` };
+  // The kind is part of what passed: a key tested as one protocol does not connect as the other.
+  return { url, key, kind, tested: `${kind}\n${url}\n${secret}` };
 }
 
 // ---------- connect ----------
@@ -413,6 +484,8 @@ export interface ConnectRequest {
   draft?: string;
   url?: string;
   secret?: string;
+  /** The protocol a manual connection speaks. A paired draft knows its own. */
+  kind?: RemoteKind;
   bills?: string;
   /** Make a crew role bound to it (decision F8, on by default). */
   role: boolean;
@@ -448,7 +521,7 @@ export async function connectAgent(req: ConnectRequest, ctx: () => CrewSaveConte
   if (!name) throw refused('Give the agent a name.');
   prune();
   const d = req.draft ? draftOf(req.draft) : null;
-  const m = d ? null : await manual(req.url, req.secret);
+  const m = d ? null : await manual(req.url, req.secret, req.kind);
   if (d ? !d.tested : !testedManual.has(m!.tested)) throw refused('Run the test first: Omni connects an agent only once a test turn passed.', 409);
   const secret = d ? agentKeyName(req.slug) : req.secret!;
   if (d && hasSecret('global', secret)) throw refused(`A secret named ${secret} already exists. Pick another id, or remove that secret first.`, 409);
@@ -461,7 +534,7 @@ export async function connectAgent(req: ConnectRequest, ctx: () => CrewSaveConte
     }
     const harness = saveCustomHarness(
       req.slug,
-      { name, url: d ? d.url : m!.url, secret, ...(req.bills?.trim() && { bills: req.bills.trim().slice(0, 160) }) },
+      { name, kind: d ? d.kind : m!.kind, url: d ? d.url : m!.url, secret, ...(req.bills?.trim() && { bills: req.bills.trim().slice(0, 160) }) },
       { create: true, ...(d && { pairing: { keyId: d.keyId, at: d.pair, sharedKey: d.sharedKey, revoke: d.revoke, secretMade: true, secret } }) },
     );
     made.harness = req.slug;
@@ -546,7 +619,7 @@ export async function testSaved(slug: string): Promise<AgentTest> {
   if (h.error) return { ok: false, failed: 'probe', detail: h.error };
   const key = await globalSecret(h.secret).catch(() => null);
   if (!key) return { ok: false, failed: 'probe', detail: `Key not on this machine: set ${h.secret} in Secrets.` };
-  const r = await testAgent(h.url, key);
+  const r = await testAgent(h.url, key, h.kind);
   await checkCustomHarness(h.id);
   return r;
 }

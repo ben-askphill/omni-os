@@ -233,8 +233,12 @@ The AI tool a thread runs in, together with the plan it bills: Claude Code, Code
 _Avoid_: Agent (what a thread runs as), provider, engine, backend, runtime
 
 **Custom harness**:
-A remote AI service the user registered on a server of their own, which Omni reaches the same way it reaches Hermes.
+A remote AI service the user registered on a server of their own: one that speaks the Runs API, as Hermes does, or an eve agent.
 _Avoid_: Agent, remote agent (an agent bound to one), provider, engine, plugin
+
+**eve agent**:
+An AI service built on Vercel's eve framework, which Omni runs threads on as a custom harness through eve's own API.
+_Avoid_: Vercel agent, eve harness, Nomos (one eve agent, not the kind)
 
 **Account**:
 Who a harness is signed in as on one machine, with its plan.
@@ -338,7 +342,7 @@ A browser, phone app or desktop window signed in to one machine's Omni, which th
 _Avoid_: Device (alone), machine, session
 
 **Pairing**:
-Signing a phone, browser or app in to a machine with a one-time code made somewhere already signed in.
+Signing a phone, browser or app in to a machine, or a machine in to a custom harness, with a one-time code made somewhere already signed in.
 _Avoid_: Login, linking
 
 **Install token**:

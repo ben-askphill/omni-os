@@ -15,6 +15,8 @@ const refused = (message: string, status: 400 | 404 | 409 = 400) => Object.assig
 export const customHarnessSave = z
   .object({
     name: z.string().trim().min(1, 'Give the harness a name.').max(80),
+    /** The wire protocol. Left out, an edit keeps the file's, and a new file speaks the Runs API. */
+    kind: z.enum(['runs-api', 'eve']).optional(),
     url: z.string().trim().min(1, "Give the server's URL.").max(500),
     secret: z.string().trim().max(64),
     bills: z.string().trim().max(160).optional(),
@@ -34,7 +36,7 @@ function savedText(old: string | null, save: CustomHarnessSave, pairing?: Harnes
   const url = save.url.replace(/\/+$/, '');
   if (!pairing && (doc.get('url') !== url || doc.getIn(['auth', 'secret']) !== save.secret)) doc.delete('pairing');
   doc.set('name', save.name);
-  doc.set('kind', 'runs-api');
+  doc.set('kind', save.kind ?? (typeof doc.get('kind') === 'string' ? doc.get('kind') : 'runs-api'));
   doc.set('url', url);
   doc.setIn(['auth', 'scheme'], 'bearer');
   doc.setIn(['auth', 'secret'], save.secret);

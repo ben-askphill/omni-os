@@ -9,7 +9,7 @@ A harness is the AI CLI a thread runs on. Pick one per channel (its default) or 
 | Cursor Agent | Cursor plan | `curl https://cursor.com/install -fsS \| bash && cursor-agent login` | `cursor-agent` |
 | Hermes | Anthropic API | On your own Linux server, see [below](#hermes-remote) | HTTP over Tailscale ([ADR 0003](../adr/0003-hermes-remote-harness.md)) |
 | Cursor Cloud | Cursor plan | Secret `CURSOR_API_KEY`, see [below](#cursor-cloud) | A Cursor cloud agent, through the Cloud Agents API |
-| Custom harness | What its server bills | A file in `data/harnesses/`, see [below](#custom-harnesses) | HTTP, the [Runs API](../internals/remote-harness-protocol.md) ([ADR 0017](../adr/0017-custom-harnesses.md)) |
+| Custom harness | What its server bills | A file in `data/harnesses/`, see [below](#custom-harnesses) | HTTP, the [Runs API](../internals/remote-harness-protocol.md) ([ADR 0017](../adr/0017-custom-harnesses.md)), or an [eve agent's own API](#eve-agents) ([ADR 0018](../adr/0018-eve-agents.md)) |
 
 - `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN` and `OMNI_CURSOR_BIN` in `.env` point at a binary that is not on `PATH`. Without one, Codex also tries the copy inside the ChatGPT app.
 - A harness Omni can't use shows why in the model picker, Settings > Models and the error `delegate` gets. Claude Code is asked with `claude auth status --json`: signed out reads as `claude auth login`, no `claude` on `PATH` as missing, and a CLI too old to answer stays available. For Codex that is one of: signed out (`codex login`), signed in with an API key, no `codex` on `PATH`, a binary that won't run, `codex app-server` exiting before it answers (with the last line it printed), or no answer to a request. A server busy with disk writes does not count as no answer.
@@ -123,21 +123,43 @@ The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of t
 
 ## Custom harnesses
 
-A custom harness is another AI service on a server of your own, such as a second Hermes or one you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Models > Harnesses lists each one with a Remote mark, its host and the secret its key is in, and Test connection, Edit and Remove under it.
+A custom harness is another AI service on a server of your own, such as a second Hermes or one you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes, or an [eve agent](#eve-agents) such as Nomos. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Models > Harnesses lists each one with a Remote mark, its host and the secret its key is in, and Test connection, Edit and Remove under it.
 
 ### Connect a harness
 
 **Connect a harness** on the Harnesses card (and on the Harnesses step of setup) adds one without pasting its key. The same sheet runs on desktop web, the phone layout and the desktop app.
 
-1. **On a Hermes server**, run the pairing helper the sheet shows, pinned to this build: `curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh`. It prints an `omni://connect-agent` link, a QR code when `qrencode` is installed, and an address and code to type. It makes `API_SERVER_KEY` in Hermes's `.env` when there is none (restart Hermes after), and answers one pairing for at most 10 minutes.
-2. **Find.** Click the link (the desktop app opens it), or paste it, a bare address, or the helper's address and code into the sheet. Omni looks at the address without a key and shows what it found: its name and host, whether it is on this machine, the tailnet or https, and chips for what a thread on it can and cannot do. Plain `http://` off the tailnet, an address this machine cannot reach, and A2A or eve agents (later versions) say why they cannot connect.
-3. **Sign in.** With a code, **Pair** redeems it server to server: the key goes into this machine's server and never reaches the page. Without one, pick the secret in Secrets that holds the key, or add it there from the sheet.
+1. **On a Hermes server**, run the pairing helper the sheet shows, pinned to this build: `curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh`. It prints an `omni://connect-agent` link, a QR code when `qrencode` is installed, and an address and code to type. It makes `API_SERVER_KEY` in Hermes's `.env` when there is none (restart Hermes after), and answers one pairing for at most 10 minutes. **For an eve agent** there is nothing to run: go straight to Find with its address.
+2. **Find.** Click the link (the desktop app opens it), or paste it, a bare address, or the helper's address and code into the sheet. Omni looks at the address without a key and shows what it found: its name and host, what kind of agent it is, whether it is on this machine, the tailnet or https, and chips for what a thread on it can and cannot do. Plain `http://` off the tailnet, an address this machine cannot reach, a Vercel deployment behind Vercel's login wall, and A2A agents (a later version) say why they cannot connect.
+3. **Sign in.** With a code, **Pair** redeems it server to server: the key goes into this machine's server and never reaches the page. An eve agent that pairs shows **Get a code**, which opens its own Connect Omni page in a new tab or your browser: sign in there if it asks, copy the code, paste it in the sheet and press Pair. Without pairing, pick the secret in Secrets that holds the key, or add it there from the sheet.
 4. **Test.** One short turn on its own session ("Reply with one line: your name and the model you run on"), with the reply, the model, the time it took and its tokens, or which step failed and what came back.
 5. **Connect** saves only after the test passed: a paired key as the global secret `AGENT_<SLUG>_KEY`, the harness file, and with **Make an agent for it** (on by default) an agent of the same id bound to it, delegatable and with no powers. A failure at any step undoes the steps before it.
 
 A link never reaches out to anything by itself: it fills the sheet in, you press Find to look the harness up, and Connect once its test turn passed. `#/settings/models?connect=<link>` opens the same sheet on a phone or in a browser. **Remove** revokes the key at the agent when it offers that, deletes the secret Connect made for it (a secret you picked yourself stays), and deletes the file here and on your other machines. Editing its address or secret first makes Remove skip the revoke and leave every secret alone, since the paired key may not be the one the file names any more. Hermes gives every machine the same key, so to cut one machine off, change `API_SERVER_KEY` on the server. Agent threads cannot connect, change, test or remove one (403); the Conductor hands you the page instead.
 
-You can still write the file by hand, or `POST /api/harnesses/custom/<slug>` with `{ name, url, secret, bills?, family?, cap?, capabilities? }` (`PUT` to change it, `DELETE` to remove it).
+### eve agents
+
+An eve agent is an AI service built on Vercel's [eve](https://eve.dev) framework, such as Nomos. Omni talks to its own API (`/eve/v1`, the one eve's web chat and terminal use), so the agent needs no Runs API, and Omni needs no Vercel connector or Vercel API. Its file says `kind: eve`.
+
+- **Signing in.** eve has no built-in key: each agent decides who may call it. To connect with one sign-in step, the agent serves Omni's pairing route and a Connect Omni page that shows a one-time code to whoever is signed in to its own web chat ([protocol](../internals/remote-harness-protocol.md#eve-agents)). The key Omni gets acts as that signed-in owner, so a thread reaches the same connections (Notion, say) the web chat does. An agent without the route connects with a key from Secrets that its route auth takes as a bearer token.
+- **On Vercel**, turn Vercel Authentication off for the production deployment (project Settings > Deployment Protection), or nothing outside Vercel reaches the agent. The agent's own sign-in guards it then, so check it refuses strangers first. Find says so when it meets the wall.
+- **Remove** revokes the key at the agent. Nomos stops taking it within 30 seconds.
+
+| Piece | What |
+| --- | --- |
+| Session | One eve session per thread. Omni keeps eve's session id as the thread's (`omni-eve-<id>`), so later turns and a restart continue it. A session eve ended (after 30 days, say) is replaced by a new one, without the earlier context |
+| Prompt | Omni's prompt goes as client context on the session's first message |
+| Mid-turn messages | Wait for the turn to end and go as the next one: eve's steer would cancel the running turn and start again |
+| Stop | Cancels the turn |
+| In the thread | Reply text, a row per tool call and subagent, token counts and the model, from eve's event stream |
+| Approvals and sign-ins | The thread shows a status line saying what the agent is waiting for. Answer it in the agent's own chat: Omni cannot answer yet |
+| Attachments | Described in the message, not sent |
+
+Nomos's own setup: the Connect Omni page is `/omni`, behind its web login, and a deployment refuses to open its chat until `NOMOS_WEB_PASSWORD` is set.
+
+### The harness file
+
+You can still write the file by hand, or `POST /api/harnesses/custom/<slug>` with `{ name, kind?, url, secret, bills?, family?, cap?, capabilities? }` (`PUT` to change it, `DELETE` to remove it). `kind` is `runs-api` (the default) or `eve`.
 
 ```yaml
 name: Hermes on Hetzner
@@ -156,7 +178,7 @@ capabilities:
 - **The key** is the secret the file names, set in Settings > Secrets on each machine. The file syncs to your other machines; the key does not, and a machine without it shows the harness as not ready, naming the secret. The key goes only on that server's requests, never into a thread's environment. A file cannot name one of Omni's own credentials or any `OMNI_` name.
 - **The URL** is `https://`, or plain `http://` only to this machine or a Tailscale address. Omni never follows a redirect.
 - **An agent binds to it by id**: `harness: custom:hermes-hetzner` with `model: default`. The Conductor sees it in `list_harnesses`. Auto never picks it.
-- **What it runs like**: a Hermes thread. No worktree, browser, Omni tools, channel secrets or plan meter; Omni's prompt goes as `instructions`; it cannot run the Conductor or any delegate-only agent, or run below Full access. Its replies come from a server outside Omni.
+- **What it runs like**: a Hermes thread (an eve agent differs where [eve agents](#eve-agents) says). No worktree, browser, Omni tools, channel secrets or plan meter; Omni's prompt goes as `instructions`; it cannot run the Conductor or any delegate-only agent, or run below Full access. Its replies come from a server outside Omni.
 - **Only you** add, change or remove one: an agent thread, a Google or Omni Connect session and an app paired by code get a 403. It takes the install token or a browser paired with it.
 - **Removing one** keeps its threads readable. They do not run again, on it or on any other harness, until a harness with that id is back.
 

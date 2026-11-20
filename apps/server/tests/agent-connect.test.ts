@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 import { startFakeHermes, type FakeHermes } from './fake-hermes.ts';
+import { startFakeEve, type FakeEve } from './fake-eve.ts';
 
 const CODE = 'GB8Z-DP5J-0TGX-R608-WYSB-WV2T-G8SV';
 
@@ -314,5 +315,65 @@ describe('who may connect an agent', () => {
     expect(pair.redeems).toEqual([]);
     expect(existsSync(harnessFile('box'))).toBe(true);
     expect(existsSync(harnessFile('sneaky'))).toBe(false);
+  });
+});
+
+describe('an eve agent', () => {
+  let eve: FakeEve;
+  beforeAll(async () => {
+    eve = await startFakeEve('eve-paired-key-0123456789');
+  });
+  afterAll(async () => {
+    await eve.close();
+  });
+  beforeEach(() => eve.reset());
+
+  it('is found at its own address: what it says it is, its Connect Omni page on its own host, and what a thread on it can do', async () => {
+    const f = (await post('harnesses/connect/find', { url: eve.url })).json;
+    expect(f).toMatchObject({ kind: 'eve', supported: true, signIn: 'pairing', name: 'Nomos', description: 'An eve agent for tests.', url: eve.url, codeUrl: `${eve.url}/omni` });
+    expect(f.problem).toBeUndefined();
+    expect(f.can).not.toContain('Steer');
+    expect(f.cannot).toEqual(expect.arrayContaining(['Steering', 'Approvals']));
+    // A code page on another host is not offered.
+    eve.offer = { name: 'Nomos', code_url: 'https://evil.example.com/omni' };
+    expect((await post('harnesses/connect/find', { url: eve.url })).json.codeUrl).toBeUndefined();
+    // No pairing route: a key from Secrets.
+    eve.offer = null;
+    expect((await post('harnesses/connect/find', { url: eve.url })).json).toMatchObject({ kind: 'eve', supported: true, signIn: 'key', name: `eve agent on ${new URL(eve.url).host}` });
+  });
+
+  it('pairs with the code from its page, tests over eve\'s own API, and connects as a kind: eve harness', async () => {
+    const paired = await post('harnesses/connect/pair', { url: eve.url, code: eve.code, name: 'Nomos', kind: 'eve' });
+    expect(paired.status).toBe(200);
+    expect(paired.json).toMatchObject({ url: eve.url, name: 'Nomos', sharedKey: false, revoke: true });
+    expect(paired.text).not.toContain(eve.key);
+    const tested = await post('harnesses/connect/test', { draft: paired.json.draft });
+    expect(tested.json).toMatchObject({ ok: true, reply: 'You have two reminders.', model: 'deepseek/deepseek-v4-pro', tokens: { input: 40, output: 9 } });
+    expect(eve.calls.find((c) => c.path === '/eve/v1/info')?.authorization).toBe(`Bearer ${eve.key}`);
+    // The test's own session is retired after.
+    expect(eve.calls.some((c) => c.path.endsWith('/reset'))).toBe(true);
+    const done = await post('harnesses/connect', { slug: 'nomos', name: 'Nomos', draft: paired.json.draft, role: false });
+    expect(done.status).toBe(201);
+    expect(done.json.harness).toMatchObject({ id: 'custom:nomos', kind: 'eve', url: eve.url, secret: 'AGENT_NOMOS_KEY', pairing: { keyId: 'omni-k1', revoke: true } });
+    expect(done.json.harness.catalog).toMatchObject({ available: true, capabilities: { steer: false } });
+    expect(readFileSync(harnessFile('nomos'), 'utf8')).toMatch(/kind: eve/);
+    expect(await secretValue('AGENT_NOMOS_KEY')).toBe(eve.key);
+    // Remove revokes the key at the agent.
+    const gone = await app.request('/api/harnesses/custom/nomos', { method: 'DELETE' });
+    expect((await gone.json()) as unknown).toMatchObject({ revoked: true, secret: 'AGENT_NOMOS_KEY' });
+  });
+
+  it('says how to get past Vercel\'s login wall instead of calling it unreachable', async () => {
+    const server = createServer((req, res) => {
+      res.writeHead(302, { location: `https://vercel.com/sso-api?url=${encodeURIComponent(`https://x.vercel.app${req.url}`)}` });
+      res.end();
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const at = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      expect((await post('harnesses/connect/find', { url: at })).json.problem).toMatch(/Vercel's login wall.*Deployment Protection/);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
   });
 });

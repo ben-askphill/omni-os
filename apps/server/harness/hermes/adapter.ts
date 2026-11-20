@@ -14,7 +14,8 @@ import { CAPABILITIES, type AnyHarnessId, type HarnessCapabilities } from '../ty
 import { missingHarness, providerWhere, runsApiTarget, type RunsApiTarget } from '../registry.ts';
 import { remoteDelegateOnlyRefusal } from '../../crew.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
-import { HermesClient, HermesHttpError, sleep } from './client.ts';
+import { HermesHttpError, sleep } from './client.ts';
+import { remoteClient, type RemoteClient } from '../remote.ts';
 import { userName } from '../../profile.ts';
 import { applyHermesEvent, emptyHermesNorm, eventFromRun, type HermesNormState } from './normalize.ts';
 
@@ -54,10 +55,10 @@ export const hermesAdapter: HarnessAdapter = {
     const thread = ctx.thread;
     // The thread's harness says which server: Hermes, or a custom harness's file, read as the session starts.
     const harness = thread.harness as AnyHarnessId;
-    const target: RunsApiTarget = runsApiTarget(harness) ?? { id: harness, name: harness, url: '', keyName: '', capabilities: CAPABILITIES.hermes, fix: '', error: `No harness ${harness} on this machine.` };
+    const target: RunsApiTarget = runsApiTarget(harness) ?? { id: harness, name: harness, kind: 'runs-api', url: '', keyName: '', capabilities: CAPABILITIES.hermes, fix: '', error: `No harness ${harness} on this machine.` };
     const baseUrl = target.url;
     const apiKey = ctx.harnessKey ?? '';
-    const sessionId = sessionIdOf(thread);
+    let sessionId = sessionIdOf(thread);
     if (sessionId !== thread.session_id) cb.session(sessionId);
 
     // The API key is an HTTP header, never an env var: no process runs for this session.
@@ -71,7 +72,7 @@ export const hermesAdapter: HarnessAdapter = {
     // A resumed session already has Omni's prompt. Sending it again would pin it to the next user message.
     let sendInstructions = !ctx.resume;
     let sendPolicy = ctx.resume;
-    let client: HermesClient | null = null;
+    let client: RemoteClient | null = null;
     const seenSeq = new Set<number>();
     // Survives the turn's finally. The session's end can land after that finally cleared `runId`.
     let activeRunId: string | null = null;
@@ -205,6 +206,11 @@ export const hermesAdapter: HarnessAdapter = {
             created = await client!.createRun({ input, session_id: sessionId }, key, ac.signal);
           }
           sendPolicy = false;
+          // An eve agent names its own session: the thread keeps that id, so the next turn and a restart continue it.
+          if (created.session_id && created.session_id !== sessionId) {
+            sessionId = created.session_id;
+            cb.session(sessionId);
+          }
           runId = created.run_id;
           activeRunId = created.run_id;
           settled = false;
@@ -283,7 +289,7 @@ export const hermesAdapter: HarnessAdapter = {
       return session;
     }
 
-    client = new HermesClient(baseUrl, apiKey);
+    client = remoteClient(target.kind, baseUrl, apiKey);
     ready = true;
 
     return detachedSession(cb, {

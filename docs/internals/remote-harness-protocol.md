@@ -1,6 +1,6 @@
 # Remote harness protocol (Runs API v1)
 
-The HTTP shape Omni speaks to a remote agent that runs on its own server: Hermes, and every custom harness (`data/harnesses/<slug>.yaml`, [ADR 0017](../adr/0017-custom-harnesses.md)). Hermes Agent's API server serves it as is. Any other agent (an eve or Cloudflare agent, a home-made server) can join Omni by serving these routes. The client is `apps/server/harness/hermes/client.ts`; the adapter that drives it is `apps/server/harness/hermes/adapter.ts`; the fake the tests run against is `apps/server/tests/fake-hermes.ts`.
+The HTTP shape Omni speaks to a remote agent that runs on its own server: Hermes, and every custom harness (`data/harnesses/<slug>.yaml`, [ADR 0017](../adr/0017-custom-harnesses.md)). Hermes Agent's API server serves it as is. Any other agent (a Cloudflare agent, a home-made server) can join Omni by serving these routes. An eve agent needs none of them: Omni speaks eve's own API to it ([eve agents](#eve-agents), [ADR 0018](../adr/0018-eve-agents.md)) and shares only the transport rules and the pairing calls below. The client is `apps/server/harness/hermes/client.ts`; the adapter that drives it is `apps/server/harness/hermes/adapter.ts`; the fake the tests run against is `apps/server/tests/fake-hermes.ts`.
 
 ## Transport
 
@@ -55,6 +55,7 @@ How a server hands Omni its key without anyone pasting it ([Connect an agent](..
 
 | Call | Request | Answer |
 | --- | --- | --- |
+| `GET /v1/omni/pair` | | 405, which tells Omni the route is there. The body may offer `{ name, description, code_url }`: what the sheet shows before signing in, and the page (on the same host, relative or absolute) where the owner gets a code. Omni reads it for eve agents |
 | `POST /v1/omni/pair` | `{ code, client_id, client_name }`, no `Authorization` | 200 `{ protocol, key, key_id?, url?, name?, kind?, shared_key?, revoke? }`; 404 for a code that is unknown, used or expired (the same answer for all three); 429 after repeated misses from one address |
 | `POST /v1/omni/revoke` | `{ key_id }`, with the key as the bearer, at the pairing address | 204, after which the key no longer works. Only when the pair answer said `revoke: true` |
 
@@ -74,6 +75,27 @@ Hermes's API server has no pairing route and takes one key per profile (`API_SER
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh
 ```
+
+## eve agents
+
+An eve agent (`kind: eve`) is spoken to through eve's default HTTP channel, the API eve's own web chat and terminal use. The client is `apps/server/harness/eve/client.ts`; it presents the same calls as the Runs API client, translating eve's stream into the events above, so the adapter, the test turn and the transcript are shared. The fake the tests run against is `apps/server/tests/fake-eve.ts`.
+
+| eve call | Omni's use |
+| --- | --- |
+| `GET /eve/v1/health` | Find, without a key: a 200 means an eve agent answers here |
+| `GET /eve/v1/info` | The availability probe, with the key: 200 up, 401 or 403 the key refused. It costs no model call, and names the model for the test |
+| `POST /eve/v1/session` `{ message, operationId, clientContext? }` | A thread's first turn. `operationId` is the message's uuid, so a retry returns the same session. `clientContext` carries Omni's prompt. The answer's `sessionId` becomes the thread's session id, `omni-eve-<sessionId>` |
+| `POST /eve/v1/session/{id}` `{ message, turnPolicy: "queue" }` | Every later turn. A 409 (the session ended) starts a new session instead |
+| `GET /eve/v1/session/{id}/stream?startIndex=-1&includeTailIndex=1` | Before a later turn: the tail index, so the run reads from the next event on |
+| `GET /eve/v1/session/{id}/stream?startIndex=<n>` | The run's events, NDJSON. A reconnect reads the run from its start again; the adapter skips what it has seen by `seq` (the stream index) |
+| `POST /eve/v1/session/{id}/cancel` | Stop |
+| `POST /eve/v1/session/{id}/reset` | Retires the test turn's session after Connect's test |
+
+- **A run is one turn**: events count from the run's first `turn.started`; a terminal event before it belongs to the turn before and is skipped.
+- **Mapping**: `message.appended` is reply text and `message.completed` its finished block; `actions.requested` and `action.result` are tool rows (subagent calls are task rows); `step.started` names the model and `step.completed` adds up the tokens; `turn.completed`, `turn.failed` and `turn.cancelled` end the run. `input.requested` and `authorization.required` become a status line saying to answer in the agent's own chat; a turn that parks on one ends at `session.waiting` with what it said so far.
+- **No steer**: eve's steer cancels the running turn and starts another, so `kind: eve` has steering off and a message sent mid-turn waits for the next turn.
+- **Signing in**: eve has no key of its own; each agent's route auth decides. To pair, the agent serves `GET` and `POST /v1/omni/pair` and `POST /v1/omni/revoke` at its root (not under `/eve/v1`, which eve owns; a Next.js app with `withEve` serves them as route handlers, since only `/eve/v1/**` reaches the eve runtime there), shows codes on a page behind its own sign-in, and accepts the key it hands out in its `eveChannel` auth. Nomos (`ben-askphill/nomos`: `agent/lib/omni-pairing.ts`, `app/v1/omni/`, `app/omni/`) is the reference: stateless HMAC codes (a nonce and an expiry, used once), keys `omni_<id>_<hmac>`, and a revoked list.
+- **Vercel's login wall** (Vercel Authentication) redirects every path to `vercel.com/sso-api`. Find says how to turn it off for production instead of calling the agent unreachable.
 
 ## Later additions
 

@@ -1,6 +1,6 @@
 // Custom harnesses: remote agents the user registers, one YAML file each in data/harnesses/<slug>.yaml, with the id
-// `custom:<slug>`. Each speaks the Runs API (docs/internals/remote-harness-protocol.md), as Hermes does, and runs on the
-// generalized Hermes adapter (hermes/adapter.ts). ADR 0017.
+// `custom:<slug>`. Each speaks the Runs API (docs/internals/remote-harness-protocol.md), as Hermes does, or is an eve
+// agent (`kind: eve`, eve's own API, ADR 0018), and runs on the generalized Hermes adapter (hermes/adapter.ts). ADR 0017.
 //
 //   name: Hermes on Hetzner
 //   kind: runs-api
@@ -30,17 +30,21 @@ import { CUSTOM_HARNESS_PREFIX, CUSTOM_HARNESS_SLUG, customHarnessSlug, type Cus
 import { config, paths } from '../config.ts';
 import { NAME_RE, omniCredential } from '../secret-names.ts';
 import { HERMES_KEY } from './env-guard.ts';
+import type { RemoteKind } from './remote.ts';
 import { RUNS_API_CAPABILITIES, type HarnessCapabilities } from './types.ts';
 
 /** The wire protocols this build speaks. A2A and others come in later slices. */
-const KINDS = ['runs-api'] as const;
+const KINDS = ['runs-api', 'eve'] as const satisfies readonly RemoteKind[];
+
+/** What a kind offers before a file turns anything off. eve's steer cancels the turn, so Omni queues instead. */
+const KIND_CAPABILITIES: Record<RemoteKind, HarnessCapabilities> = { 'runs-api': RUNS_API_CAPABILITIES, eve: { ...RUNS_API_CAPABILITIES, steer: false } };
 
 /** A custom harness as its file says, checked. */
 export interface CustomHarness {
   id: CustomHarnessId;
   slug: string;
   name: string;
-  kind: 'runs-api';
+  kind: RemoteKind;
   /** The base URL, without a trailing slash. */
   url: string;
   /** The URL's host and port, for the UI. */
@@ -196,15 +200,17 @@ export function parseHarnessFile(slug: string, text: string): CustomHarness {
   } catch {
     // urlProblem says why below.
   }
+  const kind = raw.kind ?? 'runs-api';
+  if (typeof kind !== 'string' || !(KINDS as readonly string[]).includes(kind)) return { ...h, error: `kind "${String(kind)}" needs a newer Omni. This one speaks: ${KINDS.join(', ')}.` };
+  h.kind = kind as RemoteKind;
   // A file can turn a capability off, never on: the adapter does not have what the protocol does not offer.
   const caps = raw.capabilities ?? {};
-  h.capabilities = { ...RUNS_API_CAPABILITIES, steer: caps.steer !== false, interrupt: caps.interrupt !== false };
+  const offered = KIND_CAPABILITIES[h.kind];
+  h.capabilities = { ...offered, steer: offered.steer && caps.steer !== false, interrupt: offered.interrupt && caps.interrupt !== false };
   if (raw.cap !== undefined) {
     if (typeof raw.cap === 'number' && Number.isInteger(raw.cap) && raw.cap >= 1 && raw.cap <= MAX_CAP) h.cap = raw.cap;
     else return { ...h, error: `cap is a whole number from 1 to ${MAX_CAP}.` };
   }
-  const kind = raw.kind ?? 'runs-api';
-  if (typeof kind !== 'string' || !(KINDS as readonly string[]).includes(kind)) return { ...h, error: `kind "${String(kind)}" needs a newer Omni. This one speaks: ${KINDS.join(', ')}.` };
   if (!plain(raw.name, 80)) return { ...h, error: 'Give the harness a name.' };
   if (!h.url) return { ...h, error: "Give the server's URL (url)." };
   const scheme = raw.auth?.scheme ?? 'bearer';
