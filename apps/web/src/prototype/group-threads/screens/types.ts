@@ -21,6 +21,8 @@ export interface Screen {
   id: number;
   name: string;
   place: Place;
+  /** Ben's pick (2026-11-20): the variant the page opens on. The others stay behind the switcher. */
+  pick: string;
   /** A switch only this screen reads, shown in the bar. */
   toggle?: { key: string; label: string };
   variants: Variant[];

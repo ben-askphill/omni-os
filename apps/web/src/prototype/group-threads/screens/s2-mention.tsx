@@ -1,10 +1,11 @@
 // PROTOTYPE, throwaway. Screen 2: the `@` agent mention. Above: Ben's message that named Reviewer and Hermes seated
 // them, and both reply in parallel. Below: Ben picks a third agent to seat (Designer), so the menu shows who sits here
-// and who would join.
+// and who would join. Ben's pick: A, the one `@` menu, with B's hint line under the composer saying who gets the
+// message. "Menu off" shows the message once Designer is picked.
 import type { ReactNode } from 'react';
 import { AGENTS, CHANNELS, GROUP, THREAD, type AgentId, type Msg } from '../data.ts';
 import { Messages } from '../messages.tsx';
-import { AgentAvatar, ComposerBox, DesktopThread, DividerLine, Facepile, MENU, PhoneComposer, PhoneThread, RemoteTag, RunPill, ThreadHead } from '../parts.tsx';
+import { AgentAvatar, ComposerBox, DesktopThread, DividerLine, Facepile, MENU, MentionPill, PhoneComposer, PhoneThread, RemoteTag, RunPill, ThreadHead } from '../parts.tsx';
 import { Icon, StatusDot } from '../../../components/ui.tsx';
 import { useParams } from '../url-state.ts';
 import type { Screen } from './types.ts';
@@ -92,7 +93,24 @@ function MixedMenu({ phone }: { phone?: boolean }) {
 }
 
 const typed = <>Can you also check the new mark is readable in dark mode @</>;
-/** The bar's "Menu off" switch: the composer at rest, so the parallel replies above it show. */
+/** A's message once Designer is picked: the pill, marked as joining. */
+const picked = (
+  <>
+    Can you also check the new mark is readable in dark mode <MentionPill id="designer" fresh />
+  </>
+);
+/** The hint line, taken from B: who gets the message as it stands. Before an agent is named, the lead. */
+const HINT_LEAD = (
+  <>
+    Goes to <span className="font-medium text-fg-2">Builder</span>, the lead. Name an agent to send it there instead.
+  </>
+);
+const HINT_PICKED = (
+  <>
+    Goes to <span className="font-medium text-fg-2">Designer</span> only. Designer joins this thread and stays until you remove it.
+  </>
+);
+/** The bar's "Menu off" switch: the menu closed, so the parallel replies above the composer show. */
 const useClosed = () => useParams().get('closed') === '1';
 
 function DesktopA() {
@@ -101,7 +119,7 @@ function DesktopA() {
     <DesktopThread
       head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} />}
       composer={
-        <ComposerBox text={closed ? undefined : typed} menu={closed ? null : <MixedMenu />}>
+        <ComposerBox text={closed ? picked : typed} menu={closed ? null : <MixedMenu />} hint={closed ? HINT_PICKED : HINT_LEAD}>
           <RunPill label="Builder · Opus 5.5" />
         </ComposerBox>
       }
@@ -114,7 +132,7 @@ function DesktopA() {
 function PhoneA() {
   const closed = useClosed();
   return (
-    <PhoneThread title={THREAD.title} sub="#Omni OS · Builder and 2 more" composer={<PhoneComposer text={closed ? undefined : typed} menu={closed ? null : <MixedMenu phone />} />}>
+    <PhoneThread title={THREAD.title} sub="#Omni OS · Builder and 2 more" composer={<PhoneComposer text={closed ? picked : typed} menu={closed ? null : <MixedMenu phone />} hint={closed ? HINT_PICKED : HINT_LEAD} />}>
       <Transcript phone />
     </PhoneThread>
   );
@@ -226,9 +244,10 @@ export const mention: Screen = {
   id: 2,
   name: '@ agent mention',
   place: { kind: 'channel', channel: 'omni-os', hash: `#/t/${THREAD.id}` },
+  pick: 'A',
   toggle: { key: 'closed', label: 'Menu off' },
   variants: [
-    { key: 'A', name: 'One @ menu', idea: 'The @ menu Ben has today, agents on top: who sits here, then who would join, then machines and files.', desktop: desktopA, phone: phoneA },
+    { key: 'A', name: 'One @ menu', idea: 'The @ menu Ben has today, agents on top: who sits here, then who would join, then machines and files. A hint under the composer says who gets the message.', desktop: desktopA, phone: phoneA },
     { key: 'B', name: 'To line', idea: 'Recipients as chips above the message, the lead by default; + Agent seats a new one. @ in the text adds a chip.', desktop: desktopB, phone: phoneB },
   ],
 };

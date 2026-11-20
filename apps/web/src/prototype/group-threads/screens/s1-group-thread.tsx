@@ -8,13 +8,14 @@ import type { Screen } from './types.ts';
 
 const OMNI = { name: 'Omni OS', bg: '#17181a' };
 
-function Quick() {
+/** The quick card with the thread's agents: the lead's face and name, then the members' faces. Screen 3 keeps it. */
+export function GroupQuick({ status = 'Done · 3 agents', running = [] }: { status?: string; running?: ('builder' | 'reviewer' | 'hermes')[] }) {
   return (
     <QuickCard>
       <QuickTop />
       <QuickRow icon="delegate">
         <span className="shrink-0 text-fg-3">Lead</span>
-        <AgentAvatar a={AGENTS.builder} size={18} />
+        <AgentAvatar a={AGENTS.builder} size={18} ring={running.includes('builder')} />
         <span className="truncate">Builder</span>
       </QuickRow>
       <QuickRow icon="user">
@@ -23,7 +24,7 @@ function Quick() {
         <span className="truncate">Reviewer, Hermes</span>
       </QuickRow>
       <TechRow />
-      <QuickBottom status="Done · 3 agents" />
+      <QuickBottom status={status} />
     </QuickCard>
   );
 }
@@ -31,7 +32,7 @@ function Quick() {
 const desktop = (style: Style) => () => (
   <DesktopThread
     head={<ThreadHead channel={OMNI} title={THREAD.title} status="done" />}
-    quick={<Quick />}
+    quick={<GroupQuick />}
     composer={
       <ComposerBox>
         <RunPill label="Builder · Opus 5.5" />
@@ -60,6 +61,7 @@ export const groupThread: Screen = {
   id: 1,
   name: 'Group thread',
   place: { kind: 'channel', channel: 'omni-os', hash: `#/t/${THREAD.id}` },
+  pick: 'A',
   variants: [
     { key: 'A', name: 'Gutter', idea: 'Avatar in a left gutter, bold name over the reply, chat style.', desktop: desktop('gutter'), phone: phone('gutter') },
     { key: 'B', name: 'Byline', idea: 'A 20px avatar and the name on a quiet line over the reply, as the phone already shows the Conductor.', desktop: desktop('byline'), phone: phone('byline') },

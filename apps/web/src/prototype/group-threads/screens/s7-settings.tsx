@@ -356,6 +356,7 @@ export const settings: Screen = {
   id: 7,
   name: 'Settings > Agents',
   place: { kind: 'settings', hash: '#/settings/crew' },
+  pick: 'B',
   toggle: { key: 'local', label: 'Local agent' },
   variants: [
     { key: 'A', name: 'Editor modal', idea: 'Today’s list and editor; a remote agent gets a Remote tag, and its server is a fold at the foot of the editor.', desktop: desktopA, phone: phoneA },

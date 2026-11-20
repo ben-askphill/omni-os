@@ -24,7 +24,12 @@ import {
 } from '../parts.tsx';
 import { Button, Icon, IconButton, StatusDot } from '../../../components/ui.tsx';
 import { MoRound } from '../../../mobile/parts.tsx';
+import { GroupQuick } from './s1-group-thread.tsx';
+import { useParams } from '../url-state.ts';
 import type { Screen } from './types.ts';
+
+/** The bar's "List off" switch: the facepile at rest, so the quick card's faces show beside it. */
+const useListOff = () => useParams().get('closed') === '1';
 
 const LIST: Msg[] = [...GROUP.slice(0, 6), { id: 7, author: 'builder', at: '12:14', text: '', steps: '3 steps · Editing sync-thread.test.ts', running: 'Adding the failed case' }];
 
@@ -128,14 +133,22 @@ function MembersPopover() {
   );
 }
 
-const desktopA = () => (
-  <div className="relative h-full">
-    <DesktopThread head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} right={<Pile open />} />} composer={composer}>
-      <Transcript />
-    </DesktopThread>
-    <MembersPopover />
-  </div>
-);
+function DesktopA() {
+  const off = useListOff();
+  return (
+    <div className="relative h-full">
+      <DesktopThread
+        head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} right={<Pile open={!off} />} />}
+        quick={<GroupQuick status="Working · Builder" running={['builder']} />}
+        composer={composer}
+      >
+        <Transcript />
+      </DesktopThread>
+      {!off && <MembersPopover />}
+    </div>
+  );
+}
+const desktopA = () => <DesktopA />;
 
 function PhoneSheet({ children }: { children: ReactNode }) {
   return (
@@ -148,7 +161,10 @@ function PhoneSheet({ children }: { children: ReactNode }) {
   );
 }
 
-const phoneA = () => (
+const phoneA = () => <PhoneA />;
+function PhoneA() {
+  const off = useListOff();
+  return (
   <div className="relative h-full">
     <PhoneThread
       title={THREAD.title}
@@ -165,7 +181,7 @@ const phoneA = () => (
     >
       <Transcript phone />
     </PhoneThread>
-    <PhoneSheet>
+    {!off && <PhoneSheet>
       <div className="flex items-baseline justify-between px-1 pb-1">
         <span className="text-[17px] font-semibold">In this thread</span>
         <span className="text-[12.5px] text-fg-3">3 agents</span>
@@ -177,9 +193,10 @@ const phoneA = () => (
         </div>
       ))}
       <p className="px-1 pt-2 text-[12.5px] text-fg-3">To add an agent, @ it in a message.</p>
-    </PhoneSheet>
+    </PhoneSheet>}
   </div>
-);
+  );
+}
 
 // ---------- B: a strip of members under the header ----------
 
@@ -341,8 +358,10 @@ export const members: Screen = {
   id: 3,
   name: 'Member list',
   place: { kind: 'channel', channel: 'omni-os', hash: `#/t/${THREAD.id}` },
+  pick: 'A',
+  toggle: { key: 'closed', label: 'List off' },
   variants: [
-    { key: 'A', name: 'Header facepile', idea: 'Avatars at the header’s right; the list opens as a popover (a sheet on the phone) with Remove per member.', desktop: desktopA, phone: phoneA },
+    { key: 'A', name: 'Header facepile', idea: 'Avatars at the header’s right; the list opens as a popover (a sheet on the phone) with Remove per member. The quick card keeps its Lead and Members faces.', desktop: desktopA, phone: phoneA },
     { key: 'B', name: 'Members strip', idea: 'A row of member chips under the title, always in sight, × to remove.', desktop: desktopB, phone: phoneB },
     { key: 'C', name: 'Quick card', idea: 'An Agents section in the quick card on desktop, and at the top of the thread’s Details on the phone.', desktop: desktopC, phone: phoneC },
   ],

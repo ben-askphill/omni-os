@@ -1,4 +1,5 @@
-// PROTOTYPE, throwaway: three ways an agent's reply can say who wrote it (screen 1). The other screens use Byline.
+// PROTOTYPE, throwaway: three ways an agent's reply can say who wrote it (screen 1). Ben picked the gutter (A), with
+// smaller avatars than first drawn (24px, was 30), so every screen draws its messages that way.
 import type { ReactNode } from 'react';
 import { AGENTS, type AgentId, type Msg } from './data.ts';
 import { AgentAvatar, BenBubble, Prose, RemoteTag, StepsFold, TechLine, Thinking } from './parts.tsx';
@@ -35,15 +36,15 @@ function Body({ m, phone }: { m: Msg; phone?: boolean }) {
 /** A: the avatar in a gutter beside the reply, the name over it. Consecutive replies from one agent share one head. */
 function Gutter({ m, phone, first }: { m: Msg; phone?: boolean; first: boolean }) {
   const a = AGENTS[m.author as AgentId];
-  const size = phone ? 28 : 30;
+  const size = 24;
   return (
     <div className="flex gap-3">
-      <div className="shrink-0 pt-0.5" style={{ width: size }}>
+      <div className="shrink-0" style={{ width: size }}>
         {first && <AgentAvatar a={a} size={size} ring={!!m.running} />}
       </div>
       <div className="min-w-0 flex-1">
         {first && (
-          <div className="mb-0.5 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[13px]">
+          <div className="mb-0.5 flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
             <Meta id={a.id} at={m.at} phone={phone} strong />
           </div>
         )}
@@ -89,7 +90,7 @@ export function Message({ m, prev, style, phone, fresh }: { m: Msg; prev?: Msg; 
   return <Byline m={m} phone={phone} />;
 }
 
-export function Messages({ list, style = 'byline', phone, fresh }: { list: Msg[]; style?: Style; phone?: boolean; fresh?: AgentId[] }) {
+export function Messages({ list, style = 'gutter', phone, fresh }: { list: Msg[]; style?: Style; phone?: boolean; fresh?: AgentId[] }) {
   return (
     <>
       {list.map((m, i) => (

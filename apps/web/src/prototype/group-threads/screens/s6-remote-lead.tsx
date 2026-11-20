@@ -35,7 +35,8 @@ const useRead = () => useParams().get('read') === '1';
 /** The note under a remote agent's reply when the channel keeps its files closed. */
 function ClosedNote() {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">
+    // pl-9: under the reply's text, past the 24px gutter avatar and its gap.
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 pl-9 text-[12px] text-fg-3">
       <Icon name="lock" size={12} className="shrink-0" />
       <span>Remote agents can’t read files in #Volero.</span>
       <a href="#" className="font-medium text-fg-2 underline underline-offset-2">
@@ -192,6 +193,7 @@ export const remoteLead: Screen = {
   id: 6,
   name: 'Remote lead, talk only',
   place: { kind: 'channel', channel: 'volero', hash: `#/t/${REMOTE_THREAD.id}` },
+  pick: 'A',
   toggle: { key: 'read', label: 'Read on' },
   variants: [
     { key: 'A', name: 'Quiet labels', idea: '“talks only” in the crumbs and the composer, a lock line under a reply that could not read files, Files in the quick card.', desktop: desktopA, phone: phoneA },

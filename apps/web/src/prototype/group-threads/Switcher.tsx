@@ -52,6 +52,7 @@ export function Switcher({ screens, screen, variant, tech, toggle, theme }: { sc
       </button>
       <span className="min-w-0 truncate px-1 font-semibold" title={v.idea}>
         {v.key} · {v.name}
+        {v.key === screen.pick && <span className="ml-1.5 rounded-full bg-[#17181a] px-1.5 py-px text-[10px] text-[#ffe14d]">PICK</span>}
       </span>
       <button type="button" aria-label="Next variant" className={btn} onClick={() => go(1)}>
         ›

@@ -283,6 +283,7 @@ export const parallel: Screen = {
   id: 4,
   name: 'Two running, collision',
   place: { kind: 'channel', channel: 'omni-os', hash: `#/t/${THREAD.id}` },
+  pick: 'B',
   variants: [
     { key: 'A', name: 'Inline', idea: 'Each running reply shows what it changed so far; the collision is a row in the transcript.', desktop: desktopA, phone: phoneA },
     { key: 'B', name: 'Lanes', idea: 'The parallel turn splits into a lane per agent with steps and files (tabs on the phone).', desktop: desktopB, phone: phoneB },

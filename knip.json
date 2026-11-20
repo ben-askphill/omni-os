@@ -60,7 +60,9 @@
     },
     "apps/web": {
       "entry": [
-        "tests/**/*.test.ts"
+        "tests/**/*.test.ts",
+        "src/prototype/group-threads/main.tsx",
+        "src/prototype/group-threads/capture.mjs"
       ],
       "ignoreDependencies": [
         "playwright"

@@ -33,7 +33,7 @@ function Prototype() {
   const mobile = useIsMobile();
   const { channelsLoaded } = useApp();
   const screen = SCREENS.find((s) => String(s.id) === q.get('s')) ?? SCREENS[0];
-  const vi = Math.max(0, screen.variants.findIndex((v) => v.key === (q.get('v') ?? 'A').toUpperCase()));
+  const vi = Math.max(0, screen.variants.findIndex((v) => v.key === (q.get('v') ?? screen.pick).toUpperCase()));
   const variant = screen.variants[vi];
   const tech = q.get('tech') === '1';
   const toggle = !!screen.toggle && q.get(screen.toggle.key) === '1';
