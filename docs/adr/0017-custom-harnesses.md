@@ -1,5 +1,7 @@
 # Custom harnesses: remote agents the user registers
 
+> Parts superseded by [ADR 0020](0020-remote-agents-are-agents.md), decided 2026-11-20 and not built yet: a remote agent is an agent, not a harness in the pickers, and "a remote agent gets nothing else" gains one exception, a worktree read tool in channels that allow it. The rest of this ADR stands.
+
 Omni had one remote agent of the user's own, Hermes: one URL in Settings and one global key, `HERMES_API_KEY` ([ADR 0003](0003-hermes-remote-harness.md)). A second server could not be added, the harness list was a fixed union of five ids, and a thread whose harness id Omni did not know ran on Claude Code (`adapterFor` fell back to it). Hermes's key also reached every local Claude Code, Codex and Cursor thread as an environment variable when it was set in Secrets. Slice B1 of Addendum A of the [user-defined crew plan](../plans/2026-11-18-user-defined-crew.md) opens the list. Ben took the addendum's recommendations E1 to E10.
 
 ## Decision
