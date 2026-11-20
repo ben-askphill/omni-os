@@ -344,11 +344,33 @@ function ThreadsSection() {
         <span id={settingAnchor('thread-features')} />
         <ServerOptions section="threads" />
       </div>
+      <OpenItemsSetting />
       <TemplatesCard />
       <div id={settingAnchor('automations')} className="scroll-mt-6">
         <LinkLine href={href.automations()}>Automations have their own page</LinkLine>
       </div>
     </>
+  );
+}
+
+/** The Open items card under a finished turn (packages/shared/display.ts): off by default, kept by the server for every machine. */
+function OpenItemsSetting() {
+  const { openItems } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="open-items" title="Open items">
+      <SwitchRow
+        title="Open items card"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="After a turn, a card under the reply lists the questions, decisions and blockers it left for you, with a field to answer each. Off, the reply still says the same and no card is made."
+        checked={openItems}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ openItems: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
   );
 }
 

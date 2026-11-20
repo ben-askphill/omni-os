@@ -747,7 +747,7 @@ server.registerTool(
     description:
       'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
       'its last model activity and the minutes since. `waits_for_sign_in`, when present, says which account it needs signed in before it starts. `open_items`, when present, lists what its last turn left for the user to resolve ' +
-      '(questions, decisions with options, blockers). Reading it never wakes the thread.',
+      '(questions, decisions with options, blockers), only while the Open items card setting is on. Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },
   },
   async ({ thread_id }) => text(await call(`/threads/${await threadId(thread_id)}/summary`)),
@@ -1312,7 +1312,7 @@ server.registerTool('settings', {
     `Read-only: ${USER}'s Omni settings on this machine and where each value comes from. config: data/omni.config.json (you, folders, integrations, ` +
     'network access, run-on machine, worktree retention). env_overrides: config fields an environment variable overrides now, by section.key. ' +
     'server_options: the .env options (models, threads, worktrees, port), each with its value, default and source (env or default). ' +
-    'display: Show technical details (technical) and the Shopify add-on (shopify), shared by every client. ' +
+    'display: Show technical details (technical), the Shopify add-on (shopify) and the Open items card (openItems), shared by every client. ' +
     `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets, and set_secret saves one here or on another synced machine.`,
   inputSchema: {},
 }, async () => {

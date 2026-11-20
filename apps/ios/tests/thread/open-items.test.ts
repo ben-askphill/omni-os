@@ -11,18 +11,22 @@ const all = storeOpenItems([question, decision, blocker]);
 
 describe('shownOpenItems', () => {
   it('lists the items of a finished turn', () => {
-    expect(shownOpenItems(thread({ status: 'done', open_items: all }), false)).toEqual([question, decision, blocker]);
+    expect(shownOpenItems(thread({ status: 'done', open_items: all }), false, true)).toEqual([question, decision, blocker]);
   });
 
   it('shows nothing while a turn runs, while a message waits or without items', () => {
-    expect(shownOpenItems(thread({ status: 'running', open_items: all }), false)).toEqual([]);
-    expect(shownOpenItems(thread({ status: 'queued', open_items: all }), false)).toEqual([]);
-    expect(shownOpenItems(thread({ status: 'done', open_items: all }), true)).toEqual([]);
-    expect(shownOpenItems(thread({ status: 'done', open_items: null }), false)).toEqual([]);
+    expect(shownOpenItems(thread({ status: 'running', open_items: all }), false, true)).toEqual([]);
+    expect(shownOpenItems(thread({ status: 'queued', open_items: all }), false, true)).toEqual([]);
+    expect(shownOpenItems(thread({ status: 'done', open_items: all }), true, true)).toEqual([]);
+    expect(shownOpenItems(thread({ status: 'done', open_items: null }), false, true)).toEqual([]);
+  });
+
+  it('shows nothing while the Open items card is off in Settings', () => {
+    expect(shownOpenItems(thread({ status: 'done', open_items: all }), false, false)).toEqual([]);
   });
 
   it('reads a malformed column as none', () => {
-    expect(shownOpenItems(thread({ status: 'done', open_items: '{oops' }), false)).toEqual([]);
+    expect(shownOpenItems(thread({ status: 'done', open_items: '{oops' }), false, true)).toEqual([]);
   });
 });
 
@@ -36,7 +40,7 @@ describe('answersWait', () => {
   it('keeps the card while the outbox holds a failed send', () => {
     expect(answersWait(false, { phase: 'failed' })).toBe(false);
     const t = thread({ status: 'done', open_items: all });
-    expect(shownOpenItems(t, answersWait(false, { phase: 'failed' }))).toHaveLength(3);
+    expect(shownOpenItems(t, answersWait(false, { phase: 'failed' }), true)).toHaveLength(3);
   });
 });
 

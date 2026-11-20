@@ -484,6 +484,22 @@
       ]
     },
     {
+      "id": "open-items",
+      "section": "threads",
+      "title": "Open items card",
+      "keywords": [
+        "open items",
+        "questions",
+        "decisions",
+        "blockers",
+        "answers",
+        "send answers",
+        "card",
+        "after a turn",
+        "distracting"
+      ]
+    },
+    {
       "id": "templates",
       "section": "threads",
       "title": "Templates",

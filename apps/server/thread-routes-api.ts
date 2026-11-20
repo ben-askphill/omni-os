@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { OWNER_MAX } from '@omni/shared/thread-owner.ts';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { readOpenItems } from '@omni/shared/open-items.ts';
+import { displayPrefs } from './display.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { stampMachineMentions } from './message-context/machine-mention.ts';
@@ -299,8 +300,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
     // It waits for a sign-in to an account it needs (runner/setup.ts holdForSignIn): which, and how to sign in.
     ...(t.setup === 'signin' && { waits_for_sign_in: t.setup_error }),
-    // What its last turn left open for the user (packages/shared/open-items.ts). Only while some are.
-    ...(t.open_items && { open_items: readOpenItems(t.open_items) }),
+    // What its last turn left open for the user (packages/shared/open-items.ts). Only while some are, and the Open items card is on.
+    ...(t.open_items && displayPrefs().openItems && { open_items: readOpenItems(t.open_items) }),
     // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
     session: sessionWarmth(t),
     // The agents it spawned that still run, as the thread panel's Running subagents list shows them.

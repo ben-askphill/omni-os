@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { StatusDot } from '../../components/StatusDot';
-import { useChannels, useLiveHub } from '../../live/react';
+import { useChannels, useLiveHub, useStore } from '../../live/react';
 import { useRemote } from '../../live/use-remote';
 import type { RootStackParamList } from '../../navigation/types';
 import { fontSize, lineHeight, mono, space, useOmniTheme } from '../../theme';
@@ -21,7 +21,7 @@ import { ListRow } from '../../ui/GroupedList';
 import { Text } from '../../ui/Text';
 import { channelTitle, runLabel } from '../channel-settings-model';
 import { harnessRows } from '../harness-model';
-import { ChoiceRow, Footnote, Group, ServerOptionsGroup, SettingsPage } from '../parts';
+import { ChoiceRow, Footnote, Group, ServerOptionsGroup, SettingsPage, SwitchRow } from '../parts';
 import { Loading, useSetup } from './OmniSections';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -72,7 +72,24 @@ export function ModelsSection() {
   );
 }
 
-/** Threads: where new threads run, then the session and usage-limit options from .env, then Automations. */
+/** The Open items card under a finished turn: kept by the server, so it changes every client (packages/shared/display.ts). */
+function OpenItemsGroup() {
+  const hub = useLiveHub();
+  const display = useStore(hub.display);
+  const [error, setError] = useState<string | null>(null);
+  // An older server has no switch.
+  if (!display) return null;
+  return (
+    <Group
+      title="Open items"
+      footer={error ?? 'After a turn, a card under the reply lists the questions, decisions and blockers it left for you, with a field to answer each. Off, the reply still says the same and no card is made. Every device.'}
+    >
+      <SwitchRow first title="Open items card" value={display.openItems} onValueChange={(on) => void hub.setDisplay({ openItems: on }).then(setError)} />
+    </Group>
+  );
+}
+
+/** Threads: where new threads run, the session and usage-limit options from .env, the Open items card, then Automations. */
 export function ThreadsSection() {
   const navigation = useNavigation<Nav>();
   const hub = useLiveHub();
@@ -117,6 +134,7 @@ export function ThreadsSection() {
         <Loading error={setup.error} retry={setup.reload} />
       )}
       <ServerOptionsGroup section="threads" title="Sessions, usage limits and thread features" />
+      <OpenItemsGroup />
       <Group footer="Threads that start on a schedule, a GitHub event or a webhook.">
         <ListRow first icon="automation" title="Automations" chevron onPress={() => navigation.navigate('Automations')} />
       </Group>

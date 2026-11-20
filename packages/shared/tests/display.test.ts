@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MARK, STATUS, type Glyph, type Mark } from '../status.ts';
-import { glyphLabel, markLabel, parseDisplay, parseDisplayPatch, PLAIN_GLYPH, PLAIN_MARK, plainDetail, showsCode, statusWord, term, TERMS } from '../display.ts';
+import { glyphLabel, markLabel, parseDisplay, sameDisplay, parseDisplayPatch, PLAIN_GLYPH, PLAIN_MARK, plainDetail, showsCode, statusWord, term, TERMS } from '../display.ts';
 
 const FIVE = ['Working', 'Needs you', 'Done', 'Failed', 'Stopped'];
 
@@ -55,10 +55,20 @@ describe('the switches', () => {
   });
 
   it('parses a stored value and a patch', () => {
-    expect(parseDisplay(null)).toEqual({ technical: false, shopify: false });
-    expect(parseDisplay({ technical: true })).toEqual({ technical: true, shopify: false });
+    expect(parseDisplay(null)).toEqual({ technical: false, shopify: false, openItems: false });
+    expect(parseDisplay({ technical: true })).toEqual({ technical: true, shopify: false, openItems: false });
+    expect(parseDisplay({ openItems: true })).toEqual({ technical: false, shopify: false, openItems: true });
+    expect(parseDisplay({ openItems: 'yes' }).openItems).toBe(false);
     expect(parseDisplayPatch({ shopify: true })).toEqual({ shopify: true });
+    expect(parseDisplayPatch({ openItems: false })).toEqual({ openItems: false });
+    expect(parseDisplayPatch({ openItems: 'no' })).toBeNull();
     expect(parseDisplayPatch({ technical: 'yes' })).toBeNull();
     expect(parseDisplayPatch({})).toBeNull();
+  });
+
+  it('compares every switch, the Open items card included', () => {
+    const a = parseDisplay({ technical: true });
+    expect(sameDisplay(a, { ...a })).toBe(true);
+    expect(sameDisplay(a, { ...a, openItems: true })).toBe(false);
   });
 });

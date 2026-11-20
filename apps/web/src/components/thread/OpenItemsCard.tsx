@@ -3,6 +3,7 @@ import { api, errorText, type Thread } from '../../api.ts';
 import { answersMessage, OPEN_ITEM_LABEL, readOpenItems, spawnPrompt, type OpenItem } from '@omni/shared/open-items.ts';
 import { Button, ErrorNote, IconButton } from '../ui.tsx';
 import { isImeEnter } from '../../ime.ts';
+import { useOpenItemsCard } from '../../display.ts';
 
 type Busy = 'send' | 'dismiss-all' | `dismiss:${number}`;
 
@@ -14,7 +15,7 @@ const keep = (answers: Record<string, string>, items: readonly OpenItem[]) =>
  * What the finished turn left open for Ben (apps/server/runner/aux.ts): questions it asked him, decisions it left to
  * him and blockers only he can clear. Answers typed or picked here go back as one reply; New thread opens a composer
  * with one item as its first prompt; Dismiss drops an item, the x drops the card. Any reply drops it too, and the next
- * turn reads what is still open.
+ * turn reads what is still open. Only while Settings > Threads > Open items card is on, which it is not by default.
  */
 export function OpenItemsCard({
   thread,
@@ -28,6 +29,7 @@ export function OpenItemsCard({
   onSpawn: (prompt: string) => void;
   mobile?: boolean;
 }) {
+  const on = useOpenItemsCard();
   const items = readOpenItems(thread.open_items);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Busy | null>(null);
@@ -41,7 +43,7 @@ export function OpenItemsCard({
     const before = new Set(readOpenItems(answeredFor).map((i) => i.text));
     setAnswers(items.length && items.every((i) => before.has(i.text)) ? (a) => keep(a, items) : {});
   }
-  if (!items.length || thread.status !== 'done') return null;
+  if (!on || !items.length || thread.status !== 'done') return null;
 
   const path = `/threads/${encodeURIComponent(thread.id)}`;
   const reply = answersMessage(items, items.map((i) => answers[i.text]));
