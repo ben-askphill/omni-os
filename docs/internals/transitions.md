@@ -1,7 +1,7 @@
 # Transitions
 
 How a thread changes how or where it runs, and the one service behind every way of doing it. The words are in
-[CONTEXT.md](../../CONTEXT.md); who may run a thread at all is [ADR 0005](../adr/0005-one-execution-owner.md), what a
+[GLOSSARY.md](../../GLOSSARY.md); who may run a thread at all is [ADR 0005](../adr/0005-one-execution-owner.md), what a
 message is promised is the [delivery contract](delivery.md), and what owns a process is
 [execution state](execution-state.md).
 

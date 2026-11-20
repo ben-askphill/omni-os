@@ -71,6 +71,7 @@ Most misses are a change that works where it was tested and is missing elsewhere
 - **Sync**: new state that should reach the other Mac needs a handler in `apps/server/sync/handlers/`. The relay (`apps/relay/`) takes any entity name, so it needs no change.
 - **Wire contract**: the desktop app shows the Web UI, so it reads the same JSON. A change to the shape of an API response or stream updates its recorded fixture in `packages/test-fixtures/wire/` through `apps/server/tests/wire-fixtures.test.ts`.
 - **Docs**: if the change makes a page in `docs/` wrong, fix it in the same PR. Where a new doc goes: `docs/README.md`. Don't document what the code already says.
+- **Words**: use the canonical domain terms in [GLOSSARY.md](GLOSSARY.md), not the ones it lists under _Avoid_.
 
 ## Unslop every message (always on)
 

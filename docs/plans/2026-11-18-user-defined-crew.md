@@ -4,7 +4,7 @@ A plan for letting Omni users create and edit their own crew roles (Ben's "agent
 
 - Status: approved 2026-11-18. Ben took the recommendation for every decision, D1 to D11, as written (section 7). S0 to S4 and S7's first part are merged; S5 (no-edits) and S6 (role memory) are being built (T-CREW-S5S6). Task T-AGENTS.
 - Surveyed: `main` at `9e087e5a` (desktop 0.1.35). Every claim about current behavior cites `path:line` on that commit.
-- Wording: the glossary calls these **crew roles** and asks to avoid "agent" (`CONTEXT.md:24-26`). This plan follows it. What the UI calls them is open decision D1.
+- Wording: this plan was written when the glossary called these **crew roles**, and it keeps that word. Ben settled D1 on 2026-11-20: the UI word is **Agent**, and `GLOSSARY.md` now lists "crew role" under _Avoid_ for anything the user reads. The code keeps the crew role names.
 
 ## Summary
 
@@ -347,11 +347,11 @@ S1 to S4 give a usable feature: roles you can create, edit, sync and trust. S5 t
 
 ## 7. Decisions
 
-Settled 2026-11-18: Ben took the recommendation for all eleven. For D11, the UI and docs say that no-edits is not read-only, since Bash stays.
+Settled 2026-11-18: Ben took the recommendation for all eleven. On 2026-11-20 he changed D1 to Agents. For D11, the UI and docs say that no-edits is not read-only, since Bash stays.
 
 | # | Decision | Options | Recommendation (decided) |
 | --- | --- | --- | --- |
-| D1 | What the UI calls them | "Crew" (glossary) or "Agents" | Crew, as a section in the existing Agents group |
+| D1 | What the UI calls them | "Crew" (glossary) or "Agents" | Agents (decided 2026-11-20, replacing Crew) |
 | D2 | Storage | Markdown files, or a database table | Files |
 | D3 | Editing a built-in charter | Add to it (overlay), replace it (today), or per-field only | Add by default, Replace as an option with the change notice |
 | D4 | Which roles ship | All seven, or a generic core | Generic core; store-ops and Ben's flavor move to his own set |
@@ -365,7 +365,7 @@ Settled 2026-11-18: Ben took the recommendation for all eleven. For D11, the UI 
 
 Why:
 
-- **D1**: `CONTEXT.md:24-26` already settled "crew role" and Settings already has an Agents group with harnesses and accounts (`packages/shared/settings-catalog.ts:11`). Calling roles "Agents" would put two meanings on one word.
+- **D1**: the recommendation was Crew, since the glossary said "crew role" and Settings already used "agent" for harnesses and accounts. Ben picked Agent instead, as the thread's quick-actions card already says, so `GLOSSARY.md` now has **Agent** with "crew role" under _Avoid_. The UI strings that still say crew role, and the ones that use "agent" for a harness, are listed on PR #874 for a rename follow-up.
 - **D2**: files keep hand edits, agent-readable diffs and read-every-time behavior, and reuse the automation editor, store and sync handler. A table makes field-level sync easier but splits the source between shipped files and rows.
 - **D3**: replace-only is why a copied charter silently misses fixes like #785. Add-to keeps both.
 - **D4**: the same leak as the automations bug. A user who does Shopify work can duplicate a template from the docs or the Conductor can write one.

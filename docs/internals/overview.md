@@ -1,6 +1,6 @@
 # Architecture overview
 
-One Node server (`apps/server/`, Hono on `node:sqlite`) owns every thread, harness process, secret and automation. The Web UI, the desktop app that shows it, and the iOS app are clients of its `/api`. Words like channel, thread, turn and request are defined in [CONTEXT.md](../../CONTEXT.md). Decisions and their reasons are in the [ADRs](../adr/).
+One Node server (`apps/server/`, Hono on `node:sqlite`) owns every thread, harness process, secret and automation. The Web UI, the desktop app that shows it, and the iOS app are clients of its `/api`. Words like channel, thread, turn and request are defined in [GLOSSARY.md](../../GLOSSARY.md). Decisions and their reasons are in the [ADRs](../adr/).
 
 Tool-failure diagnostics reuse the runner's normalized `tool_result` records and SQLite connection. Only `is_error` results enter the local failure ledger. The ledger stores allowlisted error categories and summaries, never arguments or raw error bodies. Transcripts keep their payloads as before. A shell failure that starts with `Exit code N` is classified from that code (124 timeout, 126 permission, 127 not found, else `command_exit`, or `not_found` when the next lines say the command was missing), not from keywords in the command's own output. A Cursor call rejected before it starts arrives as a completion only; the adapter still records the tool name from that event so the failure is not stored as `unknown`. Claude Code Read's missing file, wiki and browser "not found" replies, and similar misses go to `not_found`; directory and size-limit refusals go to `invalid_input`. DesignSync's headless login failure and a claude.ai connector asking to sign in again are `authentication`; a missing-parameter reply and a connector's "must be a timestamp" style field check are `invalid_input`. Omni deduplicates repeated reports by thread, harness, session and call reference. A report with no call reference falls back to its event ID. Groups combine harness, tool and category, so unrelated causes can share a group. Triage status and human-written guidance do not disable tools. A new occurrence reopens a fixed group while keeping its guidance. Retry links and recovery observations are set only through `PATCH /api/tool-failures/occurrences/:id`; successful calls do not imply recovery. This diagnostic state stays out of sync on purpose, so one machine's tool installation and failures do not become another machine's guidance.
 
@@ -25,7 +25,7 @@ The server stores every stream event in SQLite (`data/omni.db`) and pushes it to
 
 Both clients open a thread with `GET /api/threads/:id?history=recent`: its newest page of events, within a row and byte budget. Older pages come from `GET /api/threads/:id/history` as Ben scrolls up or opens a search hit. The stream then sends only rows after the newest one held. A `tool_result` travels as its first 1,024 characters and its size, and the open row loads the rest in chunks and follows a running command's tail. The budgets, cursors, compact tool output and the rows a page carries from outside it are in [Thread history](thread-history.md).
 
-Messages are durable. The server saves a message as a request before it tells the client the message was accepted, so a restart parks it instead of losing it. The states are in [CONTEXT.md](../../CONTEXT.md) under Delivery state.
+Messages are durable. The server saves a message as a request before it tells the client the message was accepted, so a restart parks it instead of losing it. The states are in [GLOSSARY.md](../../GLOSSARY.md) under Delivery state.
 
 ## Worktree preparation and cleanup
 
@@ -77,7 +77,7 @@ omni.config.example.json    every field of data/omni.config.json
 mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
 scripts/                    shell shim, desktop build, QA stack, PR screenshots, sync-main (Update), docs-daily
 docs/                       user guides (user/), architecture (internals/), ADRs (adr/), PR screenshot guide
-CONTEXT.md                  domain glossary (channel, thread, harness, crew...)
+GLOSSARY.md                 domain glossary (channel, thread, harness, crew...)
 CONTRIBUTING.md             dev setup, checks and what a PR needs
 FORKING.md                  what is yours in a fork and how to pull upstream
 .github/                    PR template

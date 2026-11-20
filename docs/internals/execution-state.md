@@ -1,7 +1,7 @@
 # Execution and ownership state
 
 How a thread runs on one machine, who owns that state, and how the runner reaches the rest of Omni. Start here before
-touching `apps/server/runner/`. The words (thread, turn, request, delivery state) are in [CONTEXT.md](../../CONTEXT.md);
+touching `apps/server/runner/`. The words (thread, turn, request, delivery state) are in [GLOSSARY.md](../../GLOSSARY.md);
 who may run a thread at all is [ADR 0005](../adr/0005-one-execution-owner.md), and what a message is promised is the
 [delivery contract](delivery.md).
 
@@ -58,7 +58,7 @@ timer (`hardKill`).
 
 ## A message inside a process
 
-Where a message sent to a thread can be, and the request state recorded for it (`CONTEXT.md`, Delivery state).
+Where a message sent to a thread can be, and the request state recorded for it (`GLOSSARY.md`, Delivery state).
 
 ```mermaid
 stateDiagram-v2

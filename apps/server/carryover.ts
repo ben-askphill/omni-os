@@ -1,4 +1,4 @@
-// The Carryover (CONTEXT.md): what a continued thread's first session reads ahead of Ben's first message, built from
+// The Carryover (GLOSSARY.md): what a fork's first session reads ahead of Ben's first message, built from
 // its source's transcript, checkout and facts to a character budget. Pure, so the preview Ben inspects and the text the
 // harness gets are the same for the same inputs (apps/server/continue.ts captures them; runner/handover.ts delivers the
 // text). Everything taken from the transcript is data: tags that would end the block are neutralised, and paths into
