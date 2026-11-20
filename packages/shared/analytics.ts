@@ -146,7 +146,9 @@ export interface CleanException {
   surface?: (typeof SURFACES)[number];
 }
 
-const IDENT = /^[A-Za-z_$][\w$.<> ]{0,99}$/;
+/** A class or function name as V8 writes it: dotted names, `<anonymous>` among them, optionally after `new `. No spaces, so no words. */
+const NAME = '(?:[A-Za-z_$][\\w$]*|<anonymous>)';
+const IDENT = new RegExp(`^(?=.{1,100}$)(?:new )?${NAME}(?:\\.${NAME})*$`);
 const FILE = /^[\w.@+-]{1,100}$/;
 const ROUTE = /^\/[\w/:.*-]{0,120}$/;
 const MAX_FRAMES = 30;
@@ -157,15 +159,39 @@ export function fileName(path: string): string {
   return noQuery.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 }
 
+const V8_FRAME = /^\s+at /;
+
+/**
+ * A V8 stack without its `Name: message` header, or the whole stack when the message is not where V8 wrote it (it was
+ * changed after the stack was written). The header's first line holds the message's start, and the message ends a line.
+ */
+function afterMessage(stack: string, message: string | undefined): string {
+  if (message === undefined) return stack;
+  if (!message) return stack.slice(stack.indexOf('\n') + 1);
+  const at = stack.indexOf(message);
+  const end = at + message.length;
+  return at >= 0 && stack.lastIndexOf('\n', at) < 0 && (end === stack.length || stack[end] === '\n') ? stack.slice(end) : stack;
+}
+
+/** The unbroken run of frame lines that ends a V8 stack: its own frames, never the lines of a message above them. */
+function lastFrameRun(lines: string[]): string[] {
+  let end = lines.length - 1;
+  while (end >= 0 && !V8_FRAME.test(lines[end])) end--;
+  let start = end;
+  while (start > 0 && V8_FRAME.test(lines[start - 1])) start--;
+  return end < 0 ? [] : lines.slice(start, end + 1);
+}
+
 /**
  * The frames of a stack, innermost first, each reduced to a function name and a file name. V8 (Chromium, Node) writes
- * the message first and then `    at fn (file:line:col)` lines: only those are read, so no line of the message is.
- * WebKit and Gecko write `fn@url:line:col` lines and no message.
+ * `Name: message` first, and a message can hold anything, lines shaped like frames among them (a failed command's
+ * stderr), then its own `    at fn (file:line:col)` lines, which end the stack. So only the last run of frame lines
+ * after `message` is read. WebKit and Gecko write `fn@url:line:col` lines and no message.
  */
-export function stackFrames(stack: string | undefined): ExceptionFrame[] {
+export function stackFrames(stack: string | undefined, message?: string): ExceptionFrame[] {
   if (!stack) return [];
-  const lines = stack.split('\n');
-  const v8 = lines.some((l) => /^\s+at /.test(l));
+  const v8 = stack.split('\n').some((l) => V8_FRAME.test(l));
+  const lines = v8 ? lastFrameRun(afterMessage(stack, message).split('\n')) : stack.split('\n');
   const frames: ExceptionFrame[] = [];
   for (const line of lines) {
     const m = v8 ? /^\s+at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?$/.exec(line) : /^(?:([^@\s]*)@)?([a-z-]+:\/\/\S+?|[^\s:]+):(\d+):(\d+)$/.exec(line.trim());
@@ -203,5 +229,5 @@ export function cleanException(v: unknown): CleanException | null {
 export function exceptionOf(err: unknown, extra: Omit<CleanException, 'type' | 'frames'>): CleanException | null {
   const e = err instanceof Error ? err : null;
   const type = e ? (e.constructor?.name && e.constructor.name !== 'Object' ? e.constructor.name : e.name) || 'Error' : typeof err === 'string' ? 'StringThrown' : 'NonError';
-  return cleanException({ ...extra, type, frames: stackFrames(e?.stack) });
+  return cleanException({ ...extra, type, frames: stackFrames(e?.stack, e?.message) });
 }
