@@ -94,6 +94,9 @@ crewApi.put('/crew/:id', async (c) => write(c, (save) => saveCrew(c.req.param('i
 crewApi.delete('/crew/:id', (c) =>
   guard(c, 'delete') ??
   run(c, () => {
+    // A remote agent goes with its server (ADR 0020): its file alone would come back at the next start (convertRemoteAgents).
+    const role = getCrew(c.req.param('id'));
+    if (role && serverOf(role, getCatalog())?.url) throw Object.assign(new Error(`Remove ${role.name} on its Server card in Settings > Agents: that removes its server with it.`), { status: 409 });
     deleteCrew(c.req.param('id'));
     return { ok: true };
   }),

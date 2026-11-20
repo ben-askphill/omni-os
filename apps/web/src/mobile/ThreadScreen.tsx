@@ -174,7 +174,8 @@ export function ThreadScreen() {
   if (code && pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
   else if (code && changes?.files.length) {
     chips.push({ label: slotBusy ? 'Changes so far' : 'Review changes', icon: 'diff', diff: [changes.add, changes.del], onClick: () => shell.open(href.threadView(thread.id, 'changes')) });
-    if (!slotBusy && !offered) chips.push(openChip);
+    // A remote-led thread's PR waits for Ben's commit: Omni opens it from what is committed (ADR 0020).
+    if (!slotBusy && !offered && !(remoteLead && changes.uncommitted)) chips.push(openChip);
   }
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });

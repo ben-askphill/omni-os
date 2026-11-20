@@ -128,6 +128,8 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         <MoConnectors t={t} onOpen={() => steps(t)} />
         {t.prose && <MoProse text={t.prose} event={t.proseKey} />}
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
+        {/* A remote agent could not read the thread's files: its reply ends with the lock line (ADR 0020). */}
+        {t.prose && !!t.author && !!c.agents.find((a) => a.id === t.author)?.server && <RemoteLockLine channelId={thread.channel_id} />}
         {delegated}
         {t.artifacts.filter((a) => !isRenderPath(a.path)).map((a) => (
           <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
@@ -157,14 +159,11 @@ function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNod
   const look = t.author ? agentLook(t.author, c.agents) : null;
   if (!look) return <>{children}</>;
   const first = t.items.find(isReply);
-  // A remote agent could not read the thread's files: its reply ends with the lock line (ADR 0020).
-  const remote = !!first && !!c.agents.find((a) => a.id === look.id)?.server;
   return (
     <div className="flex flex-col gap-2">
       <AuthorLine agent={look} at={first ? replyAt(first) : null} run={seatRun(c.thread.members, look.id) ?? { harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
       <div className={`flex min-w-0 flex-col gap-4 ${REPLY_INDENT} empty:hidden`}>
         {children}
-        {remote && <RemoteLockLine channelId={c.thread.channel_id} />}
       </div>
     </div>
   );

@@ -180,7 +180,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   prsReload.current = reloadPRs;
   const watch = usePRWatch(thread?.id, prs);
   const changes = useBranchChanges(thread, slotBusy);
-  const next = prNext(prs?.pr ?? null, !!changes?.files.length, prompts);
+  // A remote-led thread's PR waits for Ben's commit: Omni opens it from what is committed (ADR 0020).
+  const waitsForCommit = !!thread && isRemoteAgentHarness(thread.harness) && !!changes?.uncommitted;
+  const next = prNext(prs?.pr ?? null, !!changes?.files.length && !waitsForCommit, prompts);
   const step = stepOf(sending, prompts) ?? underway;
   const offered = useMemo(() => prOffered(events, !slotBusy && !queued.length, prs?.pr), [events, slotBusy, queued, prs?.pr]);
 

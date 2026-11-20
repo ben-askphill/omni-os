@@ -213,6 +213,13 @@ describe('a thread led by a remote agent', () => {
 });
 
 describe("a remote agent's server card", () => {
+  it('goes with its server: Delete is refused while the server is there', T, async () => {
+    const del = await call('/crew/nomos', { method: 'DELETE' });
+    expect(del.status).toBe(409);
+    expect(del.json.error).toMatch(/Remove Nomos on its Server card/);
+    expect((await crew()).some((r) => r.id === 'nomos')).toBe(true);
+  });
+
   it('reads the offered avatar again on Test connection, unless Ben set one of his own', T, async () => {
     const image = async () => {
       const r = (await crew()).find((x) => x.id === 'nomos');

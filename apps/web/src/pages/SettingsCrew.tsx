@@ -401,7 +401,8 @@ function EditorBody({
     duplicate: !refusedActions.duplicate,
     edited: builtIn && role?.kind === 'edited',
     hide: builtIn && (!!role?.hidden || !refusedActions.hide),
-    delete: !builtIn,
+    // A remote agent goes with its server, through Remove on the Server card: its file alone would come back at the next start.
+    delete: !builtIn && !remoteAgent,
   };
   const theId = id ?? newId ?? crewIdFrom(draft?.name ?? '');
 
