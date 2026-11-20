@@ -23,7 +23,7 @@ const dataUrlOf = (blob: Blob) =>
 
 /**
  * The file cropped square from its center and scaled to AVATAR_PX, as a data URL: WebP where the browser encodes it
- * (Safari before 18 does not, and hands back a PNG), else PNG, which keeps transparency.
+ * (Safari, on the Mac and iPhone, never does and hands back a PNG), else PNG, which keeps transparency.
  */
 export async function squareAvatar(file: File): Promise<string> {
   const problem = avatarFileProblem(file);
