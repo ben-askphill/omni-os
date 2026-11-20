@@ -1,7 +1,7 @@
 // How the desktop app decides to start or attach, and the environment of the server it starts (ADR 0010): a proof
 // that the process on the port holds this install's token, or a free port.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PAIR_SECRET_FD, PAIR_SECRET_FD_ENV } from './pairing.ts';
 
 /** PATH from a login shell, between markers, so a shell that echoes the command cannot fake it. */
@@ -150,11 +150,16 @@ export function decide(probe: Probe, port: number): Decision {
 
 export type CheckoutProblem = 'missing' | 'dependencies';
 
-/** Development runs the server from a checkout: it needs the source and its node_modules. */
+/**
+ * Development runs the server from a checkout: it needs the source and tsx. Node finds tsx in the checkout's
+ * node_modules or any parent's, so a worktree under the main checkout's data/worktrees uses the main one's.
+ */
 export function checkoutProblem(repo: string, exists: (path: string) => boolean): CheckoutProblem | null {
   if (!exists(join(repo, 'apps/server/index.ts'))) return 'missing';
-  if (!exists(join(repo, 'node_modules/tsx/package.json'))) return 'dependencies';
-  return null;
+  for (let dir = repo; ; dir = dirname(dir)) {
+    if (exists(join(dir, 'node_modules/tsx/package.json'))) return null;
+    if (dirname(dir) === dir) return 'dependencies';
+  }
 }
 
 export function checkoutMessage(problem: CheckoutProblem, repo: string): string {
