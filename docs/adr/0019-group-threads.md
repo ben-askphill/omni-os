@@ -6,16 +6,19 @@ A thread today is one agent with one harness session. The glossary defined it as
 
 ## Decision
 
-- **Every agent has a name and an avatar.** There is no per-agent voice. Ben uploads the avatar in Settings > Agents. Without one, the agent shows a colored disc with its initials. A remote agent can offer its own avatar when it connects ([ADR 0020](0020-remote-agents-are-agents.md)). Every message in a transcript shows the name and avatar of the agent that wrote it. The harness and model show beside them only with **Show technical details** on.
-- **The lead.** The agent a thread started as is its lead. A message that names no agent goes to the lead.
+- **Every agent has a name and an avatar.** There is no per-agent voice. Ben uploads the avatar in Settings > Agents, and it syncs to every machine with the agent's crew file, the phone included. Without one, the agent shows a colored disc with its initials. A remote agent can offer its own avatar when it connects ([ADR 0020](0020-remote-agents-are-agents.md)). Every message in a transcript shows the name and avatar of the agent that wrote it. The harness and model show beside them only with **Show technical details** on.
+- **The lead.** The agent a thread started as is its lead, fixed once the thread starts. To change the lead, Ben starts a new thread. A message that names no agent goes to the lead.
 - **Seating.** An agent mention (`@agent`) in Ben's message seats that agent in the thread as a **member**, for good, with a session of its own in that thread. It stays until Ben removes it from the thread's member list. Removing it closes its session and keeps its past replies in the transcript.
 - **Once per thread.** An agent is seated in a thread at most once. Naming a member again makes it reply. It never seats a second copy.
 - **Routing.** A message that names one or more agents goes to each of them, and they reply in parallel. The lead stays quiet unless the message names it too.
-- **What a member reads.** On each turn, an agent gets every message posted since its own last turn as context: Ben's, the lead's and the other members'. It never gets their tool calls or tool output.
-- **One worktree, parallel turns, own powers.** Every agent in a thread works in the thread's one worktree and branch. Their turns run at the same time, and each agent keeps its own powers and run. When two agents touch the same file, Omni tells each running agent which files the other changed this turn. The thread flags every file both of them edited (a **collision**).
+- **What a member reads.** On its first turn, a newly seated member gets a **catch-up**: a summary of the thread so far, written by the lead. After that, on each turn, an agent gets every message posted since its own last turn as context: Ben's, the lead's and the other members'. It never gets their tool calls or tool output.
+- **One worktree, parallel turns, own powers.** Every agent in a thread works in the thread's one worktree and branch. Their turns run at the same time, and each agent keeps its own powers and run. When two agents touch the same file, Omni tells each running agent which files the other changed this turn. The thread flags every file both of them edited (a **collision**). Changes shows one combined diff with no credit per agent: the collision flags are enough.
+- **Only the lead commits.** The lead is the one agent that commits and opens the pull request. Members edit files only.
+- **Cursor Cloud as a member.** A Cursor Cloud agent can be a member. It works on its own branch, and its changes come back as a separate diff.
+- **Stop stops everyone.** Stop stops every running agent in the thread. There is no Stop for one agent. A message steers the agents it goes to under the routing rule: the ones it names, else the lead.
 - **Agents do not seat agents.** An `@name` in an agent's reply is plain text. It seats no one and wakes no one. The one exception is the Conductor. It can seat agents, but only in a delegated thread it creates in the client channel, never in its own #conductor thread.
-- **A team is one thread.** `delegate_team` makes a single thread in the client channel, with a lead and the members seated. The Conductor posts each member's part as a message that names that member. The members run in parallel. Once every one of them has finished, Omni wakes the lead with their replies, and the lead writes the crew report. Ordinary delegation does not change: `delegate` still makes a thread of its own with a task id and a crew report.
-- **The status mark shows the busiest agent.** A thread's mark is Needs you when any of its agents waits on Ben, else Working when any of them runs, else Done. Avatars on the mark show which agents are running and which one waits on Ben (see How it looks).
+- **A team is one thread.** `delegate_team` makes a single thread in the client channel, with a lead and the members seated. The Conductor posts each member's part as a message that names that member. The members run in parallel. An agent with two parts gets one seat, and the Conductor gives it both parts in one message. Once every member has finished, Omni wakes the lead with their replies, and the lead writes the crew report. Ordinary delegation does not change: `delegate` still makes a thread of its own with a task id and a crew report.
+- **The status mark shows the busiest agent.** A thread's mark is the highest state among its agents, in this order: Needs you, Failed, Working, Done, Idle. Avatars on the mark show which agents are running and which one waits on Ben (see How it looks).
 - **Seating replaces Ask for new messages.** An agent mention no longer starts a thread under this one with a report card. Asks already sent stay readable as they are.
 
 ## How it looks
@@ -23,14 +26,18 @@ A thread today is one agent with one harness session. The glossary defined it as
 Ben picked these on 2026-11-20 from a throwaway prototype that draws each screen on desktop and phone (branch `prototype/group-threads`, never merged). The variants he turned down stay behind its switcher.
 
 - **Who wrote a reply.** An agent's avatar sits in a gutter left of its reply, at 24px, with its name and the time on the line beside it. Replies in a row from one agent share one head. Ben's messages stay right-hand bubbles.
-- **Agent mentions.** The composer keeps one `@` menu. Agents come first: the thread's members, then the agents a mention would seat. Machines and files follow. A line under the composer says who gets the message: the lead when it names no agent, else the named agents, and that a new one joins the thread and stays until Ben removes it.
+- **Default avatars.** The initials disc shows two letters, unique across agents: Researcher is RS and Reviewer is RV, never both RE. Below 18px the disc shows its color only.
+- **Joining.** When an agent is seated, a quiet line in the transcript says so ("Designer joined").
+- **Agent mentions.** The composer keeps one `@` menu. Agents come first: the thread's members, then the agents a mention would seat. Machines and files follow. With no `@` in the message, the composer's placeholder names the lead ("Reply to Builder"). Once Ben types an `@`, a hint line under the composer says who gets the message ("Goes to Designer only"), and that a new agent joins the thread and stays until Ben removes it.
+- **Mention pills.** An agent pill carries the agent's avatar, in the accent color. A machine pill carries a device icon, in the current blue.
+- **The model picker.** With several agents in the thread, the composer's model picker changes only the lead's model.
 - **The member list.** The members' avatars sit at the right of the thread header. They open the member list, a popover on desktop and a sheet on the phone, with Remove on each member. The quick-actions card keeps a Lead row and a Members row, with their avatars.
-- **Parallel turns.** While several agents answer one message, the turn splits into a lane per agent, each with its steps and the files it changed. A collision flag sits above the lanes and names the file. The phone shows one lane at a time, with a tab per agent.
+- **Parallel turns.** While several agents answer one message, the turn splits into a lane per agent, each with its steps and the files it changed. The lanes stay as lanes in the history after the turn ends. A collision flag sits above the lanes. It names the file with its folder (`thread/Composer.tsx`) and shows the full path on hover. The phone shows one lane at a time, with a tab per agent.
 - **The status mark in a list.** On desktop, the agents' avatars are the mark while any of them runs or waits on Ben. The agent waiting on Ben comes first and on top, with the Needs you ring and the Needs you diamond on its corner. Agents that run follow in the Working ring. The mark shows two avatars at most, else one and a count. Other states keep today's mark. On the phone, the row's second line says who asks and who works, with their avatars ("Builder asks you · Designer working").
 
 ## Supersedes
 
-- `GLOSSARY.md`: Thread (one agent), Turn, Session, Run, Ask, Team, Crew report and Mention. This change rewrites them and adds Lead, Member, Seat, Agent mention and Collision.
+- `GLOSSARY.md`: Thread (one agent), Turn, Session, Run, Ask, Team, Crew report and Mention. This change rewrites them and adds Lead, Member, Seat, Catch-up, Agent mention and Collision.
 - [Ask an agent](../user/threads.md#ask-an-agent) in `docs/user/threads.md`: "Omni never seats a second agent in a thread", the Ask chip, the thread excerpt and the report card, for new messages. The section changes when the members slice ships.
 - A team as a lead thread with one member thread per part, in `docs/user/crew.md` (Thread delegation) and in `docs/user/threads.md` ("A team's members sit under their lead", "Team of 7"). Teams already made keep their tree.
 - Agents without an uploaded avatar: the crew plan's S3 build note ([user-defined crew plan](../plans/2026-11-18-user-defined-crew.md), section 6.3, "no SVG upload") and the Avatar line in [Settings > Agents](../user/crew.md#settings--agents). These change when the identity slice ships.
@@ -46,6 +53,7 @@ The reasons below follow from Ben's decisions. The session that settled them did
 - **Members see tool calls.** Tool output is most of a turn's size, and it would fill every member's context. A member that needs the files reads the shared worktree.
 - **Several copies of one agent.** `@builder` would no longer name one agent, and two sessions with one charter would split one role's work.
 - **A lead that hears every message.** It would answer messages meant for members and spend a turn on each one.
+- **Changing the lead, a Stop per agent, members that commit, and credit per agent in Changes.** Ben turned these down when he answered the plan's questions. For credit per agent, he said one combined diff and the collision flags are enough. He gave no reason for the others.
 - **Other layouts.** For each screen in How it looks, the prototype drew two to four layouts: a byline or a card per reply, a To line of recipient chips above the composer, a members strip under the title, collisions inline in the transcript or in a dock over the composer, and the mark with avatars beside it. Ben did not record why he turned them down.
 
 ## Consequences
@@ -53,4 +61,6 @@ The reasons below follow from Ben's decisions. The session that settled them did
 - A thread has one session per seated agent. Everything that assumes one session per thread moves to one per agent in the thread: resume, warm state, the context meter, limit stops, switching a run, handoff to another machine and fork.
 - Transcript rows record the agent that wrote them, and the member list syncs to the other machines.
 - Each member's spawn gets a thread token of its own ([ADR 0016](0016-thread-bound-credentials.md)). An agent's `access` still only narrows the channel's access level ([ADR 0015](0015-access-levels.md)).
-- A harness that cannot work in the thread's worktree cannot be a member that changes files. Cursor Cloud works on its own cloud checkout. The plan lists this as open.
+- Cursor Cloud works on its own cloud checkout, so a Cursor Cloud member's changes stay off the thread's branch until they are brought in. The plan lists how.
+- With only the lead committing, a thread whose lead never changes files, such as a remote lead ([ADR 0020](0020-remote-agents-are-agents.md)), has no agent that commits. The plan lists this as open.
+- Seating a member makes work for the lead: the member's first turn waits on the catch-up the lead writes. The plan lists how the lead writes it.

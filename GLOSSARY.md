@@ -105,7 +105,7 @@ A name and avatar with a charter, run defaults and powers, which leads threads a
 _Avoid_: Crew role, role (in anything the user reads; the code still says crew role), persona, bot, harness (what a local agent runs in)
 
 **Remote agent**:
-An agent that runs on a server outside Omni, such as Hermes or an eve agent, which talks in threads but never changes their files.
+An agent that runs on a server outside Omni, such as Hermes or an eve agent, which talks in threads but never changes their files, and sees a channel's messages and git-tracked files only where the channel lets remote agents see its work.
 _Avoid_: Custom harness (the code's name for its server, which the user never picks), remote harness, provider
 
 **eve agent**:
@@ -141,7 +141,7 @@ The short label, such as T-1A2B, that a delegated thread carries and its crew re
 _Avoid_: Ticket, job id
 
 **Team**:
-A delegation of several parts of one job as one thread: a lead and one member per part, where the lead writes the crew report once every member has replied.
+A delegation of several parts of one job as one thread: a lead and one member per agent with a part, where an agent with two parts gets both in one message and the lead writes the crew report once every member has replied.
 _Avoid_: Crew (every agent), swarm, member thread (the older form, one thread per part)
 
 **Crew report**:
@@ -171,20 +171,24 @@ _Avoid_: Learning (a channel's), memory (the harness's own)
 ### Group threads
 
 **Lead**:
-The agent a thread started as, which answers every message that names no agent.
+The agent a thread started as, fixed for the thread's life, which answers every message that names no agent and is the only agent that commits and opens the pull request.
 _Avoid_: Owner (the person the work is for), host, main agent, primary
 
 **Member**:
-An agent seated in a thread beside its lead, with its own session there, which replies only to messages that name it.
+An agent seated in a thread beside its lead, with its own session there, which replies only to messages that name it and edits files but never commits.
 _Avoid_: Participant, guest, collaborator, sub-agent (a helper inside one turn)
 
 **Seat**:
-To make an agent a member of a thread with an agent mention. Only the user seats agents, except the Conductor in a thread it delegates. The member stays until the user removes it.
+To make an agent a member of a thread with an agent mention. Only the user seats agents, except the Conductor in a thread it delegates. The member starts from a catch-up and stays until the user removes it.
 _Avoid_: Invite, add, ask (the older question to another agent)
 
 **Agent mention**:
 An `@` pill naming an agent in a message, which seats it the first time and makes it reply. A message with agent mentions goes only to the agents it names.
 _Avoid_: Mention (a skill), machine mention, tag, ping
+
+**Catch-up**:
+The summary of a thread so far that its lead writes for a newly seated member's first turn.
+_Avoid_: Excerpt (what an Ask carried), carryover (what a session reads when work moves), recap, briefing
 
 **Collision**:
 A file that two agents in one thread both changed, which the thread flags. Omni then tells each agent still running which files the other changed.
@@ -253,7 +257,7 @@ A flag the user sets that takes a thread out of Needs you without changing its s
 _Avoid_: Result, archive, closed
 
 **Status mark**:
-The one symbol every thread carries: its shape says who has the ball, its color repeats it and its fill says how far along it is. In a thread with members it shows the busiest state of any of its agents.
+The one symbol every thread carries: its shape says who has the ball, its color repeats it and its fill says how far along it is. In a thread with members it shows the highest state of any of its agents, in this order: Needs you, Failed, Working, Done, Idle.
 _Avoid_: Spinner, badge
 
 ### Runs
