@@ -886,7 +886,7 @@ function TechnicalCard() {
       <SwitchRow
         title="Show technical details"
         origin={<Origin of="machine" label="Every machine" />}
-        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches, token counts and the context ring in every channel. Off, a channel with a repo still shows its code detail."
+        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches and token counts in every channel. Off, a channel with a repo still shows its code detail. The context ring shows either way."
         checked={technical}
         onChange={(on) => {
           setError(null);

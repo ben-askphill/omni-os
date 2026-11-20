@@ -31,7 +31,7 @@ const header = (t: Thread) =>
       modLines: [],
       delegated: [],
       roleName: crewRoleName(t.role, crew),
-      actions: { thread: t, meter: null, reconnecting: false, onDone: () => {}, onRestore: () => {}, restoring: false, panelOpen: true, onPanel: () => {}, artifactCount: 0 },
+      actions: { thread: t, context: null, reconnecting: false, onDone: () => {}, onRestore: () => {}, restoring: false, panelOpen: true, onPanel: () => {}, artifactCount: 0 },
     }),
   );
 
