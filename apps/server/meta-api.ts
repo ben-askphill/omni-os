@@ -17,6 +17,7 @@ import { markHidden, modelVisibility, setHarnessModelPrefs } from './harness/mod
 import { parseHarnessPrefs } from '@omni/shared/model-visibility.ts';
 import { parseDisplayPatch } from '@omni/shared/display.ts';
 import { displayPrefs, setDisplayPrefs } from './display.ts';
+import { capture } from './analytics.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { HARNESS_INSTALL, isHarnessId, type HarnessInfo } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
@@ -66,6 +67,7 @@ metaApi.put('/model-visibility/:harness', async (c) => {
   if (!isHarnessId(harness)) return c.json({ error: `Unknown harness "${harness}".` }, 400);
   const prefs = parseHarnessPrefs(await c.req.json().catch(() => null));
   if (!prefs) return c.json({ error: 'Send { show, hide, newModels }.' }, 400);
+  capture('settings_changed', { setting: 'model-visibility' });
   return c.json(setHarnessModelPrefs(harness, prefs));
 });
 
@@ -74,6 +76,7 @@ metaApi.get('/display', (c) => c.json(displayPrefs()));
 metaApi.put('/display', async (c) => {
   const patch = parseDisplayPatch(await c.req.json().catch(() => null));
   if (!patch) return c.json({ error: 'Send { technical, shopify, openItems } as booleans.' }, 400);
+  for (const [k, v] of Object.entries(patch)) capture('settings_changed', { setting: `display.${k}`, value: v });
   return c.json(setDisplayPrefs(patch));
 });
 

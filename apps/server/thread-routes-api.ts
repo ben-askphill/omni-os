@@ -70,6 +70,8 @@ import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from '.
 import { stepOf, stepPrompts } from '@omni/shared/thread-glance.ts';
 import { fixChecksPrompt } from './fix-checks.ts';
 import { shellAllowed } from './request-guard.ts';
+import { capture } from './analytics.ts';
+import { harnessToken } from '@omni/shared/analytics.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
 /** A thread under an automation or a usage scan acts only on threads under the same one (automation-guard.ts lineageRefusal). */
@@ -363,8 +365,14 @@ threadActionsApi.post('/:id/messages', async (c) => {
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const attachments = await saveUploads(id, files);
   // Ben's Fix checks step (the channel's own prompt or the built-in one) goes out with the failing checks and their log tails (fix-checks.ts), from any client.
-  const text = from === 'ben' && stepOf(prompt, stepPrompts(channels.get(target.channel_id))) === 'checks' ? await fixChecksPrompt(target) : prompt;
-  return c.json(await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away }));
+  const step = from === 'ben' ? stepOf(prompt, stepPrompts(channels.get(target.channel_id))) : null;
+  const text = step === 'checks' ? await fixChecksPrompt(target) : prompt;
+  const posted = await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away });
+  // Kinds only (packages/shared/analytics.ts): never the message.
+  const harness = harnessToken(target.harness);
+  capture('message_sent', { harness, mode, from: from === 'ben' ? 'user' : 'conductor', attachments: attachments.length, ...(step && { step }) });
+  if (step) capture('pr_step_requested', { harness, step });
+  return c.json(posted);
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });

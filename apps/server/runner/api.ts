@@ -6,6 +6,8 @@ import { channels, folders, messageRequests, outbox, reportFollowUps, threadBase
 import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { threadDir } from '../config.ts';
+import { capture } from '../analytics.ts';
+import { harnessToken } from '@omni/shared/analytics.ts';
 import { quickAskRemoteRefusal } from '@omni/shared/quick-ask.ts';
 import { checkBase } from '../worktree-base.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
@@ -258,6 +260,10 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   });
   if (input.connectors?.length) declareConnectors(id, input.connectors);
   if (base) threadBasePicks.set(id, base);
+  // Kinds only (packages/shared/analytics.ts): never the prompt, title, channel or role.
+  const kind = { harness: harnessToken(harness), source: thread.source, team: thread.source === 'team' };
+  capture('thread_created', { ...kind, delegated: !!thread.parent_id, quick: !!input.quick, workspace: workspace ?? 'channel', remote });
+  if (thread.parent_id) capture('thread_delegated', kind);
   if (input.follow_up && input.parent_id) reportFollowUps.set(id);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }

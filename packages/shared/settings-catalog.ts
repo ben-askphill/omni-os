@@ -154,6 +154,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'desktop-login', section: 'desktop', title: 'Open Omni at login', keywords: ['startup', 'launch', 'login items', 'autostart'], surfaces: ['desktop'], needs: 'loginItem' },
   { id: 'desktop-updates', section: 'machines', title: 'App version and updates', keywords: ['version', 'update', 'upgrade', 'relaunch', 'restart', 'release notes', 'download', 'automatic', 'check for updates'], surfaces: ['desktop'] },
   { id: 'server', section: 'about', title: 'Server address, port and log', keywords: ['port', 'host', 'address', 'node', 'log', 'OMNI_PORT', 'data folder'] },
+  { id: 'analytics', section: 'about', title: 'Usage analytics', keywords: ['analytics', 'posthog', 'telemetry', 'tracking', 'privacy', 'usage data', 'errors', 'crash reports', 'opt out'] },
   { id: 'version', section: 'about', title: 'Version and build', keywords: ['version', 'commit', 'build', 'update', 'release'] },
   { id: 'files', section: 'about', title: 'Where Omni keeps its files', keywords: ['data folder', 'config file', 'omni.config.json', 'secret store', 'logs'] },
 ] as const satisfies readonly SettingsEntry[];
