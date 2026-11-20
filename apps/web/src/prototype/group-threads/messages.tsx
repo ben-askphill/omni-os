@@ -2,7 +2,7 @@
 // smaller avatars than first drawn (24px, was 30), so every screen draws its messages that way.
 import type { ReactNode } from 'react';
 import { AGENTS, type AgentId, type Msg } from './data.ts';
-import { AgentAvatar, BenBubble, Prose, RemoteTag, StepsFold, TechLine, Thinking } from './parts.tsx';
+import { AgentAvatar, BenBubble, JoinedLine, Prose, RemoteTag, StepsFold, TechLine, Thinking } from './parts.tsx';
 
 export type Style = 'gutter' | 'byline' | 'card';
 
@@ -84,7 +84,17 @@ function Card({ m, phone }: { m: Msg; phone?: boolean }) {
 
 /** One message in the style asked for. Ben's stay the right-hand bubble in every style. */
 export function Message({ m, prev, style, phone, fresh }: { m: Msg; prev?: Msg; style: Style; phone?: boolean; fresh?: AgentId[] }): ReactNode {
-  if (m.author === 'ben') return <BenBubble m={m} phone={phone} fresh={fresh} />;
+  if (m.author === 'ben')
+    return (
+      <>
+        <BenBubble m={m} phone={phone} fresh={fresh} />
+        {m.joined && (
+          <div className="mt-4">
+            <JoinedLine ids={m.joined} />
+          </div>
+        )}
+      </>
+    );
   if (style === 'gutter') return <Gutter m={m} phone={phone} first={prev?.author !== m.author} />;
   if (style === 'card') return <Card m={m} phone={phone} />;
   return <Byline m={m} phone={phone} />;

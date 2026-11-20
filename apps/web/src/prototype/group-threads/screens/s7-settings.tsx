@@ -14,7 +14,7 @@ import type { Screen } from './types.ts';
 /** The bar's "Local agent" switch: edit Reviewer (no avatar yet, so its initials) in place of Hermes. */
 const useEditing = (): Agent => (useParams().get('local') === '1' ? AGENTS.reviewer : AGENTS.hermes);
 
-const ORDER: AgentId[] = ['conductor', 'builder', 'reviewer', 'designer', 'hermes', 'nomos', 'writer'];
+const ORDER: AgentId[] = ['conductor', 'builder', 'reviewer', 'researcher', 'designer', 'hermes', 'nomos', 'writer'];
 const host = (a: Agent) => a.server?.url.replace(/^https:\/\//, '') ?? '';
 
 function RunLine({ a }: { a: Agent }) {
@@ -160,7 +160,7 @@ const listCard = (
     actions={
       <>
         <Button size="sm" icon="globe">
-          Connect remote agent
+          Add remote agent
         </Button>
         <Button size="sm" icon="plus">
           New agent
@@ -266,6 +266,15 @@ function DesktopB() {
       </div>
       <div className="flex gap-6 pb-16">
         <div className="w-64 shrink-0">
+          {/* Connect lives here now, next to the agent list (Ben, 2026-11-20). */}
+          <div className="mb-2 flex flex-wrap gap-2">
+            <Button size="sm" icon="plus">
+              New agent
+            </Button>
+            <Button size="sm" icon="globe">
+              Add remote agent
+            </Button>
+          </div>
           <AgentList selected={a.id} compact />
         </div>
         <div className="min-w-0 max-w-xl flex-1 space-y-5">
@@ -288,8 +297,8 @@ function DesktopB() {
               </Card>
               <Card title="In threads" subtitle={`What ${a.name} may do where it is seated.`}>
                 <InfoList>
-                  <InfoRow label="Files">Reads a thread’s files only in channels that allow it</InfoRow>
-                  <InfoRow label="Channels">#Omni OS allows it · #Volero does not</InfoRow>
+                  <InfoRow label="Sees">A thread’s messages and git-tracked files, only where the channel lets remote agents see its work</InfoRow>
+                  <InfoRow label="Channels">#Omni OS lets them · #Volero does not</InfoRow>
                 </InfoList>
               </Card>
             </>

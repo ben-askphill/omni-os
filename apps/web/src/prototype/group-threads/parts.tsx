@@ -18,6 +18,29 @@ import { AGENTS, type Agent, type AgentId, type Msg } from './data.ts';
 
 const swatchOf = (id: string) => AVATAR_SWATCHES[[...id].reduce((n, c) => n + c.charCodeAt(0), 0) % 6];
 
+/** The agent's own color: its image's main color, else its initials disc's color. Agent mention pills wear it. */
+export const accentOf = (a: Agent) => a.accent ?? swatchOf(a.id);
+
+const letters = (name: string) => name.replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
+
+/**
+ * Two letters per agent, unique across agents (Ben, 2026-11-20). Two agents whose monograms match each keep their first
+ * letter and take the first letter where their names part: Researcher RS and Reviewer RV, never both RE.
+ */
+const INITIALS: Record<string, string> = (() => {
+  const list = Object.values(AGENTS);
+  const base = new Map(list.map((a) => [a.id, monogram(a.name)]));
+  const out: Record<string, string> = {};
+  for (const a of list) {
+    const m = base.get(a.id)!;
+    const rivals = list.filter((b) => b.id !== a.id && base.get(b.id) === m).map((b) => letters(b.name));
+    const own = letters(a.name);
+    const i = rivals.length ? [...own].findIndex((c, i) => i > 0 && rivals.every((r) => r[i] !== c)) : -1;
+    out[a.id] = i > 0 ? own[0] + own[i] : m;
+  }
+  return out;
+})();
+
 /**
  * An agent's avatar: the image Ben uploaded or the server offered, else a colored disc with its initials, the color
  * taken from its id. `ring`: it is running (the agent family's blue, as the Working mark). `needs`: it waits on Ben.
@@ -36,10 +59,10 @@ export function AgentAvatar({ a, size = 24, ring, needs, className = '' }: { a: 
     <span
       aria-hidden
       className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium leading-none ${className}`}
-      style={{ width: size, height: size, fontSize: size < 18 ? size * 0.55 : size * 0.4, backgroundColor: bg, color: avatarInk(bg), ...edge }}
+      style={{ width: size, height: size, fontSize: size * 0.4, backgroundColor: bg, color: avatarInk(bg), ...edge }}
     >
-      {/* Two letters stop reading below 18px: one letter there. */}
-      {size < 18 ? monogram(a.name)[0] : monogram(a.name)}
+      {/* Below 18px the disc is its color only (Ben, 2026-11-20). */}
+      {size < 18 ? null : INITIALS[a.id]}
     </span>
   );
 }
@@ -83,15 +106,47 @@ export function RemoteTag({ className = '' }: { className?: string }) {
   return <span className={`inline-flex h-[18px] shrink-0 items-center rounded-full px-1.5 text-[10.5px] font-medium text-fg-3 shadow-[inset_0_0_0_1px_var(--line-strong)] ${className}`}>Remote</span>;
 }
 
-/** An agent mention as a pill in a message: the agent's face and name, never a text `@`. */
+/**
+ * An agent mention as a pill in a message: the agent's avatar and name, never a text `@`, in the agent's own color
+ * (Ben, 2026-11-20: "the agent's avatar in the accent color"). An image's color tints the pill; an initials disc's
+ * pale swatch fills it.
+ */
 export function MentionPill({ id, fresh }: { id: AgentId; fresh?: boolean }) {
   const a = AGENTS[id];
+  const accent = accentOf(a);
+  const light = !a.accent;
   return (
-    <span className="mention-pill" title={fresh ? `${a.name} joins this thread` : a.name}>
-      <AgentAvatar a={a} size={14} />
+    <span
+      className="mention-pill"
+      title={fresh ? `${a.name} joins this thread` : a.name}
+      style={{ backgroundColor: light ? accent : `color-mix(in srgb, ${accent} 24%, var(--bg))`, color: light ? '#202020' : 'var(--fg)' }}
+    >
+      <AgentAvatar a={a} size={14} className="shadow-[0_0_0_1px_rgb(0_0_0/0.18)]" />
       {a.name}
       {fresh && <Icon name="plus" size={10} strokeWidth={2.4} />}
     </span>
+  );
+}
+
+/** A machine mention as a pill: a device icon and the machine's name, in the blue machine pills have today. */
+export function MachinePill({ name }: { name: string }) {
+  return (
+    <span className="mention-pill" title={`${name} (machine)`}>
+      <Icon name="monitor" size={12} strokeWidth={2} className="mention-icon" />
+      {name}
+    </span>
+  );
+}
+
+/** The quiet line under the message that seated agents: "Designer joined", "Reviewer and Hermes joined". */
+export function JoinedLine({ ids }: { ids: AgentId[] }) {
+  const names = ids.map((id) => AGENTS[id].name);
+  const said = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+  return (
+    <DividerLine>
+      <Facepile ids={ids} size={16} />
+      {said} joined
+    </DividerLine>
   );
 }
 
@@ -247,7 +302,7 @@ export function DesktopThread({
 }
 
 /** The reply composer's frame (Composer.tsx shell), with what goes in it. */
-export function ComposerBox({ text, placeholder = 'Reply · / commands, @ agents and files', above, menu, hint, children }: { text?: ReactNode; placeholder?: string; above?: ReactNode; menu?: ReactNode; hint?: ReactNode; children?: ReactNode }) {
+export function ComposerBox({ text, placeholder = 'Reply to Builder', above, menu, hint, stop, children }: { text?: ReactNode; placeholder?: string; above?: ReactNode; menu?: ReactNode; hint?: ReactNode; stop?: boolean; children?: ReactNode }) {
   return (
     <div className="relative">
       {menu}
@@ -262,6 +317,13 @@ export function ComposerBox({ text, placeholder = 'Reply · / commands, @ agents
           <IconButton icon="branch" label="Fork" size={15} />
           {children}
           <div className="ml-auto flex items-center gap-2.5">
+            {/* Stop stops every running agent; there is no Stop for one agent (Ben, 2026-11-20). */}
+            {stop && (
+              <button type="button" className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-3 text-[12.5px] font-medium text-fg">
+                <Icon name="stop" size={13} />
+                Stop all
+              </button>
+            )}
             <button type="button" aria-label="Send" className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink">
               <Icon name="arrowUp" size={17} strokeWidth={2.2} />
             </button>
@@ -379,7 +441,7 @@ export function PhoneThread({ title, sub, right, below, composer, children }: { 
   );
 }
 
-export function PhoneComposer({ text, placeholder = 'Reply', above, menu, hint }: { text?: ReactNode; placeholder?: string; above?: ReactNode; menu?: ReactNode; hint?: ReactNode }) {
+export function PhoneComposer({ text, placeholder = 'Reply to Builder', above, menu, hint, stop }: { text?: ReactNode; placeholder?: string; above?: ReactNode; menu?: ReactNode; hint?: ReactNode; stop?: boolean }) {
   return (
     <div className="relative shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: bottomInset(2) }}>
       {menu}
@@ -388,6 +450,7 @@ export function PhoneComposer({ text, placeholder = 'Reply', above, menu, hint }
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
           <MoRound icon="plus" label="Add" />
           <div className="min-w-0 flex-1 self-center px-1 py-2 text-[16px] leading-[1.35]">{text ? <span className="text-fg">{text}</span> : <span className="text-fg-3">{placeholder}</span>}</div>
+          {stop && <MoRound icon="stop" label="Stop all" />}
           <MoRound ink icon="send" label="Send" />
         </div>
         {hint && <div className="px-4 pb-2.5 -mt-1 text-[12px] text-fg-3">{hint}</div>}

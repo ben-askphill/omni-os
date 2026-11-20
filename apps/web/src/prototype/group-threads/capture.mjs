@@ -30,7 +30,7 @@ const PICKS = [
   { s: 7, v: 'B', q: 'tech=1', tag: 'tech' },
 ];
 const SCREENS = { 1: ['A', 'B', 'C'], 2: ['A', 'B'], 3: ['A', 'B', 'C'], 4: ['A', 'B', 'C'], 5: ['A', 'B', 'C', 'D'], 6: ['A', 'B'], 7: ['A', 'B'] };
-const only = process.env.ONLY; // e.g. "3" to shoot one screen
+const only = process.env.ONLY?.split(","); // e.g. "3" or "1,2,4" to shoot only those screens
 
 const browser = await chromium.launch({ executablePath: exe });
 const sizes = [
@@ -44,7 +44,7 @@ for (const size of sizes) {
   const ctx = await browser.newContext({ viewport: { width: size.width, height: size.height }, isMobile: size.isMobile, hasTouch: size.hasTouch, deviceScaleFactor: size.deviceScaleFactor ?? 1, colorScheme: 'light' });
   const page = await ctx.newPage();
   for (const sh of shots) {
-    if (only && String(sh.s) !== only) continue;
+    if (only && !only.includes(String(sh.s))) continue;
     const url = `${base}?s=${sh.s}&v=${sh.v}${sh.q ? `&${sh.q}` : ''}&bar=0`;
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);

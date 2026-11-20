@@ -1,11 +1,13 @@
 // PROTOTYPE, throwaway. Screen 2: the `@` agent mention. Above: Ben's message that named Reviewer and Hermes seated
 // them, and both reply in parallel. Below: Ben picks a third agent to seat (Designer), so the menu shows who sits here
 // and who would join. Ben's pick: A, the one `@` menu, with B's hint line under the composer saying who gets the
-// message. "Menu off" shows the message once Designer is picked.
+// message. "Menu off" shows the message once Designer is picked. Ben's answers (2026-11-20): the hint shows only once
+// an agent is named; with no `@`, the placeholder names the lead. The machine pill keeps today's blue and a device
+// icon, the agent pill takes the agent's own color.
 import type { ReactNode } from 'react';
 import { AGENTS, CHANNELS, GROUP, THREAD, type AgentId, type Msg } from '../data.ts';
 import { Messages } from '../messages.tsx';
-import { AgentAvatar, ComposerBox, DesktopThread, DividerLine, Facepile, MENU, MentionPill, PhoneComposer, PhoneThread, RemoteTag, RunPill, ThreadHead } from '../parts.tsx';
+import { AgentAvatar, ComposerBox, DesktopThread, MENU, MachinePill, MentionPill, PhoneComposer, PhoneThread, RemoteTag, RunPill, ThreadHead } from '../parts.tsx';
 import { Icon, StatusDot } from '../../../components/ui.tsx';
 import { useParams } from '../url-state.ts';
 import type { Screen } from './types.ts';
@@ -15,18 +17,10 @@ const RUNNING: Msg[] = [
   { id: 51, author: 'hermes', at: '12:09', text: '', running: 'Searching the bridge log' },
 ];
 
-const Seated = () => (
-  <DividerLine>
-    <Facepile ids={['reviewer', 'hermes']} size={16} />
-    You seated Reviewer and Hermes
-  </DividerLine>
-);
-
 function Transcript({ phone }: { phone?: boolean }) {
   return (
     <>
       <Messages list={GROUP.slice(0, 2)} phone={phone} />
-      <Seated />
       <Messages list={[GROUP[2]]} phone={phone} fresh={['reviewer', 'hermes']} />
       <Messages list={RUNNING} phone={phone} />
     </>
@@ -92,19 +86,18 @@ function MixedMenu({ phone }: { phone?: boolean }) {
   );
 }
 
-const typed = <>Can you also check the new mark is readable in dark mode @</>;
-/** A's message once Designer is picked: the pill, marked as joining. */
+const typed = (
+  <>
+    Can you also check the new mark is readable in dark mode on <MachinePill name="MacBook Pro" /> @
+  </>
+);
+/** A's message once Designer is picked: the pill, marked as joining, beside a machine pill. */
 const picked = (
   <>
-    Can you also check the new mark is readable in dark mode <MentionPill id="designer" fresh />
+    Can you also check the new mark is readable in dark mode on <MachinePill name="MacBook Pro" /> <MentionPill id="designer" fresh />
   </>
 );
-/** The hint line, taken from B: who gets the message as it stands. Before an agent is named, the lead. */
-const HINT_LEAD = (
-  <>
-    Goes to <span className="font-medium text-fg-2">Builder</span>, the lead. Name an agent to send it there instead.
-  </>
-);
+/** The hint line, taken from B: who gets the message, once it names an agent. Before that, the placeholder names the lead. */
 const HINT_PICKED = (
   <>
     Goes to <span className="font-medium text-fg-2">Designer</span> only. Designer joins this thread and stays until you remove it.
@@ -119,7 +112,7 @@ function DesktopA() {
     <DesktopThread
       head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} />}
       composer={
-        <ComposerBox text={closed ? picked : typed} menu={closed ? null : <MixedMenu />} hint={closed ? HINT_PICKED : HINT_LEAD}>
+        <ComposerBox text={closed ? picked : typed} menu={closed ? null : <MixedMenu />} hint={closed ? HINT_PICKED : null}>
           <RunPill label="Builder · Opus 5.5" />
         </ComposerBox>
       }
@@ -132,7 +125,7 @@ function DesktopA() {
 function PhoneA() {
   const closed = useClosed();
   return (
-    <PhoneThread title={THREAD.title} sub="#Omni OS · Builder and 2 more" composer={<PhoneComposer text={closed ? picked : typed} menu={closed ? null : <MixedMenu phone />} hint={closed ? HINT_PICKED : HINT_LEAD} />}>
+    <PhoneThread title={THREAD.title} sub="#Omni OS · Builder and 2 more" composer={<PhoneComposer text={closed ? picked : typed} menu={closed ? null : <MixedMenu phone />} hint={closed ? HINT_PICKED : null} />}>
       <Transcript phone />
     </PhoneThread>
   );

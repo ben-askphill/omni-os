@@ -27,6 +27,8 @@ export interface Agent {
   avatar?: string;
   /** The avatar came from the server when it connected. */
   offered?: boolean;
+  /** The agent's own color: its image's main color. An initials disc's color is taken from its id instead. */
+  accent?: string;
   harness: string;
   harnessName: string;
   model: string;
@@ -40,6 +42,7 @@ export const AGENTS: Record<AgentId, Agent> = {
     name: 'Builder',
     kind: 'local',
     avatar: BUILDER_ART,
+    accent: '#ff6a2b',
     harness: 'claude-code',
     harnessName: 'Claude Code',
     model: 'Opus 5.5',
@@ -59,6 +62,7 @@ export const AGENTS: Record<AgentId, Agent> = {
     name: 'Hermes',
     kind: 'remote',
     avatar: HERMES_ART,
+    accent: '#2b3bff',
     offered: true,
     harness: 'hermes',
     harnessName: 'Hermes',
@@ -81,6 +85,7 @@ export const AGENTS: Record<AgentId, Agent> = {
     name: 'Designer',
     kind: 'local',
     avatar: DESIGNER_ART,
+    accent: '#c6f52b',
     harness: 'claude-code',
     harnessName: 'Claude Code',
     model: 'Sonnet 5.5',
@@ -132,6 +137,8 @@ export interface Msg {
   running?: string;
   /** Files this turn changed. */
   files?: string[];
+  /** Agents this message of Ben's seated: the transcript says "Designer joined" under it. */
+  joined?: AgentId[];
 }
 
 export const THREAD = {
@@ -172,6 +179,7 @@ export const GROUP: Msg[] = [
     author: 'ben',
     at: '12:09',
     mentions: ['reviewer', 'hermes'],
+    joined: ['reviewer', 'hermes'],
     text: '@Reviewer check Builder’s change before I merge. @Hermes did the VPS bridge log the same stale status last week?',
   },
   {
@@ -220,6 +228,7 @@ export const PARALLEL: Msg[] = [
     author: 'ben',
     at: '12:20',
     mentions: ['builder', 'designer'],
+    joined: ['designer'],
     text: '@Builder clear the mark in the sidebar as soon as the handoff starts. @Designer give a thread that is moving to the other machine its own mark while it moves.',
   },
 ];

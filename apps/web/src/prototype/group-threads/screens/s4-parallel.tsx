@@ -1,5 +1,7 @@
 // PROTOTYPE, throwaway. Screen 4: Ben named Builder and Designer in one message. Both run at once in the one worktree,
-// both edited status.tsx, Omni told each of them, and the thread flags the file (a collision).
+// both edited status.tsx, Omni told each of them, and the thread flags the file (a collision). Ben's answers
+// (2026-11-20): Stop stops every running agent (no Stop per lane), the flag shows folder and file with the full path on
+// hover, the lanes stay as lanes in the history, and with no `@` the placeholder names the lead.
 import type { ReactNode } from 'react';
 import { AGENTS, CHANNELS, COLLIDED, PARALLEL, THREAD, type AgentId } from '../data.ts';
 import { Messages } from '../messages.tsx';
@@ -74,7 +76,10 @@ function CollisionRow({ phone }: { phone?: boolean }) {
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[18px] px-3.5 py-2.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--warn)_45%,transparent)] ${phone ? '' : ''}`}>
       <Icon name="alert" size={15} className="shrink-0 text-warn" />
       <span className="min-w-0 flex-1 text-[13px] leading-[1.45]">
-        <span className="font-medium">Both edited</span> <span className="font-mono text-[12px]">{short(COLLIDED)}</span>
+        <span className="font-medium">Both edited</span>{' '}
+        <span className="font-mono text-[12px]" title={COLLIDED}>
+          {short(COLLIDED)}
+        </span>
         <span className="text-fg-3"> · Builder and Designer were each told.</span>
       </span>
       <Button size="sm" icon="diff">
@@ -116,7 +121,7 @@ const transcriptA = (phone?: boolean) => (
 );
 
 const stopComposer = (
-  <ComposerBox placeholder="Add to this. Builder and Designer read it at their next step">
+  <ComposerBox stop>
     <RunPill label="Builder · Opus 5.5" />
   </ComposerBox>
 );
@@ -134,7 +139,7 @@ const phoneA = () => (
         <Facepile ids={['builder', 'designer']} size={14} ring={['builder', 'designer']} /> 2 working · #Omni OS
       </span>
     }
-    composer={<PhoneComposer placeholder="Add to this" />}
+    composer={<PhoneComposer stop />}
   >
     {transcriptA(true)}
   </PhoneThread>
@@ -151,7 +156,6 @@ function Lane({ r, compact }: { r: Run; compact?: boolean }) {
           <AgentAvatar a={a} size={22} ring />
           <span className="font-medium">{a.name}</span>
           <span className="ml-auto font-num text-[11.5px] text-fg-3 tabular-nums">{r.time}</span>
-          <IconButton icon="stop" label={`Stop ${a.name}`} size={13} className="-mr-1.5 h-7 w-7" />
         </div>
       )}
       <ol className="space-y-1">
@@ -187,7 +191,7 @@ const desktopB = () => (
 );
 
 const phoneB = () => (
-  <PhoneThread title={THREAD.title} sub="2 working · #Omni OS" composer={<PhoneComposer placeholder="Add to this" />}>
+  <PhoneThread title={THREAD.title} sub="2 working · #Omni OS" composer={<PhoneComposer stop />}>
     <Messages list={PARALLEL} phone />
     <div className="space-y-3">
       <div className="grid grid-cols-2 rounded-full bg-surface-2 p-1" role="tablist">
@@ -225,7 +229,10 @@ function Dock({ phone }: { phone?: boolean }) {
       <div className="mt-1 flex min-w-0 items-center gap-2.5 rounded-[14px] bg-[color-mix(in_srgb,var(--warn)_12%,transparent)] px-2.5 py-2">
         <Icon name="alert" size={15} className="shrink-0 text-warn" />
         <span className="min-w-0 flex-1 truncate text-[12.5px]">
-          <span className="font-mono text-[11.5px]">{short(COLLIDED)}</span> <span className="text-fg-2">edited by both</span>
+          <span className="font-mono text-[11.5px]" title={COLLIDED}>
+            {short(COLLIDED)}
+          </span>{' '}
+          <span className="text-fg-2">edited by both</span>
         </span>
         <button type="button" className="shrink-0 text-[12.5px] font-medium underline underline-offset-2">
           Compare
@@ -271,7 +278,7 @@ const phoneC = () => (
         <div className="px-3">
           <Dock phone />
         </div>
-        <PhoneComposer placeholder="Add to this" />
+        <PhoneComposer stop />
       </div>
     }
   >
