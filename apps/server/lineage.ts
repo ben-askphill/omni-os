@@ -1,7 +1,7 @@
 // Where a thread came from, in one place for everything that asks "did an automation or an agent start this?": the
 // automation guard (automation-guard.ts) and the usage scan's asks (usage-scan/asks.ts). Two columns link a thread to
 // the one it came from. parent_id: delegate, delegate_team, review notes and PR review. continued_from: continue.ts,
-// whose new thread has no parent, source manual and no automation. Hand off and the run switch keep the thread's id.
+// whose new thread has no automation, and a delegated source's parent and source (no parent and source manual otherwise). Hand off and the run switch keep the thread's id.
 // Both walks read each thread once, so a cycle in bad data ends them, and neither has a depth limit.
 // Takes the database as an argument: the repeated-asks script opens its own, read-only.
 import type { DatabaseSync } from 'node:sqlite';

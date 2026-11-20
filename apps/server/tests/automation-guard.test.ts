@@ -75,7 +75,8 @@ describe('threads an automation started', () => {
   });
 
   it('cannot create one from a thread continued out of one below the run', async () => {
-    // continue.ts starts the new thread with no parent, source manual and no automation: only continued_from links it.
+    // continue.ts starts the new thread with no automation. A delegated source's parent and source carry over, so both
+    // parent_id and continued_from link it to the run.
     const { loadCatalog } = await import('../harness/catalog-service.ts');
     await loadCatalog(['claude-code']);
     const crewmate = 'g-crewmate';
@@ -90,7 +91,7 @@ describe('threads an automation started', () => {
     const made = await call('POST', `/threads/${crewmate}/continue`, { ...how, text: 'Make the automation.', request_id: 'continue-guard', revision: preview.body.revision });
     expect(made.status, JSON.stringify(made.body)).toBe(200);
     const continued = made.body.thread;
-    expect(continued).toMatchObject({ parent_id: null, automation: null, source: 'manual', continued_from: crewmate });
+    expect(continued).toMatchObject({ parent_id: run, automation: null, source: 'conductor', continued_from: crewmate });
 
     const { status, body } = await call('POST', '/automations', { fields: fields('From the continuation') }, continued.id);
     expect(status).toBe(403);

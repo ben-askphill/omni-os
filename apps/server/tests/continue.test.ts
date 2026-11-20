@@ -125,6 +125,43 @@ describe('continuing a thread on another harness', () => {
     expect((await detail(src.id)).continued_in).toMatchObject([{ id, harness: 'codex', carried: { entries: 2 } }]);
   });
 
+  it('keeps a delegated thread under the thread that delegated it: same parent, task, source and follow-up, and its report goes there', async () => {
+    if (!H.db.channels.get('conductor')) H.db.channels.create({ id: 'conductor', name: 'Conductor', kind: 'internal', use_worktree: 0, base_dir: H.tmp });
+    const parent = await H.start('conductor job', { channel: 'conductor' });
+    await H.untilResults(parent.id, 1);
+    const folder = H.db.folders.create({ channel_id: 'scratch', name: 'Delegated work' });
+    const child = await H.start('delegated task', { ...claude, parent_id: parent.id, source: 'conductor', role: 'builder', follow_up: true, folder: folder.id });
+    await H.untilResults(child.id, 1);
+    await H.until('the first report reached the parent', () => H.byKind(parent.id, 'crew_report').length === 1);
+    const src = H.thread(child.id);
+    expect(src).toMatchObject({ parent_id: parent.id, source: 'conductor', role: 'builder', folder_id: folder.id });
+    expect(src.task_id).toMatch(/^T-/);
+
+    const res = await start(child.id, codex, 'carry on');
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const id = res.body.thread.id as string;
+    expect(H.thread(id)).toMatchObject({
+      continued_from: child.id,
+      parent_id: parent.id,
+      task_id: src.task_id,
+      source: 'conductor',
+      role: 'builder',
+      channel_id: 'scratch',
+      folder_id: folder.id,
+    });
+    expect(H.db.reportFollowUps.has(id), 'a follow_up delegation still wakes the parent').toBe(true);
+
+    await H.untilResults(id, 1);
+    const report = await H.until('the continued thread reported to the parent', () => H.byKind(parent.id, 'crew_report').find((e) => e.p.thread_id === id));
+    expect(report.p).toMatchObject({ thread_id: id, task_id: src.task_id, status: 'done' });
+    expect(H.byKind(child.id, 'crew_report'), 'not to the source').toEqual([]);
+
+    const { channelsApi } = await import('../channels-api.ts');
+    const list = (await (await channelsApi.request('/')).json()) as { id: string; handoffs?: { parent: { id: string }; children: { id: string }[] }[] }[];
+    const job = list.find((c) => c.id === 'conductor')?.handoffs?.find((h) => h.parent.id === parent.id);
+    expect(job?.children.map((c) => c.id), "listed among the Conductor job's delegated threads").toEqual([child.id, id]);
+  });
+
   it("starts on Cursor Agent with the Carryover too, on Cursor's own auto model", async () => {
     const src = await idle('remember the word FIG');
     const res = await start(src.id, { ...cursor, model: 'auto' }, 'which fruit?');

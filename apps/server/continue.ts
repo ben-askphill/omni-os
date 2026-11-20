@@ -1,5 +1,6 @@
 // Continuing an idle thread on another local harness (#221, GLOSSARY.md "Fork"): a new thread in the
 // source's channel, role and folder, linked to it by `continued_from` but not its crew child, with a session of its own
+// (a delegated source's parent, task, source and follow-up carry over, so it reports where the source did)
 // and, for repo work, a worktree of its own on a new branch at the source's HEAD. Its first session reads a Carryover
 // (carryover.ts) ahead of Ben's first message, through the pending handover (runner/handover.ts). The source is only
 // read: its transcript, session, status and checkout stay as they were.
@@ -11,7 +12,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
 import { continueRefusal, continueSourceRefusal, type CarriedStats, type CarryoverFile, type ContinueBlock, type ContinueBody, type ContinueLink, type ContinuePreview } from '@omni/shared/continue.ts';
 import type { Run, RunName } from '@omni/shared/run-switch.ts';
-import { channels, continuations, events, messageRequests, outbox, threadBases, threads, tx, type SkippedFile, type Thread, type ThreadBase } from './db.ts';
+import { channels, continuations, events, messageRequests, outbox, reportFollowUps, threadBases, threads, tx, type SkippedFile, type Thread, type ThreadBase } from './db.ts';
 import { buildCarryover, carriedStats, historyText, type CarryoverP } from './carryover.ts';
 import { copyAttachments, planAttachments, planSignature, type AttachmentPlan } from './continue-attachments.ts';
 import { changesCheckout, defaultBranch, git, gitOr, parseNameStatus, real, threadBase } from './changes.ts';
@@ -381,9 +382,11 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
           session_id: id,
           cwd: at.cwd,
           branch: at.branch,
-          parent_id: null,
-          task_id: null,
-          source: 'manual',
+          // A delegated thread carried on is still that delegation: it nests under the same parent, on the same task,
+          // and its report goes there. Anything else reports to nobody, as before.
+          parent_id: now.parent_id,
+          task_id: now.parent_id ? now.task_id : null,
+          source: now.parent_id ? now.source : 'manual',
           automation: null,
           // The same person stays accountable for the work it carries on.
           owner: now.owner,
@@ -392,6 +395,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
           setup: at.branch && !route ? 'preparing' : null,
         });
         continuations.link(id, sourceId);
+        if (now.parent_id && reportFollowUps.has(sourceId)) reportFollowUps.set(id);
         const carried = cap.preview.carryover;
         threads.update(id, { handover: { from: carried.source.run, since: 0 }, updated_at: t.updated_at });
         events.add(id, 'carryover', { source: carried.source, goal: carried.goal, text: cap.body, ...carriedStats(carried) } satisfies CarryoverP);
