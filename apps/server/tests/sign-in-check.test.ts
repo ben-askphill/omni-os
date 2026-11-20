@@ -11,7 +11,9 @@ import {
   parseConnectorList,
   parseInitServers,
   parseMcpList,
+  parseTokenMap,
   signInMessage,
+  withoutTokenAccounts,
 } from '../connectors.ts';
 
 // A4: a job that needs a connector that is signed out on this machine stops before any harness starts, says which one
@@ -95,6 +97,17 @@ describe('connectors (pure)', () => {
     expect(parseConnectorList('gmail, drive')).toEqual(['gmail', 'drive']);
     expect(parseConnectorList(['jira'])).toMatch(/unknown connector "jira"/);
     expect(neededConnectors('check my calendar', ['slack'])).toEqual(['slack', 'calendar']);
+  });
+
+  it("reads a role's tokens by account id or label, and leaves an account out only while its token is set", () => {
+    expect(parseTokenMap({ Notion: 'OMNI_NOTION_TOKEN', slack: ' SLACK_BOT_TOKEN ' })).toEqual({ notion: 'OMNI_NOTION_TOKEN', slack: 'SLACK_BOT_TOKEN' });
+    expect(parseTokenMap({ jira: 'JIRA_TOKEN' })).toMatch(/unknown connector "jira"/);
+    expect(parseTokenMap(['notion'])).toMatch(/tokens must map an account to a secret/);
+    expect(parseTokenMap({ notion: 'notion token' })).toMatch(/^notion: tokens must map/);
+    const tokens = { notion: 'OMNI_NOTION_TOKEN' };
+    expect(withoutTokenAccounts(['slack', 'notion'], tokens, (name) => name === 'OMNI_NOTION_TOKEN')).toEqual(['slack']);
+    expect(withoutTokenAccounts(['slack', 'notion'], tokens, () => false)).toEqual(['slack', 'notion']);
+    expect(withoutTokenAccounts(['notion'], undefined, () => true)).toEqual(['notion']);
   });
 
   it('reads both server lists Claude Code prints', () => {
@@ -232,5 +245,66 @@ describe('a scheduled automation whose connector is signed out', () => {
     const again = await automations.fireScheduled(get());
     expect(again).not.toBeNull();
     await r.until('held again', () => r.thread(again!.id).setup === 'signin');
+  }, 20_000);
+});
+
+describe('an agent that reaches an account through a token', () => {
+  // A role's `tokens:` names the secret it reaches an account with instead of that account's connector. Every shipped
+  // role that does its own work reaches Notion through OMNI_NOTION_TOKEN, so while that is set a Notion brief does not
+  // wait for the claude.ai Notion connector. Other agents, and every other account, still wait.
+  const notionOut = 'claude.ai Notion: https://mcp.notion.com/mcp - ! Needs authentication';
+  const brief = 'Add these tasks to the Notion task tracker';
+  /** Where OMNI_NOTION_TOKEN is set on this pretend machine (its name only: the check never reads a value), or nowhere. */
+  const notionToken = (scope: string | null) => {
+    r.db.db.prepare(`DELETE FROM secrets WHERE name = 'OMNI_NOTION_TOKEN'`).run();
+    if (scope) r.db.db.prepare(`INSERT INTO secrets (scope, name) VALUES (?, 'OMNI_NOTION_TOKEN')`).run(scope);
+  };
+
+  it('starts a builder thread with a Notion brief while Notion is signed out, when the token is set', async () => {
+    mcpList = notionOut;
+    notionToken('global');
+    const t = await r.start(brief, { role: 'builder' });
+    await r.untilResults(t.id, 1);
+    expect(r.thread(t.id)).toMatchObject({ setup: null, setup_error: null });
+    expect(listCalls).toBe(0);
+    // The channel's own secret counts as well.
+    notionToken('channel:scratch');
+    const researcher = await r.start(brief, { role: 'researcher' });
+    await r.untilResults(researcher.id, 1);
+    expect(r.thread(researcher.id).setup).toBeNull();
+    notionToken(null);
+  }, 20_000);
+
+  it('still waits on an agent without the rule, without the token, or for an account no token reaches', async () => {
+    const { writeOwnCrew } = await import('../crew.ts');
+    writeOwnCrew('store-ops', '---\nname: Store ops\ndescription: Hands-on store work.\n---\nYou operate on client stores.');
+    mcpList = [notionOut, slackOut].join('\n');
+    notionToken('global');
+    const noRule = await r.start(brief, { role: 'store-ops' });
+    const noRole = await r.start(brief);
+    const slack = await r.start(`${brief}, then post the summary to Slack`, { role: 'builder' });
+    for (const t of [noRule, noRole, slack]) await r.until('held', () => r.thread(t.id).setup === 'signin');
+    for (const t of [noRule, noRole]) expect(r.thread(t.id).setup_error).toMatch(/^Notion is signed out on .+, so this job has not started/);
+    expect(r.thread(slack.id).setup_error).toMatch(/^Slack is signed out on .+, so this job has not started/);
+
+    notionToken(null);
+    const noToken = await r.start(brief, { role: 'builder' });
+    await r.until('held', () => r.thread(noToken.id).setup === 'signin');
+    expect(r.thread(noToken.id).setup_error).toMatch(/^Notion is signed out on /);
+    for (const t of [noRule, noRole, slack, noToken]) expect(r.spawns(t.id)).toHaveLength(0);
+  }, 20_000);
+
+  it('runs a scheduled automation as that agent instead of holding or skipping it', async () => {
+    writeFileSync(join(dir, 'notion-log.yaml'), `name: Notion log\nenabled: true\ncron: "0 8 * * *"\nchannel: scratch\nrole: builder\nprompt: ${brief}\n`);
+    const get = () => automations.loadAutomations().find((a) => a.id === 'notion-log')!;
+    mcpList = notionOut;
+    notionToken('global');
+    for (let run = 0; run < 2; run++) {
+      const t = await automations.fireScheduled(get());
+      expect(t, `run ${run + 1}`).not.toBeNull();
+      await r.untilResults(t!.id, 1);
+      expect(r.thread(t!.id).setup).toBeNull();
+    }
+    notionToken(null);
   }, 20_000);
 });

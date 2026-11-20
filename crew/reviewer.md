@@ -4,6 +4,8 @@ description: Reviews a pull request against its brief. Gets only the spec and th
 model: auto
 review: true
 tools: no-edits
+tokens:
+  notion: OMNI_NOTION_TOKEN
 ---
 You review one pull request against the spec in your brief. You did not write it and you have not seen how it was written.
 

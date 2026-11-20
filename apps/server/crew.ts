@@ -6,9 +6,10 @@ import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { CrewLockedField, CrewLocks } from '@omni/shared/crew-settings.ts';
 import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
-import { parseConnectorList } from './connectors.ts';
+import { parseConnectorList, parseTokenMap } from './connectors.ts';
 import { isAccessLevel, type AccessLevel } from '@omni/shared/access.ts';
 import { isRoleMemoryMode, type RoleMemoryMode, type RoleMemoryWrites } from '@omni/shared/memory.ts';
+import { readsOnly } from '@omni/shared/quick-ask.ts';
 
 // Crew roles: one markdown file each, frontmatter and a charter. The shipped ones live in crew/ and each release
 // replaces them. The user's own live in data/crew/: a file there with a new id is a whole role of theirs, and one with
@@ -64,6 +65,13 @@ export interface CrewRole {
    * thread of the role waits at its sign-in check while one is signed out. Unset when the role names none.
    */
   connectors?: string[];
+  /**
+   * `tokens:`, the accounts its threads reach through a token instead of their connector, by connector id, each with
+   * the secret that holds the token (`notion: OMNI_NOTION_TOKEN`). While that secret reaches a thread that does its
+   * own work (doesOwnWork), the sign-in check does not wait on the account's connector (runner/setup.ts connectorsFor).
+   * Unset when the role names none.
+   */
+  tokens?: Record<string, string>;
   /** The tools its threads run with: everything, everything but the file-edit tools, or only what routes work. */
   tools: CrewTools;
   /** The role routes work and never does it: no shell, file edits, browser or subagents (DELEGATE_ONLY_DENIED). `tools` is delegate-only. */
@@ -190,6 +198,13 @@ function connectorsOf(raw: unknown): { connectors?: string[] } {
   return Array.isArray(ids) && ids.length ? { connectors: ids } : {};
 }
 
+/** A role's `tokens:`, when it is a valid map. A bad one is left out, so the role waits for its connectors as before. */
+function tokensOf(raw: unknown): { tokens?: Record<string, string> } {
+  if (raw === undefined || raw === null) return {};
+  const map = parseTokenMap(raw);
+  return typeof map === 'object' && Object.keys(map).length ? { tokens: map } : {};
+}
+
 /**
  * A role's tools: delegate-only when either key says so (an overlay's `tools: full` never undoes a built-in's
  * `delegate_only: true`), else what `tools:` names, else full.
@@ -212,6 +227,7 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     channel: text(meta.channel),
     mcp: Array.isArray(meta.mcp) ? meta.mcp.filter((x): x is string => typeof x === 'string') : [],
     ...connectorsOf(meta.connectors),
+    ...tokensOf(meta.tokens),
     ...(isAccessLevel(meta.access) && { access: meta.access }),
     tools,
     delegateOnly: tools === 'delegate-only',
@@ -377,6 +393,13 @@ export function crewForNewThread(id: string | null | undefined, delegated: boole
   if (delegated && !role.delegatable) return { refused: `The agent "${id}" cannot be delegated to. Agents: ${valid()}.`, status: 409 };
   return { role };
 }
+
+/**
+ * A thread that does its own work: not a routing role's, not a quick ask and not in a read-only workspace. Only these
+ * get the workspace and Notion sections of the prompt (runner/prompts.ts), so only these reach an account through a
+ * role's `tokens:`.
+ */
+export const doesOwnWork = (t: { quick?: number | null; workspace?: string | null }, role?: CrewRole) => !role?.delegateOnly && !readsOnly(t);
 
 /**
  * The Claude Code tools a delegate-only role runs without: everything that changes files, runs commands, drives a

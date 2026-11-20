@@ -103,6 +103,15 @@ connectors: [slack, calendar]   # gmail, calendar, slack, notion, drive, granola
 
 An agent names them the same way in its frontmatter. A brief that asks to use one counts too ("check my Slack", "post the summary to Slack", "add a task to the Notion tracker"). A brief that only mentions one does not: one about how you write Slack replies starts with Slack signed out, and so does anything inside code, quoted lines or quoted strings. Accounts the check does not know (Figma, Vercel, Expo and other claude.ai connectors) never hold a thread. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
 
+An agent that reaches an account through a token instead of its connector says so with `tokens:` in its frontmatter: the account, then the secret that holds the token.
+
+```yaml
+tokens:
+  notion: OMNI_NOTION_TOKEN
+```
+
+While that secret is set on this machine, globally or for the thread's channel, the agent's threads and scheduled runs do not wait for that account's connector. They still wait for every other account they need. A quick ask, and an agent that only routes work like the Conductor, has no shell to use a token from, so it waits as before. The shipped agents that do their own work (builder, inbox, researcher, reviewer and writer) reach Notion this way ([Notion](notion.md)). A thread with no agent, or an agent of your own without `tokens:`, still waits for Notion.
+
 ## Choose a machine
 
 In Automations, "Run automations on" picks this machine or another synced machine for every scheduled and event-triggered automation that does not name its own. The choice reaches the other machines through sync.

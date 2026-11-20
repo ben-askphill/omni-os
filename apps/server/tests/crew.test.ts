@@ -76,6 +76,13 @@ describe('parseCrewFile', () => {
     expect(parseCrewFile('s', '---\nreview: "yes"\n---\nbody').review).toBe(false);
   });
 
+  it('reads tokens: as the accounts a role reaches through a secret, and leaves a bad map out', () => {
+    expect(parseCrewFile('t', '---\ntokens:\n  notion: OMNI_NOTION_TOKEN\n  Slack: SLACK_BOT_TOKEN\n---\nbody').tokens).toEqual({ notion: 'OMNI_NOTION_TOKEN', slack: 'SLACK_BOT_TOKEN' });
+    expect(parseCrewFile('u', '---\nname: U\n---\nbody')).not.toHaveProperty('tokens');
+    for (const bad of ['tokens: [notion]', 'tokens: OMNI_NOTION_TOKEN', 'tokens:\n  jira: JIRA_TOKEN', 'tokens:\n  notion: notion-token'])
+      expect(parseCrewFile('v', `---\n${bad}\n---\nbody`), bad).not.toHaveProperty('tokens');
+  });
+
   it('accepts frontmatter with no body', () => {
     expect(parseCrewFile('c', '---\nname: C\n---')).toMatchObject({ name: 'C', charter: '' });
   });
@@ -98,6 +105,13 @@ describe('parseCrewFile', () => {
     expect(crew.filter((r) => r.delegateOnly).map((r) => r.id)).toEqual(['conductor', 'usage-scan']);
     expect(crew.find((r) => r.id === 'usage-scan')).toMatchObject({ mcp: ['omni'], channel: 'inbox', harness: 'claude-code' });
     for (const r of crew) expect(r.charter.length).toBeGreaterThan(0);
+  });
+
+  it('has every shipped role that does its own work reach Notion through its token, and the routers none', async () => {
+    // A role that does work gets the Notion section when the token is set (runner/prompts.ts), so it never waits on
+    // the claude.ai Notion connector. The Conductor and usage-scan only route, with no shell to use a token from.
+    const { listCrew } = await import('../crew.ts');
+    for (const r of listCrew().filter((x) => x.kind !== 'own')) expect(r.tokens, r.id).toEqual(r.delegateOnly ? undefined : { notion: 'OMNI_NOTION_TOKEN' });
   });
 
   it("has the Conductor answer quick asks itself, keep the brief and folder pick for real work, and opt in to report wakes", async () => {

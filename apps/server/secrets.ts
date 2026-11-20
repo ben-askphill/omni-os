@@ -70,6 +70,15 @@ export function hasSecret(scope: string, name: string): boolean {
   return !!db.prepare('SELECT 1 FROM secrets WHERE scope = ? AND name = ?').get(scope, name);
 }
 
+/**
+ * Whether a channel's threads get a secret of this name in their environment (secretsEnv): set for the channel or
+ * globally, and one a thread may have. Reads the names table only, never the store.
+ */
+export function threadSecretSet(channelId: string, name: string): boolean {
+  const keys = harnessKeyNames();
+  return [`channel:${channelId}`, 'global'].some((scope) => secretReachesThread(scope, name, keys) && hasSecret(scope, name));
+}
+
 /** One global secret from the store, or null when it is missing. The value is never logged. */
 export async function globalSecret(name: string): Promise<string | null> {
   if (!NAME_RE.test(name)) return null;

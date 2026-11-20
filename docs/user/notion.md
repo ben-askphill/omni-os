@@ -26,6 +26,8 @@ When `OMNI_NOTION_TOKEN` is in a thread's environment, Omni adds a Notion sectio
 
 Markdown arguments also take `@file` or `-` for stdin. Long tables and lists go out in as many requests as Notion's limit of 100 children per list needs. The helper only sends the token to `https://api.notion.com/v1/` and follows no redirects. A write that fails with a 5xx or no answer is not retried, since it may have landed: the helper says so, with how far a `create` or `append` got. Only a 429 is retried. Without the helper, an agent calls `https://api.notion.com/v1` with `Authorization: Bearer $OMNI_NOTION_TOKEN` and `Notion-Version: 2022-06-28`. The helper never prints the token.
 
+The shipped agents that get this section also set `tokens: { notion: OMNI_NOTION_TOKEN }`, so a brief that uses Notion does not wait for the claude.ai Notion connector at the [sign-in check](automations.md#sign-in-check). Add the same lines to an agent of your own for it to skip that wait too.
+
 Link previews read the same secret: a Notion link posted in a thread shows its page title ([Link previews](link-previews.md)).
 
 ## Share pages with the connection

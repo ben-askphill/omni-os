@@ -4,8 +4,9 @@
 //
 // Only Claude Code reports its connectors' sign-in state: each session's init lists every MCP server with a status
 // (stream.ts), and `claude mcp list` checks them all in a few seconds without a model call; sign-in-check.ts reads both.
-// This module is pure, so crew.ts can read a role's `connectors:` without loading more. Other
-// harnesses' state is unknown, and unknown never holds a job.
+// This module is pure, so crew.ts can read a role's `connectors:` and `tokens:` without loading more. Other
+// harnesses' state is unknown, and unknown never holds a job. A role that reaches an account through a token instead
+// (`tokens:`) does not wait on that account's connector while the token is set (runner/setup.ts connectorsFor).
 
 import { ACCESS_CONNECTORS, type AccessConnector } from '@omni/shared/access.ts';
 
@@ -141,6 +142,13 @@ export const connectorsIn = (text: string): string[] => {
   return CONNECTORS.filter((c) => c.cue.test(ask)).map((c) => c.id);
 };
 
+/** A connector by its catalog id or its label, in any case. */
+const connectorNamed = (name: string) => {
+  const n = name.trim().toLowerCase();
+  return CONNECTORS.find((x) => x.id === n || x.label.toLowerCase() === n);
+};
+const unknownConnector = (name: unknown) => `unknown connector "${String(name)}": use ${CONNECTORS.map((x) => x.id).join(', ')}`;
+
 /**
  * `connectors:` in an automation's YAML or a role's frontmatter: one id or a list of them. The ids, or the problem
  * as a string. Ids are the catalog's (gmail, calendar, slack, notion, drive, granola), or its labels in any case.
@@ -150,10 +158,10 @@ export function parseConnectorList(raw: unknown): string[] | string {
   if (!Array.isArray(list)) return 'connectors must be a list such as [slack, calendar]';
   const ids: string[] = [];
   for (const item of list) {
-    const name = typeof item === 'string' ? item.trim().toLowerCase() : '';
+    const name = typeof item === 'string' ? item.trim() : '';
     if (!name) continue;
-    const c = CONNECTORS.find((x) => x.id === name || x.label.toLowerCase() === name);
-    if (!c) return `unknown connector "${String(item)}": use ${CONNECTORS.map((x) => x.id).join(', ')}`;
+    const c = connectorNamed(name);
+    if (!c) return unknownConnector(item);
     if (!ids.includes(c.id)) ids.push(c.id);
   }
   return ids;
@@ -163,6 +171,33 @@ export function parseConnectorList(raw: unknown): string[] | string {
 export const neededConnectors = (prompt: string, ...declared: (readonly string[] | undefined)[]) => [
   ...new Set([...declared.flatMap((d) => d ?? []), ...connectorsIn(prompt)]),
 ];
+
+/** A secret's name, as Settings > Secrets takes it (secret-names.ts NAME_RE). */
+const SECRET_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/**
+ * `tokens:` in a role's frontmatter: the accounts the role reaches through a token instead of their connector, each
+ * with the secret that holds it (`notion: OMNI_NOTION_TOKEN`). The map by connector id, or the problem as a string.
+ */
+export function parseTokenMap(raw: unknown): Record<string, string> | string {
+  const usage = 'tokens must map an account to a secret, such as { notion: OMNI_NOTION_TOKEN }';
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return usage;
+  const out: Record<string, string> = {};
+  for (const [account, secret] of Object.entries(raw)) {
+    const c = connectorNamed(account);
+    if (!c) return unknownConnector(account);
+    if (typeof secret !== 'string' || !SECRET_NAME.test(secret.trim())) return `${account}: ${usage}`;
+    out[c.id] = secret.trim();
+  }
+  return out;
+}
+
+/**
+ * The connectors left to check once a role's `tokens:` takes out the accounts it reaches through a token. `has` says
+ * whether the thread gets a secret of that name; an account whose token is not set still needs its connector.
+ */
+export const withoutTokenAccounts = (ids: readonly string[], tokens: Readonly<Record<string, string>> | undefined, has: (secret: string) => boolean) =>
+  tokens ? ids.filter((id) => !(tokens[id] && has(tokens[id]))) : [...ids];
 
 // ---------- server states ----------
 

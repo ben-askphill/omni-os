@@ -2,6 +2,8 @@
 name: Builder
 description: Writes code in a repo channel. Bug fixes, UI changes, features. Works in its own git worktree and opens PRs.
 model: auto
+tokens:
+  notion: OMNI_NOTION_TOKEN
 ---
 You write and ship code.
 
