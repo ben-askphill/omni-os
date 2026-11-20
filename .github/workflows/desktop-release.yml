@@ -87,16 +87,17 @@ jobs:
       # Electron fetches its binary the first time stage.ts starts it.
       - run: npm ci --include=dev --ignore-scripts
       # identity=null builds it unsigned. The zip target is what has electron-builder write app-update.yml into the app.
+      # Only the app goes on from here, so that zip is stored, not compressed: the Mac package job makes the one that ships.
       - name: Build
         working-directory: apps/desktop
-        run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --native required -- -c.mac.identity=null -c.mac.target=zip
+        run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --native required -- -c.mac.identity=null -c.mac.target=zip -c.compression=store
       # A tarball keeps the bundle's links and modes. COPYFILE_DISABLE and --no-mac-metadata keep extended attributes and
-      # ._ files out of it.
+      # ._ files out of it. It lives for one run, so gzip's fastest level: a third of the time for a tenth more bytes.
       - name: Pack the app
         id: pack
         run: |
           tarball="$RUNNER_TEMP/omni-mac-unsigned.tar.gz"
-          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf "$tarball" -C apps/desktop/release/mac-universal Omni.app
+          COPYFILE_DISABLE=1 tar --no-mac-metadata --options gzip:compression-level=1 -czf "$tarball" -C apps/desktop/release/mac-universal Omni.app
           echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
@@ -253,7 +254,7 @@ jobs:
         id: pack
         run: |
           tarball="$RUNNER_TEMP/omni-mac-signed.tar.gz"
-          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf "$tarball" -C "$RUNNER_TEMP/app" Omni.app
+          COPYFILE_DISABLE=1 tar --no-mac-metadata --options gzip:compression-level=1 -czf "$tarball" -C "$RUNNER_TEMP/app" Omni.app
           echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:

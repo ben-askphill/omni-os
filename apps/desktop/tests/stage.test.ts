@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
 import { personalTermProblems, SHIPPED_SOURCES } from '../scripts/personal-terms.ts';
-import { NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
+import { cargoArgs, NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
 import { NATIVE_CLI } from '../src/cli-shim.ts';
 import {
   compareVersions,
@@ -325,6 +325,13 @@ describe('the Rust binaries', () => {
     expect(rustTriple('linux', 'arm64')).toBe('aarch64-unknown-linux-musl');
     expect(rustTriple('darwin', 'arm64')).toBe('aarch64-apple-darwin');
     expect(rustTriple('darwin', 'x64')).toBe('x86_64-apple-darwin');
+  });
+
+  it('compiles every arch of a universal build in one cargo run', () => {
+    const args = cargoArgs('omni-mcp', ['aarch64-apple-darwin', 'x86_64-apple-darwin']);
+    expect(args.filter((_, i) => args[i - 1] === '--target')).toEqual(['aarch64-apple-darwin', 'x86_64-apple-darwin']);
+    expect(args).toEqual(expect.arrayContaining(['build', '--release', '--locked', '-p', 'omni-mcp']));
+    expect(cargoArgs('omni-cli', ['x86_64-unknown-linux-musl']).filter((arg) => arg === '--target')).toHaveLength(1);
   });
 
   it('stages them where the server looks', () => {
