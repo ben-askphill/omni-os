@@ -13,6 +13,7 @@ import { ThreadReferencePanel } from '../src/components/ThreadReference.tsx';
 import { MoComposer } from '../src/mobile/MoComposer.tsx';
 import { ContextInspector } from '../src/message-context/ContextChips.tsx';
 import { addDraftContext, draftContext, settleDraftContext } from '../src/message-context/draft.ts';
+import { messageBox, typeIn } from './message-box.ts';
 
 // The thread reference picker in the thread menu (a sheet on a phone): it searches this channel by default, offers other channels only
 // from All channels, attaches a reference to the draft without displacing the `@` menu, and shows the captured identity.
@@ -86,11 +87,7 @@ const settle = () => act(async () => void (await new Promise((r) => setTimeout(r
 const open = async (phone: boolean, typed = '') => {
   await mount(phone);
   if (typed) {
-    const box = host.querySelector('textarea')!;
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(box, typed);
-      box.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    await typeIn(messageBox(host)!, typed);
   }
   await settle();
 };
@@ -105,7 +102,7 @@ describe.each([false, true])('the picker, phone=%s', (phone) => {
     const [r] = readContexts(draftContext(thread.id));
     expect(r).toMatchObject({ as: 'known', kind: 'thread_reference', body: { thread: same.id, title: 'Fix the cart total', channel: 'shop', cross_channel: false } });
     expect(host.textContent).toContain('Thread: Fix the cart total (Shop · 7d3e91a0)');
-    expect(host.querySelector('textarea')!.value).toBe('look at');
+    expect(messageBox(host)!.textContent).toBe('look at');
     // Only the draft changed: nothing was posted anywhere.
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
   });

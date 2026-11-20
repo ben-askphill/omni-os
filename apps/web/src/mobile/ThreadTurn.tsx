@@ -12,7 +12,7 @@ import { Avatar } from '../components/ui.tsx';
 import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { MentionText } from '../message-context/MentionField.tsx';
+import { MentionText } from '../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';

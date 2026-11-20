@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { useEffect, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { takeComposerFocus } from '../../router.ts';
 import { Icon, Loader } from '../ui.tsx';
 import { isImeEnter } from '../../ime.ts';
@@ -7,47 +7,7 @@ import { isImeEnter } from '../../ime.ts';
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 export const MOD = isMac ? 'Cmd' : 'Ctrl';
 
-/**
- * Whether a textarea with `field-sizing: content` (the `field-sizing-content` class) grows by itself: Chromium, so
- * the desktop app, and Safari 26.2 on. Older iOS Safari and Firefox still need useAutosize's measuring.
- */
-export const fieldSizes = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('field-sizing', 'content');
-
-/**
- * A composer box that grows with its text, up to the textarea's own CSS `max-height`, which caps it in both paths.
- * Give the textarea `field-sizing-content`: where that works this hook does nothing, since an inline height would
- * override it. Elsewhere it measures `scrollHeight` on each change.
- */
-export function useAutosize(ref: RefObject<HTMLTextAreaElement | null>, value: string) {
-  const measure = !fieldSizes();
-  const fit = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [ref]);
-  useLayoutEffect(() => {
-    if (measure) fit();
-  }, [measure, fit, value]);
-  // The placeholder counts toward scrollHeight, so a measurement taken before layout or font load
-  // settles can come out far too tall. Refit when the width or the fonts change.
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !measure) return;
-    void document.fonts?.ready.then(fit);
-    if (typeof ResizeObserver === 'undefined') return;
-    let w = el.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth === w) return;
-      w = el.clientWidth;
-      fit();
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref, fit, measure]);
-}
-
-export function useFocusRequests(ref: RefObject<HTMLTextAreaElement | null>, enabled: boolean) {
+export function useFocusRequests(ref: RefObject<{ focus: () => void } | null>, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     if (takeComposerFocus()) ref.current?.focus();
@@ -100,21 +60,18 @@ export function SendButton({ armed, busy, onClick, children }: { armed: boolean;
 export const withKeys = (text: string) => `${text.replace(/\.$/, '')} · / commands, @ files`;
 
 /**
- * Enter sends, Shift+Cmd/Ctrl+Enter interrupts, Cmd/Ctrl+Enter inserts a newline (Shift+Enter keeps the
- * textarea's own). Null for every other key, and for the Enter that ends an IME composition (229: Safari's,
- * which it doesn't flag as composing). Prevents the default for the keys it acts on.
+ * Enter sends, Shift+Cmd/Ctrl+Enter interrupts, Cmd/Ctrl+Enter calls `newline` (Shift+Enter keeps the box's own).
+ * Null for every other key, and for the Enter that ends an IME composition (229: Safari's, which it doesn't flag as
+ * composing). Prevents the default for the keys it acts on.
  */
-export function enterKey(e: ReactKeyboardEvent<HTMLTextAreaElement>, text: string, onText: (text: string) => void): 'send' | 'interrupt' | null {
+export function enterKey(e: ReactKeyboardEvent<HTMLElement>, newline: () => void): 'send' | 'interrupt' | null {
   if (e.key !== 'Enter' || isImeEnter(e) || e.altKey) return null;
   const mod = e.metaKey || e.ctrlKey;
   if (!mod && e.shiftKey) return null;
   e.preventDefault();
   if (mod && e.shiftKey) return 'interrupt';
   if (!mod) return 'send';
-  const el = e.currentTarget;
-  const at = el.selectionStart + 1;
-  onText(text.slice(0, el.selectionStart) + '\n' + text.slice(el.selectionEnd));
-  requestAnimationFrame(() => el.setSelectionRange(at, at));
+  newline();
   return null;
 }
 

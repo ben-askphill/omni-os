@@ -4,16 +4,13 @@ import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
-import { useAutosize } from '../components/composer/controls.tsx';
+import { MessageEditor, type MessageEditorHandle } from '../components/composer/MessageEditor.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { LivesOnNote, sendRefusal, type SendRefusal } from '../components/thread/LivesOn.tsx';
 import type { Takeover } from '@omni/shared/handoff.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
-import { machineMentions } from '../message-context/machine-mention.tsx';
-import { useMentionField } from '../message-context/MentionField.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
-import { FileMenu, useFileMenu } from '../components/FileMenu.tsx';
 import { canSteer } from '../steer.ts';
 import { currentRun, pickedModelRun, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
@@ -81,27 +78,22 @@ export function MoComposer({
   const att = useAttachments();
   const context = useDraftContext(thread.id);
   const send = useReplySend(thread.id);
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<MessageEditorHandle>(null);
+  const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  // The `@` menu: files, and in a thread that can delegate, the machines a task can be sent to.
-  const mentions = machineMentions(thread.id, setError);
+  const latest = useRef(text);
+  latest.current = text;
   const update = (v: string) => {
     setText(v);
     drafts.set(thread.id, v);
-    mentions.edited(v);
   };
-  const mic = useDictation((p) => update(withPhrase(ref.current?.value ?? '', p)));
+  const mic = useDictation((p) => update(withPhrase(latest.current, p)));
   // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts), as in the desktop reply box.
   const askRoles = useAskRoles(thread);
-  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(thread.id)}`, roles: askRoles, onMachine: mentions.picked });
-  const { aria: menuAria, ...menuEvents } = fileMenu.textarea;
-  const field = useMentionField(ref, text, context);
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
   useEffect(() => {
     if (!takeover) setAway((a) => (a?.livesOn ? null : a));
   }, [takeover]);
-
-  useAutosize(ref, text);
 
   const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
   const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
@@ -116,7 +108,7 @@ export function MoComposer({
     try {
       await postAsk(thread.id, ask.role.id, ask.question, askOptions);
     } catch (e) {
-      const now = ref.current?.value ?? '';
+      const now = latest.current;
       if (!now || now === raw) update(raw);
       setError(errorText(e));
     } finally {
@@ -149,7 +141,7 @@ export function MoComposer({
       onSent(t, mode);
     } catch (e) {
       // Unless Ben started a new message meanwhile.
-      const now = ref.current?.value ?? '';
+      const now = latest.current;
       if (!now || now === raw) update(raw);
       att.add(files);
       const refusal = sendRefusal(e);
@@ -234,39 +226,29 @@ export function MoComposer({
         />
       )}
       {(att.error || error) && <ErrorNote className="mb-2">{att.error ?? error}</ErrorNote>}
-      <div className="relative flex flex-col rounded-[26px] bg-surface">
-        {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
+      <div ref={setFrame} className="relative flex flex-col rounded-[26px] bg-surface">
         {ask && <AskChip threadId={thread.id} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
         <ContextChips records={chipRecords(text, context)} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
           <MoRound icon="plus" label={term('plusSheet', technical)} onClick={() => setPlus(true)} disabled={busy} />
-          {field.layer}
-          <textarea
-            ref={ref}
-            rows={1}
-            value={text}
-            {...menuEvents}
-            {...(fileMenu.open ? menuAria : {})}
-            onChange={(e) => {
-              update(e.target.value);
-              menuEvents.onChange(e);
-            }}
-            onSelect={(e) => {
-              field.onSelect(e);
-              menuEvents.onSelect(e);
-            }}
-            onScroll={field.onScroll}
-            style={field.style}
-            onKeyDown={(e) => {
-              if (fileMenu.onKey(e)) return;
-              field.onKeyDown(e, update);
-            }}
+          <MessageEditor
+            key={thread.id}
+            handle={ref}
+            text={text}
+            onText={update}
+            draft={thread.id}
+            records={context}
+            // The `@` menu: files, and in a thread that can delegate, the machines a task can be sent to.
+            mentions={`thread=${encodeURIComponent(thread.id)}`}
+            roles={askRoles}
+            anchor={frame}
+            onError={setError}
             onPaste={att.onPaste}
             enterKeyHint="send"
             placeholder={hint}
-            aria-label={hint}
-            className="field-sizing-content max-h-[132px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
+            label={hint}
+            className="max-h-[132px] min-w-0 flex-1 self-center overflow-y-auto bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none"
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />

@@ -16,11 +16,11 @@ import { parsePayload } from '@omni/shared/transcript-fold.ts';
 import { cantShowText, ContextChips, ContextInspector, NEWER_LABEL } from '../src/message-context/ContextChips.tsx';
 import { rangeText, sourceText } from '../src/message-context/diff-selection.tsx';
 import { CONTEXT_VIEWS } from '../src/message-context/kinds.ts';
-import { machineMentions } from '../src/message-context/machine-mention.tsx';
-import { MentionText } from '../src/message-context/MentionField.tsx';
+import { MentionText } from '../src/message-context/MentionText.tsx';
+import { editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMachines } from '../src/message-context/machine-tokens.ts';
 import { referencesFor } from '../src/message-context/thread-picker.ts';
-import { newThreadScope } from '../src/components/FileMenu.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import { newThreadScope } from '../src/components/composer/MessageEditor.tsx';
+import { chipRecords, machineMention, mentionBody, type MachineIdentity } from '@omni/shared/message-context-machine.ts';
 import { addDraftContext, draftContext, removeDraftContext, settleDraftContext } from '../src/message-context/draft.ts';
 import { sendKey } from '../src/requests.ts';
 import type { UserP } from '@omni/shared/transcript-fold.ts';
@@ -260,48 +260,43 @@ describe('request keys with context', () => {
 });
 
 describe('machine mentions in a composer', () => {
-  const row = (id: string, name: string) => ({
-    insert: name,
-    name,
-    detail: 'Online',
-    kind: 'machine' as const,
-    machine: { id, here: false, reachability: 'online' as const, lastSeen: null },
+  const machine = (id: string, name: string): MachineIdentity => ({ id, name, reachability: 'online', lastSeen: null });
+  const pick = (draft: string, m: MachineIdentity) => addDraftContext(draft, newContext(machineMention, mentionBody(m, new Date()), ''));
+
+  it('holds a picked machine as one token that the text writes as @<name>', () => {
+    const value = ['run it on ', machineToken(machine('box-1', 'omarchy')), ' now'];
+    expect(editorText(value)).toBe('run it on @omarchy now');
+    expect(value[1]).toMatchObject({ type: MACHINE_TOKEN, value: 'box-1', label: 'omarchy', data: { reachability: 'online', lastSeen: null } });
   });
 
-  it('puts a picked machine on the draft once, and drops it only when an edit takes its @name out', () => {
-    const thread = 'thread-machine-mentions';
-    const errors: string[] = [];
-    const m = machineMentions(thread, (why) => errors.push(why));
-    m.edited('@omarchy');
-    m.picked(row('box-1', 'omarchy'));
-    m.picked(row('box-1', 'omarchy'));
-    m.picked(row('mac-1', 'MacBook Pro'));
-    expect(draftContext(thread).map((r) => [r.label, (r.body as { machine: string }).machine])).toEqual([
-      ['@omarchy', 'box-1'],
-      ['@MacBook Pro', 'mac-1'],
-    ]);
-    // A render that still holds the text from before the pick never runs this, so nothing comes off until an edit.
-    m.edited('@omarchy run the server tests, @MacBook Pro build the page');
-    expect(draftContext(thread)).toHaveLength(2);
-    m.edited('@omarchy run the server tests, build the page');
-    expect(draftContext(thread).map((r) => r.label)).toEqual(['@omarchy']);
-    m.edited('');
-    expect(draftContext(thread)).toEqual([]);
-    expect(errors).toEqual([]);
+  it("rebuilds the tokens from the text and the draft's records, and leaves an @name with no record as text", () => {
+    const thread = 'thread-machine-value';
+    pick(thread, machine('mac-air', "Ben's MacBook Air"));
+    const text = "@Ben's MacBook Air run the ingest, @omarchy the tests";
+    const value = editorValue(text, draftContext(thread));
+    expect(value).toEqual([machineToken(machine('mac-air', "Ben's MacBook Air")), ' run the ingest, @omarchy the tests']);
+    expect(editorText(value)).toBe(text);
+    settleDraftContext(thread, draftContext(thread).map((r) => r.id));
   });
 
-  it('brings a pill back with a fresh id when Undo returns its @name', () => {
+  it('drops the record of a machine whose last chip went, and keeps one per machine', () => {
+    const thread = 'thread-machine-reconcile';
+    pick(thread, machine('box-1', 'omarchy'));
+    pick(thread, machine('mac-1', 'MacBook Pro'));
+    const [box, mac] = draftContext(thread);
+    const both = [machineToken(machine('box-1', 'omarchy')), ' run the tests, ', machineToken(machine('mac-1', 'MacBook Pro')), ' build it'];
+    expect(reconcileMachines(both, draftContext(thread))).toEqual({ add: [], remove: [] });
+    expect(reconcileMachines([both[0], ' run the tests, build it'], draftContext(thread))).toEqual({ add: [], remove: [mac.id] });
+    expect(reconcileMachines(['', both[0], ' and ', both[0]], draftContext(thread)).remove).toEqual([mac.id]);
+    expect(reconcileMachines(['nothing left'], draftContext(thread)).remove).toEqual([box.id, mac.id]);
+    settleDraftContext(thread, draftContext(thread).map((r) => r.id));
+  });
+
+  it('gives a chip with no record one, from what its token knew of the machine (Undo, or a paste)', () => {
     const thread = 'thread-machine-undo';
-    const m = machineMentions(thread);
-    m.picked(row('box-1', 'omarchy'));
-    const [first] = draftContext(thread);
-    m.edited(' run the tests');
-    expect(draftContext(thread)).toEqual([]);
-    m.edited('@omarchy run the tests');
-    const [back] = draftContext(thread);
-    expect([back.label, (back.body as { machine: string }).machine]).toEqual(['@omarchy', 'box-1']);
-    expect(back.id).not.toBe(first.id);
-    m.edited('');
+    const back = { ...machine('mac-1', 'MacBook Pro'), reachability: 'offline' as const, lastSeen: '2026-11-20T08:00:00.000Z' };
+    expect(reconcileMachines([machineToken(back), ' build it'], draftContext(thread))).toEqual({ add: [back], remove: [] });
+    expect(reconcileMachines([{ type: MACHINE_TOKEN, value: 'box-9', label: 'pasted' }], [])).toEqual({ add: [{ id: 'box-9', name: 'pasted', reachability: 'unknown', lastSeen: null }], remove: [] });
   });
 
   // Home's dashboard composer (NewThreadComposer, draft key `new:*`): the `@` menu asks for the machines with the role,
@@ -310,10 +305,8 @@ describe('machine mentions in a composer', () => {
     expect(newThreadScope('conductor', 'conductor')).toBe('channel=conductor&role=conductor');
     expect(newThreadScope('shop')).toBe('channel=shop');
     const key = 'new:*';
-    const m = machineMentions(key);
-    m.picked(row('mac-air', "Ben's MacBook Air"));
-    const text = "@Ben's MacBook Air run the ingest";
-    m.edited(text);
+    pick(key, machine('mac-air', "Ben's MacBook Air"));
+    const text = editorText([machineToken(machine('mac-air', "Ben's MacBook Air")), ' run the ingest']);
     const context = referencesFor(draftContext(key), 'conductor');
     expect(context.map((r) => [r.kind, r.label, (r.body as { machine: string }).machine])).toEqual([['machine_mention', "@Ben's MacBook Air", 'mac-air']]);
     // Shown inline, so no chip over the box.
@@ -323,7 +316,7 @@ describe('machine mentions in a composer', () => {
 
   it('shows a sent mention inline in the bubble, and no chip for it', () => {
     const thread = 'thread-machine-bubble';
-    machineMentions(thread).picked(row('mac-air', "Ben's MacBook Air"));
+    pick(thread, machine('mac-air', "Ben's MacBook Air"));
     const records = draftContext(thread);
     const text = "@Ben's MacBook Air run the ingest";
     const html = renderToStaticMarkup(createElement(MentionText, { text, records }));

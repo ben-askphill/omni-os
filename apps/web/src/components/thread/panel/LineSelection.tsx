@@ -68,7 +68,7 @@ export function SelectionDock({
     if (why) return setError(why);
     onClose();
     if (shell) shell.back();
-    else document.querySelector<HTMLTextAreaElement>('textarea[data-reply-composer]')?.focus();
+    else document.querySelector<HTMLElement>('[data-reply-composer]')?.focus();
   };
 
   const pin = async () => {

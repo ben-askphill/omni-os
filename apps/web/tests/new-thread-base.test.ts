@@ -10,6 +10,7 @@ vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), sh
 
 import { NewThreadComposer } from '../src/components/Composer.tsx';
 import { NewSheet } from '../src/mobile/NewSheet.tsx';
+import { messageBox, typeIn } from './message-box.ts';
 
 // Choosing the base of a new worktree thread, on the desktop composer and the phone sheet (apps/web/src/components/BasePicker.tsx).
 
@@ -65,11 +66,7 @@ const click = async (el: Element | undefined | null) => {
   await act(async () => (el as HTMLElement).click());
 };
 const type = async (text: string) => {
-  const input = host.querySelector('textarea')!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, text);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeIn(messageBox(host)!, text);
 };
 
 describe.each([false, true])('base of a new thread, phone=%s', (phone) => {
@@ -111,7 +108,7 @@ describe.each([false, true])('base of a new thread, phone=%s', (phone) => {
     await type('Fix it');
     await send();
     expect(host.textContent).toContain('No branch named "release/1.2".');
-    expect(host.querySelector('textarea')!.value).toBe('Fix it');
+    expect(messageBox(host)!.textContent).toBe('Fix it');
     expect(host.querySelector('button[aria-label="Base: release/1.2 · bbbbbbb"]')).toBeTruthy();
   });
 });

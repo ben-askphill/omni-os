@@ -6,7 +6,7 @@ import { Markdown } from '../components/Markdown.tsx';
 import { useSending } from '../sending.ts';
 import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { MentionText } from '../message-context/MentionField.tsx';
+import { MentionText } from '../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { Attachments } from '../components/Transcript.tsx';
 import { Button, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';

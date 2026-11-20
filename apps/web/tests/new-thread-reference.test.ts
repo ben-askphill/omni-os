@@ -19,6 +19,7 @@ import { NewThreadComposer } from '../src/components/Composer.tsx';
 import { NewSheet, NEW_SHEET_DRAFT } from '../src/mobile/NewSheet.tsx';
 import { clearDraftContext, draftContext } from '../src/message-context/draft.ts';
 import { attachReference, referencesFor } from '../src/message-context/thread-picker.ts';
+import { messageBox, typeIn } from './message-box.ts';
 
 const harnesses = [
   { id: 'claude-code', name: 'Claude Code', available: true, models: [{ id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', efforts: ['high'], defaultEffort: 'high', default: true }] },
@@ -102,8 +103,9 @@ const click = async (el: Element | null | undefined) => {
 const button = (label: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
 const byText = (text: string) => [...host.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.includes(text));
 const rows = () => [...host.querySelectorAll<HTMLElement>('[role="listitem"]')];
-const type = async (el: HTMLTextAreaElement | HTMLInputElement, value: string) => {
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+const type = async (el: HTMLElement, value: string) => {
+  if (!(el instanceof HTMLInputElement)) return typeIn(el, value);
+  const proto = HTMLInputElement.prototype;
   await act(async () => {
     Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -142,7 +144,7 @@ describe.each([false, true])('referencing a thread from the new-thread composer,
     // Picking adds to the draft only: nothing went anywhere yet, least of all to the referenced thread.
     expect(posts).toHaveLength(0);
 
-    await type(host.querySelector('textarea')!, 'Pick up where that thread left off');
+    await type(messageBox(host)!, 'Pick up where that thread left off');
     await start();
     const body = sent();
     expect(body).toMatchObject({ channel: 'shop', prompt: 'Pick up where that thread left off' });
@@ -160,7 +162,7 @@ describe.each([false, true])('referencing a thread from the new-thread composer,
     await click(rows()[0]);
     await click(button(`Remove ${CHIP}`));
     expect(host.textContent).not.toContain(CHIP);
-    await type(host.querySelector('textarea')!, 'No reference after all');
+    await type(messageBox(host)!, 'No reference after all');
     await start();
     expect(sent()).not.toHaveProperty('context');
   });
@@ -174,7 +176,7 @@ describe.each([false, true])('referencing a thread from the new-thread composer,
     await settle();
     expect(searches.at(-1)).toBe('/api/thread-references?channel=shop&q=&scope=all');
     await click(rows().find((r) => r.textContent!.includes('Nails page')));
-    await type(host.querySelector('textarea')!, 'Compare with the nails page');
+    await type(messageBox(host)!, 'Compare with the nails page');
     await start();
     expect((sent().context as MessageContext[])[0]).toMatchObject({ body: { thread: nails.id, channel: 'pink', cross_channel: true } });
   });
@@ -190,7 +192,7 @@ describe('the Home composer, whose channel can change after a pick', () => {
     // Now start it in Pink Gellac instead: the chip, which names Shop, goes as a reference to another channel.
     await click(host.querySelector('button[aria-label^="Channel:"]'));
     await click([...host.querySelectorAll('[role="option"]')].find((o) => o.textContent?.includes('Pink Gellac')));
-    await type(host.querySelector('textarea')!, 'Port the fix');
+    await type(messageBox(host)!, 'Port the fix');
     await click(byText('Start'));
     const body = sent();
     expect(body.channel).toBe('pink');
@@ -216,7 +218,7 @@ describe('the phone New sheet', () => {
     await click(button('Reference a thread'));
     await settle();
     await click(rows()[0]);
-    await type(host.querySelector('textarea')!, 'what is the cart total?');
+    await type(messageBox(host)!, 'what is the cart total?');
     await click(button('Send'));
     await settle();
     expect(sent()).toMatchObject({ channel: 'shop', prompt: 'what is the cart total?', quick: true, context: [expect.objectContaining({ kind: 'thread_reference' })] });

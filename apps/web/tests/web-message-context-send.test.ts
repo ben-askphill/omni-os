@@ -12,6 +12,7 @@ vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], st
 import { ReplyComposer } from '../src/components/Composer.tsx';
 import { MoComposer } from '../src/mobile/MoComposer.tsx';
 import { addDraftContext, draftContext, settleDraftContext } from '../src/message-context/draft.ts';
+import { messageBox, typeIn } from './message-box.ts';
 
 // Both reply composers send the thread's drafted context with the message, can send it with no text, and drop only
 // what the send carried.
@@ -82,14 +83,10 @@ const mount = async (phone: boolean) => {
 };
 
 const sendButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Send"]');
-const textarea = () => host.querySelector('textarea')!;
+const textarea = () => messageBox(host)!;
 
 const type = async (value: string) => {
-  const input = textarea();
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeIn(textarea(), value);
 };
 
 describe.each([false, true])('a reply with context, phone=%s', (phone) => {
@@ -110,7 +107,7 @@ describe.each([false, true])('a reply with context, phone=%s', (phone) => {
     await type('look at this');
     expect(sendButton()?.disabled).toBe(false);
     await act(async () => void addDraftContext(thread.id, record('')));
-    expect(textarea().value).toBe('look at this');
+    expect(textarea().textContent).toBe('look at this');
     expect(host.querySelector('button[aria-label="Remove src/cart.ts:1-3"]')).toBeTruthy();
   });
 
@@ -125,7 +122,7 @@ describe.each([false, true])('a reply with context, phone=%s', (phone) => {
     await act(async () => void addDraftContext(thread.id, b));
     await act(async () => answer!());
     expect(draftContext(thread.id)).toEqual([b]);
-    expect(textarea().value).toBe('');
+    expect(textarea().textContent).toBe('');
   });
 
   it('removes a chip from the draft', async () => {
