@@ -8,7 +8,8 @@ export interface CrewListed {
   id: string;
   name: string;
   description: string;
-  avatar?: { icon?: string; bg?: string };
+  /** `image`: the URL of the image Ben uploaded (GET /api/crew/:id/avatar). Without one, the icon on its color. */
+  avatar?: { image?: string; icon?: string; bg?: string };
   harness?: string;
   model?: string;
   effort?: string;
@@ -215,10 +216,10 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
     const unset = builtIn ? same(now[k], builtIn[k]) : k in SWITCH_DEFAULTS && now[k] === SWITCH_DEFAULTS[k as keyof typeof SWITCH_DEFAULTS];
     fields[key] = unset ? (typeof value === 'string' ? '' : null) : value;
   }
-  // The avatar goes whole: both parts, or null to drop it.
+  // The avatar's icon and color go together, a cleared one as null: a save changes only the avatar keys it names, so
+  // an uploaded image (PUT /api/crew/:id/avatar) stays. Null for both drops them.
   if (!before || before.icon !== now.icon || before.bg !== now.bg) {
-    const avatar = { ...(now.icon && { icon: now.icon }), ...(now.bg && { bg: now.bg }) };
-    fields.avatar = Object.keys(avatar).length ? avatar : null;
+    fields.avatar = now.icon || now.bg ? { icon: now.icon || null, bg: now.bg || null } : null;
   }
   const body: CrewSaveBody = { fields };
   if (!detail || d.charter.trim() !== (detail.charters.own ?? '').trim()) body.charter = d.charter;

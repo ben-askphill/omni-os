@@ -162,3 +162,13 @@ describe('threadView', () => {
     expect(v.turns[0].proseClipped).toBeNull();
   });
 });
+
+describe('threadView authors', () => {
+  it('names the agent that answered each turn: the row\'s, else the lead\'s, none without an agent', () => {
+    const events = [user('Fix it', 0), text('Fixed.', 1), result(2), user('Review it', 3), { ...text('Looks right.', 4), agent: 'reviewer' }];
+    const lead = threadView({ events, thread: { ...thread('done'), role: 'builder' }, artifacts: [], children: [] });
+    expect(lead.turns.map((t) => t.author)).toEqual(['builder', 'reviewer']);
+    const none = threadView({ events: events.slice(0, 3), thread: thread('done'), artifacts: [], children: [] });
+    expect(none.turns.map((t) => t.author)).toEqual([null]);
+  });
+});

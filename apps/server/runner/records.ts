@@ -56,7 +56,7 @@ export function onTask(live: Live, u: TaskUpdate) {
     // Codex can report a sub-agent's start twice: from its spawn call and from its own activity item.
     if (known) return;
     const t = threads.get(id);
-    const row = addEvent(id, 'task', u);
+    const row = addEvent(id, 'task', u, live.agent);
     live.taskStarted({
       thread_id: id,
       channel_id: live.channelId,
@@ -85,12 +85,12 @@ export function onTask(live: Live, u: TaskUpdate) {
       summary: u.summary ?? known.summary,
     });
     // A task backgrounded mid-turn now keeps the process alive; a stored row keeps the transcript honest.
-    if (live.taskSaveDue(u.task_id, TASK_PROGRESS_MS, u.background !== undefined)) addEvent(id, 'task', u);
+    if (live.taskSaveDue(u.task_id, TASK_PROGRESS_MS, u.background !== undefined)) addEvent(id, 'task', u, live.agent);
     return publishTasks();
   }
   // Ended. The CLI can report the end twice (a status patch, then the notification); keep the first.
   if (!live.taskEnded(u.task_id)) return;
-  addEvent(id, 'task', u);
+  addEvent(id, 'task', u, live.agent);
   publishTasks(true);
   if (live.turn || hasBackground(live)) return;
   // The last background task ended: a switch queued behind it applies, and closes the process.
@@ -149,13 +149,13 @@ export function onResult(live: Live, p: ResultPayload) {
   if (p.ok && !p.turns && !answered) return;
   // A local slash command (/cost, /context, /compact) never calls the model: zero turns, and its output
   // is the result text, with no assistant message to duplicate.
-  if (p.ok && !p.turns && p.text?.trim()) addEvent(id, 'assistant_text', { text: p.text });
+  if (p.ok && !p.turns && p.text?.trim()) addEvent(id, 'assistant_text', { text: p.text }, live.agent);
   const intr = live.interrupt;
   // Unacked and ok: the turn finished before the CLI read our interrupt. The CLI answers it in the gap
   // before its next turn (and it stops nothing), or during that turn, which it then stops.
   const stopped = !!intr && (intr.acked || !p.ok);
   // The result text duplicates the last assistant message; keep only the metadata.
-  addEvent(id, 'result', { ...p, text: undefined, stopped: stopped || undefined });
+  addEvent(id, 'result', { ...p, text: undefined, stopped: stopped || undefined }, live.agent);
   goalMet(live, p, stopped);
   if (!live.turn) return;
   if (stopped) clearInterrupt(live);
@@ -219,7 +219,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
       if (!live.sawInit()) return;
       // Claude Code's connector sign-ins, for the next job's sign-in check (connectors.ts).
       if (threads.get(id)?.harness === 'claude-code') noteInitServers(rec.payload.mcp);
-      addEvent(id, 'init', rec.payload);
+      addEvent(id, 'init', rec.payload, live.agent);
       return;
     case 'result':
       return onResult(live, rec.payload);
@@ -238,7 +238,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
       // about it by itself. Track it like any other so status, last_text and the parent report follow.
       const opens = !live.turn && !live.closing && (rec.kind === 'assistant_text' || (rec.kind === 'tool_use' && !rec.payload.parent));
       if (opens) openTurn(live);
-      const row = addEvent(id, rec.kind, rec.payload);
+      const row = addEvent(id, rec.kind, rec.payload, live.agent);
       if (opens) live.turnOpenedAt(row.id);
       if (rec.kind === 'tool_result') {
         toolTails.end(id, rec.payload.tool_use_id);

@@ -11,7 +11,8 @@ import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { parseAvatarImage } from './agent-avatar.ts';
+import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { ROLE_MEMORY_MODES } from '@omni/shared/memory.ts';
 import { record } from './db/sync.ts';
@@ -33,19 +34,35 @@ const OMNI_MCP = new Set(['omni']);
 
 const optText = (max: number) => z.string().trim().max(max).optional();
 
-/** A role's avatar: a shared icon (`icon:<name>`) or one emoji, and a hex background. Null removes it. */
+/**
+ * A role's avatar: an uploaded image (agent-avatar.ts), a shared icon (`icon:<name>`) or one emoji, and a hex
+ * background. A save changes the keys it names and keeps the rest; null or an empty string removes one. `avatar: null`
+ * removes the icon and background, as it did before uploads: the image goes only when a save names it.
+ */
 const avatar = z
   .object({
+    image: z
+      .string()
+      .max(500_000)
+      .superRefine((v, ctx) => {
+        if (!v) return;
+        const parsed = parseAvatarImage(v);
+        if ('problem' in parsed) ctx.addIssue({ code: 'custom', message: parsed.problem });
+      })
+      .nullable()
+      .optional(),
     icon: z
       .string()
       .max(64)
-      .refine((v) => ['glyph', 'emoji'].includes(parseChannelIcon(v)?.kind ?? ''), 'An avatar icon is one of the shared icons or one emoji.')
+      .refine((v) => !v || ['glyph', 'emoji'].includes(parseChannelIcon(v)?.kind ?? ''), 'An avatar icon is one of the shared icons or one emoji.')
+      .nullable()
       .optional(),
-    bg: z.string().regex(AVATAR_BG, 'An avatar background is a hex color like #f5e6ba.').optional(),
+    bg: z.string().regex(/^$|^#[0-9a-f]{6}$/i, 'An avatar background is a hex color like #f5e6ba.').nullable().optional(),
   })
   .strict()
   .nullable()
   .optional();
+type AvatarSave = z.infer<typeof avatar>;
 
 /** What a client sets, by frontmatter key. An empty string or null removes the key: an overlay then falls back to the built-in. */
 export const crewFields = z
@@ -77,12 +94,16 @@ export const crewFields = z
   .strict();
 export type CrewFields = z.infer<typeof crewFields>;
 
+/** The longest crew file a save takes: a charter and an uploaded avatar. */
+export const MARKDOWN_MAX = 600_000;
+
 /**
  * A save: either the fields and charter to change in the file, or the whole file as markdown. For a built-in, the
  * charter is the overlay's body: what is added to the shipped charter, or the whole charter with `replace`.
  */
 export const crewSave = z.union([
-  z.object({ markdown: z.string().max(200_000) }).strict(),
+  // An uploaded avatar rides in the frontmatter (agent-avatar.ts), so a file can be a few hundred KB.
+  z.object({ markdown: z.string().max(MARKDOWN_MAX) }).strict(),
   z
     .object({
       fields: crewFields.optional(),
@@ -175,9 +196,16 @@ export interface CrewSaveContext {
   channelExists: (id: string) => boolean;
 }
 
+/** A name as names compare: trimmed, case and spacing aside. */
+const sameName = (name: string) => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+
 /** Check the role a write would leave behind, against the built-in it overlays (null for a role of the user's own). Throws a refusal with the first problem. */
 function check(id: string, role: CrewRole, builtIn: CrewRole | null, ctx: CrewSaveContext) {
   if (role.error) throw refused(role.error.replace(/^bad frontmatter/, 'The frontmatter is not valid YAML'));
+  // A transcript names each reply's agent, so two agents both shown as Builder would read the same (Q4).
+  const name = sameName(role.name);
+  const twin = listCrew().find((r) => r.id !== id && sameName(r.name) === name);
+  if (twin) throw refused(`An agent is already called "${twin.name}". Agent names are unique, ignoring case: pick another.`, 409);
   const run = crewRunProblem(role, ctx.catalog);
   if (run) throw refused(`Run defaults: ${run}.`);
   if (role.channel && !ctx.channelExists(role.channel)) throw refused(`No channel "${role.channel}" for the agent's default channel.`);
@@ -226,6 +254,10 @@ function savedText(save: CrewSave, shipped: string | null, own: string | null): 
   const { doc, body: oldBody } = openOwn(own);
   for (const [key, value] of Object.entries(save.fields ?? {})) {
     if (value === undefined) continue;
+    if (key === 'avatar') {
+      setAvatar(doc, value as AvatarSave);
+      continue;
+    }
     if (value === '' || value === null || (Array.isArray(value) && !value.length && shipped === null)) doc.delete(key);
     else doc.set(key, value);
   }
@@ -237,6 +269,23 @@ function savedText(save: CrewSave, shipped: string | null, own: string | null): 
     throw refused('Only an edit of a built-in agent adds to or replaces its charter.');
   }
   return serialize(doc, save.charter === undefined ? oldBody : save.charter.trim());
+}
+
+/**
+ * Lay an avatar save over the file's `avatar:` map: the keys it names change, the rest stay (an icon picked in the form
+ * keeps the uploaded image). An overlay's map is the user's only, so a key it drops falls back to the built-in's.
+ */
+function setAvatar(doc: Document, save: AvatarSave) {
+  const before = doc.get('avatar');
+  const now: Record<string, unknown> = isMap(before) ? { ...(before.toJSON() as Record<string, unknown>) } : {};
+  const changes = save === null ? { icon: null, bg: null } : (save ?? {});
+  for (const [k, v] of Object.entries(changes)) {
+    if (v === undefined) continue;
+    if (v === null || v === '') delete now[k];
+    else now[k] = v;
+  }
+  if (Object.keys(now).length) doc.set('avatar', now);
+  else doc.delete('avatar');
 }
 
 const roleIn = (id: string, shipped: string | null, text: string): CrewRole =>
@@ -256,6 +305,9 @@ export function draftCrew(id: string | undefined, save: CrewSave, own?: string |
   if (role.error) throw refused(role.error.replace(/^bad frontmatter/, 'The frontmatter is not valid YAML'));
   return { markdown, detail: detailOf(role, texts.shipped, markdown) };
 }
+
+/** Set or remove a role's uploaded image (`null`), keeping its icon and background: Settings' Avatar card. */
+export const saveCrewAvatar = (id: string, image: string | null, ctx: CrewSaveContext): CrewDetail => saveCrew(id, { fields: { avatar: { image } } }, ctx);
 
 /** What a duplicate never copies: how an overlay joins the built-in, which a whole role of its own has no use for. */
 const OVERLAY_KEYS = ['charter_mode', 'based_on'];

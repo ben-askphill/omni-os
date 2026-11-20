@@ -13,6 +13,8 @@ interface EventData {
   /** The payload as JSON, not the stored string. */
   payload: unknown;
   created_at: string;
+  /** The agent that wrote it. Left out by builds from before it was recorded, and on Ben's and Omni's rows. */
+  agent?: string | null;
 }
 
 const byUid = (uid: string) =>
@@ -21,7 +23,7 @@ const byUid = (uid: string) =>
 registerHandler('event', {
   serialize(uid) {
     const e = byUid(uid);
-    return e ? ({ uid, thread_id: e.thread_id, kind: e.kind, payload: JSON.parse(e.payload), created_at: e.created_at } satisfies EventData) : null;
+    return e ? ({ uid, thread_id: e.thread_id, kind: e.kind, payload: JSON.parse(e.payload), created_at: e.created_at, ...(e.agent && { agent: e.agent }) } satisfies EventData) : null;
   },
   apply(change) {
     if (change.op === 'delete') {
@@ -32,8 +34,8 @@ registerHandler('event', {
     }
     const e = change.data as EventData;
     const res = db
-      .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uid) DO NOTHING')
-      .run(change.entity_id, e.thread_id, e.kind, JSON.stringify(e.payload), e.created_at);
+      .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at, agent) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(uid) DO NOTHING')
+      .run(change.entity_id, e.thread_id, e.kind, JSON.stringify(e.payload), e.created_at, typeof e.agent === 'string' ? e.agent : null);
     if (!res.changes) return false;
     indexEvent(e.thread_id, e.kind, e.payload, Number(res.lastInsertRowid));
     return true;

@@ -19,6 +19,11 @@ export interface TranscriptEvent {
   thread_id?: string;
   /** The row was too big to page whole: its long strings are cut (`@omni/shared/history.ts`). */
   clipped?: Clipped;
+  /**
+   * The id of the agent that wrote the row. Ben's rows and Omni's own have none, and so do rows from before Omni
+   * recorded it: those read as the thread's lead's (`replyHeads`).
+   */
+  agent?: string | null;
 }
 
 /** A file on a user message. The same shape as the server's Attachment. */
@@ -161,8 +166,8 @@ export interface ToolCall {
 
 export type Item =
   | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped }
-  | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped }
-  | { type: 'tools'; key: number; calls: ToolCall[]; total: number }
+  | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped; agent?: string }
+  | { type: 'tools'; key: number; calls: ToolCall[]; total: number; agent?: string }
   | { type: 'result'; key: number; p: ResultP }
   | { type: 'error'; key: number; p: TextP }
   | { type: 'report'; key: number; at: string; p: ReportP }
@@ -171,10 +176,10 @@ export type Item =
   /** Mod log lines in a row. They do not end a group of calls, so a busy hook does not split it. */
   | { type: 'mod'; key: number; lines: ModLine[] }
   /** One Cursor cloud agent run, where its first row was, showing its newest state. */
-  | { type: 'cloud'; key: number; p: CloudAgentP }
+  | { type: 'cloud'; key: number; p: CloudAgentP; agent?: string }
   | SwitchItem
   /** A question the agent asked Ben, where it asked it. The card stands in for the ask_user_question call. */
-  | { type: 'question'; key: number; at: string; q: ThreadQuestion };
+  | { type: 'question'; key: number; at: string; q: ThreadQuestion; agent?: string };
 
 /**
  * A run switch. A handover switch stays pending until its `handover` event fills `done`, or a later handover or back
@@ -303,8 +308,10 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         const parent = call.parent ? byId.get(call.parent) : undefined;
         let home = parent && groupOf.get(parent.id);
         if (!home) {
+          // Another agent's call opens a group of its own.
+          if (group && (group.agent ?? null) !== (e.agent ?? null)) group = null;
           if (!group) {
-            group = { type: 'tools', key: e.id, calls: [], total: 0 };
+            group = { type: 'tools', key: e.id, calls: [], total: 0, ...(e.agent && { agent: e.agent }) };
             items.push(group);
           }
           home = group;
@@ -333,8 +340,8 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         {
           const p = payload<TextP>(e);
           const last = items[items.length - 1];
-          if (last?.type === 'text' && !last.clipped && !e.clipped) last.p = { ...last.p, text: last.p.text + p.text };
-          else items.push({ type: 'text', key: e.id, at: e.created_at, p, ...(e.clipped && { clipped: e.clipped }) });
+          if (last?.type === 'text' && !last.clipped && !e.clipped && (last.agent ?? null) === (e.agent ?? null)) last.p = { ...last.p, text: last.p.text + p.text };
+          else items.push({ type: 'text', key: e.id, at: e.created_at, p, ...(e.clipped && { clipped: e.clipped }), ...(e.agent && { agent: e.agent }) });
         }
         break;
       case 'result': {
@@ -371,7 +378,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
           break;
         }
         group = null;
-        const item = { type: 'cloud' as const, key: e.id, p: p as CloudAgentP };
+        const item = { type: 'cloud' as const, key: e.id, p: p as CloudAgentP, ...(e.agent && { agent: e.agent }) };
         runs.set(id, item);
         items.push(item);
         break;
@@ -395,7 +402,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         const q = questions.get(e.id);
         if (!q) break;
         group = null;
-        items.push({ type: 'question', key: e.id, at: e.created_at, q });
+        items.push({ type: 'question', key: e.id, at: e.created_at, q, ...(e.agent && { agent: e.agent }) });
         break;
       }
       case 'mod': {
@@ -416,6 +423,37 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   if (!spans) return { items, plan };
   // A gap after any span but the last may hold a newer TodoWrite.
   return { items: items.filter((it) => segOf(it.key) >= 0), plan: plan && segOf(plan.after) === spans.length - 1 ? plan : null };
+}
+
+/** The items an agent wrote: what a reply is made of. */
+export type ReplyItem = Extract<Item, { type: 'text' | 'tools' | 'question' | 'cloud' }>;
+const REPLY = new Set<Item['type']>(['text', 'tools', 'question', 'cloud']);
+export const isReply = (it: Item): it is ReplyItem => REPLY.has(it.type);
+/** Rows between two replies that do not part them: how a turn ended, and a mod's log lines. */
+const QUIET = new Set<Item['type']>(['result', 'mod']);
+
+/** Who wrote a reply item: the agent its row names, else the thread's lead (rows from before Omni recorded it). */
+export const authorOf = (it: ReplyItem, lead: string | null | undefined) => it.agent ?? lead ?? null;
+
+/**
+ * Where an author line goes (ADR 0019, How it looks): the key of each reply item that opens a run of replies from one
+ * agent, with that agent's id. Ben's message, a report, a switch or another agent's reply ends a run; a turn's result
+ * line and mod lines do not. A reply with no author (no agent wrote it and the thread has no lead) gets no head.
+ */
+export function replyHeads(items: readonly Item[], lead: string | null | undefined): Map<number, string> {
+  const out = new Map<number, string>();
+  let run: string | null = null;
+  for (const it of items) {
+    if (QUIET.has(it.type)) continue;
+    if (!isReply(it)) {
+      run = null;
+      continue;
+    }
+    const author = authorOf(it, lead);
+    if (author && author !== run) out.set(it.key, author);
+    run = author;
+  }
+  return out;
 }
 
 /** Structural equality, by identity first. Rows parse once, so the unchanged parts of two folds are mostly one object. */

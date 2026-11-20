@@ -51,11 +51,12 @@ const reply = (q: ThreadQuestion) => ({ state: q.state, text: resultText(q.quest
  * fix.
  */
 export function askQuestion(threadId: string, raw: unknown): { id: string } {
-  if (!threads.get(threadId)) throw refusal('thread not found', 404);
+  const thread = threads.get(threadId);
+  if (!thread) throw refusal('thread not found', 404);
   const parsed = parseQuestions(raw);
   if (!parsed.ok) throw refusal(parsed.error, 400);
   const id = randomUUID();
-  addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload);
+  addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload, thread.role ?? null);
   const home = threads.home(threadId);
   if (home !== threadId) threads.setDone(home, false);
   settled(threadId);

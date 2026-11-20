@@ -84,8 +84,8 @@ function flagged(v: unknown): unknown {
  */
 export function clip(row: EventRow, rowBytes: number, bytes = Buffer.byteLength(row.payload)): PageRow {
   if (encodedSize(row) <= rowBytes) return row;
-  const { id, thread_id, kind, created_at } = row;
-  const as = (payload: string): PageRow => ({ id, thread_id, kind, payload, created_at, clipped: { bytes } });
+  const { id, thread_id, kind, created_at, agent } = row;
+  const as = (payload: string): PageRow => ({ id, thread_id, kind, payload, created_at, agent, clipped: { bytes } });
   let value: unknown;
   try {
     value = JSON.parse(row.payload);
@@ -190,7 +190,7 @@ function take(threadId: string, dir: 'newest' | 'oldest', b: Bounds, budget: His
     if (p.payload === null) return null;
     let row = carried.get(p.id);
     if (!row) {
-      row = clip(compactRow({ id: p.id, thread_id: p.thread_id, kind: p.kind, payload: p.payload, created_at: p.created_at }), budget.rowBytes, p.bytes);
+      row = clip(compactRow({ id: p.id, thread_id: p.thread_id, kind: p.kind, payload: p.payload, created_at: p.created_at, agent: p.agent }), budget.rowBytes, p.bytes);
       carried.set(p.id, row);
     }
     return row;
@@ -204,9 +204,9 @@ function take(threadId: string, dir: 'newest' | 'oldest', b: Bounds, budget: His
   const rows = kept.map((p) => {
     const row = carry(p);
     if (row) return row;
-    const { id, thread_id, kind, created_at, bytes } = p;
+    const { id, thread_id, kind, created_at, agent, bytes } = p;
     // A tool_result is cut by SQLite to its preview; any other row is read whole, then clipped.
-    return (kind === 'tool_result' && compactStored(id)) || clip({ id, thread_id, kind, payload: repo.payload(id), created_at }, budget.rowBytes, bytes);
+    return (kind === 'tool_result' && compactStored(id)) || clip({ id, thread_id, kind, payload: repo.payload(id), created_at, agent }, budget.rowBytes, bytes);
   });
   if (dir === 'newest') rows.reverse();
   return { rows, span: spanOf(kept, next, dir, b.after, b.before) };

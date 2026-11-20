@@ -132,7 +132,10 @@ describe('Settings > Crew (S3)', () => {
     expect(res.status).toBe(200);
     expect((await json(res)).role.avatar).toEqual({ icon: 'icon:zap', bg: '#f5e6ba' });
     expect(own('builder')).toContain('avatar:\n  icon: icon:zap\n  bg: "#F5E6BA"');
+    // A save changes the avatar keys it names and keeps the rest; null removes one.
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { icon: '🛒' } } })).status).toBe(200);
+    expect(getCrew('builder')?.avatar).toEqual({ icon: '🛒', bg: '#f5e6ba' });
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: null } } })).status).toBe(200);
     expect(getCrew('builder')?.avatar).toEqual({ icon: '🛒' });
     // An uploaded SVG would not read in a file, and a color must be hex.
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { icon: 'svg:<svg/>' } } })).status).toBe(400);

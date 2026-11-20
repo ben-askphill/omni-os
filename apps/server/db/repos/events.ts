@@ -8,13 +8,15 @@ export interface EventRow {
   kind: string;
   payload: string;
   created_at: string;
+  /** The agent that wrote it, by id: the thread's agent on the rows its runs write. Null on Ben's and Omni's rows. */
+  agent: string | null;
 }
 
 /** Kinds whose text is worth searching. */
 const SEARCHABLE = new Set(['user', 'assistant_text', 'crew_report', 'error']);
 
 /** The columns clients read. The uid is sync's own key, kept out of the API. */
-export const EVENT_COLUMNS = 'id, thread_id, kind, payload, created_at';
+export const EVENT_COLUMNS = 'id, thread_id, kind, payload, created_at, agent';
 
 /** Add an event's text to search. events.add and a synced event both call it. */
 export function indexEvent(threadId: string, kind: string, payload: unknown, eventId: number) {
@@ -36,20 +38,21 @@ function runTexts(threadId: string, after: number): string[] {
 }
 
 export const events = {
-  add(threadId: string, kind: string, payload: unknown, createdAt?: string): EventRow {
+  /** `agent`: the agent that wrote the row, for a row a run of the thread wrote (runner/state.ts addEvent). */
+  add(threadId: string, kind: string, payload: unknown, createdAt?: string, agent: string | null = null): EventRow {
     const json = JSON.stringify(payload);
     const ts = createdAt ?? now();
     const uid = randomUUID();
     const id = tx(() => {
       const res = db
-        .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(uid, threadId, kind, json, ts);
+        .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at, agent) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(uid, threadId, kind, json, ts, agent);
       const id = Number(res.lastInsertRowid);
       indexEvent(threadId, kind, payload, id);
       record('event', uid);
       return id;
     });
-    return { id, thread_id: threadId, kind, payload: json, created_at: ts };
+    return { id, thread_id: threadId, kind, payload: json, created_at: ts, agent };
   },
   /** The `ask` event in `parentId` that started `childId` (ask.ts), as stored, or null when that child was no Ask. */
   askFor: (parentId: string, childId: string) =>

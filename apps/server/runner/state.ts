@@ -203,8 +203,9 @@ export function emitThread(id: string) {
   if (t) publishFeed({ type: 'thread', thread: t });
 }
 
-export function addEvent(threadId: string, kind: string, payload: unknown) {
-  const row = events.add(threadId, kind, payload);
+/** `agent`: the agent that wrote the row, on the rows a run of the thread writes. None on Ben's and Omni's own. */
+export function addEvent(threadId: string, kind: string, payload: unknown, agent: string | null = null) {
+  const row = events.add(threadId, kind, payload, undefined, agent);
   publishThread(threadId, row);
   // The step a running thread is on may have moved (step-line.ts).
   bus.emit(EVENT_ADDED, threadId, kind);

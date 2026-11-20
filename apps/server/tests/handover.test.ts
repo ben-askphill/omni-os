@@ -8,7 +8,7 @@ const claude: RunName = { harness: 'claude-code', model: 'opus', effort: 'high',
 const codex: RunName = { harness: 'codex', model: 'gpt-5.6-sol', effort: '', harnessName: 'Codex', modelLabel: 'GPT-5.6 Sol' };
 
 let id = 0;
-const ev = (kind: string, p: unknown): EventRow => ({ id: ++id, thread_id: 't', kind, payload: JSON.stringify(p), created_at: '' });
+const ev = (kind: string, p: unknown): EventRow => ({ id: ++id, thread_id: 't', kind, payload: JSON.stringify(p), created_at: '', agent: null });
 
 const input = (events: EventRow[], over: Partial<HandoverInput> = {}): HandoverInput => ({
   from: claude,

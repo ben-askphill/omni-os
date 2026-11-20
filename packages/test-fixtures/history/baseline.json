@@ -13,19 +13,19 @@
   },
   "full": {
     "rows": 3472,
-    "bytes": 8517329
+    "bytes": 8562465
   },
   "head": {
     "rows": 262,
-    "bytes": 158053,
+    "bytes": 161459,
     "anchors": 1,
-    "anchorBytes": 173,
+    "anchorBytes": 186,
     "resultsBelow": 74
   },
   "pages": {
     "count": 13,
     "partial": 1,
     "maxRows": 299,
-    "maxBytes": 178266
+    "maxBytes": 182153
   }
 }

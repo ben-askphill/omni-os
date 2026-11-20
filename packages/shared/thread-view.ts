@@ -7,7 +7,7 @@ import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
 import { connectorOf, isOutsideConnector, type Connector } from './connectors.ts';
 import { turnSteps, type StepsView } from './steps.ts';
-import { buildItems, isAsking, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
+import { authorOf, buildItems, isAsking, isReply, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
 
 export type TurnStatus = 'running' | 'queued' | 'done' | 'failed' | 'stopped';
 
@@ -31,6 +31,8 @@ export interface TurnThread {
   status: string;
   cwd?: string | null;
   harness: string;
+  /** The agent the thread runs as, its lead: rows from before Omni recorded their author read as its. */
+  role?: string | null;
 }
 
 export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnChild = TurnChild> {
@@ -73,6 +75,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   switches: SwitchItem[];
   /** The harness the turn ran on, which a switch can change from one turn to the next. */
   harness: string;
+  /** The agent that answered: the author of its first reply. Null when no agent wrote it (a thread with no agent). */
+  author: string | null;
 }
 
 /** What a running thread is doing now: "Editing" `snippets/shipping-rates.liquid`. */
@@ -156,7 +160,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness, author: null };
     turns.push(t);
     return t;
   };
@@ -204,6 +208,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
       harness = it.p.to.harness;
       continue;
     }
+    if (cur && !cur.author && isReply(it)) cur.author = authorOf(it, thread.role);
     cur?.items.push(it);
   }
 

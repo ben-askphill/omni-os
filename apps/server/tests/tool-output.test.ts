@@ -39,7 +39,7 @@ describe('compactRow', () => {
     const long = compactRow(result('t', 'z'.repeat(P + 1)));
     expect(compactRow(long)).toBe(long);
     for (const payload of ['not json', JSON.stringify({ tool_use_id: 'c', text: 5 }), JSON.stringify(null)]) {
-      const odd = { id: 1, thread_id: 't', kind: 'tool_result', payload: payload.padEnd(P + 10, ' '), created_at: '' };
+      const odd = { id: 1, thread_id: 't', kind: 'tool_result', payload: payload.padEnd(P + 10, ' '), created_at: '', agent: null };
       expect(compactRow(odd)).toBe(odd);
     }
   });

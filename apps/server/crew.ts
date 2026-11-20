@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { parseAvatarImage } from './agent-avatar.ts';
 import type { CrewLockedField, CrewLocks } from '@omni/shared/crew-settings.ts';
 import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
@@ -36,8 +37,13 @@ export type CrewTools = 'full' | 'no-edits' | 'delegate-only';
 export const CREW_TOOLS: readonly CrewTools[] = ['full', 'no-edits', 'delegate-only'];
 const isCrewTools = (v: unknown): v is CrewTools => CREW_TOOLS.includes(v as CrewTools);
 
-/** A role's own look, as a channel's: an icon (`icon:<name>` from the shared set, or one emoji) and a background. */
+/**
+ * A role's own look: an image Ben uploaded (a data URL, agent-avatar.ts), else an icon (`icon:<name>` from the shared
+ * set, or one emoji) on a background, as a channel's. The API sends the image as a URL (crew-api.ts).
+ */
 export interface CrewAvatar {
+  /** A square PNG, JPEG or WebP, at most 256px a side, as a data URL. */
+  image?: string;
   icon?: string;
   /** A six-digit hex color. */
   bg?: string;
@@ -47,7 +53,7 @@ export interface CrewRole {
   id: string;
   name: string;
   description: string;
-  /** Unset: a built-in keeps its mark, any other role its monogram. */
+  /** Unset: a built-in keeps its mark, any other role its initials disc. */
   avatar?: CrewAvatar;
   harness?: string;
   model?: string;
@@ -176,16 +182,20 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : und
 
 export const AVATAR_BG = /^#[0-9a-f]{6}$/i;
 
-/** The avatar a file names: a shared icon or an emoji (never an uploaded SVG, which would not read in a file), and a hex color. */
+/**
+ * The avatar a file names: an uploaded image (agent-avatar.ts, never an SVG), a shared icon or an emoji, and a hex
+ * color. A key that does not check out is left out, so a hand edit gone wrong falls back to the next look.
+ */
 export function avatarOf(v: unknown): CrewAvatar | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
-  const { icon, bg } = v as Record<string, unknown>;
+  const { image, icon, bg } = v as Record<string, unknown>;
   const kind = typeof icon === 'string' ? parseChannelIcon(icon)?.kind : undefined;
   const out: CrewAvatar = {
+    ...(typeof image === 'string' && !('problem' in parseAvatarImage(image)) ? { image } : {}),
     ...(kind === 'glyph' || kind === 'emoji' ? { icon: icon as string } : {}),
     ...(typeof bg === 'string' && AVATAR_BG.test(bg) ? { bg: bg.toLowerCase() } : {}),
   };
-  return out.icon || out.bg ? out : undefined;
+  return out.image || out.icon || out.bg ? out : undefined;
 }
 /** A field the overlay sets wins; one it leaves out (or empties) falls back to the shipped file's. */
 const pick = (key: string, over: Record<string, unknown>, base: Record<string, unknown>) =>

@@ -741,6 +741,9 @@ export function migrate() {
   // The machines that held a thread before its holder, oldest first (db/repos/assignments.ts), for the Inbox row's
   // machine history. JSON; synced with the row. Null reads as none.
   ensureColumn('assignments', 'trail', 'TEXT');
+  // The agent that wrote a transcript row (group threads slice 1, ADR 0019): the thread's agent on the rows its runs
+  // write. Ben's rows and Omni's own have none, and rows from before this read as the thread's lead's.
+  ensureColumn('events', 'agent', 'TEXT');
   // Sub-agents another machine runs, read from their synced task rows (db/repos/events.ts openTasksSince): the recent
   // ones, and each one's start.
   db.exec(`CREATE INDEX IF NOT EXISTS events_task_at ON events(created_at) WHERE kind = 'task';
