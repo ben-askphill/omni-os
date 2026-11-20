@@ -13,6 +13,13 @@
       "skillPath": "skills/turborepo/SKILL.md",
       "computedHash": "49bb6427015253ce5d93f15dfa6c9ade3f8528f0fbe54769b6da1e1458f058d4"
     },
+    "ui-sdk": {
+      "source": "vercel-labs/ui",
+      "commit": "b4dbe88209ecf4dc555225f630268095f510ad49",
+      "sourceType": "github",
+      "skillPath": "packages/core/skills/ui-sdk/SKILL.md",
+      "computedHash": "9a60caf01da3d47beedf627bf1505d922dccc93b04f294c6aa64edf01c46b3ba"
+    },
     "unslop": {
       "source": "ben-askphill/agent-config",
       "sourceType": "github",

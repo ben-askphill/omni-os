@@ -27,6 +27,13 @@ Local agent workspace. See README.md for what it does.
 - Look support up on MDN or webstatus.dev, not from memory, and say in the PR which browsers get the fallback.
 - Why: nothing was written down, and Chromium-only APIs (`focusgroup`, `interestfor`, `closedby`) work in the desktop app but not on iPhone Safari. The modern web audit (#838) is the first work held to it.
 
+### Build components with ui-sdk
+
+- The Web UI (`apps/web`) has ui-sdk (`@ui-sdk/react` and `@ui-sdk/core`). It needs React 19 or newer.
+- Before using ui-sdk, follow the `ui-sdk` skill (`.agents/skills/ui-sdk/`) if it's installed, and read `node_modules/@ui-sdk/react/docs/llms.txt`.
+- To build a new component, also search `node_modules/@ui-sdk/react/docs/core.md` by heading (it's about 400 KB, so don't read it whole), and read `rendering.md` in the same folder.
+- A component built with it still goes into the design system (next section).
+
 ### New UI components go into the design system
 
 - The Omni OS design system lives in Claude Design: https://claude.ai/design/p/a7120f6b-8577-40e3-9087-e512ce20d673. Reuse its components and tokens first.

@@ -63,7 +63,9 @@
         "tests/**/*.test.ts"
       ],
       "ignoreDependencies": [
-        "playwright"
+        "playwright",
+        "@ui-sdk/core",
+        "@ui-sdk/react"
       ]
     },
     "apps/desktop": {
