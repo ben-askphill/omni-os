@@ -4,8 +4,12 @@
 // their replies. The crew report goes when that turn ends. Only the Conductor's own delegations get seats from it,
 // never a #conductor thread. Teams made before this slice keep their tree.
 import { readFileSync } from 'node:fs';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { once } from 'node:events';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
+import { hasMcpBuild } from './support.ts';
 import { legacyTeam } from './legacy-team.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
@@ -53,9 +57,21 @@ async function idle(prompt: string) {
   return H.thread(t.id);
 }
 
+let server: Server | undefined;
+afterAll(() => {
+  server?.close();
+  server?.closeAllConnections();
+});
+
 beforeAll(async () => {
   H = await startRunner({ FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW' });
   ({ app } = await import('../app.ts'));
+  // A thread's MCP servers call Omni over HTTP, as on a real install.
+  const { serve } = await import('@hono/node-server');
+  server = serve({ fetch: (app as { fetch: (r: Request) => Response | Promise<Response> }).fetch, port: 0, hostname: '127.0.0.1' }) as Server;
+  await once(server, 'listening');
+  const { about } = await import('../about.ts');
+  about.port = (server.address() as AddressInfo).port;
   ({ threadTokenPath: tokenFile } = await import('../config.ts'));
   ({ mintThreadToken: mint } = await import('../thread-tokens.ts'));
   for (const [id, name] of [['lead', 'Lead'], ['copywriter', 'Copywriter'], ['designer', 'Designer'], ['critic', 'Critic']]) {
@@ -186,6 +202,29 @@ describe('delegate_team', () => {
     const conductorSeat = await team(conductor.id, { tasks: [{ title: 'Route', prompt: 'route', role: 'conductor' }] });
     expect(conductorSeat.status).toBe(409);
     expect(H.db.threads.children(conductor.id)).toEqual([]);
+  });
+});
+
+describe.skipIf(!hasMcpBuild)("the lead's message_members tool", () => {
+  it('plans, gives three parts through the omni-team server, and reports once all three have finished', T, async () => {
+    const conductor = await idle('be the conductor');
+    const prompt = 'Plan the launch page\nTELL:copywriter=THINK:500 write the copy\nTELL:designer=THINK:500 make the visuals\nTELL:critic=THINK:500 critique it';
+    const { thread: t } = (await team(conductor.id, { prompt })).json;
+    await H.until('the report', () => H.byKind(conductor.id, 'crew_report').length === 1, 30_000);
+    const calls = H.db.events.since(t.id).filter((r) => r.kind === 'tool_use' && r.agent === 'lead').map((r) => JSON.parse(r.payload));
+    expect(calls.map((c) => [c.name, c.input.to])).toEqual([
+      ['mcp__omni-team__message_members', ['copywriter']],
+      ['mcp__omni-team__message_members', ['designer']],
+      ['mcp__omni-team__message_members', ['critic']],
+    ]);
+    const answers = H.db.events.since(t.id).filter((r) => r.kind === 'tool_result' && r.agent === 'lead').map((r) => JSON.parse(r.payload));
+    expect(answers.every((a) => !a.is_error && /^Sent to (Copywriter|Designer|Critic), who started on it\./.test(a.content ?? a.text ?? JSON.stringify(a)))).toBe(true);
+    for (const p of PARTS) expect(H.claudeTexts(sessionOf(t.id, p.role))).toHaveLength(1);
+    expect(H.claudeTexts(t.id)[1]).toMatch(/^\[team\] All 3 members have finished\./);
+    // Only the lead gets the tool: a member's session has no omni-team server.
+    const mcp = (id: string) => JSON.parse(readFileSync(H.paths.threads + `/${id}/mcp.json`, 'utf8')).mcpServers;
+    expect(Object.keys(mcp(t.id))).toContain('omni-team');
+    expect(Object.keys(mcp(sessionOf(t.id, 'designer')))).not.toContain('omni-team');
   });
 });
 
