@@ -271,6 +271,27 @@ describe('the member list', () => {
 });
 
 describe('cards and the thread', () => {
+  it('dismisses only the questions of the agents receiving a message', T, async () => {
+    const t = await groupThread('plain start');
+    await say(t.id, 'get started', ['designer', 'Designer'], ['critic', 'Critic']);
+    await untilIdle(t.id, 3);
+    const ask = (id: string) => call(`/threads/${id}/questions`, json('POST', { questions: [{ question: 'Which one?', header: 'Pick', multiSelect: false, options: [{ label: 'A', description: 'a' }, { label: 'B', description: 'b' }] }] }));
+    const state = async (id: string, question: string) => (await call(`/threads/${id}/questions/${question}?wait=0`)).json.state;
+    const designer = sessionOf(t.id, 'designer');
+    const critic = sessionOf(t.id, 'critic');
+    const leadQuestion = (await ask(t.id)).json.id;
+    const designerQuestion = (await ask(designer)).json.id;
+    const criticQuestion = (await ask(critic)).json.id;
+    await say(t.id, 'go with A', ['critic', 'Critic']);
+    expect(await state(critic, criticQuestion)).toBe('dismissed');
+    expect(await state(designer, designerQuestion)).toBe('pending');
+    expect(await state(t.id, leadQuestion)).toBe('pending');
+    await say(t.id, 'go with B');
+    expect(await state(t.id, leadQuestion)).toBe('dismissed');
+    expect(await state(designer, designerQuestion)).toBe('pending');
+    await untilIdle(t.id, 5);
+  });
+
   it('shows a member’s question card in the thread, naming it, and answers into that member’s session', T, async () => {
     const t = await groupThread('plain start');
     await say(t.id, 'TOOL:4000 think it over', ['designer', 'Designer']);

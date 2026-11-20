@@ -631,7 +631,7 @@ export async function postMessage(
   if (readOnly) throw refusal(readOnly, 409);
   if (thread.source === 'member') throw refusal('Write in the thread this agent is seated in.', 409);
   if ((opts.from ?? 'ben') !== 'ben' && mentionedAgents(opts.context).length && !opts.seats) throw refusal(`Only ${userName()} seats agents in a thread.`, 403);
-  namedAgents(threadId, opts.context);
+  const recipients = namedAgents(threadId, opts.context);
   const goal = goalSend(thread, prompt, opts.attachments?.length ?? 0);
   const mode = goal ? 'queue' : (opts.mode ?? 'steer');
   const source = opts.from ?? 'ben';
@@ -655,7 +655,7 @@ export async function postMessage(
       context: opts.context,
       ifAway: opts.ifAway,
     })) as PostedThread;
-    if (dismiss) dismissQuestions(threadId);
+    if (dismiss) dismissQuestions(threadId, recipients);
     return forwarded;
   }
   // Refused before anything is saved: the other Mac runs it.
@@ -663,7 +663,7 @@ export async function postMessage(
   if (blocked) throw refusal(blocked, 409);
   // Ben (or the conductor) wrote in it again, so it is not done: what comes of it shows in Needs you.
   threads.setDone(threadId, false);
-  if (dismiss) dismissQuestions(threadId);
+  if (dismiss) dismissQuestions(threadId, recipients);
   const { row, fresh } = messageRequests.accept({
     thread_id: threadId,
     request_id: opts.requestId ?? randomUUID(),
