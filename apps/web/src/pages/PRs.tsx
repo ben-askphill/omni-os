@@ -8,6 +8,7 @@ import { pullRequestUrl } from '@omni/shared/pr-links.ts';
 import { href, navigate } from '../router.ts';
 import { DiffStat, PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
 import { PRMergePanel } from './PRMergePanel.tsx';
+import { MergePrototype, useProtoParams } from './PRMergePanel.prototype.tsx';
 import { LinkChannel } from '../link-previews.ts';
 import { useRerunFailedChecks } from '../components/RerunChecks.tsx';
 
@@ -144,6 +145,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const rerun = useRerunFailedChecks(channel.id, n, q.data?.checkRuns, !q.data?.state || q.data.state === 'OPEN');
+  const proto = useProtoParams();
 
   if (!channel.github_repo) return <NoRepo channel={channel} />;
   const back = (
@@ -220,7 +222,12 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
       </header>
       {reviewError && <ErrorNote className="mt-3">{reviewError}</ErrorNote>}
 
-      <PRMergePanel channel={channel} p={p} n={n} onMerged={q.reload} rerun={rerun} />
+      {/* PROTOTYPE: ?variant=A|B|C swaps the merge card for a layout prototype (PRMergePanel.prototype.tsx). */}
+      {proto.variant ? (
+        <MergePrototype slot="top" variant={proto.variant} state={proto.state} channel={channel} p={p} rerun={rerun} />
+      ) : (
+        <PRMergePanel channel={channel} p={p} n={n} onMerged={q.reload} rerun={rerun} />
+      )}
       <Tabs
         className="mt-6"
         size="sm"
@@ -241,6 +248,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
           <PRDetailTabBody tab={tab} p={p} />
         </div>
       </LinkChannel.Provider>
+      {proto.variant && <MergePrototype slot="bottom" variant={proto.variant} state={proto.state} channel={channel} p={p} rerun={rerun} />}
     </div>
   );
 }
