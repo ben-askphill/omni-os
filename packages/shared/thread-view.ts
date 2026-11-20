@@ -8,6 +8,8 @@ import { cloudStatus } from './cloud-agent.ts';
 import { connectorOf, isOutsideConnector, type Connector } from './connectors.ts';
 import { turnSteps, type StepsView } from './steps.ts';
 import { authorOf, buildItems, isAsking, isReply, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
+import { laneFold, type LaneState } from './lanes.ts';
+import type { Collision } from './collisions.ts';
 
 export type TurnStatus = 'running' | 'queued' | 'done' | 'failed' | 'stopped';
 
@@ -79,7 +81,16 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   harness: string;
   /** The agent that answered: the author of its first reply. Null when no agent wrote it (a thread with no agent). */
   author: string | null;
+  /**
+   * A message several agents answered (ADR 0019): a turn per agent, one per tab on the phone, with the collision flags
+   * raised while they ran and each agent's changed files. The turn ends once every lane has.
+   */
+  lanes?: { turns: TurnView<A, C>[]; flags: Collision[]; files: Record<string, string[]>; latest: Record<string, string | null>; stacked: boolean } | null;
+  /** Collision flags raised during the turn outside its lanes. */
+  flags?: Collision[];
 }
+
+const LANE_STATUS: Record<LaneState, TurnStatus> = { working: 'running', done: 'done', failed: 'failed', stopped: 'stopped' };
 
 /** What a running thread is doing now: "Editing" `snippets/shipping-rates.liquid`. */
 export interface NowDoing {
@@ -135,7 +146,13 @@ const walk = (calls: ToolCall[], fn: (c: ToolCall) => void) => {
 
 const time = (iso: string) => new Date(iso).getTime();
 
-function endOf(t: Pick<TurnView, 'result' | 'error'>): TurnStatus | null {
+function endOf(t: Pick<TurnView, 'result' | 'error' | 'lanes'>): TurnStatus | null {
+  // A turn in lanes ends once every lane has: Done when one finished, else how they all ended.
+  if (t.lanes?.turns.length) {
+    const ends = t.lanes.turns.map((l) => l.status);
+    if (ends.some((x) => x === 'running' || x === 'queued')) return null;
+    return ends.includes('done') ? 'done' : ends.every((x) => x === 'stopped') ? 'stopped' : 'failed';
+  }
   if (t.result) return t.result.stopped ? 'stopped' : t.result.ok ? 'done' : 'failed';
   return t.error ? 'failed' : null;
 }
@@ -157,10 +174,13 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   artifacts: A[];
   children: C[];
 }): ThreadView<A, C> {
-  const { items } = buildItems(events, spans);
+  const { items: all } = buildItems(events, spans);
+  // A message several agents answered gathers their replies into lanes (lanes.ts): each becomes a turn of its own.
+  const flow = laneFold(all, { lead: thread.role, cwd: thread.cwd });
   const turns: TurnView<A, C>[] = [];
+  const laneTurns: TurnView<A, C>[] = [];
   // Until the first switch, the thread ran where that switch moved it from.
-  let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
+  let harness = all.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
     const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], members: [], harness, author: null };
     turns.push(t);
@@ -168,7 +188,45 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   };
   let cur: TurnView<A, C> | null = null;
   const shown: ReportP[] = [];
-  for (const it of items) {
+  /** One lane's replies as a turn: its own steps, answer, result and status. */
+  const laneTurn = (agent: string, state: LaneState, items: Item[], at: string): TurnView<A, C> => {
+    const t: TurnView<A, C> = { key: items[0]?.key ?? 0, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: LANE_STATUS[state], items, switches: [], members: [], harness, author: agent };
+    for (const it of items) {
+      if (it.type === 'text') {
+        t.texts.push(it.p.text);
+        t.proseKey = it.key;
+        t.proseClipped = it.clipped ? { key: it.key, clipped: it.clipped } : null;
+      } else if (it.type === 'tools') {
+        t.steps += it.total;
+        walk(it.calls, (c) => {
+          if (c.result?.is_error) t.failed++;
+        });
+      } else if (it.type === 'question') t.questions.push(it.q);
+      else if (it.type === 'result') t.result = it.p;
+      else if (it.type === 'error') t.error = it.p.text;
+      else if (it.type === 'cloud') t.cloud = it.p;
+    }
+    t.prose = t.texts.at(-1) ?? null;
+    laneTurns.push(t);
+    return t;
+  };
+  for (const it of flow) {
+    if (it.type === 'lanes') {
+      cur ??= start(it.key, '');
+      cur.lanes = {
+        turns: it.lanes.map((l) => laneTurn(l.agent, l.state, l.items, cur!.at)),
+        flags: it.flags,
+        files: Object.fromEntries(it.lanes.map((l) => [l.agent, l.files])),
+        latest: Object.fromEntries(it.lanes.map((l) => [l.agent, l.latest])),
+        stacked: it.stacked,
+      };
+      continue;
+    }
+    if (it.type === 'collision') {
+      cur ??= start(it.key, it.at);
+      (cur.flags ??= []).push(it.c);
+      continue;
+    }
     // A report that started no turn belongs to the turn that delegated its thread, placed below.
     if (it.type === 'report' && it.p.shown) {
       shown.push(it.p);
@@ -245,11 +303,12 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
 
   const asking = isAsking(events);
   const latest = turns[turns.length - 1];
-  const running = thread.status === 'running' && !!latest && latest.status === 'running';
+  const running = thread.status === 'running' && !!latest && latest.status === 'running' && !latest.lanes;
   turns.forEach((t) => {
     const live = running && t === latest;
     t.progress = turnSteps(t.items, { live, asking: live && asking });
   });
+  for (const t of laneTurns) t.progress = turnSteps(t.items, { live: t.status === 'running' });
   if (!running) return { turns, now: null, asking };
   // The newest call still waiting on its result is what it is doing; with none, it is between calls.
   let open: ToolCall | undefined;

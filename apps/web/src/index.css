@@ -1375,6 +1375,21 @@
       animation: member-ring 1.6s ease-in-out infinite;
     }
   }
+  /* Parallel turns (thread/Lanes.tsx): a lane per agent, and the collision flag over them (thread/Collision.tsx). */
+  .lane {
+    border-radius: 20px;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .lane-file-hit {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+  }
+  .collision-flag {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 45%, transparent);
+  }
+  .collision-flag-cleared {
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--fg-2);
+  }
 }
 
 @layer components {

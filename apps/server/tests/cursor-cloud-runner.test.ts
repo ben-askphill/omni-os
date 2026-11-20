@@ -104,6 +104,43 @@ describe('Cursor Cloud through the runner', () => {
     expect(fake.calls.filter((c) => c.method === 'POST' && c.path === `/v1/agents/bc-${t.id}/runs`)).toHaveLength(1);
   });
 
+  it('seats a Cursor Cloud member on its own branch with no PR, raises no collision, and asks the lead to pull the branch', { timeout: 30_000 }, async () => {
+    const json = (method: string, body?: unknown) => ({ method, headers: { 'content-type': 'application/json' }, ...(body !== undefined && { body: JSON.stringify(body) }) });
+    const { app } = await import('../app.ts');
+    for (const [id, name, harness] of [['planner', 'Planner', 'claude-code'], ['clouder', 'Clouder', 'cursor-cloud']]) {
+      const res = await app.request('/api/crew', json('POST', { id, fields: { name, harness, ...(harness === 'claude-code' && { model: 'sonnet' }) }, charter: `You are ${name}.` }));
+      expect(res.status).toBe(201);
+    }
+    // A repo with a commit, so the lead gets a worktree.
+    const repo = join(H.tmp, 'group-repo');
+    mkdirSync(repo);
+    execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+    writeFileSync(join(repo, 'README.md'), 'widgets\n');
+    execFileSync('git', ['-C', repo, '-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'start']);
+    H.db.channels.create({ id: 'acme-group', name: 'Acme group', kind: 'client', use_worktree: 1, repo_path: repo, github_repo: 'acme/widgets' });
+    const t = await H.runner.createThread({ channel: 'acme-group', prompt: 'plan it', role: 'planner' });
+    await H.untilResults(t.id, 1);
+    const mention = { id: 'm-clouder', kind: 'agent_mention', v: 1, label: '@Clouder', body: { agent: 'clouder', name: 'Clouder' } };
+    expect((await app.request(`/api/threads/${t.id}/messages`, json('POST', { prompt: 'build the toolbar', context: [mention] }))).status).toBe(200);
+    const sid = H.db.members.of(t.id, 'clouder')!.session_thread;
+    await H.until('the cloud member finished', () => H.byKind(t.id, 'cloud_agent').some((e) => e.p.status === 'FINISHED'), 15_000).catch((err) => {
+      throw new Error(`${err.message}: ${JSON.stringify(H.flow(t.id))} ${JSON.stringify(H.texts(t.id, 'error'))} member ${H.thread(sid).status}`);
+    });
+    // Its own branch, and no pull request of its own: only the lead opens one.
+    const create = fake.calls.filter((c) => c.method === 'POST' && c.path === '/v1/agents').at(-1)!;
+    expect((create.body as { autoCreatePR: boolean }).autoCreatePR).toBe(false);
+    const finished = H.byKind(t.id, 'cloud_agent').findLast((e) => e.p.status === 'FINISHED')!;
+    expect(finished.p.branch).toMatch(/^cursor\//);
+    expect(finished.p.pr_url).toBeUndefined();
+    // The lead is asked to pull it in, and runs a turn on it.
+    await H.until('the lead pulls it', () => H.texts(t.id, 'user').some((x) => x.startsWith('Pull Clouder')));
+    await H.untilResults(t.id, 3);
+    const toLead = H.claudeTexts(t.id).at(-1)!;
+    expect(toLead).toContain(`git fetch origin ${finished.p.branch}`);
+    expect(H.thread(sid).status).toBe('done');
+    expect(H.byKind(t.id, 'collision')).toHaveLength(0);
+  });
+
   it('refuses a cloud thread in a channel with no GitHub repo', async () => {
     await expect(H.runner.createThread({ channel: 'notes', prompt: 'go', harness: 'cursor-cloud' })).rejects.toThrow(/GitHub repo/);
   });

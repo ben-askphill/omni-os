@@ -17,6 +17,7 @@ import { baseOptions } from './worktree-base.ts';
 import { storedList, worktreeListProblem } from '@omni/shared/worktree-lists.ts';
 import { ACCESS_CONNECTORS } from '@omni/shared/access.ts';
 import { callerOf } from './automation-guard.ts';
+import { memberViews } from './member-view.ts';
 
 export const channelsApi = new Hono();
 
@@ -141,9 +142,12 @@ const THREADS_PER_FOLDER = 50;
 
 /** A thread as the sidebar lists it. `delegating`: a thread it delegated still works (apps/server/delegating.ts). */
 /** A thread as the lists show it. `model` and `branch` are for the thread tree's child rows (tooltip and second line), `setup` for the Starting dot. */
-const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup }: Thread, delegating: ReadonlySet<string>) => ({
-  id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id),
-});
+const stub = (t: Thread, delegating: ReadonlySet<string>) => {
+  const { id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup } = t;
+  // A group thread's agents (member-view.ts): while any works or waits on the user, the row draws their faces.
+  const members = memberViews(t);
+  return { id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id), ...(members && { members }) };
+};
 
 /** Conductor jobs with their delegated child threads, including children in other channels. */
 function conductorHandoffs(delegating: ReadonlySet<string>) {

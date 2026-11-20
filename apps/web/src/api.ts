@@ -53,7 +53,7 @@ export type Thread = ThreadRow & {
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &
-  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating' | 'limit_state' | 'setup' | 'model' | 'branch' | 'goal_objective' | 'goal_status' | 'ran_on' | 'run_started_at' | 'step'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
+  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating' | 'limit_state' | 'setup' | 'model' | 'branch' | 'goal_objective' | 'goal_status' | 'ran_on' | 'run_started_at' | 'step' | 'members'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
 /** A Conductor job and its cross-channel delegated threads, as the channel API sends them. */
 export interface ConductorHandoffGroup {
   parent: ThreadStub;

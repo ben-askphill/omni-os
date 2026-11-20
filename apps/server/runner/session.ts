@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolveDelivery } from '../delivery.ts';
 import { config } from '../config.ts';
-import { events, threads, type ThreadStatus } from '../db.ts';
+import { events, members, threads, type ThreadStatus } from '../db.ts';
 import { lostTo } from '../ownership.ts';
 import { machineName } from '../sync/guard.ts';
 import { detachThread } from '../browser.ts';
@@ -196,6 +196,12 @@ export function fenceStale() {
 }
 
 export function interruptThread(threadId: string) {
+  // A group thread (ADR 0019, Q13): Stop stops every agent in it, each in the session it runs in.
+  for (const m of members.seated(threadId)) if (!m.lead) stopOne(m.session_thread);
+  return stopOne(threadId);
+}
+
+function stopOne(threadId: string) {
   // A worktree still being prepared has no agent yet: Stop ends the preparation, its setup run included, and a
   // lead's team with it, as for a lead that waits.
   if (stopPreparation(threadId)) {
@@ -218,7 +224,11 @@ export function interruptThread(threadId: string) {
     waiting.splice(w, 1);
     drop(threadId, waitingMsgs.get(threadId) ?? []);
     waitingMsgs.delete(threadId);
-    if (!live?.turn) threads.update(threadId, { status: 'stopped' });
+    if (!live?.turn) {
+      threads.update(threadId, { status: 'stopped' });
+      // Its turn never started, and now never will: what waited on it hears that it is over (runner/members.ts).
+      endedTurn(threadId, 'stopped');
+    }
   }
   // A process already being stopped needs nothing more; what waited for its successor was dropped above.
   if (live?.turn && !live.closing) {

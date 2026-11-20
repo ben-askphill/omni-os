@@ -239,8 +239,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setLinks((prev) => linksWith(prev, id, t));
   });
 
-  // Queued or running: the header interrupt and the composer treat both as busy.
-  const slotBusy = thread?.status === 'running' || thread?.status === 'queued';
+  // Queued or running: the header interrupt and the composer treat both as busy. In a group thread, any agent at work
+  // counts: Stop stops every one of them (ADR 0019).
+  const slotBusy = thread?.status === 'running' || thread?.status === 'queued' || !!thread?.members?.some((m) => !m.lead && (m.state === 'working' || m.state === 'needs'));
   // Running only. Queued is waiting for a slot, so the transcript does not show a working turn.
   const turnInProgress = thread?.status === 'running';
   const { interrupting, interrupt, actionError, setActionError } = useInterrupt(id, slotBusy, queued, events);

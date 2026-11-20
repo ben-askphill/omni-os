@@ -9,12 +9,13 @@ const changes = {
   head: 'abc',
   base: { sha: 'def', ref: 'main', how: 'thread-start', recorded_at: '2026-01-01T00:00:00Z' },
   groups: [{ kind: 'committed', files: [file], truncated: false }],
+  collisions: [],
 };
 
 describe('changes contract', () => {
   it('takes both forms of BranchChanges', () => {
     expect(changesProblems(changes)).toEqual([]);
-    expect(changesProblems({ available: false, reason: 'no repo' })).toEqual([]);
+    expect(changesProblems({ available: false, reason: 'no repo', collisions: [] })).toEqual([]);
   });
 
   it('names a missing key, an unknown key and a value outside its list', () => {

@@ -6,6 +6,7 @@ import type { SlashRecord } from './slash.ts';
 import { spanIndex, type Clipped, type Span } from './history.ts';
 import { shortPath } from './short-path.ts';
 import type { OutputMeta } from './tool-output.ts';
+import { collisionsIn, type Collision } from './collisions.ts';
 
 // The transcript fold. Pure: events in, rows out. The Web UI's Transcript.tsx and the phone's thread-view.ts render
 // the rows, and the iOS app folds with it too, so it imports no DOM, no React and no Node API.
@@ -168,8 +169,8 @@ export type Item =
   | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped }
   | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped; agent?: string }
   | { type: 'tools'; key: number; calls: ToolCall[]; total: number; agent?: string }
-  | { type: 'result'; key: number; p: ResultP }
-  | { type: 'error'; key: number; p: TextP }
+  | { type: 'result'; key: number; p: ResultP; agent?: string }
+  | { type: 'error'; key: number; p: TextP; agent?: string }
   | { type: 'report'; key: number; at: string; p: ReportP }
   /** An Ask Ben sent from this thread to a crew role (ask.ts): his question, shown with the Ask's live state. */
   | { type: 'ask'; key: number; at: string; p: AskP }
@@ -181,7 +182,9 @@ export type Item =
   /** A question the agent asked Ben, where it asked it. The card stands in for the ask_user_question call. */
   | { type: 'question'; key: number; at: string; q: ThreadQuestion; agent?: string }
   /** An agent was seated in the thread or removed from it (ADR 0019): a quiet "Designer joined" or "Designer left" line. */
-  | { type: 'member'; key: number; at: string; p: MemberP };
+  | { type: 'member'; key: number; at: string; p: MemberP }
+  /** A file two agents both edited (ADR 0019, packages/shared/collisions.ts), with whether it was cleared since. */
+  | { type: 'collision'; key: number; at: string; c: Collision };
 
 /** A `member` row (apps/server/runner/members.ts). */
 export interface MemberP {
@@ -278,6 +281,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
     }
   }
   const questions = new Map(questionsIn(events).map((q) => [q.event_id, q]));
+  const collisions = events.some((e) => e.kind === 'collision') ? new Map(collisionsIn(events).map((c) => [c.id, c])) : null;
 
   const items: Item[] = [];
   // Every call so far, not just this group's: a background agent's calls land after later text and turns.
@@ -363,13 +367,20 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         // just before) or, in older threads, the CLI flushing a background task on resume.
         if (p.ok && !p.turns) break;
         group = null;
-        items.push({ type: 'result', key: e.id, p });
+        items.push({ type: 'result', key: e.id, p, ...(e.agent && { agent: e.agent }) });
         break;
       }
       case 'error':
         group = null;
-        items.push({ type: 'error', key: e.id, p: payload<TextP>(e) });
+        items.push({ type: 'error', key: e.id, p: payload<TextP>(e), ...(e.agent && { agent: e.agent }) });
         break;
+      case 'collision': {
+        const c = collisions?.get(e.id);
+        if (!c) break;
+        group = null;
+        items.push({ type: 'collision', key: e.id, at: e.created_at, c });
+        break;
+      }
       case 'crew_report':
         group = null;
         items.push({ type: 'report', key: e.id, at: e.created_at, p: payload<ReportP>(e) });

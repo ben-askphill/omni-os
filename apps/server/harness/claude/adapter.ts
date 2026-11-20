@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
-import { DELEGATE_ONLY_DENIED, NO_EDITS_DENIED, type CrewRole } from '../../crew.ts';
+import { DELEGATE_ONLY_DENIED, MEMBER_DENIED, NO_EDITS_DENIED, type CrewRole } from '../../crew.ts';
 import { ASK_TIMEOUT_SEC } from '../../sandbox.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { describeAttachments, inlinable, messageContent, type Attachment } from '../../uploads.ts';
@@ -174,7 +174,9 @@ export const claudeAdapter: HarnessAdapter = {
     // A quick ask only reads: the same tools go, and needing one is what turns it into a task (apps/server/quick-ask.ts).
     // A no-edits role (the reviewer) loses the tools that write files and keeps Bash, so it is not read only.
     const denied = ctx.role?.delegateOnly || readsOnly(thread) ? DELEGATE_ONLY_DENIED : ctx.role?.tools === 'no-edits' ? NO_EDITS_DENIED : [];
-    args.push('--disallowedTools', ['AskUserQuestion', ...denied].join(','));
+    // A seated member of a group thread edits files only: its lead commits (ADR 0019).
+    const member = thread.source === 'member' ? MEMBER_DENIED : [];
+    args.push('--disallowedTools', ['AskUserQuestion', ...denied, ...member].join(','));
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 

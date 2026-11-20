@@ -10,6 +10,7 @@ import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../component
 import type { Mark, Phase } from '@omni/shared/status.ts';
 import type { RowItem } from './rows.ts';
 import { LayerShownCtx, SheetHostCtx } from './sheet-stack.ts';
+import { drawsFaces, MarkLine } from '../components/thread/AvatarMark.tsx';
 
 /** Safe-area insets: a home-screen app draws under the status bar and the home indicator. */
 export const SAFE_TOP = 'env(safe-area-inset-top)';
@@ -160,10 +161,18 @@ export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () 
           <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${it.settled ? 'text-fg-2' : 'text-fg'}`}>{it.title}</span>
           <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{it.time}</span>
         </span>
-        <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
-          <span className="min-w-0 flex-1 truncate">{[`#${it.channel}`, it.meta].filter(Boolean).join(' · ')}</span>
-          {trailing}
-        </span>
+        {/* A group thread at work says who on its second line: "Builder asks you · Designer working" (Q35). */}
+        {drawsFaces(it.members) ? (
+          <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
+            <MarkLine members={it.members} className="min-w-0 flex-1" />
+            {trailing}
+          </span>
+        ) : (
+          <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
+            <span className="min-w-0 flex-1 truncate">{[`#${it.channel}`, it.meta].filter(Boolean).join(' · ')}</span>
+            {trailing}
+          </span>
+        )}
       </span>
     </button>
   );

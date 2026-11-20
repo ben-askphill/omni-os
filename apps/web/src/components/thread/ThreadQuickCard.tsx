@@ -387,7 +387,7 @@ function LineageMark({ t }: { t: Thread }) {
     <span className="relative grid size-5 shrink-0 place-items-center text-fg-3">
       <HarnessLogo harness={t.harness ?? 'claude-code'} size={15} title={harnessLabel(t.harness ?? 'claude-code')} />
       <span className="absolute -right-0.5 -bottom-0.5 grid place-items-center rounded-full bg-surface p-px">
-        <ThreadDot t={t} size={6} />
+        <ThreadDot t={t} size={6} faces={false} />
       </span>
     </span>
   );

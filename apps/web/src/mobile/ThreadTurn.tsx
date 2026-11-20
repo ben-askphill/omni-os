@@ -1,5 +1,5 @@
 import { PHASE, type TurnPhase } from '@omni/shared/status.ts';
-import { Fragment, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, MemberLine, SwitchLine } from '../components/Transcript.tsx';
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
@@ -10,7 +10,11 @@ import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
 import { agentLook, type AgentLook } from '../components/AgentAvatar.tsx';
 import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
-import { Avatar } from '../components/ui.tsx';
+import { Avatar, Icon, Segmented } from '../components/ui.tsx';
+import { tabPanelProps } from '../components/ui/segmented.tsx';
+import { AgentAvatar } from '../components/AgentAvatar.tsx';
+import { CollisionFlag, CollisionMark } from '../components/thread/Collision.tsx';
+import { collisionLabel } from '@omni/shared/collisions.ts';
 import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
@@ -161,6 +165,78 @@ function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNod
   );
 }
 
+/**
+ * A message several agents answered (ADR 0019): one lane per tab, the collision flags above the tabs (Q55). Each tab
+ * names its agent, with the Working ring while it runs and a flag when it edited a collided file; the lane under it is
+ * that agent's reply, steps and changed files.
+ */
+function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
+  const lanes = t.lanes!;
+  const [picked, setPicked] = useState(lanes.turns[0]?.author ?? '');
+  const panel = useId();
+  const lane = lanes.turns.find((l) => l.author === picked) ?? lanes.turns[0];
+  if (!lane) return null;
+  const open = lanes.flags.filter((f) => !f.cleared);
+  const hit = (agent: string) => (lanes.files[agent] ?? []).some((f) => open.some((x) => x.path === f));
+  const files = lanes.files[lane.author ?? ''] ?? [];
+  const working = lane.status === 'running' || lane.status === 'queued';
+  return (
+    <div className="flex flex-col gap-3" data-lanes={t.key}>
+      {lanes.flags.map((f) => (
+        <CollisionFlag key={f.key} c={f} threadId={c.thread.id} compact />
+      ))}
+      <Segmented
+        kind="tabs"
+        label="Agents answering"
+        panel={panel}
+        value={lane.author ?? ''}
+        onChange={setPicked}
+        options={lanes.turns.map((l) => {
+          const look = agentLook(l.author ?? '', c.agents);
+          const run = l.status === 'running' || l.status === 'queued';
+          return {
+            id: l.author ?? '',
+            label: (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <span className={`inline-grid shrink-0 rounded-full ${run ? 'member-ring-working' : ''}`}>
+                  <AgentAvatar agent={look} size={18} />
+                </span>
+                <span className="truncate">{look.name}</span>
+                {hit(l.author ?? '') && <Icon name="alert" size={13} className="shrink-0 text-warn" />}
+              </span>
+            ),
+            title: `${look.name}: ${l.status}`,
+          };
+        })}
+      />
+      <div {...tabPanelProps(panel, lane.author ?? '')} className="flex flex-col gap-3">
+        <Reply t={lane} c={c}>
+          {lane.questions.map((q) => (
+            <QuestionCard key={q.id} threadId={c.thread.id} q={q} touch />
+          ))}
+          {/* Its own latest line while it works, not the thread's. */}
+          <TurnBody t={lane} last={working} c={{ ...c, status: lanes.latest[lane.author ?? ''] ?? null, turn: 'working' }} />
+          {files.length > 0 && (
+            <ul className="flex flex-col gap-0.5 rounded-2xl bg-surface px-2 py-1.5" aria-label="Files it changed">
+              {files.map((f) => {
+                const flagged = open.some((x) => x.path === f);
+                return (
+                  <li key={f} className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-[13px] ${flagged ? 'lane-file-hit' : ''}`}>
+                    {flagged ? <CollisionMark path={f} collisions={open} /> : <Icon name="file" size={13} className="shrink-0 text-fg-3" />}
+                    <span className="min-w-0 flex-1 truncate font-mono text-[12px]" title={f}>
+                      {collisionLabel(f)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Reply>
+      </div>
+    </div>
+  );
+}
+
 /** One turn: the prompts that started it, what came back, and how it ended. */
 export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last: boolean; c: TurnCtx }) {
   const { thread } = c;
@@ -203,12 +279,19 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     {t.reports.map((r, k) => (
       <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} remote={r.remote ? (r.harness_name ?? r.harness ?? '') : undefined} />
     ))}
-    <Reply t={t} c={c}>
-      {t.questions.map((q) => (
-        <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
-      ))}
-      <TurnBody t={t} last={last} c={c} />
-    </Reply>
+    {t.lanes ? (
+      <MoLanes t={t} c={c} />
+    ) : (
+      <Reply t={t} c={c}>
+        {t.questions.map((q) => (
+          <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
+        ))}
+        <TurnBody t={t} last={last} c={c} />
+      </Reply>
+    )}
+    {t.flags?.map((f) => (
+      <CollisionFlag key={f.key} c={f} threadId={thread.id} compact />
+    ))}
     {t.switches.map((it) => (
       <SwitchLine key={it.key} it={it} running={thread.status === 'running'} />
     ))}

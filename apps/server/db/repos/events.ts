@@ -168,6 +168,12 @@ export const events = {
       .prepare(`SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind IN ('question', 'question_answer') ${one} ORDER BY id`)
       .all(transcriptOf(threadId), ...(id ? [id] : [])) as unknown as EventRow[];
   },
+  /** A thread's collision and collision_cleared rows (packages/shared/collisions.ts), oldest first. */
+  collisions(threadId: string): EventRow[] {
+    return db
+      .prepare(`SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind IN ('collision', 'collision_cleared') ORDER BY id`)
+      .all(transcriptOf(threadId)) as unknown as EventRow[];
+  },
   /** The payload of a thread's tool_use event, by the tool call's id. */
   toolUse(threadId: string, toolUseId: string): { id: string; name: string; input: unknown; parent?: string | null } | null {
     const row = db

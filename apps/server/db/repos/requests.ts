@@ -56,9 +56,10 @@ export interface MessageRequest {
    * crew: a child's report. team: the go a team's lead gets once its members have reported. limit: the continuation
    * of a turn stopped at a usage limit (apps/server/runner/limits.ts). handoff: a thread handed over from another Mac,
    * its continuation and the messages that were queued there (apps/server/handoff.ts). pr-watch: a watched PR's new
-   * check failure (apps/server/pr-watch/).
+   * check failure (apps/server/pr-watch/). omni: Omni asking a group thread's lead to pull a Cursor Cloud member's
+   * branch (runner/members.ts).
    */
-  source: 'ben' | 'conductor' | 'crew' | 'team' | 'limit' | 'handoff' | 'pr-watch';
+  source: 'ben' | 'conductor' | 'crew' | 'team' | 'limit' | 'handoff' | 'pr-watch' | 'omni';
   attachments: Attachment[] | null;
   /** The transcript row it becomes: `user`, or `crew_report` for a child's report. */
   /** `routed`: Ben's message as one agent of a group thread reads it (apps/server/members.ts). Hidden in the transcript. */

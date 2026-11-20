@@ -149,9 +149,9 @@ describe('branch changes of a worktree thread', () => {
   it('is unavailable while the worktree is not on this machine or not on its branch', async () => {
     const { t } = await worktreeThread();
     git(t.cwd, 'checkout', '-q', '-b', 'elsewhere');
-    expect((await changes(t.id)).body).toEqual({ available: false, reason: expect.stringContaining('not omni/') });
+    expect((await changes(t.id)).body).toEqual({ available: false, reason: expect.stringContaining('not omni/'), collisions: [] });
     rmSync(t.cwd, { recursive: true, force: true });
-    expect((await changes(t.id)).body).toEqual({ available: false, reason: "This thread's worktree is not on this machine." });
+    expect((await changes(t.id)).body).toEqual({ available: false, reason: "This thread's worktree is not on this machine.", collisions: [] });
   });
 });
 
@@ -181,11 +181,11 @@ describe('branch changes of other threads', () => {
         cwd: dir, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null, ...patch,
       } as any);
     const hermes = make({ harness: 'hermes' });
-    expect((await changes(hermes.id)).body).toEqual({ available: false, reason: expect.stringContaining('Hermes server') });
+    expect((await changes(hermes.id)).body).toEqual({ available: false, reason: expect.stringContaining('Hermes server'), collisions: [] });
     const noRepo = make({ channel_id: channel(null, false) });
-    expect((await changes(noRepo.id)).body).toEqual({ available: false, reason: expect.stringContaining('no repository') });
+    expect((await changes(noRepo.id)).body).toEqual({ available: false, reason: expect.stringContaining('no repository'), collisions: [] });
     const brain = make({ cwd: r.tmp });
-    expect((await changes(brain.id)).body).toEqual({ available: false, reason: expect.stringContaining("does not run in its channel's repository") });
+    expect((await changes(brain.id)).body).toEqual({ available: false, reason: expect.stringContaining("does not run in its channel's repository"), collisions: [] });
     expect((await changes('nope')).status).toBe(404);
   });
 });

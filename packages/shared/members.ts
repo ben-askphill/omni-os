@@ -86,6 +86,53 @@ export function groupMark(own: Mark, members: readonly Pick<ThreadMember, 'lead'
   return out;
 }
 
+/** One face in the avatar mark: an agent that waits on Ben (the Needs you ring and diamond) or works (the Working ring). */
+export interface MarkFace {
+  agent: string;
+  name: string;
+  ring: 'needs' | 'working';
+}
+
+/** A thread row's mark while its agents run or wait on Ben (Q35, Q68): the faces to draw, how many more, and a red dot. */
+export interface AvatarMark {
+  faces: MarkFace[];
+  /** Agents at work or waiting past the face shown: one face and a count once there are more than two. */
+  more: number;
+  /** An agent failed while another works: the row adds a red dot. Failed outranks Working in the order only. */
+  failed: boolean;
+}
+
+type Marked = Pick<ThreadMember, 'agent' | 'name' | 'lead' | 'state'>;
+
+/** The agents that ask first, then the working ones, each in the member order (the lead first). */
+function busyFaces(members: readonly Marked[]): MarkFace[] {
+  const face = (m: Marked, ring: MarkFace['ring']): MarkFace => ({ agent: m.agent, name: m.name, ring });
+  return [...members.filter((m) => m.state === 'needs').map((m) => face(m, 'needs')), ...members.filter((m) => m.state === 'working').map((m) => face(m, 'working'))];
+}
+
+/**
+ * The avatar mark a thread row draws in place of its status mark while any of its agents works or waits on Ben: the
+ * one asking first, then the working ones, two at most, else one and a count. Null when none does, so the
+ * busiest-state mark shows (threadMark).
+ */
+export function avatarMark(members: readonly Marked[] | undefined): AvatarMark | null {
+  const faces = busyFaces(members ?? []);
+  if (!faces.length) return null;
+  const failed = (members ?? []).some((m) => m.state === 'failed');
+  return faces.length <= 2 ? { faces, more: 0, failed } : { faces: faces.slice(0, 1), more: faces.length - 1, failed };
+}
+
+/** The phone row's second line while agents ask, work or failed beside them: "Builder asks you · Designer working". */
+export function markLine(members: readonly Marked[] | undefined): string | null {
+  const all = members ?? [];
+  const names = (state: MemberState) => list(all.filter((m) => m.state === state).map((m) => m.name));
+  const asks = names('needs');
+  const works = names('working');
+  if (!asks && !works) return null;
+  const failed = names('failed');
+  return [asks && `${asks} ${all.filter((m) => m.state === 'needs').length === 1 ? 'asks' : 'ask'} you`, works && `${works} working`, failed && `${failed} failed`].filter(Boolean).join(' · ');
+}
+
 /** The agents a message goes to: the ones it names, else the lead (ADR 0019). */
 export function recipients(lead: { agent: string; name: string }, named: readonly { agent: string; name: string }[]): { agent: string; name: string }[] {
   return named.length ? [...new Map(named.map((a) => [a.agent, a])).values()] : [lead];

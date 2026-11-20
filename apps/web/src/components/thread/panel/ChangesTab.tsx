@@ -20,6 +20,8 @@ import { DiffFile, type LineNotes, type LineSelect } from '../../DiffViewer.tsx'
 import { Empty, ErrorNote, IconButton, Loading, Picker, Segmented } from '../../ui.tsx';
 import { SelectionDock, useLineSelection } from './LineSelection.tsx';
 import { NotesBar, useNotePlaces, useReviewNotes, type ReviewNotesState } from './ReviewNotes.tsx';
+import { CollisionBanner, CollisionMark } from '../Collision.tsx';
+import type { Collision } from '@omni/shared/collisions.ts';
 
 type Mode = 'base' | 'turn';
 
@@ -107,13 +109,19 @@ function SinceBase({ thread, notes }: { thread: Thread; notes: ReviewNotesState 
         </ErrorNote>
       )}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
+        {/* Files two of the thread's agents both edited (ADR 0019): one combined diff, the flags over it. */}
+        {data.collisions?.some((c) => !c.cleared) && (
+          <div className="mb-3">
+            <CollisionBanner collisions={data.collisions} threadId={thread.id} onChanged={reload} />
+          </div>
+        )}
         {notes.notes && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} target={notes} />}
         {!view?.files ? (
           <Empty icon="diff" title="No changes">
             Nothing changed since {shortSha(base.sha)}: no commits, staged, unstaged or untracked files.
           </Empty>
         ) : (
-          <Groups groups={view.groups} total={view.files} sel={sel} notes={places.byFile} />
+          <Groups groups={view.groups} total={view.files} sel={sel} notes={places.byFile} collisions={data.collisions} />
         )}
       </div>
       {sel.picked && (
@@ -233,7 +241,7 @@ function ThisTurn({ thread, notes }: { thread: Thread; notes: ReviewNotesState }
 
 type Selection = ReturnType<typeof useLineSelection>;
 
-function Groups({ groups, total, sel, notes }: { groups: ChangeGroupView[]; total: number; sel: Selection; notes: ReadonlyMap<string, LineNotes> }) {
+function Groups({ groups, total, sel, notes, collisions }: { groups: ChangeGroupView[]; total: number; sel: Selection; notes: ReadonlyMap<string, LineNotes>; collisions?: readonly Collision[] }) {
   return groups.map((g) => (
     <section key={g.kind} className="mb-4" aria-label={`${g.title} changes`}>
       <div className="flex items-center gap-2 px-1.5 pb-1.5 text-[11.5px] font-medium text-fg-3">
@@ -243,7 +251,7 @@ function Groups({ groups, total, sel, notes }: { groups: ChangeGroupView[]; tota
       <div className="space-y-2">
         {g.files.map((f) => {
           const on = sel.pick?.file === f.key ? sel.pick : null;
-          return <ChangedFileDiff key={f.key} f={f} total={total} from={on?.from} to={on?.to} press={sel.press} notes={notes.get(f.key)} />;
+          return <ChangedFileDiff key={f.key} f={f} total={total} from={on?.from} to={on?.to} press={sel.press} notes={notes.get(f.key)} collisions={collisions} />;
         })}
       </div>
       {g.truncated && <div className="px-1.5 pt-2 text-[12px] text-fg-3">More files changed than are listed here.</div>}
@@ -259,6 +267,7 @@ const ChangedFileDiff = memo(function ChangedFileDiff({
   to,
   press,
   notes,
+  collisions,
 }: {
   f: ChangeFileView;
   total: number;
@@ -266,6 +275,7 @@ const ChangedFileDiff = memo(function ChangedFileDiff({
   to?: number;
   press: Selection['press'];
   notes?: LineNotes;
+  collisions?: readonly Collision[];
 }) {
   const select = useMemo<LineSelect | undefined>(
     () => (f.diff.lines.length ? { range: from === undefined || to === undefined ? null : { from, to }, press: (i, extend) => press(f, i, extend) } : undefined),
@@ -280,9 +290,12 @@ const ChangedFileDiff = memo(function ChangedFileDiff({
       select={select}
       notes={notes}
       badge={
-        <span className="w-3 shrink-0 font-mono text-[11px] text-fg-3" title={f.file.status.replace('_', ' ')}>
-          {STATUS_LETTER[f.file.status]}
-        </span>
+        <>
+          <span className="w-3 shrink-0 font-mono text-[11px] text-fg-3" title={f.file.status.replace('_', ' ')}>
+            {STATUS_LETTER[f.file.status]}
+          </span>
+          <CollisionMark path={f.file.path} collisions={collisions} />
+        </>
       }
     />
   );
