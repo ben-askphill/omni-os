@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { busiest, groupGlyph, groupMark, recipients, replyTo, routingHint, seatRun, type MemberState } from '../members.ts';
+import { avatarMark, busiest, groupGlyph, groupMark, markLine, recipients, replyTo, routingHint, seatRun, type MemberState } from '../members.ts';
 import { threadGlyph, threadMark } from '../status.ts';
 import { agentMention, mentionedAgents } from '../message-context-agent.ts';
 
@@ -74,5 +74,42 @@ describe('seatRun', () => {
     expect(seatRun(seats, 'designer')).toBeNull();
     expect(seatRun(undefined, 'builder')).toBeNull();
     expect(seatRun(seats, null)).toBeNull();
+  });
+});
+
+describe('the avatar mark', () => {
+  const m = (agent: string, state: MemberState, lead = false) => ({ agent, name: agent[0].toUpperCase() + agent.slice(1), lead, state });
+
+  it('draws the asker first in the Needs you ring, then the working agents, two at most', () => {
+    expect(avatarMark([m('builder', 'working', true), m('designer', 'needs')])).toEqual({
+      faces: [{ agent: 'designer', name: 'Designer', ring: 'needs' }, { agent: 'builder', name: 'Builder', ring: 'working' }],
+      more: 0,
+      failed: false,
+    });
+    // Three at work: one face and a count.
+    expect(avatarMark([m('builder', 'working', true), m('designer', 'working'), m('critic', 'needs')])).toEqual({
+      faces: [{ agent: 'critic', name: 'Critic', ring: 'needs' }],
+      more: 2,
+      failed: false,
+    });
+  });
+
+  it('shows the working avatar and a red dot when one agent failed while another works', () => {
+    expect(avatarMark([m('builder', 'failed', true), m('designer', 'working')])).toEqual({
+      faces: [{ agent: 'designer', name: 'Designer', ring: 'working' }],
+      more: 0,
+      failed: true,
+    });
+  });
+
+  it('draws nothing once no agent works or waits on Ben, so the busiest-state mark shows', () => {
+    expect(avatarMark([m('builder', 'done', true), m('designer', 'failed')])).toBeNull();
+    expect(avatarMark(undefined)).toBeNull();
+  });
+
+  it('says it on the phone row’s second line', () => {
+    expect(markLine([m('builder', 'needs', true), m('designer', 'working')])).toBe('Builder asks you · Designer working');
+    expect(markLine([m('builder', 'working', true), m('designer', 'working'), m('critic', 'failed')])).toBe('Builder and Designer working · Critic failed');
+    expect(markLine([m('builder', 'done', true), m('designer', 'done')])).toBeNull();
   });
 });

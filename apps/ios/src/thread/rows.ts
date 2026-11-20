@@ -77,6 +77,8 @@ export const ITEM_ROWS: Record<Item['type'], readonly RowKind[]> = {
   question: ['question'],
   // The joined and left lines of a group thread come with slice 7 (#905): the app shows no member rows yet.
   member: [],
+  // Collision flags come with slice 7 too: the app draws no lanes or flags yet.
+  collision: [],
   // No row of its own: an Ask's thread is one of the turn's children (thread-view.ts), on the turn's delegation card.
   ask: [],
 };
@@ -160,6 +162,8 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
   }
   if (open) yield* stepRows(t, disclosure.calls, thread.status === 'running');
   for (const it of t.switches) yield { kind: 'switch', key: `w${it.key}`, it, running: thread.status === 'running' };
+  // Lanes come with slice 7 (#905): until then, each agent a message named reads as a turn of its own under it.
+  for (const lane of t.lanes?.turns ?? []) yield* turnRows(lane, i, last, view, input);
 }
 
 /** The thread as the list draws it, oldest first. Pass `prev` to keep every unchanged row the object it was, so memoized rows skip. */

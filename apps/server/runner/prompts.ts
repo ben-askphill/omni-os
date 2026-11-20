@@ -2,9 +2,9 @@
 import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
-import { artifacts, memories, type Channel, type Thread } from '../db.ts';
+import { artifacts, memories, threads, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
-import { doesOwnWork, type CrewRole } from '../crew.ts';
+import { doesOwnWork, getCrew, type CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { writtenCharter } from '../remote-agents.ts';
@@ -304,6 +304,22 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       '',
       '## Team task',
       `You are one member of a team${thread.task_id ? `, on task ${thread.task_id}` : ''}. Your final message is automatically reported to the team lead, who combines it with the other members' replies. Stick to your own task. Report outcomes and blockers, even if the answer is "nothing found".`,
+    );
+  } else if (thread.source === 'member') {
+    // A seated member (ADR 0019): the lead commits, and several agents edit one worktree at once (Q24). A remote agent
+    // seated here talks only, and where a remote agent leads, the user commits what the local members change (ADR 0020).
+    const lead = thread.parent_id ? threads.get(thread.parent_id) : undefined;
+    const leadName = (lead?.role && getCrew(lead.role)?.name) || lead?.role || 'The lead';
+    const committer = isRemoteAgentHarness(lead?.harness) ? `${leadName} is a remote agent and talks only, so ${name}` : leadName;
+    lines.push(
+      '',
+      '## Group thread',
+      `You are seated in a group thread with ${name} and other agents. ${leadName} leads this thread. Its messages go to the agents they name, and agents named in one message work at the same time in this one worktree.`,
+      remoteAgent
+        ? 'You talk only: the local agents seated here change the files.'
+        : remote
+          ? `You work in your own checkout on a branch of your own, not in this thread's worktree. Push your work to that branch and do not open a pull request: when you finish, ${leadName} pulls your branch into the thread's branch.`
+          : `Edit files only. ${committer} commits and opens the pull request: never run git commit, git push, git rebase, git reset, git stash or git checkout, and never open a pull request. When another agent changed a file you changed, Omni tells you which files: read them again before you edit them and keep their changes.`,
     );
   } else if (thread.parent_id) {
     lines.push(

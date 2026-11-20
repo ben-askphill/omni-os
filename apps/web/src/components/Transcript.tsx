@@ -45,6 +45,9 @@ import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 import { AgentRow, ConnectorRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
 import { connectorGroups } from '@omni/shared/connectors.ts';
 import { StepsCard } from './thread/StepsCard.tsx';
+import { LanesBlock, type LaneItems } from './thread/Lanes.tsx';
+import { CollisionFlag } from './thread/Collision.tsx';
+import { laneFold, lanesEnded, type LaneFolded } from '@omni/shared/lanes.ts';
 import { Attachments } from './thread/Attachments.tsx';
 import { QueuedMessages, SendingMessages } from './thread/PendingMessages.tsx';
 
@@ -83,6 +86,7 @@ const SOURCE_LABEL: Record<string, string> = {
   import: 'Imported',
   limit: 'After the usage limit',
   'pr-watch': 'PR watch',
+  omni: 'From Omni',
 };
 
 
@@ -430,6 +434,8 @@ const ItemRow = memo(
           return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
         case 'member':
           return <MemberLine key={it.key} p={it.p} />;
+        case 'collision':
+          return <CollisionFlag key={it.key} c={it.c} threadId={threadId} />;
         case 'ask':
           return <AskItem key={it.key} p={it.p} byId={byId} reports={reports} answer={answers?.[it.p.thread_id]} />;
         default:
@@ -510,15 +516,29 @@ export const Transcript = memo(function Transcript({
   const spans = history?.history.spans;
   // The last fold's items, whose unchanged ones the next fold keeps (`keepSame`).
   const held = useRef<Item[]>([]);
-  const items = useMemo(() => {
+  const all = useMemo(() => {
     held.current = keepSame(held.current, buildItems(events, spans).items);
     return held.current;
   }, [events, spans]);
+  // A message several agents answered gathers their replies into lanes (ADR 0019, @omni/shared/lanes.ts). `items` is
+  // the flow outside the lanes, which the author lines and the turns' steps read; each lane folds its own.
+  const flow = useMemo<LaneFolded[]>(() => laneFold(all, { lead, cwd }), [all, lead, cwd]);
+  const items = useMemo(() => (flow.some((x) => x.type === 'lanes') ? flow.filter((x): x is Item => x.type !== 'lanes') : all), [flow, all]);
+  // The turns' boundaries: lanes whose agents have all finished end their turn as a result does.
+  const turnItems = useMemo(
+    () => (flow.some((x) => x.type === 'lanes') ? flow.flatMap((x): Item[] => (x.type !== 'lanes' ? [x] : lanesEnded(x) ? [{ type: 'result', key: x.key + 0.5, p: { ok: true, subtype: 'success', turns: 1 } }] : [])) : all),
+    [flow, all],
+  );
+  // The lanes are still running: they show their own steps and latest line, not the transcript's live ones.
+  const lanesLive = useMemo(() => {
+    const at = flow.findLast((x) => x.type !== 'mod' && x.type !== 'collision');
+    return at?.type === 'lanes' && !lanesEnded(at);
+  }, [flow]);
   const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
   // The first item is the thread's first message only when the start is held.
   const fromStart = !spans || atStart({ spans });
-  const pages = useMemo(() => publishedByGroup(items), [items]);
-  const answers = useMemo(() => shownAnswers(items), [items]);
+  const pages = useMemo(() => publishedByGroup(all), [all]);
+  const answers = useMemo(() => shownAnswers(all), [all]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
   const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
@@ -560,7 +580,7 @@ export const Transcript = memo(function Transcript({
 
   // Each turn's steps: a finished turn's fold onto its first group of calls, the running one's sit under the transcript.
   const { folded, liveSteps } = useMemo(() => {
-    const turns = turnsOf(items);
+    const turns = turnsOf(turnItems);
     const folded = new Map<number, StepsView>();
     let liveSteps: StepsView | null = null;
     turns.forEach((turn, k) => {
@@ -573,7 +593,7 @@ export const Transcript = memo(function Transcript({
       }
     });
     return { folded, liveSteps: liveSteps as StepsView | null };
-  }, [items, running, asking, latestStatus]);
+  }, [turnItems, running, asking, latestStatus]);
 
   // A turn that runs with no reply of the lead's open yet (Ben just wrote): its live steps and thinking line get a head.
   const liveHead = running && !!leadLook && (() => {
@@ -593,6 +613,28 @@ export const Transcript = memo(function Transcript({
     );
   };
 
+  // One lane's rows, drawn as the transcript draws them, with its steps on its first calls.
+  const laneItems: LaneItems = (its, steps) => {
+    if (!its.length) return steps ? <StepsCard key="lane-steps" v={steps} cwd={cwd} byId={byId} /> : null;
+    const first = its.find((x) => x.type === 'tools')?.key;
+    return its.map((it) => (
+      <ItemRow
+        key={it.key}
+        it={it}
+        threadId={threadId}
+        cwd={cwd}
+        running={running}
+        reports={reports}
+        byId={byId}
+        artifacts={artifacts}
+        pages={pages.get(it.key)}
+        steps={steps && it.key === first ? steps : undefined}
+        code={it.type === 'result' ? code : undefined}
+        answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
+      />
+    ));
+  };
+
   const edgeRow = (key: number) => {
     const edge = edges?.get(key);
     return edge && history ? <HistoryEdgeRow key={edge.type === 'earlier' ? 'earlier' : `gap:${edge.after}`} edge={edge} history={history} /> : null;
@@ -603,7 +645,7 @@ export const Transcript = memo(function Transcript({
       <TaskCtx.Provider value={tasks}>
         <div className="space-y-4">
           {!fromStart && team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null}
-          {items.flatMap((it, idx) => [
+          {flow.flatMap((it, idx) => it.type === 'lanes' ? [<LanesBlock key={`lanes${it.key}`} block={it} threadId={threadId} render={laneItems} />] : [
             edgeRow(it.key),
             author(it.key),
             <ItemRow
@@ -623,23 +665,23 @@ export const Transcript = memo(function Transcript({
               code={it.type === 'result' ? code : undefined}
               answers={it.type === 'tools' ? answersFor(it.calls, answers) : it.type === 'ask' && answers.has(it.p.thread_id) ? { [it.p.thread_id]: answers.get(it.p.thread_id)! } : undefined}
               onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
-              defer={defers(idx, items.length, LIVE_ROWS)}
+              defer={defers(idx, flow.length, LIVE_ROWS)}
               indent={!!lead && isReply(it)}
             />,
             tails.has(it.key) && channelId ? <RemoteLockLine key={`lock${it.key}`} channelId={channelId} className={REPLY_INDENT} /> : null,
           ])}
           {edgeRow(-1)}
-          {liveHead && leadLook && (liveSteps || !asking) && (
+          {!lanesLive && liveHead && leadLook && (liveSteps || !asking) && (
             <div key="live-head" className="mb-2">
               <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} />
             </div>
           )}
-          {liveSteps && (
+          {!lanesLive && liveSteps && (
             <div className={lead ? REPLY_INDENT : undefined}>
               <StepsCard key="live-steps" v={liveSteps} cwd={cwd} byId={byId} />
             </div>
           )}
-          {running && !asking && (
+          {running && !asking && !lanesLive && (
             <div className={lead ? REPLY_INDENT : undefined}>
               <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />
             </div>

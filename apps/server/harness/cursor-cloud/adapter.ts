@@ -213,7 +213,9 @@ export const cursorCloudAdapter: HarnessAdapter = {
                   agentId,
                   prompt: first,
                   repos: [{ url: `https://github.com/${repo}` }],
-                  autoCreatePR: true,
+                  // A group thread's member works on its own branch, which its lead pulls in: only the lead opens the
+                  // pull request (ADR 0019, Q63).
+                  autoCreatePR: thread.source !== 'member',
                   ...(thread.title && { name: thread.title.slice(0, 100) }),
                   ...(thread.model && thread.model !== 'default' && { model: { id: thread.model } }),
                 },

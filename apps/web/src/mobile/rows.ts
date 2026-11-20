@@ -26,6 +26,8 @@ export interface RowItem {
   time: string;
   /** What follows the channel on the second line. */
   meta: string | null;
+  /** A group thread's agents (ADR 0019): while any runs or waits on Ben, the second line says who (Q35). */
+  members?: ThreadStub['members'];
 }
 
 export interface ChannelInfo {
@@ -62,5 +64,6 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     settled: !isWorking(t),
     time: shortTime(t.updated_at ?? t.created_at, now),
     meta: [state, owner].filter(Boolean).join(' · ') || null,
+    ...(t.members?.length && { members: t.members }),
   };
 }

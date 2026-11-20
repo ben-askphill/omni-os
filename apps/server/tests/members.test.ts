@@ -1,6 +1,6 @@
 // Group threads, slice 2 (ADR 0019, runner/members.ts): Ben seats agents in a thread with a typed agent mention, and
 // each one answers there in a session of its own. A message with no mention goes to the lead; one with mentions goes
-// only to the agents it names, one after another in the order it names them. Each agent's turn opens with the messages
+// only to the agents it names, which run at once (slice 3, parallel-members.test.ts). Each agent's turn opens with the messages
 // since its last turn that it did not write, without tool calls; a new member's first opens with a small-model catch-up.
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -117,18 +117,18 @@ describe('seating by agent mention', () => {
     expect(readBy(t.id, 'designer')).toHaveLength(1);
   });
 
-  it('runs several named agents one after another in the order named, each reading the ones before it', T, async () => {
+  it('runs several named agents at once, and each reads the others’ replies at its next turn', T, async () => {
     const t = await groupThread('plain start');
     await say(t.id, 'THINK:300 both of you, go', ['critic', 'Critic'], ['designer', 'Designer']);
     await untilIdle(t.id, 3);
-    expect(replies(t.id).slice(1).map(([a]) => a)).toEqual(['critic', 'designer']);
-    // Designer went second and read Critic's reply to the same message.
-    expect(readBy(t.id, 'designer')[0]).toContain('Fake catch-up of');
-    const critic = H.byKind(t.id, 'result');
-    expect(critic.length).toBe(3);
-    // Naming a seated member again seats nothing more.
+    expect(replies(t.id).slice(1).map(([a]) => a).sort()).toEqual(['critic', 'designer']);
+    // Side by side: neither read the other's reply to the same message.
+    expect(readBy(t.id, 'designer')[0]).not.toContain('### Critic');
+    expect(readBy(t.id, 'critic')[0]).not.toContain('### Designer');
+    // Naming a seated member again seats nothing more, and it now reads what the other said.
     await say(t.id, 'critic again', ['critic', 'Critic']);
     await untilIdle(t.id, 4);
+    expect(readBy(t.id, 'critic')[1]).toContain('### Designer');
     expect(H.db.members.seated(t.id).map((m) => m.agent)).toEqual(['lead', 'critic', 'designer']);
     expect(H.byKind(t.id, 'member')).toHaveLength(2);
   });
@@ -137,7 +137,7 @@ describe('seating by agent mention', () => {
     const t = await groupThread('plain start');
     await say(t.id, 'SAY:@Critic please weigh in', ['lead', 'Lead'], ['designer', 'Designer']);
     await untilIdle(t.id, 3);
-    expect(replies(t.id).slice(1).map(([a]) => a)).toEqual(['lead', 'designer']);
+    expect(replies(t.id).slice(1).map(([a]) => a).sort()).toEqual(['designer', 'lead']);
     expect(H.db.members.of(t.id, 'critic')).toBeUndefined();
   });
 

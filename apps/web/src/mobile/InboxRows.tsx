@@ -19,6 +19,7 @@ import { ownedByOther } from '@omni/shared/thread-owner.ts';
 import { MoAvatar, MoRound } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell } from './shell.tsx';
+import { drawsFaces, MarkLine } from '../components/thread/AvatarMark.tsx';
 
 interface RowAction {
   icon: IconName;
@@ -110,6 +111,8 @@ export function MoInboxRow({
             <span className="min-w-0 flex-1 truncate text-[15px] leading-[1.3] text-fg">{title}</span>
             <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{status ? status.label : shortTime(t.updated_at ?? t.created_at, now)}</span>
           </span>
+          {/* A group thread at work says who: "Builder asks you · Designer working" (Q35). */}
+          {drawsFaces(t.members) && <MarkLine members={t.members} className="text-[12.5px] leading-[1.35] text-fg-2" />}
           {t.step && (
             <span className="truncate text-[13px] leading-[1.35] text-fg-2" data-step>
               {t.step}

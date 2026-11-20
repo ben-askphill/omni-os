@@ -187,6 +187,12 @@ describe('a thread led by a remote agent', () => {
     // The member ran in the thread's worktree with no setup run of its own.
     expect(H.thread(sessionOf(lead.id, 'builder2')).cwd).toBe(cwd);
     expect(readFileSync(join(cwd, 'notes.md'), 'utf8')).toBe('written by fake-claude');
+    // Its prompt says Ben commits, since the remote lead talks only, and keeps git commit and pull requests away from it.
+    const { buildSystemPrompt } = await import('../runner/prompts.ts');
+    const { getCrew } = await import('../crew.ts');
+    const member = H.thread(sessionOf(lead.id, 'builder2'));
+    const prompt = buildSystemPrompt(member, H.db.channels.get('repo')!, getCrew('builder2')!);
+    expect(prompt).toMatch(/Edit files only\. Nomos is a remote agent and talks only, so .+ commits and opens the pull request: never run git commit/);
 
     // Only Ben commits: an agent thread is refused.
     const agent = await call(`/threads/${lead.id}/commit`, json('POST', { message: 'Add the notes' }, { [CALLER]: lead.id }));
@@ -267,6 +273,10 @@ describe('a remote agent seated as a member', () => {
       expect((await say(t.id, 'what do you make of it?', ['nomos', 'Nomos'])).status).toBe(200);
       await untilIdle(t.id, 2);
       const [sent] = eveSent();
+      // Its prompt seats it as a remote agent that talks only, not as a harness on a branch of its own.
+      expect(sent.clientContext).toContain('## Group thread');
+      expect(sent.clientContext).toMatch(/You talk only: the local agents seated here change the files/);
+      expect(sent.clientContext).not.toMatch(/branch of your own/);
       if (closed) expect(sent.message).toMatch(/^what do you make of it\?\n\n<omni-context>/);
       else expect(sent.message).toMatch(/^\[Catch-up\] You are Nomos, a remote agent seated in this thread\. Lead leads it\. You talk only[^]*\n---\n\nwhat do you make of it\?/);
       // Its reply lands in the group thread as Nomos.

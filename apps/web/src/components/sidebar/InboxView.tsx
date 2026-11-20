@@ -21,6 +21,7 @@ import { AgentRows, FoldTrees, TreeRows, TreeToggle, TreeToggleSpace } from '../
 import { RunElapsed } from '../RunElapsed.tsx';
 import { ChannelRollup } from '../ChannelStack.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
+import { AvatarMark, drawsFaces } from '../thread/AvatarMark.tsx';
 
 /**
  * The sidebar's Inbox view, T3 Code's default thread list: every channel's threads in one list, on four shelves in a
@@ -223,7 +224,10 @@ function InboxCard({
             {forOwner && <span data-owner-line> · {forOwner}</span>}
           </span>
           <span className="flex shrink-0 items-center gap-1.5 md:group-focus-within/row:invisible md:group-hover/row:invisible">
-            {status ? (
+            {drawsFaces(t.members) ? (
+              // A group thread's agents at work or waiting on the user: their faces are the mark (Q35).
+              <AvatarMark members={t.members} size={14} />
+            ) : status ? (
               <>
                 <StatusDot mark={mark} size={phase ? 7 : 6} />
                 <span className="text-fg-3">{said}</span>

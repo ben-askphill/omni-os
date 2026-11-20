@@ -2,7 +2,8 @@
 // A fake Cursor Cloud Agents API (v1) for tests and the QA stack. It listens on 127.0.0.1 only and never calls out.
 // Any bearer key works except "bad-key", which gets a 401. It never logs or stores the Authorization header's value.
 //
-// A run moves one step each time it is read: CREATING, RUNNING, then FINISHED with a reply, a branch and a PR. The
+// A run moves one step each time it is read: CREATING, RUNNING, then FINISHED with a reply, a branch and a PR (none for
+// an agent created with autoCreatePR false, as a group thread's member is). The
 // prompt steers it like fake-claude's directives:
 //   CLOUD:ERROR   the run ends in ERROR
 //   CLOUD:EXPIRE  the run ends in EXPIRED
@@ -78,7 +79,7 @@ export async function startFakeCursorApi({ port = 0 } = {}) {
       run.status = end;
       run.durationMs = Date.now() - run.started;
       if (end === 'FINISHED') {
-        agent.prUrl ??= `https://github.com/${agent.repo}/pull/${++prs}`;
+        if (agent.autoCreatePR) agent.prUrl ??= `https://github.com/${agent.repo}/pull/${++prs}`;
         run.result = `Done: ${run.prompt.split('\n').pop().slice(0, 80)}`;
       }
     }
@@ -109,7 +110,7 @@ export async function startFakeCursorApi({ port = 0 } = {}) {
       const id = body.agentId ?? `bc-${randomUUID()}`;
       if (agents.has(id)) return fail(res, 409, 'agent_id_conflict', 'An agent with this id exists');
       const repo = repoUrl.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
-      const agent = { id, name: body.name ?? 'Cloud agent', status: 'ACTIVE', url: `https://cursor.com/agents/${id}`, repo, startingRef: body.repos[0].startingRef ?? 'main', createdAt: new Date().toISOString() };
+      const agent = { id, name: body.name ?? 'Cloud agent', status: 'ACTIVE', url: `https://cursor.com/agents/${id}`, repo, startingRef: body.repos[0].startingRef ?? 'main', autoCreatePR: body.autoCreatePR !== false, createdAt: new Date().toISOString() };
       agents.set(id, agent);
       const run = newRun(agent, text);
       return json(res, 201, { agent: agentView(agent), run: view(run) });
@@ -150,7 +151,7 @@ export async function startFakeCursorApi({ port = 0 } = {}) {
     updatedAt: a.createdAt,
     latestRunId: a.latestRunId,
     repos: [{ url: `https://github.com/${a.repo}`, startingRef: a.startingRef }],
-    autoCreatePR: true,
+    autoCreatePR: a.autoCreatePR,
   });
 
   await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));

@@ -220,7 +220,7 @@ function Node({
         aria-label={tip}
         className={`item group/tn flex min-w-0 items-center gap-1.5 pr-2 pl-3 ${ROW[variant]} ${phone ? 'text-fg-2' : 'text-fg-3 hover:text-fg'}`}
       >
-        <span className="mr-0.5 grid w-3 shrink-0 place-items-center">
+        <span className="mr-0.5 grid min-w-3 shrink-0 place-items-center">
           <ThreadDot t={t} state={n.state} />
         </span>
         {t.harness && (

@@ -430,6 +430,17 @@ export const DELEGATE_ONLY_DENIED = [
 export const NO_EDITS_DENIED = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 
 /**
+ * What a seated member of a group thread loses on Claude Code (ADR 0019, Q24): the git commands that commit, move or
+ * rewrite the branch, and opening a pull request. Its lead commits. Other harnesses take the rule from the prompt.
+ * A guard against two agents racing on git in one worktree, not a security boundary: a member keeps Bash, as its lead
+ * does, so it could still reach git another way.
+ */
+export const MEMBER_DENIED = [
+  'Bash(git commit:*)', 'Bash(git push:*)', 'Bash(git rebase:*)', 'Bash(git reset:*)', 'Bash(git stash:*)', 'Bash(git checkout:*)',
+  'Bash(git switch:*)', 'Bash(git merge:*)', 'Bash(git pull:*)', 'Bash(gh pr create:*)', 'Bash(gh pr merge:*)',
+];
+
+/**
  * Why a delegate-only role cannot run on a remote harness (Hermes, Cursor Cloud): it would have no omni tools to
  * delegate with, and Omni cannot take its work tools away there, so it could only do the work itself.
  */

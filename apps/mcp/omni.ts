@@ -761,7 +761,7 @@ server.registerTool(
       'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
       'its last model activity and the minutes since. `waits_for_sign_in`, when present, says which account it needs signed in before it starts. `open_items`, when present, lists what its last turn left for the user to resolve ' +
       '(questions, decisions with options, blockers), only while the Open items card setting is on. `members`, on a group thread, lists its agents: ' +
-      'the lead, the others seated in it, and each one\'s run and state. Only the user seats or removes an agent. Reading it never wakes the thread.',
+      'the lead, the others seated in it, and each one\'s run and state. `collisions` lists files two of its agents both edited, while the flags are up. Only the user seats or removes an agent. Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },
   },
   async ({ thread_id }) => text(await call(`/threads/${await threadId(thread_id)}/summary`)),

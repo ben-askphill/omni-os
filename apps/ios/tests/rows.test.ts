@@ -214,6 +214,23 @@ describe('threadRows', () => {
     expect(b.every((r, i) => r === a[i])).toBe(true);
   });
 
+  it('reads each agent a message named as a turn of its own, until the app draws lanes', () => {
+    const at = (n: number) => `2026-11-20T12:00:0${n}Z`;
+    const rows = [
+      { kind: 'user', payload: { text: 'both of you, go', source: 'ben', to: ['builder', 'designer'] }, agent: null },
+      { kind: 'assistant_text', payload: { text: 'Builder here.' }, agent: 'builder' },
+      { kind: 'assistant_text', payload: { text: 'Designer here.' }, agent: 'designer' },
+      { kind: 'result', payload: { ok: true, subtype: 'success', turns: 1 }, agent: 'builder' },
+      { kind: 'result', payload: { ok: true, subtype: 'success', turns: 1 }, agent: 'designer' },
+    ];
+    const events = rows.map((r, i) => ({ id: i + 1, thread_id: 't', kind: r.kind, payload: JSON.stringify(r.payload), created_at: at(i), agent: r.agent })) as unknown as HistoryEvent[];
+    const { rows: out } = threadRows({ events, thread: thread('done', { role: 'builder' }), artifacts: [], children: [], atStart: true });
+    expect(of(out, 'prompt')).toHaveLength(1);
+    expect(of(out, 'prose').map((r) => r.kind === 'prose' && r.text)).toEqual(['Builder here.', 'Designer here.']);
+    const keys = out.map((r) => r.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it('draws an artifact the thread made as a row', () => {
     const art = { id: 9, name: 'funnel.html', path: 'funnel.html', kind: 'html', updated_at: '2026-11-02T09:01:00.000Z' } as unknown as Artifact;
     const { rows } = threadRows(input(rich, { artifacts: [art] }));

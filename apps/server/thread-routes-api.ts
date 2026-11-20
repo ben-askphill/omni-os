@@ -31,6 +31,7 @@ import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
 import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
 import { memberFields } from './member-view.ts';
+import { collisionsOf } from './runner/collisions.ts';
 import { machineNames } from './ran-on.ts';
 import { coldRefusal, sessionWarmth } from './session-warmth.ts';
 import {
@@ -289,8 +290,11 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
 /** A group thread's members for the Conductor: each one's run and state, and why the thread is read-only when it is. */
 function memberSummary(t: Thread) {
   const { members, read_only } = memberFields(t);
+  // Files two agents both edited, while the flags are up (runner/collisions.ts).
+  const collisions = members ? collisionsOf(t.id).map((c) => ({ path: c.path, agents: c.agents })) : [];
   return {
     ...(members && { members: members.map((m) => ({ agent: m.agent, name: m.name, lead: m.lead, state: m.state, harness: m.harness, model: m.model, effort: m.effort })) }),
+    ...(collisions.length && { collisions }),
     ...(read_only && { read_only }),
   };
 }

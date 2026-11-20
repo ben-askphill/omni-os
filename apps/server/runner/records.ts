@@ -202,8 +202,9 @@ export function onRecord(live: Live, rec: StreamRecord) {
       if (!m) return;
       if (live.handover?.uuid === m.uuid) handedOver(live);
       // The harness read it: the transcript records it here, where it did.
-      // Ben's own row has no agent. The copy an agent of a group thread read is its own (apps/server/members.ts).
-      const row = addEvent(id, m.event.kind, eventPayload(m), m.event.kind === 'routed' ? live.agent : null);
+      // Ben's own row has no agent. The copy an agent of a group thread read is its own (runner/members.ts), and so is
+      // a notice Omni sent it (runner/collisions.ts).
+      const row = addEvent(id, m.event.kind, eventPayload(m), m.event.kind === 'routed' || m.event.kind === 'notice' ? live.agent : null);
       track(m, 'delivered', row.id);
       // A met goal stays on the line until Ben's next message reaches the session.
       if (threads.get(id)?.goal_status === 'complete') threads.setGoal(id, null);
