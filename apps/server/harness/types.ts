@@ -109,8 +109,8 @@ export interface ModelEntry {
 export interface RemoteTarget {
   /** A custom harness the user registered (data/harnesses/), rather than Hermes's Settings URL. */
   custom: boolean;
-  /** The wire protocol. Only the Runs API so far. */
-  kind: 'runs-api';
+  /** The wire protocol: the Runs API, or an eve agent's own API. */
+  kind: 'runs-api' | 'eve';
   /** The server's host and port, from its URL. Empty when no URL is set. */
   host: string;
   /** The secret store name its key is read from, on each machine. */

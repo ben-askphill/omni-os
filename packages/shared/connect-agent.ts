@@ -119,10 +119,12 @@ export interface FoundAgent {
   name: string;
   description?: string;
   kind: AgentKind;
-  /** This build can connect it. A2A and eve agents need later slices. */
+  /** This build can connect it. A2A agents need a later slice. */
   supported: boolean;
   /** How Ben signs in: a pairing code, or a key from Secrets. */
   signIn: 'pairing' | 'key';
+  /** The agent's own page where its owner gets a pairing code (an eve agent's `code_url`), on its own host. */
+  codeUrl?: string;
   /** Where the address is: this machine, the tailnet, or elsewhere over https. */
   network: 'local' | 'tailnet' | 'https';
   /** What a thread on it can do, and what it cannot, for the sheet's chips. */

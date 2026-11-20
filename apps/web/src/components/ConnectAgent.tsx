@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
 import { api, errorText, useApi } from '../api.ts';
 import { agentKeyName, groupedCode, KIND_LABEL, NETWORK_LABEL, normalizeCode, parseConnectInput, slugFrom, type AgentTest, type FoundAgent, type PairedAgent } from '@omni/shared/connect-agent.ts';
-import { Button, CheckItem, Chip, CopyButton, ErrorNote, Label, Modal, ModalFooter, Picker, Toggle, type PickerOption } from './ui.tsx';
+import { Button, CheckItem, Chip, CopyButton, ErrorNote, Label, LinkButton, Modal, ModalFooter, Picker, Toggle, type PickerOption } from './ui.tsx';
 import { href } from '../router.ts';
 
 // Connect an agent (docs/plans/2026-11-18-connect-an-agent.md, C1): Find, Sign in, Test, then Connect. The same
 // sheet on desktop web, the phone layout and the desktop app, opened from Settings > Models > Harnesses, from an
 // omni://connect-agent link (the page #/connect-agent?...), or #/settings/models?connect=<link>. A link only fills the
 // sheet in: nothing is saved until the test turn passed and Ben presses Connect. The agent's key never reaches this
-// page: a paired key stays on the server under a draft id, and a manual one is a secret's name.
+// page: a paired key stays on the server under a draft id, and a manual one is a secret's name. An eve agent that pairs
+// offers its own Connect Omni page (`codeUrl`): Get a code opens it, Ben copies the code back and presses Pair.
 
 interface Connected {
   harness: { id: string; name: string; host: string };
@@ -98,7 +99,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
     setBusy('pair');
     setError(null);
     try {
-      const p = await api.post<PairedAgent>('/harnesses/connect/pair', { ...(found.url && { url: found.url }), ...(found.pair && { pair: found.pair }), code: theCode, name: found.name });
+      const p = await api.post<PairedAgent>('/harnesses/connect/pair', { ...(found.url && { url: found.url }), ...(found.pair && { pair: found.pair }), code: theCode, name: found.name, ...(found.kind === 'eve' && { kind: 'eve' }) });
       setPaired(p);
       setName(p.name);
       if (!slugTouched) setSlug(slugFrom(p.name));
@@ -114,7 +115,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
     setError(null);
     setTest(null);
     try {
-      setTest(await api.post<AgentTest>('/harnesses/connect/test', paired ? { draft: paired.draft } : { url: found?.url, secret }));
+      setTest(await api.post<AgentTest>('/harnesses/connect/test', paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }));
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -126,7 +127,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
     setBusy('connect');
     setError(null);
     try {
-      const c = await api.post<Connected>('/harnesses/connect', { slug, name, role, ...(paired ? { draft: paired.draft } : { url: found?.url, secret }) });
+      const c = await api.post<Connected>('/harnesses/connect', { slug, name, role, ...(paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }) });
       setDone(c);
       onConnected?.(c);
     } catch (e) {
@@ -137,7 +138,11 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
   };
 
   const usable = !!found?.supported && !found.problem;
-  const pairing = usable && found!.signIn === 'pairing' && !!normalizeCode(theCode);
+  // A manual key for an eve agent is tested and saved as one: the server speaks eve's own API to it.
+  const eveKind = found?.kind === 'eve' ? { kind: 'eve' as const } : {};
+  // A pairing route without a code yet (an eve agent's Connect Omni page): the code is typed under Sign in.
+  const pairing = usable && found!.signIn === 'pairing' && (!!normalizeCode(theCode) || found!.kind === 'eve');
+  const codeReady = !!normalizeCode(theCode);
   const signedIn = pairing ? !!paired : !!secret;
   const steps: { label: string; state: Step }[] = [
     { label: 'Find', state: usable ? 'completed' : busy === 'find' ? 'in_progress' : 'pending' },
@@ -177,12 +182,13 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
   return (
     <>
       <div className="space-y-5 px-6 pb-5">
-        <p className="text-[13px] leading-5 text-fg-2">An AI service on your own server, such as Hermes, becomes a harness threads run on. Nothing is saved until its test turn passes and you press Connect.</p>
+        <p className="text-[13px] leading-5 text-fg-2">An AI service on your own server, such as Hermes or an eve agent, becomes a harness threads run on. Nothing is saved until its test turn passes and you press Connect.</p>
         <ol className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Steps">
+          {/* CheckItem is the list item itself. */}
           {steps.map((s) => (
-            <li key={s.label}>
-              <CheckItem state={s.state}>{s.label}</CheckItem>
-            </li>
+            <CheckItem key={s.label} state={s.state}>
+              {s.label}
+            </CheckItem>
           ))}
         </ol>
 
@@ -194,7 +200,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
           }}
         >
           <div>
-            <Label htmlFor="connect-input" hint="The link its pairing helper printed, or the server's address">
+            <Label htmlFor="connect-input" hint="The link its pairing helper printed, or the agent's address">
               Address, link or code
             </Label>
             <div className="flex gap-2">
@@ -222,7 +228,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
               Opened from a link. Check this is the harness you meant, then press Find.
             </p>
           )}
-          {!codeInText && (
+          {!codeInText && !pairing && (
             <div>
               <Label htmlFor="connect-code" hint="Only when the helper printed an address and a code to type">
                 Pairing code
@@ -253,7 +259,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
                   Paired with {paired.host}. The key is in this machine's server and is never shown.
                   {paired.sharedKey && ' The server gives every machine that pairs the same key: to cut one off, change the key on the server.'}
                 </p>
-              ) : (
+              ) : codeInText ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[13px] text-fg-2">
                     Code <code className="text-[12px]">{groupedCode(theCode)}</code>
@@ -262,6 +268,8 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
                     Pair
                   </Button>
                 </div>
+              ) : (
+                <CodeEntry found={found!} code={code} onCode={setCode} ready={codeReady} busy={busy === 'pair'} disabled={!!busy} onPair={() => void pair()} />
               )
             ) : (
               <SecretPick value={secret} onChange={setSecret} suggested={agentKeyName(slug || slugFrom(found!.name))} />
@@ -324,6 +332,51 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
         </Button>
       </ModalFooter>
     </>
+  );
+}
+
+/**
+ * The one sign-in step for an agent that pairs: get a code where its owner sees it (an eve agent's Connect Omni page,
+ * opened in a new tab or the system browser), paste it, Pair.
+ */
+function CodeEntry({ found, code, onCode, ready, busy, disabled, onPair }: { found: FoundAgent; code: string; onCode: (c: string) => void; ready: boolean; busy: boolean; disabled: boolean; onPair: () => void }) {
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready && !disabled) onPair();
+      }}
+    >
+      <p className="text-[12.5px] leading-[18px] text-fg-2">
+        {found.codeUrl ? (
+          <>
+            Get a one-time code from {found.name}: open its Connect Omni page, sign in there if it asks, and copy the code. It works once, for 10 minutes.
+          </>
+        ) : (
+          <>Type the one-time code the agent's owner got from it. It works once, for 10 minutes.</>
+        )}
+      </p>
+      {found.codeUrl && (
+        <LinkButton href={found.codeUrl} target="_blank" external icon="external" size="md">
+          Get a code
+        </LinkButton>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          aria-label="Pairing code"
+          className="field min-w-0 flex-1 font-mono"
+          value={code}
+          onChange={(e) => onCode(e.target.value)}
+          placeholder="XXXX-XXXX-…"
+          autoComplete="one-time-code"
+          spellCheck={false}
+        />
+        <Button type="submit" variant="primary" busy={busy} disabled={disabled || !ready}>
+          Pair
+        </Button>
+      </div>
+    </form>
   );
 }
 

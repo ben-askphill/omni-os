@@ -48,6 +48,8 @@ export interface HermesRun {
 export interface HermesRunCreated {
   run_id: string;
   status: string;
+  /** The session id the thread keeps from now on, when the server names its own (an eve agent: eve/client.ts). */
+  session_id?: string;
 }
 
 const trimBase = (base: string) => base.replace(/\/$/, '');

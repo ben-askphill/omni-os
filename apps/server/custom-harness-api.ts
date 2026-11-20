@@ -77,7 +77,7 @@ customHarnessApi.post('/harnesses/connect/find', async (c) => {
 customHarnessApi.post('/harnesses/connect/pair', async (c) => {
   const refusal = guard(c);
   if (refusal) return refusal;
-  const body = z.object({ url: text(500), pair: text(500), code: z.string().trim().min(1).max(100), name: text(200) }).strict().safeParse(await c.req.json().catch(() => null));
+  const body = z.object({ url: text(500), pair: text(500), code: z.string().trim().min(1).max(100), name: text(200), kind: z.enum(['runs-api', 'eve']).optional() }).strict().safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Send { url?, pair?, code }.' }, 400);
   try {
     return c.json(await pairAgent(body.data));
@@ -89,7 +89,7 @@ customHarnessApi.post('/harnesses/connect/pair', async (c) => {
 customHarnessApi.post('/harnesses/connect/test', async (c) => {
   const refusal = guard(c);
   if (refusal) return refusal;
-  const body = z.object({ draft: text(100), url: text(500), secret: text(64) }).strict().safeParse(await c.req.json().catch(() => null));
+  const body = z.object({ draft: text(100), url: text(500), secret: text(64), kind: z.enum(['runs-api', 'eve']).optional() }).strict().safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Send { draft } or { url, secret }.' }, 400);
   try {
     return c.json(await testConnection(body.data));
@@ -102,7 +102,7 @@ customHarnessApi.post('/harnesses/connect', async (c) => {
   const refusal = guard(c);
   if (refusal) return refusal;
   const body = z
-    .object({ slug: z.string().trim().min(1).max(48), name: z.string().trim().min(1).max(80), draft: text(100), url: text(500), secret: text(64), bills: text(160), role: z.boolean().default(true) })
+    .object({ slug: z.string().trim().min(1).max(48), name: z.string().trim().min(1).max(80), draft: text(100), url: text(500), secret: text(64), kind: z.enum(['runs-api', 'eve']).optional(), bills: text(160), role: z.boolean().default(true) })
     .strict()
     .safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'Send { slug, name, draft or url and secret, role }.' }, 400);

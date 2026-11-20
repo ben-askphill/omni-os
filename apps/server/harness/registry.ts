@@ -6,12 +6,15 @@ import { config } from '../config.ts';
 import { HERMES_FIX } from './catalog.ts';
 import { customHarness } from './custom.ts';
 import { HERMES_KEY } from './env-guard.ts';
+import type { RemoteKind } from './remote.ts';
 import { CAPABILITIES, HARNESS_META, isHarnessId, type HarnessCapabilities } from './types.ts';
 
 /** What a thread needs to run on a Runs API server (hermes/adapter.ts): Hermes, or a custom harness. */
 export interface RunsApiTarget {
   id: string;
   name: string;
+  /** The wire protocol it speaks (remote.ts). */
+  kind: RemoteKind;
   /** The base URL. Empty when none is set. */
   url: string;
   /** The secret holding its bearer key. */
@@ -24,7 +27,7 @@ export interface RunsApiTarget {
 }
 
 /** Hermes, from Settings (or OMNI_HERMES_URL) and HERMES_API_KEY. */
-const hermesTarget = (): RunsApiTarget => ({ id: 'hermes', name: HARNESS_META.hermes.name, url: config.hermesUrl ?? '', keyName: HERMES_KEY, capabilities: CAPABILITIES.hermes, fix: HERMES_FIX });
+const hermesTarget = (): RunsApiTarget => ({ id: 'hermes', name: HARNESS_META.hermes.name, kind: 'runs-api', url: config.hermesUrl ?? '', keyName: HERMES_KEY, capabilities: CAPABILITIES.hermes, fix: HERMES_FIX });
 
 /** How to make a custom harness usable once its file is fine. */
 export const customFix = (h: { secret: string; host: string }) =>
@@ -35,7 +38,7 @@ export function runsApiTarget(id: string | null | undefined): RunsApiTarget | nu
   if (id === 'hermes') return hermesTarget();
   const h = customHarness(id);
   if (!h) return null;
-  return { id: h.id, name: h.name, url: h.url, keyName: h.secret, capabilities: h.capabilities, fix: customFix(h), ...(h.error && { error: h.error }) };
+  return { id: h.id, name: h.name, kind: h.kind, url: h.url, keyName: h.secret, capabilities: h.capabilities, fix: customFix(h), ...(h.error && { error: h.error }) };
 }
 
 /** A built-in, or a custom harness whose file is on this machine. */
