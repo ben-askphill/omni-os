@@ -40,9 +40,11 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       sha: ${{ steps.version.outputs.sha }}
     steps:
+      # A release is always main. A build-only run signs and publishes nothing, so it builds the commit it was started
+      # from, which is how a change to the build is tried on a branch.
       - uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ inputs.mode == 'build-only' && github.sha || 'main' }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v5
@@ -99,6 +101,23 @@ jobs:
           tarball="$RUNNER_TEMP/omni-mac-unsigned.tar.gz"
           COPYFILE_DISABLE=1 tar --no-mac-metadata --options gzip:compression-level=1 -czf "$tarball" -C apps/desktop/release/mac-universal Omni.app
           echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      # A build-only run stops before the sign job, which is where a release is packed. So it packs the unsigned app
+      # here with the same script, to try the DMG, the zip and the feed without a secret.
+      - name: Try the release packaging
+        if: inputs.mode == 'build-only'
+        run: |
+          app=apps/desktop/release/mac-universal/Omni.app
+          out="$RUNNER_TEMP/package-test"
+          node apps/desktop/scripts/mac-release-package.ts --version "$VERSION" --out "$out" "$app"
+          cat "$out/latest-mac.yml"
+          ditto -x -k "$out/Omni-$VERSION-mac-universal.zip" "$RUNNER_TEMP/from-zip"
+          diff -r "$app" "$RUNNER_TEMP/from-zip/Omni.app" >/dev/null 2>&1 || { echo '::error::The app in the zip is not the app that was built'; exit 1; }
+          mkdir -p "$RUNNER_TEMP/dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$out/Omni-$VERSION-mac-universal.dmg"
+          ls -la "$RUNNER_TEMP/dmg"
+          diff -r "$app" "$RUNNER_TEMP/dmg/Omni.app" >/dev/null 2>&1 || { echo '::error::The app in the DMG is not the app that was built'; exit 1; }
+          [[ "$(readlink "$RUNNER_TEMP/dmg/Applications")" == /Applications ]] || { echo '::error::The DMG has no link to /Applications'; exit 1; }
+          hdiutil detach "$RUNNER_TEMP/dmg"
       - uses: actions/upload-artifact@v7
         with:
           path: ${{ runner.temp }}/omni-mac-unsigned.tar.gz
