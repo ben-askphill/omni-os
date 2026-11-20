@@ -63,8 +63,8 @@ function Summary({ questions, state, answers, caption }: { questions: Question[]
       <dl className="flex flex-col gap-2.5">
         {questions.map((x, i) => (
           <div key={i} className="min-w-0">
-            <dt className="text-[12.5px] leading-snug text-fg-3">{x.question}</dt>
-            {answers && <dd className="mt-0.5 text-[14px] leading-snug break-words text-fg">{answerWords(answers[i])}</dd>}
+            <dt className="text-[12.5px] leading-[var(--lh-prose)] text-pretty text-fg-3">{x.question}</dt>
+            {answers && <dd className="mt-0.5 text-[14px] leading-[var(--lh-prose)] break-words text-fg">{answerWords(answers[i])}</dd>}
           </div>
         ))}
       </dl>
@@ -157,7 +157,7 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
                 {shown.header}
               </Chip>
             )}
-            <h3 id={`q-${q.id}-${draft.page}`} className="text-[14px] leading-snug font-semibold text-pretty">
+            <h3 id={`q-${q.id}-${draft.page}`} className="text-[14px] leading-[var(--lh-prose)] font-semibold text-pretty">
               {shown.question}
             </h3>
             {detail && (
@@ -257,13 +257,13 @@ function Row({
     >
       <span
         aria-hidden="true"
-        className={`mt-px grid h-[18px] w-[18px] shrink-0 place-items-center ${multi ? 'rounded-[5px]' : 'rounded-full'} ${on ? 'bg-fg text-on-ink' : 'shadow-[inset_0_0_0_1.5px_var(--line-strong)]'}`}
+        className={`mt-[2px] grid h-[18px] w-[18px] shrink-0 place-items-center ${multi ? 'rounded-[5px]' : 'rounded-full'} ${on ? 'bg-fg text-on-ink' : 'shadow-[inset_0_0_0_1.5px_var(--line-strong)]'}`}
       >
         {on && (multi ? <Icon name="check" size={12} strokeWidth={2.6} /> : <span className="h-1.5 w-1.5 rounded-full bg-on-ink" />)}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[13.5px] leading-snug font-semibold">{label}</span>
-        {description && <span className="text-[12.5px] leading-snug text-pretty text-fg-3">{description}</span>}
+        <span className="text-[13.5px] leading-[var(--lh-prose)] font-semibold">{label}</span>
+        {description && <span className="text-[12.5px] leading-[var(--lh-prose)] text-pretty text-fg-3">{description}</span>}
       </span>
     </button>
   );
