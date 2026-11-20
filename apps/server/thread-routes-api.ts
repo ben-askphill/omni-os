@@ -193,11 +193,13 @@ threadRoutesApi.post('/', async (c) => {
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const input = { ...body, files, ...(stamped.value.length && { context: stamped.value }) };
   const make = body.quick ? startQuickAsk : createThread;
-  if (!id) return c.json(await make(input));
+  // A thread made with members says who is seated, as GET does.
+  const shown = (t: Thread) => (body.members?.length ? { ...t, ...memberFields(t) } : t);
+  if (!id) return c.json(shown(await make(input)));
   const first = creating.get(id) ?? make(input);
   creating.set(id, first);
   try {
-    return c.json(await first);
+    return c.json(shown(await first));
   } finally {
     creating.delete(id);
   }

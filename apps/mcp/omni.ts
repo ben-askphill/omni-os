@@ -343,16 +343,26 @@ server.registerTool(
           `Where it runs: ${DEVICE_ASK}. Omit to use ${USER}'s default from Settings. ` +
             'A thread sent elsewhere runs on that machine and its report still comes back to you. No files travel.',
         ),
+      members: z
+        .array(z.string())
+        .max(12)
+        .optional()
+        .describe(
+          'Agent ids to seat in the new thread as members, besides the agent it runs as (its lead). They join with no turn and work only when a later message ' +
+            'names them: send one with message_thread and `agents`. The brief goes to the lead, whose report comes back when its turn ends. Never in #conductor, and only on this machine. ' +
+            'For parts of one job that should run at once, use delegate_team instead.',
+        ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device, owner }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device, owner, members }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const machine = await pickDevice(device);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: machine?.device, ...(owner?.trim() && { owner }) }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: machine?.device, ...(owner?.trim() && { owner }), ...(members?.length && { members }) }),
     });
-    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch, owner: t.owner ?? null, ...(machine && { machine: ranOn(machine) }) });
+    const seated = (t.members ?? []).filter((m: any) => !m.lead).map((m: any) => ({ agent: m.agent, name: m.name }));
+    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch, owner: t.owner ?? null, ...(seated.length && { members: seated }), ...(machine && { machine: ranOn(machine) }) });
   },
 );
 
@@ -360,27 +370,27 @@ server.registerTool(
   'delegate_team',
   {
     description:
-      'Hand several parts of one job to a team: one lead thread in the channel with a member thread per task under it. ' +
-      `Use it when ${USER} asks for several agents on one topic (for example price, reviews and alternatives for one product). ` +
-      'The members run in parallel; once all have reported, the lead combines their replies into one answer, ' +
-      'which comes back to you as a single [crew report]. Do not poll for it. ' +
-      `A team runs on this machine. When ${USER} @mentions machines for the parts, use delegate with each part's device instead.`,
+      'Hand several parts of one job to a team, as one thread in the channel: its lead (`role`) and a member per agent with a part, all seated in it. ' +
+      `Use it when ${USER} asks for several agents on one job (for example copy, visuals and a review of one page). ` +
+      'The thread\'s first message is your brief to the lead, with every part under the agent that has it. The lead plans first, then gives each member its part, ' +
+      'and the members work at the same time in the thread\'s one worktree; only the lead commits. An agent with two parts gets one seat, and the lead gives it both. ' +
+      'Once every member has finished, Omni wakes the lead with their replies, and the lead\'s answer comes back to you as one [crew report] on the team\'s task id. Do not poll for it. ' +
+      `A part with no \`role\` is the lead's own. A team runs on this machine, never in #conductor. When ${USER} @mentions machines for the parts, use delegate with each part's device instead.`,
     inputSchema: {
-      channel: z.string().describe('Channel id, e.g. "inbox". Use list_channels.'),
-      title: z.string().describe('Short title for the lead thread, e.g. "Shure MV7+ research".'),
-      prompt: z.string().describe('What the team is for and what the combined answer should look like. The lead gets this with every report.'),
-      role: z.string().optional().describe('Agent id for the lead, and for every task that names none. Use list_crew.'),
-      task_id: z.string().optional().describe('Short id like T-12 for the team. Members get T-12.1, T-12.2 unless they name their own.'),
-      folder: z.string().optional().describe('Sidebar folder in the channel to file the lead thread in, by name or id. Same rules as delegate.'),
+      channel: z.string().describe('Channel id, e.g. "inbox". Use list_channels. Never "conductor".'),
+      title: z.string().describe('Short title for the team thread, e.g. "Shure MV7+ research".'),
+      prompt: z.string().describe('What the team is for and what the combined answer should look like: Goal, Done when and Proof back. The lead plans from it.'),
+      role: z.string().optional().describe('Agent id for the lead. It must run on a local harness: it gives out the parts with an Omni tool. Use list_crew.'),
+      task_id: z.string().optional().describe('Short id like T-12 for the team thread and its report. Generated if omitted.'),
+      folder: z.string().optional().describe('Sidebar folder in the channel to file the team thread in, by name or id. Same rules as delegate.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
       tasks: z
         .array(
           z.object({
             title: z.string().describe('Short title, e.g. "Best price in NL".'),
-            prompt: z.string().describe('This member\'s brief: Goal, Done when and Proof back. It cannot see your chat or the other members.'),
-            role: z.string().optional(),
-            task_id: z.string().optional(),
-            harness: z.string().optional(),
+            prompt: z.string().describe('This part: what to do and what to report. The lead reads it in the brief and sends it on, so write it for the member.'),
+            role: z.string().optional().describe('The agent with this part. Left out, the lead does it itself.'),
+            harness: z.string().optional().describe('The member\'s harness, over its agent\'s default. Only when ' + USER + ' asks.'),
             model: z.string().optional(),
             effort: z.string().optional(),
           }),
@@ -390,12 +400,13 @@ server.registerTool(
   },
   async ({ channel, title, prompt, role, task_id, folder, create_folder, tasks }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
-    const { lead, members } = await call('/threads/team', {
+    const { thread, members } = await call('/threads/team', {
       method: 'POST',
       body: JSON.stringify({ channel, title, prompt, role, task_id, folder, tasks, parent_id: SELF, source: 'conductor' }),
     });
-    const brief = (t: any) => ({ thread_id: t.id, task_id: t.task_id, title: t.title, channel: t.channel_id, role: t.role, harness: t.harness, status: t.status });
-    return text({ lead: brief(lead), members: members.map(brief) });
+    // `lead` is the team thread: the one thread to follow, its report and its task id.
+    const lead = { thread_id: thread.id, task_id: thread.task_id, title: thread.title, channel: thread.channel_id, role: thread.role, harness: thread.harness, status: thread.status };
+    return text({ lead, members: members.map((m: any) => ({ agent: m.agent, name: m.name, parts: m.parts })) });
   },
 );
 
@@ -512,19 +523,33 @@ server.registerTool(
       'mode "queue" waits until its current turn ends and then runs as a new turn. ' +
       'A steer to a thread whose harness cannot steer (Cursor) is queued automatically. ' +
       "Only for a thread whose session is warm (get_thread's session.warm: it runs, or its model was active within the hour). " +
-      'A cold thread is refused: continue it with continue_thread or delegate a fresh thread that links it, and read it with get_thread for its status.',
+      'A cold thread is refused: continue it with continue_thread or delegate a fresh thread that links it, and read it with get_thread for its status. ' +
+      'With `agents`, the message seats and goes to those agents in a thread you delegated.',
     inputSchema: {
       thread_id: z.string(),
       message: z.string(),
       mode: z.enum(['steer', 'queue']).optional().describe('steer (default): read at its next step if busy. queue: after its current turn.'),
       wake_cold: z.boolean().optional().describe(`Resume the thread even though its session went cold. Only when ${USER} asked to resume that thread itself.`),
+      agents: z
+        .array(z.string())
+        .max(12)
+        .optional()
+        .describe(
+          'Agent ids this message goes to, as agent mentions: each one not seated in the thread yet is seated, and the message goes to them, not to the lead unless you name it. ' +
+            'Only in a thread you delegated, never in a #conductor thread: anywhere else the server refuses it. Use list_crew for ids.',
+        ),
     },
   },
-  async ({ thread_id, message, mode, wake_cold }) => {
+  async ({ thread_id, message, mode, wake_cold, agents }) => {
     thread_id = await threadId(thread_id);
+    const crew = agents?.length ? await call('/crew') : [];
+    const context = (agents ?? []).map((id) => {
+      const name = (crew.find((r: any) => r.id === id)?.name as string | undefined) ?? id;
+      return { id: randomUUID().slice(0, 12), kind: 'agent_mention', v: 1, label: `@${name}`, body: { agent: id, name } };
+    });
     const t = await call(`/threads/${thread_id}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }) }),
+      body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }), ...(context.length && { context }) }),
     });
     return text({ thread_id: t.id, status: t.status, ...(t.forwarded_to && { forwarded_to: t.forwarded_to }) });
   },

@@ -13,7 +13,7 @@ import { hasMcpBuild } from './support.ts';
 import { legacyTeam } from './legacy-team.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
-let app: { request: (path: string, init?: RequestInit) => Response | Promise<Response> };
+let app: (typeof import('../app.ts'))['app'];
 let tokenFile: (threadId: string) => string;
 let mint: (threadId: string) => { token: string };
 
@@ -68,7 +68,7 @@ beforeAll(async () => {
   ({ app } = await import('../app.ts'));
   // A thread's MCP servers call Omni over HTTP, as on a real install.
   const { serve } = await import('@hono/node-server');
-  server = serve({ fetch: (app as { fetch: (r: Request) => Response | Promise<Response> }).fetch, port: 0, hostname: '127.0.0.1' }) as Server;
+  server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' }) as Server;
   await once(server, 'listening');
   const { about } = await import('../about.ts');
   about.port = (server.address() as AddressInfo).port;

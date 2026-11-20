@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avatarMark, busiest, groupGlyph, groupMark, markLine, recipients, replyTo, routingHint, type MemberState } from '../members.ts';
+import { avatarMark, busiest, groupGlyph, groupMark, leadLine, markLine, recipients, replyTo, routingHint, type MemberState } from '../members.ts';
 import { threadGlyph, threadMark } from '../status.ts';
 import { agentMention, mentionedAgents } from '../message-context-agent.ts';
 
@@ -97,3 +97,14 @@ describe('the avatar mark', () => {
     expect(markLine([m('builder', 'done', true), m('designer', 'done')])).toBeNull();
   });
 });
+
+describe("a team lead's message", () => {
+  const nameOf = (a: string) => ({ builder: 'Builder', designer: 'Designer', critic: 'Critic' })[a] ?? a;
+  it('names the lead and the members it went to, and nothing on any other message', () => {
+    expect(leadLine({ source: 'lead', to: ['designer'] }, 'builder', nameOf)).toBe('Builder to Designer');
+    expect(leadLine({ source: 'lead', to: ['designer', 'critic'] }, 'builder', nameOf)).toBe('Builder to Designer and Critic');
+    expect(leadLine({ source: 'ben', to: ['designer'] }, null, nameOf)).toBeNull();
+    expect(leadLine({ source: 'conductor' }, null, nameOf)).toBeNull();
+  });
+});
+

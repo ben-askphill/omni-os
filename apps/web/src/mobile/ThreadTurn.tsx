@@ -28,6 +28,7 @@ import { HtmlRender } from '../components/HtmlRender.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoConnectors, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { askCaption } from '@omni/shared/ask.ts';
+import { leadLine } from '@omni/shared/members.ts';
 import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
@@ -254,6 +255,8 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
               ? p.undelivered
                 ? `Not delivered · ${p.undelivered}`
                 : 'Not sent'
+              : p.source === 'lead'
+                ? leadLine(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a)
               : p.source === 'pr-watch'
                 ? 'PR watch'
               : brief

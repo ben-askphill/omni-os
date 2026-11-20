@@ -39,6 +39,8 @@ export interface TranscriptAttachment {
 export interface UserP {
   text: string;
   source?: string;
+  /** The agents a message went to (ADR 0019): the ones Ben named, or a team lead's members (source `lead`). */
+  to?: string[];
   attachments?: TranscriptAttachment[];
   /** Message context records (packages/shared/message-context.ts), as stored: read them with `readContexts`. */
   context?: unknown;
@@ -166,7 +168,8 @@ export interface ToolCall {
 }
 
 export type Item =
-  | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped }
+  /** `agent`: the team lead that wrote it, on a lead's message to its members (source `lead`). Ben's have none. */
+  | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped; agent?: string }
   | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped; agent?: string }
   | { type: 'tools'; key: number; calls: ToolCall[]; total: number; agent?: string }
   | { type: 'result'; key: number; p: ResultP; agent?: string }
@@ -350,7 +353,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       case 'user':
         group = null;
-        items.push({ type: 'user', key: e.id, at: e.created_at, p: payload<UserP>(e), ...(e.clipped && { clipped: e.clipped }) });
+        items.push({ type: 'user', key: e.id, at: e.created_at, p: payload<UserP>(e), ...(e.clipped && { clipped: e.clipped }), ...(e.agent && { agent: e.agent }) });
         break;
       case 'assistant_text':
         group = null;

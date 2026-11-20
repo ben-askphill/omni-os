@@ -161,3 +161,15 @@ export function routingHint(
 
 /** The composer's placeholder: the lead the message goes to with no `@` (Q50). */
 export const replyTo = (leadName: string | null | undefined) => (leadName ? `Reply to ${leadName}` : 'Reply');
+
+/**
+ * The line over a team lead's message to its members (slice 6): "Builder to Designer and Critic". Null for any other
+ * message: Ben's, the Conductor's or Omni's own.
+ */
+export function leadLine(p: { source?: string; to?: unknown }, from: string | null | undefined, nameOf: (agent: string) => string): string | null {
+  if (p.source !== 'lead') return null;
+  const to = Array.isArray(p.to) ? p.to.filter((a): a is string => typeof a === 'string') : [];
+  const who = from ? nameOf(from) : 'The lead';
+  return to.length ? `${who} to ${list(to.map(nameOf))}` : who;
+}
+
