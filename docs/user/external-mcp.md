@@ -77,7 +77,7 @@ Add Omni's MCP server to Cursor (cursor-agent and the editor share ~/.cursor/mcp
 
 ### Hermes
 
-Hermes usually runs on its own Linux server ([Hermes remote](harnesses.md#hermes-remote)), where only the public URL reaches Omni.
+Hermes usually runs on its own Linux server ([Hermes](harnesses.md#hermes)), where only the public URL reaches Omni.
 
 ```text
 Add Omni's MCP server to Hermes.

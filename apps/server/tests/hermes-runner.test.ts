@@ -141,7 +141,9 @@ describe('Hermes through the runner', () => {
     expect(H.db.threads.list({}).length).toBe(before);
   });
 
-  it('rejects an effort Hermes does not have', async () => {
-    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'x', harness: 'hermes', model: 'hermes', effort: 'high' })).rejects.toThrow(/effort/);
+  it("runs on Hermes's own run, whatever model or effort was asked", async () => {
+    // A remote agent's run is its server's (ADR 0020): the pickers never offer one, so an effort sent anyway is dropped.
+    const t = await H.runner.createThread({ channel: 'scratch', prompt: 'x', harness: 'hermes', model: 'hermes', effort: 'high' });
+    expect(H.db.threads.get(t.id)).toMatchObject({ role: 'hermes', harness: 'hermes', model: 'hermes', effort: '' });
   });
 });

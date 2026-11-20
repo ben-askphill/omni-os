@@ -12,7 +12,7 @@ The HTTP shape Omni speaks to a remote agent that runs on its own server: Hermes
 
 | Call | Request | Answer | Omni's use |
 | --- | --- | --- | --- |
-| `GET /v1/capabilities` | | 200 when up and the key is good; 401 or 403 when the key is refused | The availability probe: at start, every 15 minutes, on a save and when a picker opens on a harness that is down. The body is not read yet |
+| `GET /v1/capabilities` | | 200 when up and the key is good; 401 or 403 when the key is refused | The availability probe: at start, every 15 minutes and on a save. Find and Test connection also read the body's `name` and [`avatar`](#the-offered-avatar) |
 | `POST /v1/runs` | `{ input, session_id, instructions? }`, header `Idempotency-Key` | 200 or 202 with `{ run_id, status }` | Starts a turn. `session_id` is `omni-<thread id>`, the same for every turn of a thread, so the server continues its own conversation. `instructions` carries Omni's system prompt on the first run of a session only |
 | `GET /v1/runs/{id}/events` | header `Accept: text/event-stream` | SSE, one JSON event per `data:` line | The turn's events, below |
 | `GET /v1/runs/{id}` | | `{ status, output?, error?, usage?, runtime? }` | Reconciles a turn whose event stream ended without a terminal event |
@@ -46,7 +46,8 @@ Each event has `event`, `run_id` and a `seq` that only grows within a run. `apps
 ## What a remote harness does not get
 
 - No secret but its own key: no channel or global secret, no install token, no thread token.
-- No Omni MCP tools, browser, worktree, artifacts folder or design-system file. The prompt says so and tells it to work on its own clone.
+- No Omni MCP tools, browser, artifacts folder or design-system file, and no read of the thread's worktree, which is on Omni's machine for the local agents seated beside it. The prompt says it talks only and works on its own clone.
+- A charter only when one was written for its agent: otherwise `instructions` carry only who it is and how the thread works, and the server's own instructions lead.
 - No delegate-only role (the Conductor) and no level below Full access: Omni cannot take its tools away.
 
 ## Pairing
@@ -55,7 +56,7 @@ How a server hands Omni its key without anyone pasting it ([Connect an agent](..
 
 | Call | Request | Answer |
 | --- | --- | --- |
-| `GET /v1/omni/pair` | | 405, which tells Omni the route is there. The body may offer `{ name, description, code_url }`: what the sheet shows before signing in, and the page (on the same host, relative or absolute) where the owner gets a code. Omni reads it for eve agents |
+| `GET /v1/omni/pair` | | 405, which tells Omni the route is there. The body may offer `{ name, description, code_url, avatar }`: what the sheet shows before signing in, the page (on the same host, relative or absolute) where the owner gets a code, and the agent's [avatar](#the-offered-avatar). Omni reads it for eve agents |
 | `POST /v1/omni/pair` | `{ code, client_id, client_name }`, no `Authorization` | 200 `{ protocol, key, key_id?, url?, name?, kind?, shared_key?, revoke? }`; 404 for a code that is unknown, used or expired (the same answer for all three); 429 after repeated misses from one address |
 | `POST /v1/omni/revoke` | `{ key_id }`, with the key as the bearer, at the pairing address | 204, after which the key no longer works. Only when the pair answer said `revoke: true` |
 
@@ -66,7 +67,7 @@ How a server hands Omni its key without anyone pasting it ([Connect an agent](..
 
 ### The pairing link
 
-`omni://connect-agent?url=<runs url>&code=<code>[&pair=<pairing address>][&name=<name>]`, with each value percent-encoded. `pair` is left out when the server pairs at `url` itself. The desktop app opens it as the page `#/connect-agent?...`, which opens Connect an agent with the fields filled in; a browser or phone takes the same link pasted into the sheet. Opening a link never connects anything: Ben presses Connect.
+`omni://connect-agent?url=<runs url>&code=<code>[&pair=<pairing address>][&name=<name>]`, with each value percent-encoded. `pair` is left out when the server pairs at `url` itself. The desktop app opens it as the page `#/connect-agent?...`, which opens Add remote agent in Settings > Agents with the fields filled in; a browser or phone takes the same link pasted into the sheet. Opening a link never connects anything: Ben presses Connect.
 
 ### Hermes: the pairing helper
 
@@ -75,6 +76,14 @@ Hermes's API server has no pairing route and takes one key per profile (`API_SER
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh
 ```
+
+### The offered avatar
+
+The agent Omni makes on Connect takes the avatar the server offers, so it looks the same everywhere it is used. An eve agent offers it in its pairing offer (`avatar` in the `GET /v1/omni/pair` 405 body, no key needed); a Runs API server in its signed-in `GET /v1/capabilities` body.
+
+- **The value** is a data URL, `data:image/png;base64,...` (PNG, JPEG or WebP), square, at most 256px a side and 256 KB decoded. Omni reads at most that much of the body. Anything else is not taken: the agent gets the initials disc, and Find says why.
+- **Saved** inline in the agent's file, as an uploaded avatar is, with `avatar_offered:` and a short hash of the image, so it syncs with the file.
+- **Read again** on every passing Test connection. A new offer replaces the avatar only while it is still the one the server offered: once Ben sets his own on the agent's Avatar card, the offer is ignored.
 
 ## eve agents
 

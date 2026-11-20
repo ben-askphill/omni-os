@@ -15,6 +15,7 @@ import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
 import { Button, ChipSet, CopyButton, ErrorNote, fieldHintId, FolderInput, Icon, IDENTIFIER, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
 import { isImeEnter } from '../ime.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { localHarnesses } from '@omni/shared/remote-agent.ts';
 import { ConnectAgentSheet } from './ConnectAgent.tsx';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
@@ -149,8 +150,9 @@ async function loadRows(): Promise<HarnessRows> {
       .catch(() => null),
     api.get<ClaudeSetup>('/setup/claude').catch(() => null),
   ]);
-  // Hermes and Cursor Cloud run off this Mac: listed once they work, never as something to install.
-  return { harnesses: harnesses.filter((h) => !isRemoteHarnessId(h.id) || h.available), accounts, github, claude };
+  // Cursor Cloud runs off this Mac: listed once it works, never as something to install. Hermes and the servers Ben
+  // connected are remote agents, in Settings > Agents (ADR 0020).
+  return { harnesses: localHarnesses(harnesses).filter((h) => !isRemoteHarnessId(h.id) || h.available), accounts, github, claude };
 }
 
 /**
@@ -229,13 +231,13 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
               <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg-3">
                 <Icon name="plus" size={13} />
               </span>
-              <span className="text-[13.5px] font-medium">Your own harness</span>
+              <span className="text-[13.5px] font-medium">A remote agent</span>
               <span className="text-[12px] text-fg-3">Optional</span>
               <Button size="sm" className="ml-auto" onClick={() => setConnecting(true)}>
-                Connect a harness
+                Add remote agent
               </Button>
             </div>
-            <p className="mt-2.5 pl-[34px] text-[12px] leading-relaxed text-fg-3">Hermes, or another AI service on a server of yours. Threads run on it like any harness; it bills its own account.</p>
+            <p className="mt-2.5 pl-[34px] text-[12px] leading-relaxed text-fg-3">Hermes, or another AI agent on a server of yours. It joins as an agent you can mention in threads, talks only, and bills its own account.</p>
           </li>
         )}
         {!list && <li className="py-6 text-center text-[13px] text-fg-3">Checking…</li>}

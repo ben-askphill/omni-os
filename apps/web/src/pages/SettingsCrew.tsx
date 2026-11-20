@@ -45,21 +45,35 @@ import { Card, LockNote } from './settings-parts.tsx';
 
 type CrewDetail = CrewDetailView<CrewRole>;
 
+/**
+ * Add remote agent, beside New agent (ADR 0020, Q58). An omni://connect-agent link, or #/settings/crew?connect=<link>,
+ * opens its sheet filled in. Only the list reads the address for it, so an agent's page never does.
+ */
+function AddRemoteAgent({ onConnected }: { onConnected: () => void }) {
+  const route = useRoute();
+  const linked = route.name === 'settings' ? route.connect : undefined;
+  const [connecting, setConnecting] = useState(false);
+  const close = () => {
+    setConnecting(false);
+    if (linked) navigate(href.settingsSection('crew'), { replace: true });
+  };
+  return (
+    <>
+      <Button size="sm" icon="plus" onClick={() => setConnecting(true)}>
+        Add remote agent
+      </Button>
+      <ConnectAgentSheet open={connecting || !!linked} initial={linked} onClose={close} onConnected={() => onConnected()} />
+    </>
+  );
+}
+
 /** The list of agents, or one agent's page when `agent` names one. */
 export function CrewSection({ agent }: { agent?: string }) {
   const { subscribe } = useApp();
   const roles = useApi<CrewRole[]>('/crew?all=1');
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');
   const [creating, setCreating] = useState(false);
-  // Add remote agent: an omni://connect-agent link, or #/settings/crew?connect=<link>, opens it filled in.
-  const route = useRoute();
-  const linked = route.name === 'settings' ? route.connect : undefined;
-  const [connecting, setConnecting] = useState(false);
   const technical = useTechnical();
-  const closeConnect = () => {
-    setConnecting(false);
-    if (linked) navigate(href.settingsSection('crew'), { replace: true });
-  };
   const reload = roles.reload;
   // A save here, by the Conductor or on another machine, or a lesson proposed or settled (the waiting counts).
   useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect' || (e.type === 'memory' && !!e.role)) && reload()), [subscribe, reload]);
@@ -79,16 +93,13 @@ export function CrewSection({ agent }: { agent?: string }) {
         subtitle="A thread started as an agent runs with its charter. The Conductor hands work to the ones it may delegate to."
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
-            <Button size="sm" icon="plus" onClick={() => setConnecting(true)}>
-              Add remote agent
-            </Button>
+            <AddRemoteAgent onConnected={reload} />
             <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
               New agent
             </Button>
           </div>
         }
       >
-        <ConnectAgentSheet open={connecting || !!linked} initial={linked} onClose={closeConnect} onConnected={() => reload()} />
         {roles.error ? (
           <ErrorNote onRetry={roles.reload}>{roles.error}</ErrorNote>
         ) : !roles.data ? (

@@ -180,8 +180,14 @@ describe('branch changes of other threads', () => {
         id: `t-${++n}`, channel_id: channel(dir, false), title: 'x', status: 'done', role: null, model: null, session_id: 's',
         cwd: dir, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null, ...patch,
       } as any);
-    const hermes = make({ harness: 'hermes' });
+    // A Hermes thread from before slice 4 has only its own data folder: its files were on the Hermes server.
+    const { threadDir } = await import('../config.ts');
+    const oldId = `t-${++n}`;
+    const hermes = make({ id: oldId, harness: 'hermes', cwd: threadDir(oldId) });
     expect((await changes(hermes.id)).body).toEqual({ available: false, reason: expect.stringContaining('Hermes server') });
+    // One a remote agent leads since then has Omni's checkout on this machine (ADR 0020, Q31), so its changes show.
+    const led = make({ harness: 'hermes' });
+    expect((await changes(led.id)).body).toMatchObject({ available: true, cwd: dir });
     const noRepo = make({ channel_id: channel(null, false) });
     expect((await changes(noRepo.id)).body).toEqual({ available: false, reason: expect.stringContaining('no repository') });
     const brain = make({ cwd: r.tmp });
