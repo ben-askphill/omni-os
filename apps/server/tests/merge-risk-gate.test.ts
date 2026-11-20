@@ -19,6 +19,10 @@ beforeAll(async () => {
   // The needs label comes from the name in Settings > General.
   mkdirSync(join(tmp, 'data'), { recursive: true });
   writeFileSync(join(tmp, 'data', 'omni.config.json'), JSON.stringify({ version: 1, user: { name: 'Ben' } }));
+  // A claude that answers with the arguments it got, so the rating call's model, effort and tools show.
+  writeFileSync(join(tmp, 'claude'), `#!/usr/bin/env node\nlet n = 0; process.stdin.on('data', (d) => (n += d.length)).on('end', () => console.log(JSON.stringify({ args: process.argv.slice(2), stdin: n })));\n`);
+  chmodSync(join(tmp, 'claude'), 0o755);
+  process.env.OMNI_CLAUDE_BIN = join(tmp, 'claude');
   db = await import('../db.ts');
   gate = await import('../merge-risk/gate.ts');
   const checkout = join(tmp, 'checkout');
@@ -44,7 +48,9 @@ interface World {
   headNow: Record<number, string>;
   replies: (string | null)[];
   prompts: string[];
-  published: { n: number; body: string; label: string; other: string }[];
+  published: { n: number; body: string; label: string; drop: string[] }[];
+  /** The needs label, when a test renames it. Otherwise from the name in the config: needs-ben. */
+  needs?: string;
   unlabelled: { n: number; label: string }[];
   rubric: string | null;
   here: boolean;
@@ -54,7 +60,7 @@ const pr = (number: number, headRefName: string, headRefOid: string, over: Parti
 const deps: GateDeps = {
   repo: () => REPO,
   here: () => w.here,
-  needs: () => gate.ghDeps.needs(),
+  needs: () => w.needs ?? gate.ghDeps.needs(),
   listOpen: async () => w.open,
   readPR: async (_repo, num): Promise<PRText> => {
     const p = w.open.find((x) => x.number === num)!;
@@ -66,7 +72,7 @@ const deps: GateDeps = {
     w.prompts.push(prompt);
     return w.replies.length ? w.replies.shift()! : ALL_GOOD;
   },
-  publish: async (_repo, num, body, label, other) => void w.published.push({ n: num, body, label, other }),
+  publish: async (_repo, num, body, label, drop) => void w.published.push({ n: num, body, label, drop }),
   unlabel: async (_repo, num, label) => void w.unlabelled.push({ n: num, label }),
 };
 const poll = () => gate.pollOnce(deps);
@@ -85,7 +91,7 @@ describe('which PRs the gate rates', () => {
     expect(w.prompts[0]).toContain('RUBRIC FROM MAIN');
     expect(w.prompts[0]).toContain('# Pull request o/omni#1 at a1');
     expect(w.prompts[0]).toMatch(/Title:\n```\nPR 1\n```/);
-    expect(w.published).toEqual([{ n: 1, label: 'merge-ready', other: 'needs-ben', body: expect.stringContaining('**Merge risk: low**') }]);
+    expect(w.published).toEqual([{ n: 1, label: 'merge-ready', drop: ['needs-ben'], body: expect.stringContaining('**Merge risk: low**') }]);
   });
 
   it("labels a low rating with one decent area needs-ben, from Ben's name, with the bullet in the comment", async () => {
@@ -93,7 +99,7 @@ describe('which PRs the gate rates', () => {
     w.open = [pr(2, 'omni/bbbb2222', 'b1')];
     w.replies = [ONE_DECENT];
     await poll();
-    expect(w.published[0]).toMatchObject({ label: 'needs-ben', other: 'merge-ready' });
+    expect(w.published[0]).toMatchObject({ label: 'needs-ben', drop: ['merge-ready'] });
     expect(w.published[0].body).toContain('**Merge risk: low**\n\n- **Impact:** 👀 touches apps/server/sync/');
   });
 
@@ -204,7 +210,7 @@ describe('reruns', () => {
     w.replies = [null, 'I think this PR is fine.'];
     expect(await poll()).toBe(0);
     expect(await poll()).toBe(1);
-    expect(w.published).toEqual([{ n: 12, label: 'needs-ben', other: 'merge-ready', body: expect.stringContaining('**Merge risk: not rated**') }]);
+    expect(w.published).toEqual([{ n: 12, label: 'needs-ben', drop: ['merge-ready'], body: expect.stringContaining('**Merge risk: not rated**') }]);
     expect(w.published[0].body).toContain("did not follow the rubric's format");
     await poll();
     expect(w.prompts).toHaveLength(2);
@@ -226,6 +232,20 @@ describe('reruns', () => {
     expect(w.prompts).toHaveLength(1);
   });
 
+  it('takes off the label written for the head before when the needs label was renamed since', async () => {
+    thread('omni/qqqq1717');
+    w.open = [pr(17, 'omni/qqqq1717', 'q1')];
+    w.needs = 'needs-review';
+    w.replies = [ONE_DECENT];
+    await poll();
+    expect(w.published[0]).toMatchObject({ label: 'needs-review', drop: ['merge-ready'] });
+    w.needs = undefined;
+    w.open = [pr(17, 'omni/qqqq1717', 'q2')];
+    w.replies = [ONE_DECENT];
+    await poll();
+    expect(w.published[1]).toMatchObject({ label: 'needs-ben', drop: ['merge-ready', 'needs-review'] });
+  });
+
   it('forgets PRs that are no longer open', async () => {
     thread('omni/nnnn1414');
     w.open = [pr(14, 'omni/nnnn1414', 'n1')];
@@ -234,6 +254,14 @@ describe('reruns', () => {
     w.open = [];
     await poll();
     expect(db.kv.get(gate.markKey(REPO, 14))).toBeUndefined();
+  });
+});
+
+describe('the rating call', () => {
+  it('runs claude on Opus at high effort with no tools, no session and the prompt on stdin', async () => {
+    const out = JSON.parse((await gate.ghDeps.rate('x'.repeat(1234)))!);
+    expect(out.stdin).toBe(1234);
+    expect(out.args).toEqual(['-p', '--model', 'claude-opus-5-5', '--effort', 'high', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', '']);
   });
 });
 
@@ -256,7 +284,7 @@ const save = () => fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(s))
 const field = (k) => { const i = args.findIndex((a, j) => args[j - 1] === '-f' && a.startsWith(k + '=')); return i < 0 ? null : args[i].slice(k.length + 1); };
 const path = args.find((a) => a.startsWith('repos/'));
 const method = args.includes('-X') ? args[args.indexOf('-X') + 1] : (args.some((a) => a === '-f') ? 'POST' : 'GET');
-if (args[0] === 'api' && args[1] === 'user') { console.log('omni-bot'); process.exit(0); }
+if (args[0] === 'api' && args[1] === 'user') { if (s.signedOut) { console.error('gh: HTTP 401'); process.exit(1); } console.log('omni-bot'); process.exit(0); }
 if (/\\/issues\\/\\d+\\/comments$/.test(path) && method === 'GET') {
   for (const c of s.comments) if (c.body.includes('<!-- omni-merge-risk -->')) console.log(JSON.stringify({ id: c.id, login: c.user }));
   process.exit(0);
@@ -278,11 +306,19 @@ console.error('fake gh: unexpected ' + args.join(' ')); process.exit(1);
   });
   const gh = () => JSON.parse(readFileSync(state, 'utf8')) as { comments: { id: number; user: string; body: string }[]; labels: string[] };
 
+  it('writes nothing when gh cannot say which account it is signed in as', async () => {
+    writeFileSync(state, JSON.stringify({ ...gh(), signedOut: true }));
+    await expect(gate.ghDeps.publish(REPO, 19, '<!-- omni-merge-risk -->\n**Merge risk: low**', 'merge-ready', ['needs-ben'])).rejects.toThrow(/signed in as/);
+    expect(gh().comments.map((c) => c.id)).toEqual([7]);
+    expect(gh().labels).toEqual(['bug']);
+    writeFileSync(state, JSON.stringify({ ...gh(), signedOut: false }));
+  });
+
   it('adds one comment and the label, then edits that comment and swaps the label on a rerun', async () => {
-    await gate.ghDeps.publish(REPO, 20, '<!-- omni-merge-risk -->\n**Merge risk: low**', 'merge-ready', 'needs-ben');
+    await gate.ghDeps.publish(REPO, 20, '<!-- omni-merge-risk -->\n**Merge risk: low**', 'merge-ready', ['needs-ben']);
     expect(gh().comments.map((c) => c.id)).toEqual([7, 100]);
     expect(gh().labels).toEqual(['bug', 'merge-ready']);
-    await gate.ghDeps.publish(REPO, 20, '<!-- omni-merge-risk -->\n**Merge risk: medium**\n\n- **Impact:** 👀 sync', 'needs-ben', 'merge-ready');
+    await gate.ghDeps.publish(REPO, 20, '<!-- omni-merge-risk -->\n**Merge risk: medium**\n\n- **Impact:** 👀 sync', 'needs-ben', ['merge-ready']);
     expect(gh().comments).toEqual([
       { id: 7, user: 'someone', body: 'LGTM' },
       { id: 100, user: 'omni-bot', body: '<!-- omni-merge-risk -->\n**Merge risk: medium**\n\n- **Impact:** 👀 sync' },
@@ -297,7 +333,7 @@ console.error('fake gh: unexpected ' + args.join(' ')); process.exit(1);
     const s = gh();
     s.comments = [{ id: 8, user: 'mallory', body: '<!-- omni-merge-risk -->\nfake' }];
     writeFileSync(state, JSON.stringify({ ...s, nextId: 200 }));
-    await gate.ghDeps.publish(REPO, 21, '<!-- omni-merge-risk -->\n**Merge risk: low**', 'merge-ready', 'needs-ben');
+    await gate.ghDeps.publish(REPO, 21, '<!-- omni-merge-risk -->\n**Merge risk: low**', 'merge-ready', ['needs-ben']);
     expect(gh().comments.map((c) => [c.id, c.user])).toEqual([
       [8, 'mallory'],
       [200, 'omni-bot'],

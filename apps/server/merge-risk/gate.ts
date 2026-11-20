@@ -57,8 +57,8 @@ export interface GateDeps {
   head(repo: string, n: number): Promise<{ headRefOid: string; state: string }>;
   rubric(checkout: string): Promise<Rubric | null>;
   rate(prompt: string): Promise<string | null>;
-  /** Write the one comment (edited when there is one), add `label` and take `other` off. */
-  publish(repo: string, n: number, body: string, label: string, other: string): Promise<void>;
+  /** Write the one comment (edited when there is one), add `label` and take each of `drop` off. */
+  publish(repo: string, n: number, body: string, label: string, drop: string[]): Promise<void>;
   unlabel(repo: string, n: number, label: string): Promise<void>;
 }
 
@@ -68,6 +68,8 @@ export interface RiskMark {
   sha: string;
   /** Rating runs on it that gave nothing usable. */
   tries: number;
+  /** The label written for the head before, taken off with the next write even when the needs label was renamed since. */
+  was?: string;
   /** A finished rating not written yet, so a failed write does not cost another run. */
   pending?: { body: string; label: string; level: RiskLevel | 'not rated' };
   posted?: { label: string; level: RiskLevel | 'not rated'; at: string };
@@ -140,7 +142,8 @@ async function markFor(repo: string, pr: OpenPR, deps: GateDeps): Promise<RiskMa
   const had = kv.get<RiskMark>(key);
   if (had?.sha === pr.headRefOid) return had;
   if (had?.posted?.label === MERGE_READY) await deps.unlabel(repo, pr.number, MERGE_READY);
-  const mark: RiskMark = { sha: pr.headRefOid, tries: 0 };
+  const was = had?.posted?.label ?? had?.was;
+  const mark: RiskMark = { sha: pr.headRefOid, tries: 0, ...(was && was !== MERGE_READY && { was }) };
   kv.set(key, mark);
   return mark;
 }
@@ -167,7 +170,8 @@ async function gateOne(repo: string, pr: OpenPR, mark: RiskMark, rubric: Rubric,
   const now = await deps.head(repo, pr.number);
   if (now.state !== 'OPEN' || now.headRefOid !== mark.sha) return false;
   const pending = mark.pending!;
-  await deps.publish(repo, pr.number, pending.body, pending.label, pending.label === MERGE_READY ? deps.needs() : MERGE_READY);
+  const drop = [...new Set([MERGE_READY, deps.needs(), ...(mark.was ? [mark.was] : [])])].filter((l) => l !== pending.label);
+  await deps.publish(repo, pr.number, pending.body, pending.label, drop);
   kv.set(key, { sha: mark.sha, tries: mark.tries, posted: { label: pending.label, level: pending.level, at: new Date().toISOString() } } satisfies RiskMark);
   return true;
 }
@@ -214,7 +218,6 @@ export async function pollOnce(deps: GateDeps = ghDeps): Promise<number> {
 }
 
 const gh = (args: string[], timeout = 60_000) => run('gh', args, { maxBuffer: 64 * 1024 * 1024, timeout }).then((r) => r.stdout);
-const notFound = (err: unknown) => /HTTP 404|Not Found/i.test(String((err as { stderr?: string }).stderr ?? (err as Error)?.message ?? err));
 
 const labelLook = (name: string) =>
   name === MERGE_READY
@@ -222,29 +225,37 @@ const labelLook = (name: string) =>
     : { color: 'd93f0b', description: "Omni's merge-risk gate: read this one before merging" };
 const labelled = new Set<string>();
 
-/** Make a label in the repo once per server, with its color. One that is there already is left as it is. */
+const stderrOf = (err: unknown) => String((err as { stderr?: string }).stderr ?? (err as Error)?.message ?? err);
+
+/** Make a label in the repo once per server, with its color. One that is there already (GitHub's 422) is left as it is. */
 async function ensureLabel(repo: string, name: string) {
   if (labelled.has(`${repo}:${name}`)) return;
   const look = labelLook(name);
-  await gh(['api', `repos/${repo}/labels`, '-f', `name=${name}`, '-f', `color=${look.color}`, '-f', `description=${look.description}`]).catch(() => {});
+  await gh(['api', `repos/${repo}/labels`, '-f', `name=${name}`, '-f', `color=${look.color}`, '-f', `description=${look.description}`]).catch((err) => {
+    if (!/HTTP 422|already_exists/i.test(stderrOf(err))) throw err;
+  });
   labelled.add(`${repo}:${name}`);
 }
 
 async function removeLabel(repo: string, n: number, label: string) {
   await gh(['api', '-X', 'DELETE', `repos/${repo}/issues/${n}/labels/${label}`]).catch((err) => {
-    if (!notFound(err)) throw err;
+    if (!/HTTP 404|Not Found/i.test(stderrOf(err))) throw err;
   });
 }
 
-/** The ids of Omni's own merge-risk comments on a PR: carrying the marker and written by this gh login. */
+/**
+ * The ids of Omni's own merge-risk comments on a PR: carrying the marker and written by this gh login. Throws when gh
+ * cannot say which login it is, rather than edit a comment someone else wrote with the marker in it.
+ */
 async function ownComments(repo: string, n: number): Promise<number[]> {
   const self = await ghLogin();
+  if (!self) throw new Error('gh did not say which account it is signed in as, so Omni does not edit or add a merge-risk comment.');
   const out = await gh(['api', '--paginate', `repos/${repo}/issues/${n}/comments`, '--jq', `.[] | select(.body | contains("${COMMENT_MARKER}")) | {id, login: .user.login}`]);
   return out
     .split('\n')
     .filter(Boolean)
     .map((l) => JSON.parse(l) as { id: number; login: string })
-    .filter((c) => !self || c.login === self)
+    .filter((c) => c.login === self)
     .map((c) => c.id);
 }
 
@@ -268,13 +279,13 @@ export const ghDeps: GateDeps = {
   },
   rubric: mainRubric,
   rate: (prompt) => askClaude('omni-os-merge-risk', prompt, RATING_TIMEOUT_MS, RATING_RUN),
-  async publish(repo, n, body, label, other) {
+  async publish(repo, n, body, label, drop) {
     const [first] = await ownComments(repo, n);
     if (first) await gh(['api', '-X', 'PATCH', `repos/${repo}/issues/comments/${first}`, '-f', `body=${body}`]);
     else await gh(['api', `repos/${repo}/issues/${n}/comments`, '-f', `body=${body}`]);
     await ensureLabel(repo, label);
     await gh(['api', `repos/${repo}/issues/${n}/labels`, '-f', `labels[]=${label}`]);
-    await removeLabel(repo, n, other);
+    for (const other of drop) await removeLabel(repo, n, other);
   },
   unlabel: removeLabel,
 };

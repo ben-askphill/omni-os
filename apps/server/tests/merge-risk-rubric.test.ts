@@ -69,6 +69,20 @@ describe('mainRubric', () => {
     expect(await mainRubric(checkout)).toBeNull();
   });
 
+  it('throws when git cannot read the rubric main has, rather than treating it as no rubric', async () => {
+    const { checkout } = repos(skill('Rule.'));
+    const bin = mkdtempSync(join(tmpdir(), 'omni-merge-risk-git-'));
+    const real = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+    writeFileSync(join(bin, 'git'), `#!/bin/sh\nfor a; do [ "$a" = show ] && { echo 'fatal: bad object' >&2; exit 128; }; done\nexec ${real} "$@"\n`, { mode: 0o755 });
+    const path = process.env.PATH;
+    process.env.PATH = `${bin}:${path}`;
+    try {
+      await expect(mainRubric(checkout)).rejects.toThrow(/bad object/);
+    } finally {
+      process.env.PATH = path;
+    }
+  });
+
   it('throws when origin cannot be reached, rather than reading a local copy', async () => {
     const { checkout } = repos(skill('Rule.'));
     git(checkout, 'remote', 'set-url', 'origin', join(tmpdir(), 'no-such-origin.git'));
