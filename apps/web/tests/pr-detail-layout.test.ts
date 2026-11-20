@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Channel, PRDetail as PRDetailT } from '../src/api.ts';
 
 // The PR page keeps its header to the title, one meta line and one line of thread links, the merge card to one block
-// above the tabs, and Files and Diff in one Changes tab, so the description starts on the first screen.
+// above the tabs (a status headline, what the merge needs, then the controls), and Files and Diff in one Changes tab, so the description starts on the first screen.
 
 const diff = ['a.ts', 'b.ts', 'c.ts']
   .map((f) => `diff --git a/${f} b/${f}\n--- a/${f}\n+++ b/${f}\n@@ -1,1 +1,1 @@\n-old\n+new\n`)
@@ -70,7 +70,9 @@ async function show(p: PRDetailT) {
 }
 
 const merge = () => host.querySelector('section[aria-label="Merge"]')!;
-const mergeButton = () => [...merge().querySelectorAll<HTMLButtonElement>('button:not([aria-label])')].find((b) => /^(Squash and merge|Merge commit|Rebase and merge)$/.test(b.textContent ?? ''));
+const mergeButton = () => [...merge().querySelectorAll<HTMLButtonElement>('button:not([aria-label]):not([role])')].find((b) => /^(Squash and merge|Merge commit|Rebase and merge)$/.test(b.textContent ?? ''));
+const headline = () => merge().querySelector('h3')?.textContent;
+const requirements = () => [...merge().querySelectorAll('ul[aria-label="What the merge needs"] > li')].map((li) => li.textContent);
 const tab = (name: string) => [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((t) => t.textContent?.startsWith(name));
 
 beforeEach(() => {
@@ -104,17 +106,42 @@ it('links the parent thread, then the thread that opened the PR, on one line', a
   expect(links.map((a) => a.textContent)).toEqual(['Rust rewrite', 'Remove TS twins']);
 });
 
-it('keeps method, delete branch and auto-merge on the merge card, with a merge button and a one-line note', async () => {
-  await show(base);
+it('leads the merge card with its state, lists what the merge needs, then the controls and a one-line note', async () => {
+  await show({ ...base, reviewDecision: 'APPROVED', checkRuns: [{ name: 'lint', state: 'SUCCESS' }] } as PRDetailT);
   const card = merge();
-  expect(card.querySelector('button[aria-label^="Merge method"]')).not.toBeNull();
+  expect(headline()).toBe('Ready to merge');
+  expect(requirements()).toEqual(['No conflicts with main', 'All checks passed', 'Approved']);
+  const methods = card.querySelector('[role="radiogroup"][aria-label="Merge method"]');
+  expect([...methods!.querySelectorAll('[role="radio"]')].map((r) => r.textContent)).toEqual(['Squash', 'Merge commit', 'Rebase']);
+  expect(methods!.querySelector('[aria-checked="true"]')?.textContent).toBe('Squash');
   expect(card.querySelector('[role="switch"]')?.getAttribute('aria-label')).toBe('Delete branch after merge');
   expect(card.querySelector('[aria-label="Auto-merge"]')?.textContent).toContain('Turn on auto-merge');
   // The desktop shell gets a plain button named for the method; a mouse drag on the slide often never registered.
   expect(mergeButton()?.textContent).toBe('Squash and merge');
   expect(card.querySelector('.sld')).toBeNull();
-  expect(card.querySelector('p')?.textContent).toBe('Runs gh pr merge, then deletes the branch. Can’t be undone from here.');
+  expect(card.querySelector('p')?.textContent).toBe('Squashes into main, then deletes omni/cecd75d2. Can’t be undone from here.');
   expect(card.textContent).not.toContain('Rerun failed checks');
+});
+
+it('names the merge button and the note for the method, and drops the branch from the note when it stays', async () => {
+  await show(base);
+  const radio = (name: string) => [...merge().querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((r) => r.textContent === name)!;
+  await act(async () => radio('Rebase').click());
+  expect(mergeButton()?.textContent).toBe('Rebase and merge');
+  await act(async () => merge().querySelector<HTMLButtonElement>('[role="switch"]')!.click());
+  expect(merge().querySelector('p')?.textContent).toBe('Rebases onto main. Can’t be undone from here.');
+  await act(async () => mergeButton()!.click());
+  expect(posts[0].body).toEqual({ method: 'rebase', delete_branch: false, confirm: true });
+});
+
+it('leaves out the review row when the repo asks for no review, and lists a requested one', async () => {
+  await show(base);
+  expect(requirements()).toEqual(['No conflicts with main']);
+  act(() => root.unmount());
+  host.remove();
+  await show({ ...base, reviewDecision: 'REVIEW_REQUIRED' } as PRDetailT);
+  expect(requirements()).toEqual(['No conflicts with main', 'Review requested']);
+  expect(headline()).toBe('Ready to merge');
 });
 
 it('merges from the button with the method and delete-branch, then shows what gh said', async () => {
@@ -153,10 +180,9 @@ it('says what auto-merge does under the slide while it is on', async () => {
 it('offers Rerun failed checks beside what blocks the merge', async () => {
   const failing = [{ name: 'check', state: 'FAILURE', url: 'https://github.com/acme/shop/actions/runs/9/job/1' }];
   await show({ ...base, mergeable: 'CONFLICTING', checkRuns: failing, checks: { passed: 0, failed: 1, pending: 0 } } as PRDetailT);
-  const text = merge().textContent ?? '';
-  expect(text).toContain('Has conflicts');
-  expect(text).toContain('1 check failing');
-  expect(text).toContain('Rerun failed checks');
+  // The first thing in the way names the card; each blocker gets its row, and the checks row carries its fix.
+  expect(headline()).toBe('Has conflicts');
+  expect(requirements()).toEqual(['Conflicts with main. Resolve them on the branch first.', '1 check failingRerun failed checks']);
   const blocked = [...merge().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Resolve conflicts first');
   expect(blocked?.disabled).toBe(true);
 });
@@ -209,4 +235,15 @@ it('adds no list when the diff holds every file', async () => {
   await show(base);
   await act(async () => tab('Changes')!.click());
   expect(host.querySelector('[role="note"]')).toBeNull();
+});
+
+it('names the card for a draft, or for running checks when nothing is in the way', async () => {
+  await show({ ...base, isDraft: true } as PRDetailT);
+  expect(headline()).toBe('Still a draft');
+  expect(requirements()).toContain('Still a draft. Mark it ready for review on GitHub.');
+  act(() => root.unmount());
+  host.remove();
+  await show({ ...base, checkRuns: [{ name: 'e2e', state: 'IN_PROGRESS' }, { name: 'lint', state: 'SUCCESS' }] } as PRDetailT);
+  expect(headline()).toBe('Checks running');
+  expect(requirements()).toContain('1 check running · 1 passed');
 });
