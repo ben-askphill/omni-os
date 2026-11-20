@@ -171,7 +171,7 @@ _Avoid_: Learning (a channel's), memory (the harness's own)
 ### Group threads
 
 **Lead**:
-The agent a thread started as, fixed for the thread's life, which answers every message that names no agent and is the only agent that commits and opens the pull request.
+The agent a thread started as, fixed for the thread's life, which answers every message that names no agent and is the only agent that commits and opens the pull request. In a thread led by a remote agent, the user commits instead.
 _Avoid_: Owner (the person the work is for), host, main agent, primary
 
 **Member**:
@@ -187,7 +187,7 @@ An `@` pill naming an agent in a message, which seats it the first time and make
 _Avoid_: Mention (a skill), machine mention, tag, ping
 
 **Catch-up**:
-The summary of a thread so far that its lead writes for a newly seated member's first turn.
+The summary of a thread so far that Omni writes with a small model for a newly seated member's first turn.
 _Avoid_: Excerpt (what an Ask carried), carryover (what a session reads when work moves), recap, briefing
 
 **Collision**:
@@ -257,7 +257,7 @@ A flag the user sets that takes a thread out of Needs you without changing its s
 _Avoid_: Result, archive, closed
 
 **Status mark**:
-The one symbol every thread carries: its shape says who has the ball, its color repeats it and its fill says how far along it is. In a thread with members it shows the highest state of any of its agents, in this order: Needs you, Failed, Working, Done, Idle.
+The one symbol every thread carries: its shape says who has the ball, its color repeats it and its fill says how far along it is. In a thread with members it shows the highest state of any of its agents, in this order: Needs you, Failed, Working, Done, Idle. Usage limit, Setup failed and Message held count as Failed, and Stopped as Done.
 _Avoid_: Spinner, badge
 
 ### Runs
