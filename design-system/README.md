@@ -7,8 +7,8 @@
 Vocabulary is from the repo's `GLOSSARY.md`:
 - **Channel** — a client, project or area that groups threads and carries shared facts (repo, store, browser profile). Kinds: client, internal, personal.
 - **Thread** — one task's conversation with one agent, from the first prompt through every follow-up. Never "chat" or "session".
-- **Crew role** — a charter in `crew/*.md` (conductor, researcher, builder, store-ops, inbox).
-- **Conductor** — the crew role Ben talks to; it delegates to crew threads in other channels. Reports come back tagged with a task id (`T-4F2A`).
+- **Agent** — a charter in `crew/*.md` (conductor, researcher, builder, store-ops, inbox). Never "crew role" in the UI.
+- **Conductor** — the agent Ben talks to; it delegates to other agents' threads in other channels. Reports come back tagged with a task id (`T-4F2A`).
 - **Harness** — the agent CLI plus the plan it bills: Claude Code, Codex, Cursor Agent, and Cursor Cloud (a Cursor cloud agent started through Cursor's API on the channel's GitHub repo; each run shows as a `CloudAgentCard`). **Model** and **Effort** are per thread, and switch between turns from the reply composer's pills (`ModelPicker`, `EffortPicker`). A switch to another harness is a **handover**: the next session reads the thread so far, shown as a `SwitchLine` in the transcript.
 - **Question card** — an agent's `ask_user_question` (Omni's AskUserQuestion): 1 to 4 multiple-choice questions in the thread, with a free-text Other, that keep the thread in Needs you until Ben answers (`QuestionCard`).
 - **Automation** — a cron schedule that starts a new thread on every run.
@@ -59,7 +59,7 @@ Intentional additions (not in web/src): `OmniMark`/`OmniLogo`/`Loader` (the flui
 
 - **Voice:** a calm operator. Plain, specific, short. The Conductor uses first person ("I'll bring the numbers back before anything ships"); the UI says **you** ("Needs you", "Waiting on you").
 - **Casing:** sentence case for buttons, titles, tabs ("New thread", "Open thread", "Search or jump to"). Section captions are sentence case too, 12px SF Pro medium ("Clients", "Recent threads", "Plan") — no all-caps labels. Channels are written `#Volero`.
-- **Words from GLOSSARY.md:** thread (not chat), harness (not provider), crew role (not agent/persona), session only for the harness's own record.
+- **Words from GLOSSARY.md:** thread (not chat), harness (not provider), agent (not crew role/persona), session only for the harness's own record.
 - **Verbs on actions:** "Merge", "Pause WEEKEND15", "Open thread", "Ask the Conductor". Never "Submit", "OK", "Magic".
 - **Exact numbers:** "78.3% → 52.1%", "step 5/9", "Claude 4/6", "resets in 3h 12m".
 - **Mono is for code only:** `T-4F2A`, `omni/t-4f2b-shipping-rates`, `9e1c0af`, `snippets/shipping-rates.liquid`, `funnel-before-after.html`, inline code, tool args/output. Times, counts, model names and labels are SF Pro (tabular figures).

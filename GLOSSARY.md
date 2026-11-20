@@ -1,6 +1,6 @@
 # Omni OS
 
-A local workspace where the user hands work to agents: channels hold threads, crew roles give threads their jobs, and every thread runs on the user's own subscriptions through an official agent CLI.
+A local workspace where the user hands work to agents: channels hold threads, agents give threads their jobs, and every thread runs on the user's own subscriptions through an official CLI.
 
 ## Language
 
@@ -28,7 +28,7 @@ _Avoid_: Job, ticket
 
 **Quick ask**:
 A question an agent answers in place with read-only tools, kept out of the thread lists until the user keeps it or makes it a task.
-_Avoid_: Chat, quick thread, ask (a question to a crew role)
+_Avoid_: Chat, quick thread, ask (a question to another agent)
 
 **Job**:
 A Conductor thread together with every thread it delegated, shown as one tree.
@@ -67,16 +67,16 @@ A standalone HTML page set on a channel that its threads follow whenever they ma
 _Avoid_: Theme, style guide
 
 **Artifact**:
-A file a thread makes for the user, shown in the thread and in the Library.
+A file a thread makes for the user, shown in the thread and in Claude Artifacts.
 _Avoid_: Output, attachment, render
 
 **Published artifact**:
 A page a thread published to claude.ai, linked to its local file and updated at the same address each time.
 _Avoid_: Artifact (alone: a local file), share link
 
-**Library**:
-The list of every artifact across channels, beside the user's Artifacts on claude.ai.
-_Avoid_: Artifacts page, Files
+**Claude Artifacts**:
+The place that lists every artifact across channels and, behind a switch, the user's Artifacts on claude.ai.
+_Avoid_: Library, Artifacts (alone: one thread's files), Artifacts page
 
 **Review note**:
 A note the user pins to lines in a thread's diff, kept with those lines until it is sent, resolved or deleted.
@@ -89,31 +89,31 @@ _Avoid_: PR subscription, PR monitor
 ### Crew
 
 **Crew**:
-Every crew role a machine offers.
-_Avoid_: Team (one delegation), agents
+Every agent a machine offers.
+_Avoid_: Team (one delegation)
 
-**Crew role**:
+**Agent**:
 A charter with run defaults and powers that gives a thread its job, either shipped with Omni or the user's own.
-_Avoid_: Agent, persona, bot
+_Avoid_: Crew role (in anything the user reads; the code still says it), persona, bot
 
 **Charter**:
-The instructions a crew role gives every thread started as it.
+The instructions an agent gives every thread started as it.
 _Avoid_: System prompt, persona, role file
 
 **Overlay**:
-The user's edit of a shipped crew role, which changes only what it names, so a release still updates the rest.
-_Avoid_: Fork, copy (a duplicate stops following releases)
+The user's edit of a shipped agent, which changes only what it names, so a release still updates the rest.
+_Avoid_: Copy, duplicate (a duplicate stops following releases)
 
 **Powers**:
-The parts of a crew role only the user may change, such as which tools it gets, whether the Conductor may delegate to it and whether it reviews work.
+The parts of an agent only the user may change, such as which tools it gets, whether the Conductor may delegate to it and whether it reviews work.
 _Avoid_: Permissions, capabilities
 
 **Conductor**:
-The crew role the user talks to, which answers quick questions itself and delegates real work to crew threads in the right channels.
+The agent the user talks to, which answers quick questions itself and delegates real work to other agents' threads in the right channels.
 _Avoid_: Orchestrator, router, main agent
 
 **Delegation**:
-One thread handing a piece of work to a new thread run as a crew role, which reports back when it is done. The two are the parent and the delegated thread.
+One thread handing a piece of work to a new thread run as an agent, which reports back when it is done. The two are the parent and the delegated thread.
 _Avoid_: Spawn, subagent, handoff
 
 **Brief**:
@@ -133,23 +133,23 @@ A delegated thread's final reply, delivered to the thread that delegated it when
 _Avoid_: Result, callback
 
 **Ask**:
-A question the user puts to another crew role from inside a thread, answered by a new thread under it whose report comes back there.
-_Avoid_: Quick ask (a question with no thread to manage), second agent
+A question the user puts to another agent from inside a thread, answered by a new thread under it whose report comes back there.
+_Avoid_: Quick ask (a question with no thread to manage), second opinion
 
 **Sub-agent**:
-An agent a thread's harness starts inside its own turn, which Omni shows but does not run as a thread.
+A helper a thread's harness starts inside its own turn, which Omni shows but does not run as a thread.
 _Avoid_: Delegated thread, child, crewmate
 
 **Review**:
-A thread run as a review role that checks another thread's work against its brief, on the other model family from the one that wrote it.
+A thread run as a review agent that checks another thread's work against its brief, on the other model family from the one that wrote it.
 _Avoid_: Audit, code review (the skill)
 
 **Learning**:
-A short lesson for every thread in one channel, whatever its crew role.
-_Avoid_: Memory, rule, lesson (a crew role's)
+A short lesson for every thread in one channel, whatever its agent.
+_Avoid_: Memory, rule, lesson (an agent's)
 
 **Lesson**:
-A short note on how one crew role should work, given to every later thread of that role, in every channel or in one. A role's lessons together are its role memory.
+A short note on how one agent should work, given to every later thread of that agent, in every channel or in one. An agent's lessons together are its agent memory.
 _Avoid_: Learning (a channel's), memory (the harness's own)
 
 ### Messages and results
@@ -176,7 +176,7 @@ _Avoid_: Rate limit (the meter), quota error
 
 **Continuation**:
 The single "continue where you left off" message that resuming a limit stop sends.
-_Avoid_: Retry, auto-resume, continued thread
+_Avoid_: Retry, auto-resume, fork
 
 **Question card**:
 One to four multiple-choice questions an agent asks the user during a turn, waiting in the thread and in Needs you until answered, skipped or overtaken by a message.
@@ -221,11 +221,11 @@ _Avoid_: Spinner, badge
 ### Runs
 
 **Harness**:
-The agent a thread runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent, Cursor Cloud, Hermes or a custom harness.
-_Avoid_: Provider, engine, backend, runtime
+The AI tool a thread runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent, Cursor Cloud, Hermes or a custom harness.
+_Avoid_: Provider, engine, backend, runtime, agent (what a thread runs as)
 
 **Custom harness**:
-A remote agent the user registered on a server of their own, which Omni reaches the same way it reaches Hermes.
+A remote AI service the user registered on a server of their own, which Omni reaches the same way it reaches Hermes.
 _Avoid_: Provider, engine, plugin
 
 **Account**:
@@ -241,7 +241,7 @@ How hard the model reasons on each step, picked from the levels that model offer
 _Avoid_: Thinking, reasoning level
 
 **Run**:
-The harness, model and effort a thread runs on, together. A crew role, channel or automation can set run defaults.
+The harness, model and effort a thread runs on, together. An agent, channel or automation can set run defaults.
 _Avoid_: Config, setup, engine
 
 **Auto**:
@@ -260,16 +260,16 @@ _Avoid_: Live, active, idle
 What a thread's next session reads after the thread moved to another harness: its facts and transcript, rebuilt by Omni.
 _Avoid_: Context transfer, migration, handoff (a move to another machine)
 
-**Continued thread**:
-A new thread started from an idle one on another local harness, with its own session and worktree and a carryover from its source.
-_Avoid_: Fork, continuation, child (a crew relation)
+**Fork**:
+A new thread started from an idle one on another local harness, with its own session and worktree and a carryover from its source. The user starts one with Fork thread.
+_Avoid_: Continued thread, continuation, child (a crew relation)
 
 **Carryover**:
 What a new session reads ahead of the user's first message when it picks up work that ran elsewhere, framed as data and cut to a budget.
 _Avoid_: Handover (a thread that changed harness), context transfer
 
 **Transition**:
-A change to how or where a thread runs, with a preview and a cancel: a switch of run, a handoff or take over, or a continued thread.
+A change to how or where a thread runs, with a preview and a cancel: a switch of run, a handoff or take over, or a fork.
 _Avoid_: Move, migration
 
 **Slash command**:
@@ -294,7 +294,7 @@ _Avoid_: Mention (a skill), tag
 ### Machines and sync
 
 **Machine**:
-A computer that runs an Omni server, such as a Mac or a Linux box.
+A computer that runs an Omni server, such as a Mac or a Linux box, alone or paired with the user's other machines.
 _Avoid_: Device, Mac (when it may be Linux), host, box
 
 **Hub**:
@@ -346,7 +346,7 @@ How much a channel's agents may do before they ask: Read only, Ask first or Full
 _Avoid_: Permission mode, sandbox
 
 **Grant**:
-A standing yes from an approval card, for one tool in a thread or for one crew role in a channel.
+A standing yes from an approval card, for one tool in a thread or for one agent in a channel.
 _Avoid_: Allowlist, permission
 
 **Omni Connect**:
@@ -378,7 +378,7 @@ The browser client, on a desktop browser or a phone, and inside the desktop app.
 _Avoid_: Frontend, dashboard
 
 **Phone layout**:
-The Web UI's own shell at phone width, with Activity, Channels, Library and PRs tabs.
+The Web UI's own shell at phone width, with Activity, Channels, Claude Artifacts and PRs tabs.
 _Avoid_: Mobile site, iOS app
 
 **Desktop app**:
@@ -410,5 +410,5 @@ A Claude Code plugin of hooks that Omni ships and loads into Claude Code threads
 _Avoid_: Plugin, extension
 
 **Grok Bot**:
-An agent outside Omni that a thread or a new message can be sent to, and that can use Omni as an MCP server.
+A bot outside Omni that a thread or a new message can be sent to, and that can use Omni as an MCP server.
 _Avoid_: Grok (the model)

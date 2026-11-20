@@ -1,4 +1,4 @@
-// Continuing an idle thread on another local harness (#221, GLOSSARY.md "Continued thread"): a new thread in the
+// Continuing an idle thread on another local harness (#221, GLOSSARY.md "Fork"): a new thread in the
 // source's channel, role and folder, linked to it by `continued_from` but not its crew child, with a session of its own
 // and, for repo work, a worktree of its own on a new branch at the source's HEAD. Its first session reads a Carryover
 // (carryover.ts) ahead of Ben's first message, through the pending handover (runner/handover.ts). The source is only
