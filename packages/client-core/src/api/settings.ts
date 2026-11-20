@@ -1,11 +1,13 @@
 import type { ServerOptionsState, SetupState, UserConfigPatch } from '@omni/shared/settings.ts';
 import type { CleanupState, RetentionPolicy } from '@omni/shared/worktree-cleanup.ts';
 import type { DisplayPrefs } from '@omni/shared/display.ts';
+import type { AnalyticsState } from '@omni/shared/analytics.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
 export type { ServerOption, ServerOptionsState, SetupState, UserConfig, UserConfigPatch } from '@omni/shared/settings.ts';
 export type { CleanupState, RetentionPolicy } from '@omni/shared/worktree-cleanup.ts';
 export type { DisplayPrefs } from '@omni/shared/display.ts';
+export type { AnalyticsState } from '@omni/shared/analytics.ts';
 
 /** A secret's name and where it applies. The value never leaves the server's secret store. */
 export interface SecretRow {
@@ -38,6 +40,9 @@ export function settingsApi(http: HttpClient) {
     display: () => http.request<DisplayPrefs>('GET', apiPath`/display`),
     /** Sets either switch and answers with both. */
     setDisplay: (patch: Partial<DisplayPrefs>) => http.request<DisplayPrefs>('PUT', apiPath`/display`, { body: patch }),
+    /** Usage analytics to PostHog: the switch, shared by every machine, and whether the server has a project key (apps/server/analytics.ts). */
+    analytics: () => http.request<AnalyticsState>('GET', apiPath`/analytics`),
+    setAnalytics: (enabled: boolean) => http.request<AnalyticsState>('PUT', apiPath`/analytics`, { body: { enabled } }),
     worktrees: () => http.request<WorktreesView>('GET', apiPath`/worktrees/scan`),
     /** This machine's worktree retention. Saved on the server's machine only, never synced. */
     setRetention: (patch: Partial<RetentionPolicy>) => http.request<WorktreesView>('PUT', apiPath`/worktrees/retention`, { body: patch }),

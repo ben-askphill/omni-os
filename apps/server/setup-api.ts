@@ -1,5 +1,7 @@
 // /api/setup: the user config behind onboarding and Settings in the Web UI. `npm run setup`
 // (apps/server/scripts/setup.ts) writes the same file from a terminal.
+import { capture } from './analytics.ts';
+import { configSetting } from '@omni/shared/analytics.ts';
 import { randomUUID } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
@@ -155,6 +157,8 @@ setupApi.put('/', async (c) => {
   const held = threadCredential(c) ? placeholderFieldsIn(parsed.data) : [];
   if (held.length) return c.json({ error: placeholderRefusal(held) }, 403);
   updateUserConfig({ ...parsed.data, onboardedAt: undefined });
+  // Which sections changed, never what they hold (packages/shared/analytics.ts).
+  for (const section of Object.keys(parsed.data)) capture('settings_changed', { setting: configSetting(section) });
   return c.json(setupState());
 });
 
