@@ -59,6 +59,9 @@ describe('the access policy', () => {
     expect(judge(a, call('mcp__plugin_slack_slack__slack_read_channel')).decision).toBe('allow');
     expect(judge(a, call('Bash', { command: 'rm x' })).decision).toBe('allow');
     expect(judge(at('read'), call('mcp__omni-ask__ask_user_question')).decision).toBe('allow');
+    // A team's lead gives its members their parts, and a role proposes lessons, at every level: Omni checks both itself.
+    expect(judge(at('read'), call('mcp__omni-team__message_members')).decision).toBe('allow');
+    expect(judge(at('read'), call('mcp__omni-memory__remember')).decision).toBe('allow');
     expect(judge(at('ask', { browser: 'ask' }), call('mcp__omni-browser__browser_click')).decision).toBe('ask');
     expect(judge(at('ask'), call('mcp__omni-browser__browser_snapshot')).decision).toBe('allow');
   });

@@ -11,7 +11,7 @@ import { STEPS_SERVER } from '@omni/shared/steps.ts';
 import { config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
-import { events, type Channel, type ThreadWorkspace } from './db.ts';
+import type { Channel, ThreadWorkspace } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
 const run = promisify(execFile);
@@ -213,6 +213,8 @@ export interface McpInput {
   noBrowser?: boolean;
   /** A quick ask: no browser. Browsing is what turns it into a task. */
   quick?: boolean;
+  /** The lead of a team thread (runner/team.ts): it gets message_members. */
+  leadsTeam?: boolean;
 }
 
 let playwrightMcp: { bin: string; version: string } | undefined;
@@ -283,7 +285,7 @@ export function buildMcpConfig(input: McpInput) {
   // set_steps: the plain step list the thread shows as its progress (@omni/shared/steps.ts).
   helper(STEPS_SERVER, 'steps');
   // message_members: a team thread's lead gives its members their parts. A member's session is a thread of its own, with no team row.
-  if (events.teamOf(input.threadId) !== null && !input.quick) helper(TEAM_SERVER, 'team');
+  if (input.leadsTeam && !input.quick) helper(TEAM_SERVER, 'team');
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly && !input.noBrowser && !input.quick) {
