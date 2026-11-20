@@ -123,6 +123,8 @@ The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of t
 
 ## Custom harnesses
 
+> Planned: connecting a server will make a remote agent with a name and avatar, which leaves the harness and model pickers, and a channel will be able to let remote agents read a thread's worktree ([ADR 0020](../adr/0020-remote-agents-are-agents.md), [group threads plan](../plans/2026-11-20-group-threads.md)). Until that ships, custom harnesses work as below.
+
 A custom harness is another AI service on a server of your own, such as a second Hermes or one you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes, or an [eve agent](#eve-agents) such as Nomos. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Models > Harnesses lists each one with a Remote mark, its host and the secret its key is in, and Test connection, Edit and Remove under it.
 
 ### Connect a harness
