@@ -4,6 +4,7 @@
 // /auth/app-pairings/redeem. desktop-pair is the desktop app's window: a loopback GET with no proxy and a one-time
 // nonce (desktop-pairing.ts), and the token never appears in the URL. A paired browser holds a session, never the token.
 // App pairing (app-pairing.ts) gives a native app its own revocable session; push-tokens.ts keeps its push token.
+import { capture } from './analytics.ts';
 import { randomBytes } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
@@ -435,6 +436,7 @@ authApi.put('/push-preferences', async (c) => {
   if (!body.success) return c.json({ error: firstIssue(body.error) }, 400);
   const next = updatePushPreferences(who.session, body.data);
   if (!next) return c.json({ error: 'Unauthorized: this session has ended' }, 401);
+  capture('settings_changed', { setting: 'push-preferences' });
   return c.json(next);
 });
 

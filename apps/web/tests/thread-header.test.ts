@@ -14,7 +14,7 @@ const render = (t: Thread, reconnecting = false) =>
   renderToStaticMarkup(
     createElement(HeaderActions, {
       thread: t,
-      meter: null,
+      context: null,
       reconnecting,
       onDone: () => {},
       onRestore: () => {},

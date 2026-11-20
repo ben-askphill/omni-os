@@ -1364,12 +1364,13 @@ server.registerTool('settings', {
     'network access, run-on machine, worktree retention). env_overrides: config fields an environment variable overrides now, by section.key. ' +
     'server_options: the .env options (models, threads, worktrees, port), each with its value, default and source (env or default). ' +
     'display: Show technical details (technical), the Shopify add-on (shopify) and the Open items card (openItems), shared by every client. ' +
+    'analytics: Usage analytics to PostHog (enabled, the switch in Settings > About; configured, whether a project key is set), shared by every machine. ' +
     `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets, and set_secret saves one here or on another synced machine.`,
   inputSchema: {},
 }, async () => {
-  const [setup, server, display] = await Promise.all([call('/setup'), call('/setup/server'), call('/display').catch(() => null)]);
+  const [setup, server, display, analytics] = await Promise.all([call('/setup'), call('/setup/server'), call('/display').catch(() => null), call('/analytics').catch(() => null)]);
   const { automations: _automations, ...config } = setup.config;
-  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options, display });
+  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options, display, analytics });
 });
 
 server.registerTool('signed_in_devices', {

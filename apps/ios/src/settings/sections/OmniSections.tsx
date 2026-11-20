@@ -19,6 +19,7 @@ import { versionLabel } from '../settings-model';
 
 const loadSetup = (api: OmniApi) => api.setup();
 const loadStatus = (api: OmniApi) => api.status();
+const loadAnalytics = (api: OmniApi) => api.analytics();
 
 /** The server's config, for the sections that show its fields. */
 export const useSetup = () => useRemote(loadSetup);
@@ -79,6 +80,33 @@ function TechnicalGroup() {
   );
 }
 
+/** Usage analytics: the server sends it, to its owner's PostHog, and keeps the switch for every client (apps/server/analytics.ts). */
+function AnalyticsGroup() {
+  const hub = useLiveHub();
+  const state = useRemote(loadAnalytics);
+  const [error, setError] = useState<string | null>(null);
+  // An older server has no switch.
+  if (!state.data) return null;
+  const footer = state.data.configured
+    ? 'The server sends which features get used, and errors, to PostHog. Never messages, prompts, files, names or secrets. This app sends nothing itself. Every device.'
+    : 'Nothing is sent yet: the server has no PostHog project key. Add the global secret POSTHOG_KEY on the computer.';
+  return (
+    <Group title="Usage analytics" footer={error ?? footer}>
+      <SwitchRow
+        first
+        title="Send usage analytics"
+        value={state.data.enabled}
+        onValueChange={(on) =>
+          void hub
+            .request((api) => api.setAnalytics(on))
+            .then((next) => (state.setData(next), setError(null)))
+            .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not save. Try again.'))
+        }
+      />
+    </Group>
+  );
+}
+
 export function AboutSection() {
   const status = useRemote(loadStatus);
   const server = status.data?.server;
@@ -90,6 +118,7 @@ export function AboutSection() {
         {server?.startedAt ? <ListRow title="Started" value={relTime(server.startedAt)} /> : null}
         {status.data?.device ? <ListRow title="Machine" value={status.data.device.name} /> : null}
       </Group>
+      <AnalyticsGroup />
       <Group title="This app" footer="Where the server keeps its files is a folder on its machine. The Web UI's About shows it.">
         <ListRow first title="Version" value={versionLabel(Constants.expoConfig?.version, Constants.nativeBuildVersion ?? Constants.expoConfig?.ios?.buildNumber)} />
         <ListRow title="Channel" value={Updates.channel || 'Development'} />

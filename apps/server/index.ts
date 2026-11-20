@@ -3,7 +3,7 @@ import './desktop-pairing.ts';
 import { spawn } from 'node:child_process';
 import type { Server } from 'node:http';
 import { serve } from '@hono/node-server';
-import { config, paths } from './config.ts';
+import { BUNDLED, config, paths } from './config.ts';
 import { releaseLock, takeLock } from './lock.ts';
 import { about } from './about.ts';
 import { isLoopback } from './loopback.ts';
@@ -28,6 +28,10 @@ const { app } = await import('./app.ts');
 const { messageRequests, outbox, threads, turnSnapshots } = await import('./db.ts');
 const { shutdownAll, startLimits } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
+const { capture, flushAnalytics, saveCrash, sendSavedCrash } = await import('./analytics.ts');
+// Usage analytics (analytics.ts): an error that kills the server is written down for the next start to report. The
+// monitor only watches, so Node still exits as it would.
+process.on('uncaughtExceptionMonitor', (err) => saveCrash(err));
 const { prepareBrowserMcp } = await import('./sandbox.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
 const { stopAllRuns } = await import('./actions.ts');
@@ -126,6 +130,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
       .on('error', (err) => console.error('[omni] caffeinate:', err.message))
       .unref();
   }
+  // Sent only with a PostHog key and Settings > About > Usage analytics on (analytics.ts).
+  sendSavedCrash();
+  capture('server_started', { bundled: BUNDLED, sync: !!outbox.machineId() });
   // Looks for new commits on main now and then, for the Update button (update.ts). Off with OMNI_UPDATE_CHECK=0.
   startUpdateCheck();
   // Off unless the sync credentials are in the secret store; then it runs alongside, and a failure only logs.
@@ -156,7 +163,7 @@ const shutdown = (sig: string, code = 0, last?: Promise<void>) => {
   stopConnect();
   stopGithubLogin();
   setTimeout(() => process.exit(code), 6000).unref();
-  void Promise.allSettled([shutdownAll(), last]).finally(() => {
+  void Promise.allSettled([shutdownAll(), last, flushAnalytics()]).finally(() => {
     closeAllBrowsers();
     process.exit(code);
   });

@@ -6,6 +6,7 @@ import { cancelWorktreeScan, currentWorktreeScan, startWorktreeScan } from './wo
 import { SLIM_DAYS } from '@omni/shared/worktree-slim.ts';
 import { cleanupRunning, cleanupState, setRetentionPolicy, startCleanup } from './worktree-cleanup.ts';
 import { setSlimPolicy, slimRunning, slimState, startSlim } from './worktree-slim.ts';
+import { capture } from './analytics.ts';
 
 // Settings > Worktrees in the Web UI: the worktree inventory, the cleanup that removes what it lists as eligible, and
 // stripping caches from idle worktrees, which keeps them.
@@ -51,7 +52,9 @@ const retentionInput = z.object({
 
 /** This Mac's retention policy. Saved on this Mac only. */
 worktreesApi.put('/retention', async (c) => {
-  setRetentionPolicy(retentionInput.parse(await c.req.json()));
+  const policy = retentionInput.parse(await c.req.json());
+  setRetentionPolicy(policy);
+  capture('settings_changed', { setting: 'worktree-retention', value: policy.enabled });
   return c.json(view());
 });
 
@@ -71,6 +74,8 @@ const slimPolicyInput = z.object({
 
 /** This Mac's schedule for stripping caches, and the idle days a manual strip lists by. Saved on this Mac only. */
 worktreesApi.put('/slim', async (c) => {
-  setSlimPolicy(slimPolicyInput.parse(await c.req.json()));
+  const policy = slimPolicyInput.parse(await c.req.json());
+  setSlimPolicy(policy);
+  capture('settings_changed', { setting: 'worktree-slim', value: policy.enabled });
   return c.json(view());
 });

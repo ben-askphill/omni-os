@@ -21,7 +21,6 @@ import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
 import { prNext, prOffered, stepOf, stepParked, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
-import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { useShowsCode } from '../display.ts';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
@@ -163,7 +162,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   // The channel's own step prompts (Channel Settings), from the live channel list so an edit applies without a reload.
   const ownChannel = (thread && listedChannel(thread.channel_id)) ?? channel;
   const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
-  // Show technical details, or a channel with a repo: branch, PRs, changes, terminal, tokens and the context ring.
+  // Show technical details, or a channel with a repo: branch, PRs, changes, terminal and tokens. The context ring shows
+  // either way (HeaderActions).
   const code = useShowsCode(ownChannel);
   // The quick card shows in every channel: Show technical details only changes which rows it lists.
   const surface = panel.surface;
@@ -231,17 +231,11 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           account={account}
           actions={{
             thread,
-            meter: (
-              <ContextMeter
-                thread={thread}
-                quiet={!code}
-                pushed={context}
-                onCompacted={(t) => {
-                  applyThread(t, true);
-                  pin();
-                }}
-              />
-            ),
+            context,
+            onCompacted: (t) => {
+              applyThread(t, true);
+              pin();
+            },
             reconnecting,
             onDone: () => void toggleDone(),
             onRestore: () => void restore(),

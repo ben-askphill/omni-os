@@ -11,6 +11,7 @@ import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
 import { saveDisplay, useDisplay } from '../display.ts';
+import { loadAnalytics, saveAnalytics, track, useAnalyticsState } from '../analytics.ts';
 import { Avatar, Button, ErrorNote, fieldDescribedBy, FolderInput, IDENTIFIER, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot, useFieldErrors } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, useRoute, type SettingsSection } from '../router.ts';
 import { connectPageHash } from '@omni/shared/connect-agent.ts';
@@ -521,7 +522,41 @@ function AboutSection() {
         </InfoList>
       </Card>
       <ServerOptions section="machines" />
+      <UsageAnalyticsCard />
     </>
+  );
+}
+
+/**
+ * Usage analytics (apps/web/src/analytics.ts, apps/server/analytics.ts): on by default, sent only once the server has a
+ * PostHog project key. The server keeps the switch for every machine.
+ */
+function UsageAnalyticsCard() {
+  const state = useAnalyticsState();
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => void loadAnalytics(), []);
+  return (
+    <Card entry="analytics" title="Usage analytics">
+      <SwitchRow
+        title="Send usage analytics"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="Which screens and features get used, and errors, to PostHog's EU cloud. Only event names and kinds: the app version, the OS and the AI app. Never messages, prompts, files, names of repos, channels or stores, or secrets."
+        checked={state?.enabled ?? true}
+        disabled={!state}
+        onChange={(on) => {
+          setError(null);
+          saveAnalytics(on).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {state && !state.configured && (
+        <FootNote>
+          Nothing is sent yet: this server has no PostHog project key. Add it as the global secret <code>POSTHOG_KEY</code>, or set <code>OMNI_POSTHOG_KEY</code> in{' '}
+          <code>.env</code>.
+        </FootNote>
+      )}
+      {error && <ErrorNote>{error}</ErrorNote>}
+      {state && !state.configured && <LinkLine href={href.settingsSection('secrets')}>Secrets</LinkLine>}
+    </Card>
   );
 }
 
@@ -863,7 +898,7 @@ function TechnicalCard() {
       <SwitchRow
         title="Show technical details"
         origin={<Origin of="machine" label="Every machine" />}
-        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches, token counts and the context ring in every channel. Off, a channel with a repo still shows its code detail."
+        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches and token counts in every channel. Off, a channel with a repo still shows its code detail. The context ring shows either way."
         checked={technical}
         onChange={(on) => {
           setError(null);
@@ -894,7 +929,10 @@ function AppearanceCard() {
             <Segmented
               label="Theme"
               value={theme}
-              onChange={setTheme}
+              onChange={(t) => {
+                setTheme(t);
+                track('settings_changed', { setting: 'theme' });
+              }}
               options={[
                 { id: 'system', icon: 'monitor', label: 'Match system' },
                 { id: 'light', icon: 'sun', label: 'Light' },
@@ -910,7 +948,10 @@ function AppearanceCard() {
               origin={thisBrowser}
               detail="One sidebar with every channel and its threads, in place of the channel rail. The phone layout stays as it is."
               checked={layout === 'classic'}
-              onChange={(on) => setLayout(on ? 'classic' : 'rail')}
+              onChange={(on) => {
+                setLayout(on ? 'classic' : 'rail');
+                track('settings_changed', { setting: 'layout', value: on });
+              }}
             />
           </div>
         )}

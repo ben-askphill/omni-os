@@ -15,6 +15,7 @@
 - [Claude Artifacts](user/claude-artifacts.md): the list of your Artifacts on claude.ai beside the Files threads made, on the Artifacts page
 - [Notion](user/notion.md): threads use a Notion connection's token (`OMNI_NOTION_TOKEN`) and the shipped helper instead of the OAuth-only plugin, and which pages to share with it
 - [Link previews](user/link-previews.md)
+- [Usage analytics](user/analytics.md): PostHog for which screens and features get used, and errors; the key, the switch in Settings > About, and exactly what is sent
 - [Mods](user/mods.md)
 - [The omni command](user/cli.md): `new`, `send`, `threads`/`show`, `status`, `doctor` and `open` from any terminal or agent shell, where the desktop app puts it, and the `--wait` exit codes
 - [Other ways in](user/entry-points.md): shell, Quick Prompt, history import, brain export

@@ -51,6 +51,8 @@ import { toolOutputApi } from './tool-output-api.ts';
 import { threadsApi } from './threads-api.ts';
 import { connectApi } from './connect-api.ts';
 import { cspReportApi } from './csp-report-api.ts';
+import { analyticsApi } from './analytics-api.ts';
+import { captureException } from './analytics.ts';
 import { connectHostname } from './connect/service.ts';
 import { requestGuard, useConnectHost, useLegacyUpgrade, useSessionCheck, useThreadTokenCheck } from './request-guard.ts';
 import { threadOfToken } from './thread-tokens.ts';
@@ -70,6 +72,8 @@ const api = new Hono();
 app.onError((err, c) => {
   console.error('[api]', err);
   const status = err instanceof z.ZodError ? 400 : ((err as { status?: number }).status ?? 500);
+  // A 500 is a bug: its class and frames go to PostHog when usage analytics is on (analytics.ts), never its message.
+  if (status >= 500) captureException(err, { where: c.req.routePath });
   // A refusal with more to say than its message (sync/guard.ts livesOnRefusal): its fields go next to `error`.
   const reply = (err as { reply?: unknown }).reply;
   return c.json({ ...(reply && typeof reply === 'object' ? reply : {}), error: err.message }, status as 400);
@@ -143,6 +147,7 @@ api.route('/update', updateApi);
 api.route('/accounts', accountsApi);
 api.route('/usage-scan', usageScanApi);
 api.route('/csp-report', cspReportApi);
+api.route('/analytics', analyticsApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { Thread } from '../../api.ts';
 import { MARK, type TurnPhase } from '@omni/shared/status.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { useNeedOf, useNow } from '../../store.tsx';
 import { threadPill } from './thread-state.ts';
+import { ContextMeter } from './ContextMeter.tsx';
 import { closeMenu, openMenu, useMenuOpenFor } from '../ContextMenu.tsx';
 import { Button, IconButton, MOD_KEY, StatusPill } from '../ui.tsx';
 
@@ -12,7 +13,8 @@ import { Button, IconButton, MOD_KEY, StatusPill } from '../ui.tsx';
 // list in packages/shared/thread-actions.ts that the right-click renders too.
 export function HeaderActions({
   thread,
-  meter,
+  context,
+  onCompacted,
   reconnecting,
   onDone,
   onRestore,
@@ -28,7 +30,10 @@ export function HeaderActions({
   findOpen = false,
 }: {
   thread: Thread;
-  meter: ReactNode;
+  /** The context reading the thread's stream pushed, for the meter. The ring shows on every thread whose harness reports a window. */
+  context: ContextUsage | null;
+  /** A Compact from the meter started a turn. */
+  onCompacted?: (t: Thread) => void;
   reconnecting: boolean;
   onDone: () => void;
   onRestore: () => void;
@@ -56,7 +61,7 @@ export function HeaderActions({
   const doneable = !archived && (!!thread.done_at || canMarkDone(thread.status));
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {meter}
+      <ContextMeter thread={thread} pushed={context} onCompacted={onCompacted} />
       {doneable && (
         <IconButton
           icon="check"

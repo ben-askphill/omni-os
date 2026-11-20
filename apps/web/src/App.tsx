@@ -10,6 +10,7 @@ import { DesktopHooks, useDesktopLayoutActions } from './components/DesktopHooks
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
 import { setInboxUp, startNewThread, useRoute } from './router.ts';
 import { Page } from './pages/Page.tsx';
+import { useAnalytics } from './analytics.ts';
 import { AppProvider, readPref, useApp, useIsMobile, usePageTitle, useSyncOnReturn, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { DoneConfirmProvider } from './done-confirm.tsx';
@@ -209,6 +210,8 @@ function SkipLink() {
 function Shells() {
   const mobile = useIsMobile();
   usePullRequestLinks();
+  // Which screens get used, sent only with a PostHog key and Settings > About > Usage analytics on (analytics.ts).
+  useAnalytics(useRoute(), mobile);
   return (
     <>
       <DesktopHooks />
