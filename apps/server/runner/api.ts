@@ -213,6 +213,15 @@ function askedRun(input: CreateThreadInput, role: CrewRole | undefined) {
   return r.run;
 }
 
+/** The channel a new thread lands in: the one asked for, else its lead's own, else the Inbox. */
+const channelFor = (input: Pick<CreateThreadInput, 'channel'>, lead: CrewRole | undefined) => input.channel || lead?.channel || 'inbox';
+
+/**
+ * The channel a new thread will land in, resolved as openThread does, lead included (a remote agent's harness picks
+ * its agent). For a check made before the thread exists (thread-routes-api.ts seating). Throws openThread's refusals.
+ */
+export const newThreadChannel = (input: CreateThreadInput) => channelFor(input, leadFor(input));
+
 async function openThread(given: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false, opts: { team?: boolean } = {}) {
   // A quick ask has no charter, folder, parent or task id, runs here, and is on Auto unless a run was asked for.
   const input: CreateThreadInput = given.quick
@@ -226,7 +235,7 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const remoteLead = isRemoteAgent(role);
   const asked = remoteLead ? {} : askedRun(input, role);
   const runCatalog = (cat: Catalog) => (remoteLead ? cat : localCatalog(cat));
-  const channelId = input.channel || role?.channel || 'inbox';
+  const channelId = channelFor(input, role);
   const channel = channels.get(channelId);
   if (!channel) throw refusal(`unknown channel "${channelId}"`, 404);
 

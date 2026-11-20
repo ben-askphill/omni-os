@@ -47,6 +47,7 @@ import {
   editRequest,
   interruptThread,
   isLive,
+  newThreadChannel,
   pendingFor,
   postMessage,
   refreshContext,
@@ -125,12 +126,10 @@ const createSchema = z.object({
  * one whose parent is itself, and never in a #conductor thread. `seating` is the thread to be, or the thread a
  * message goes to.
  */
-function seatingRefusal(c: Context, seating: { channel?: string | null; role?: string | null; parent_id?: string | null }): string | null {
+function seatingRefusal(c: Context, seating: { channel: string; parent_id?: string | null }): string | null {
   const caller = callerOf(c);
   if (!caller) return null;
-  // The channel the thread lands in, resolved as runner/api.ts openThread does: an empty one is the agent's own.
-  const channel = seating.channel || getCrew(seating.role)?.channel || 'inbox';
-  if (channel === 'conductor') return 'Agents are never seated in a #conductor thread by an agent. Delegate the work to its channel and seat them there.';
+  if (seating.channel === 'conductor') return 'Agents are never seated in a #conductor thread by an agent. Delegate the work to its channel and seat them there.';
   if (seating.parent_id !== caller) return 'An agent seats agents only in a thread it delegated. Delegate a new thread, with members, instead.';
   return null;
 }
@@ -177,7 +176,8 @@ threadRoutesApi.post('/', async (c) => {
   const filed = fileUnderCaller(c, body);
   if (filed) return filed;
   if (body.members?.length) {
-    const no = seatingRefusal(c, { channel: body.channel, role: body.role, parent_id: body.parent_id });
+    // The channel the thread will land in, as openThread resolves it: an empty one is the lead's own.
+    const no = seatingRefusal(c, { channel: newThreadChannel({ ...body, context: undefined }), parent_id: body.parent_id });
     if (no) return c.json({ error: no }, 403);
   }
   checkUploads(files);
@@ -250,7 +250,7 @@ threadRoutesApi.post('/team', async (c) => {
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'invalid team' }, 400);
   const filed = fileUnderCaller(c, body.data);
   if (filed) return filed;
-  const no = seatingRefusal(c, { channel: body.data.channel, role: body.data.role, parent_id: body.data.parent_id });
+  const no = seatingRefusal(c, { channel: newThreadChannel({ ...body.data, source: body.data.source ?? 'conductor' }), parent_id: body.data.parent_id });
   if (no) return c.json({ error: no }, 403);
   const { thread, members } = await createTeam(body.data);
   return c.json({ thread: { ...thread, ...memberFields(thread) }, members });
