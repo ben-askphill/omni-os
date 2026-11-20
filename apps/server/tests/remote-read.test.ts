@@ -169,7 +169,7 @@ describe('a remote agent reads the worktree where the channel allows it', () => 
     const t = await hermesReads({ action: 'read', path: 'src/a.ts' });
     const run = hermes.calls.find((c) => c.method === 'POST' && c.path === '/v1/runs')!;
     expect((run.body as any).tools).toBeUndefined();
-    expect(hermes.toolResults).toEqual([expect.objectContaining({ is_error: true, output: expect.stringMatching(/#Repo keeps its work from remote agents.+Remote agents can see this channel's work/) })]);
+    expect(hermes.toolResults).toEqual([expect.objectContaining({ is_error: true, output: expect.stringMatching(/#Repo keeps its work from remote agents\. [A-Z].* can open it in Channel settings with "Remote agents can see this channel's work"\.$/) })]);
     const [row] = readRows(t.id);
     expect(row).toMatchObject({ name: 'Read', result: { is_error: true, text: expect.stringMatching(/keeps its work from remote agents/) } });
     expect(row.result!.text).not.toContain('export const a');
@@ -224,6 +224,7 @@ describe('a remote agent reads the worktree where the channel allows it', () => 
     expect(diff.is_error).toBe(false);
     expect(diff.output).toMatch(/^Changed files since the thread's base \([0-9a-f]{10}\):\nmodified: src\/a\.ts\nadded: src\/b\.ts\n\n/);
     expect(diff.output).toContain('-export const a = 1;\n+export const a = 2;');
+    expect(diff.output).toContain('diff --git a/src/a.ts b/src/a.ts');
     expect(diff.output).not.toMatch(/notes\.txt|secret\.env|TOKEN/);
     expect(up).toMatchObject({ is_error: true, output: expect.stringMatching(/outside the thread's worktree/) });
     expect(readRows(t.id).map((r) => r.name)).toEqual(['Glob', 'Glob', 'Grep', 'Diff', 'Glob']);

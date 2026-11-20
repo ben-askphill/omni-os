@@ -74,7 +74,8 @@ export async function answerRead(token: string | null | undefined, raw: unknown)
   if (!grant) return refuse(ENDED);
   const ch = channels.get(grant.channel);
   if (!remoteSeesWork(grant.channel)) {
-    return refuse(`#${ch?.name ?? grant.channel} keeps its work from remote agents. ${userName()} can open it in Channel settings with "Remote agents can see this channel's work".`);
+    const who = userName();
+    return refuse(`#${ch?.name ?? grant.channel} keeps its work from remote agents. ${who.charAt(0).toUpperCase()}${who.slice(1)} can open it in Channel settings with "Remote agents can see this channel's work".`);
   }
   if (!grant.worktree) return refuse(grant.reason || 'this thread has no worktree on this machine.');
   const group = threads.get(grant.thread);
@@ -210,7 +211,8 @@ async function diff(group: Thread, root: string): Promise<ReadAnswer> {
   const base = await threadBase(group.id, root);
   // The worktree against the thread's base, as Changes compares it, for tracked files only: a new file shows once it
   // is staged or committed (Q41).
-  const common = ['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--find-renames', base.sha];
+  // Fixed prefixes: a user's diff.mnemonicPrefix or diff.noprefix would otherwise change what the agent reads.
+  const common = ['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--find-renames', '--src-prefix=a/', '--dst-prefix=b/', base.sha];
   const names = (await readGit(root, [...common.slice(0, 1), '-z', '--name-status', ...common.slice(1)])).split('\0').filter(Boolean);
   const listed: string[] = [];
   for (let i = 0; i < names.length; ) {

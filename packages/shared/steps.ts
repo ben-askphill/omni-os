@@ -220,6 +220,8 @@ export function plainCall(c: Pick<ToolCall, 'name' | 'input'>): Plain {
     case 'Glob':
     case 'LS':
       return { phase: 'files', title: FILES, now: 'Finding the right files' };
+    case 'Diff':
+      return { phase: 'files', title: FILES, now: 'Reading the changes' };
     case 'Edit':
     case 'MultiEdit':
     case 'NotebookEdit':
