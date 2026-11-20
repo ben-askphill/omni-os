@@ -2,7 +2,7 @@
 import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
-import { artifacts, memories, threads, type Channel, type Thread } from '../db.ts';
+import { artifacts, events, memories, threads, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import { doesOwnWork, getCrew, type CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
@@ -209,6 +209,27 @@ const SESSION_CACHE_RULE =
   'A cold one you do not wake: open a new session with continue_thread on its own harness and a message that carries the follow-up, or delegate a fresh thread whose brief stands alone and links the old one, then say which thread replaced which. ' +
   'message_thread refuses a cold thread unless you pass wake_cold: true, which is only for when you were asked to resume that thread itself. Never wake a cold thread to ask how it went: read it with get_thread.';
 
+/**
+ * Every thread that can delegate: how a team works and where it may seat agents (ADR 0019, slice 6). The server holds it
+ * to the seating part (thread-routes-api.ts seatingRefusal).
+ */
+const TEAM_RULE =
+  'delegate_team makes one thread in the channel: its lead plans on your brief, then gives each member its part, the members work at once, and the lead reports once they have all finished. ' +
+  'An agent with two parts gets one seat. You seat agents only in a thread you delegate, never in a #conductor thread: with delegate_team, with members on delegate, or with agents on message_thread to a thread you delegated.';
+
+/** A team thread's lead (runner/team.ts): plan, give out the parts with message_members, then report once woken. */
+function teamLeadLines(name: string): string[] {
+  return [
+    '',
+    '## Team lead',
+    `You lead a team in this thread. The agents your brief gives parts to are seated here, each in a session of its own, and they work only when you message them. ` +
+      'Plan first: read the brief, decide what each member does and what done looks like, then give each member its whole part with message_members, one call per member, both parts in one message when a member has two. ' +
+      `Do any parts the brief gives you, then end your turn. The members work at the same time in this worktree and never commit: you commit and open the pull request. ` +
+      `Omni wakes you once every member you messaged has finished, a failed or stopped one included, with their replies; a member waiting on ${name} keeps you waiting. ` +
+      'Then combine them into one answer: lead with the outcome, keep what each member found that matters, say where they disagree and what failed. That answer is your report. Do not redo their work.',
+  ];
+}
+
 /** `secretNames` are the names of the secrets in the thread's environment, never their values. */
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false, secretNames: readonly string[] = []) {
   const remote = isProviderHarness(thread.harness);
@@ -258,6 +279,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Thread delegation',
           `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another agent.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
+          TEAM_RULE,
           SESSION_CACHE_RULE,
         ]
       : []),
@@ -311,11 +333,13 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     // seated here talks only, and where a remote agent leads, the user commits what the local members change (ADR 0020).
     const lead = thread.parent_id ? threads.get(thread.parent_id) : undefined;
     const leadName = (lead?.role && getCrew(lead.role)?.name) || lead?.role || 'The lead';
+    const team = !!lead && events.teamOf(lead.id) !== null;
     const committer = isRemoteAgentHarness(lead?.harness) ? `${leadName} is a remote agent and talks only, so ${name}` : leadName;
     lines.push(
       '',
       '## Group thread',
       `You are seated in a group thread with ${name} and other agents. ${leadName} leads this thread. Its messages go to the agents they name, and agents named in one message work at the same time in this one worktree.`,
+      ...(team ? [`This thread is a team: ${leadName} gives you your part. Stick to it, and end your turn with what you did and found: your final message goes back to ${leadName}.`] : []),
       remoteAgent
         ? 'You talk only: the local agents seated here change the files.'
         : remote
@@ -329,7 +353,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       `The conductor handed you this task${thread.task_id ? ` as ${thread.task_id}` : ''}. Your final message is automatically reported back to it. Report outcomes and blockers, even if the answer is "nothing found".`,
     );
   }
-  if (lead) {
+  if (events.teamOf(thread.id) !== null) lines.push(...teamLeadLines(name));
+  else if (lead) {
+    // A team made before one-thread teams: its members ran in threads of their own under this one.
     lines.push(
       '',
       '## Team lead',

@@ -3,7 +3,7 @@ import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { config } from '../config.ts';
 import { gateFor } from './approvals.ts';
 import { channelAccess, harnessRefusal } from '../access.ts';
-import { channels, messageRequests, threads, type Thread } from '../db.ts';
+import { channels, events, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
 import { inWorkspace } from '../workspace.ts';
@@ -163,7 +163,8 @@ async function spawnLive(live: Live, thread: Thread) {
   live.setBrowserHold(attached?.hold ?? null);
   const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
-  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: readsOnly(thread) });
+  const leadsTeam = events.teamOf(thread.id) !== null;
+  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: readsOnly(thread), leadsTeam });
 
   let secretEnv: Record<string, string> = {};
   // A Runs API server (Hermes, a custom harness) gets its own key and nothing else: no channel or global secret goes to
@@ -206,6 +207,7 @@ async function spawnLive(live: Live, thread: Thread) {
     browserBusy,
     cdpEndpoint,
     omniUrl: omniUrl(),
+    leadsTeam,
     resume: run.resume,
     handoverPending: !!threads.sessionState(thread.id).handover,
     permission,

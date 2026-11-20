@@ -298,6 +298,7 @@ describe('plain words', () => {
     expect(plainCall({ name: 'mcp__omni-browser__browser_navigate', input: {} }).connector).toBeUndefined();
     expect(plainCall({ name: 'mcp__omni-browser__browser_navigate', input: { url: 'https://www.volero.com/cart' } })).toMatchObject({ title: 'Checking the website', now: 'Opening volero.com' });
     expect(plainCall({ name: 'mcp__omni-render__html_render', input: { title: 'Price table' } }).now).toBe('Building "Price table"');
+    expect(plainCall({ name: 'mcp__omni-team__message_members', input: { to: ['designer'], message: 'Draw it' } })).toEqual({ phase: 'omni', title: 'Checking on the work', now: 'Giving the members their parts' });
     expect(plainCall({ name: 'mcp__acme_crm__lookup', input: {} })).toMatchObject({ title: 'Using Acme crm', now: 'Using Acme crm', connector: { id: 'mcp:acme_crm', mark: { type: 'generic' } } });
     expect(plainCall({ name: 'mcp__0b5e2a40-1111-4222-8333-944455556666__run', input: {} }).title).toBe('Using a connected app');
     expect(plainCall({ name: 'mcp__omni__delegate', input: { role: 'researcher' } }).now).toBe('Handing it to Researcher');

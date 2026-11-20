@@ -163,6 +163,21 @@ export function routingHint(
 export const replyTo = (leadName: string | null | undefined) => (leadName ? `Reply to ${leadName}` : 'Reply');
 
 /**
+ * A team lead's message to its members (slice 6), for the line over it: the lead's name in place of a source label,
+ * and the members it went to, drawn as an agent mention's "To" is (message-context-machine.ts sentContext). Null for
+ * any other message: Ben's, the Conductor's or Omni's own.
+ */
+export function leadMessage(
+  p: { source?: string; to?: unknown },
+  from: string | null | undefined,
+  nameOf: (agent: string) => string,
+): { from: string; to: { agent: string; name: string }[] } | null {
+  if (p.source !== 'lead') return null;
+  const to = Array.isArray(p.to) ? [...new Set(p.to.filter((a): a is string => typeof a === 'string'))] : [];
+  return { from: from ? nameOf(from) : 'The lead', to: to.map((agent) => ({ agent, name: nameOf(agent) })) };
+}
+
+/**
  * The run a member's reply came from, for its author line: its own seat's harness and model. Null for the lead, an
  * agent with no seat or a thread with none, whose replies carry the thread's run.
  */

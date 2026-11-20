@@ -175,16 +175,17 @@ describe('Stop while a worktree is prepared', () => {
 });
 
 describe('a team', () => {
-  it("stopping a lead while its worktree is prepared stops its members too", async () => {
+  it('stopping a team thread while its worktree is prepared runs no agent in it', async () => {
     const ch = channel();
     await setupAction(ch.id, 'sleep 30', 'blocking');
-    const { lead, members } = await r.runner.createTeam({ channel: ch.id, prompt: 'split it', tasks: [{ prompt: 'part one' }] });
-    await until('both setups to run', async () => (await setupRun(lead.id))?.state === 'running' && (await setupRun(members[0].id))?.state === 'running');
-    await call('POST', `/threads/${lead.id}/stop`, {});
-    await r.until('both to stop', () => r.thread(lead.id).setup === 'failed' && r.thread(members[0].id).setup === 'failed');
-    expect([r.thread(lead.id).status, r.thread(members[0].id).status]).toEqual(['stopped', 'stopped']);
+    const { thread } = await r.runner.createTeam({ channel: ch.id, prompt: 'split it', role: 'builder', tasks: [{ prompt: 'part one', role: 'researcher' }] });
+    await until('its setup to run', async () => (await setupRun(thread.id))?.state === 'running');
+    await call('POST', `/threads/${thread.id}/stop`, {});
+    await r.until('it to stop', () => r.thread(thread.id).setup === 'failed');
+    expect(r.thread(thread.id).status).toBe('stopped');
     await settle();
-    expect([...r.spawns(lead.id), ...r.spawns(members[0].id)]).toEqual([]);
+    const member = r.db.members.of(thread.id, 'researcher')!.session_thread;
+    expect([...r.spawns(thread.id), ...r.spawns(member)]).toEqual([]);
   });
 });
 

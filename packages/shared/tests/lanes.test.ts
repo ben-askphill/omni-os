@@ -149,3 +149,54 @@ describe('the phone’s turn view', () => {
     expect(ended.turns.map((t) => [t.status, !!t.lanes])).toEqual([['done', true], ['done', false]]);
   });
 });
+
+describe('a team thread (slice 6)', () => {
+  const tell = (to: string, text: string) => row('user', { text, source: 'lead', to: [to] }, 'builder');
+  const wake = () => row('user', { text: 'All 2 members have finished.', source: 'team' });
+
+  it("gathers a wave of the lead's messages into one set of lanes, after its last message, until the wake", () => {
+    const events = [
+      row('user', { text: 'the brief', source: 'conductor' }),
+      say('builder', 'Planning.'),
+      tell('designer', 'make the visuals'),
+      say('designer', 'On it.'),
+      tell('critic', 'critique it'),
+      say('builder', 'Both have their parts.'),
+      done('builder'),
+      say('critic', 'Looks fine.'),
+      done('critic'),
+      done('designer'),
+      wake(),
+      say('builder', 'Report: done.'),
+      done('builder'),
+    ];
+    const items = fold(events);
+    expect(items.map((i) => (i.type === 'user' ? `user:${i.p.source}` : i.type === 'lanes' ? `lanes:${i.lanes.map((l) => l.agent)}` : i.type))).toEqual([
+      'user:conductor',
+      'text',
+      'user:lead',
+      'user:lead',
+      'lanes:designer,critic',
+      'text',
+      'result',
+      'user:team',
+      'text',
+      'result',
+    ]);
+    const [lanes] = lanesOf(items);
+    expect(lanes.lanes.map((l) => [l.agent, l.state, l.latest])).toEqual([['designer', 'done', 'On it.'], ['critic', 'done', 'Looks fine.']]);
+    // The lead's message says who wrote it.
+    const sent = items.find((i) => i.type === 'user' && i.p.source === 'lead');
+    expect(sent && 'agent' in sent && sent.agent).toBe('builder');
+  });
+
+  it('starts new lanes for a wave after the wake, and stacks from three members', () => {
+    const events = [tell('designer', 'one'), done('designer'), wake(), tell('designer', 'two'), tell('critic', 'two'), tell('writer', 'two')];
+    const blocks = lanesOf(fold(events));
+    expect(blocks.map((b) => [b.lanes.map((l) => l.agent), b.stacked])).toEqual([
+      [['designer'], false],
+      [['designer', 'critic', 'writer'], true],
+    ]);
+  });
+});
+

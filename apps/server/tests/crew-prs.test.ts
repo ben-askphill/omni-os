@@ -164,30 +164,27 @@ describe('crew PRs', () => {
     expect((await prsOf(conductor.id)).crew.map((p) => [p.url, p.thread_id])).toEqual([[url('acme/shop', 31), first.id]]);
   });
 
-  it("brings each delegate_team member's PR up to the lead and on to the Conductor", T, async () => {
+  it("reports a team thread's one PR to the Conductor, not one per member", T, async () => {
     const conductor = await H.start('be the conductor');
     await H.untilResults(conductor.id, 1);
-    const { lead, members } = await H.runner.createTeam({
+    const { thread } = await H.runner.createTeam({
       channel: 'shop',
       title: 'Checkout work',
       prompt: 'Fix checkout',
+      role: 'builder',
       parent_id: conductor.id,
       task_id: 'T-40',
       tasks: [
-        { title: 'Cart', prompt: 'fix the cart' },
-        { title: 'Pay', prompt: 'fix payment' },
+        { title: 'Cart', prompt: 'look into the cart', role: 'researcher' },
+        { title: 'Copy', prompt: 'write the error copy', role: 'writer' },
       ],
     });
-    await H.untilResults(lead.id, 1);
-    members.forEach((m, i) => H.db.threads.update(m.id, { branch: `omni/team-${i}` }));
-    github({ 'acme/shop': [{ number: 41, branch: 'omni/team-0' }, { number: 42, branch: 'omni/team-1' }] });
+    await H.untilResults(thread.id, 1);
+    // The members' sessions work on the thread's one branch.
+    for (const id of [thread.id, ...H.db.members.all(thread.id).map((m) => m.session_thread)]) H.db.threads.update(id, { branch: 'omni/team' });
+    github({ 'acme/shop': [{ number: 41, branch: 'omni/team' }] });
     later();
-    const want = [
-      [41, members[0].id, 'T-40.1'],
-      [42, members[1].id, 'T-40.2'],
-    ];
-    expect((await prsOf(lead.id)).crew.map((p) => [p.number, p.thread_id, p.task_id])).toEqual(want);
-    expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.thread_id, p.task_id])).toEqual(want);
+    expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.thread_id, p.task_id])).toEqual([[41, thread.id, 'T-40']]);
   });
 
   it('sends the keys the crew-prs.json wire fixture has', T, async () => {

@@ -1,7 +1,9 @@
 // Parallel turns (ADR 0019, Q55, Q62): a message several agents answer splits into a lane per agent, each with its
 // steps, the files it changed and its latest line, and the collision flags raised meanwhile above the lanes. The
 // lanes stay lanes in the history. From three agents they stack, each collapsed to its latest line; the phone shows
-// one per tab. Pure: the fold's items in, the same items with each such turn's replies gathered into one `lanes` item.
+// one per tab. A team thread's lead gives each member its part in a message of its own (slice 6): the messages of one
+// wave, up to Omni's wake of the lead, share one set of lanes, placed after the wave's last message. Pure: the fold's
+// items in, the same items with each such turn's replies gathered into one `lanes` item.
 import { editedPath, worktreePath, type Collision } from './collisions.ts';
 import { plainCall } from './steps.ts';
 import type { Item, ReplyItem, ToolCall, UserP } from './transcript-fold.ts';
@@ -82,7 +84,7 @@ function filesOf(items: readonly Item[], cwd: string | null | undefined): string
 
 /** The agents a message went to: those it names, else the lead. */
 const recipientsOf = (p: UserP, lead: string) => {
-  const to = (p as UserP & { to?: unknown }).to;
+  const to = p.to as unknown;
   return Array.isArray(to) ? [...new Set(to.filter((a): a is string => typeof a === 'string'))] : [lead];
 };
 
@@ -100,8 +102,33 @@ export function laneFold(items: readonly Item[], { lead, cwd }: { lead: string |
   const settling = new Map<string, Lane>();
   const blocks: LanesItem[] = [];
   const author = (it: Item) => ('agent' in it && it.agent) || leadId;
+  /** A team lead's wave of messages to its members: one set of lanes, until Omni wakes the lead (source `team`). */
+  let wave: LanesItem | null = null;
 
   for (const it of items) {
+    if (it.type === 'user' && it.p.source === 'team') wave = null;
+    if (it.type === 'user' && it.p.source === 'lead') {
+      const to = recipientsOf(it.p, leadId);
+      for (const a of to) {
+        const o = open.get(a);
+        if (o && o.block !== wave && o.lane.state === 'working') settling.set(a, o.lane);
+        if (o && o.block !== wave) open.delete(a);
+      }
+      // The wave's lanes follow its latest message.
+      if (wave) out.splice(out.indexOf(wave), 1);
+      else blocks.push((wave = { type: 'lanes', key: it.key, lanes: [], flags: [], stacked: false }));
+      wave.key = it.key;
+      out.push(it, wave);
+      for (const agent of to) {
+        if (wave.lanes.some((l) => l.agent === agent)) continue;
+        const lane: Lane = { agent, items: [], files: [], latest: null, state: 'working' };
+        wave.lanes.push(lane);
+        open.set(agent, { block: wave, lane });
+        settling.delete(agent);
+      }
+      wave.stacked = wave.lanes.length >= 3;
+      continue;
+    }
     if (it.type === 'user') {
       // A message to an agent with an open lane takes it out of that lane from here on.
       for (const a of recipientsOf(it.p, leadId)) {

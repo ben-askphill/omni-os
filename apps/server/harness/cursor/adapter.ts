@@ -74,7 +74,7 @@ export const cursorAdapter: HarnessAdapter = {
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';
     // Omni's MCP servers load from a per-thread plugin folder; nothing touches the repo or ~/.cursor.
-    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl, noBrowser: browserHeld(ctx.permission?.access), quick: readsOnly(thread) });
+    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl, noBrowser: browserHeld(ctx.permission?.access), quick: readsOnly(thread), leadsTeam: ctx.leadsTeam });
 
     let ready = false;
     let firstTurn = true;

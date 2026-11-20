@@ -28,6 +28,7 @@ import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
 import { OmniMark } from './brand.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
@@ -132,7 +133,7 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
  * Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief).
  * `lazy`: its images wait until they near the screen, as older rows do; the newest rows load them at once.
  */
-function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean }) {
+function UserBubble({ p, at, threadId, event, clipped, fold, lazy, from }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean; from?: string }) {
   const [more, setMore] = useState(false);
   // The find bar's match is in this message: a long one shows all of it.
   const found = useFindOpens((t) => t === event, () => setMore(true));
@@ -144,9 +145,14 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
   const cut = long && !more && !found;
   const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
-  const label = p.source ? SOURCE_LABEL[p.source] : undefined;
+  const { crew } = useApp();
+  // A team lead's message to its members (slice 6) names who sent it and who it went to.
+  const lead = leadMessage(p, from, (a) => crew.find((r) => r.id === a)?.name ?? a);
+  const label = lead?.from ?? (p.source ? SOURCE_LABEL[p.source] : undefined);
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
   const sent = useMemo(() => sentContext(text, p.context), [text, p.context]);
+  // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
+  const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
   const body = (
     <>
       {pieces.map(({ text: t, hit }, i) =>
@@ -178,7 +184,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
             <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
-        <SentTo agents={sent.to} />
+        <SentTo agents={to} />
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
@@ -379,7 +385,7 @@ const ItemRow = memo(
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
-          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} lazy={defer} />;
+          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} lazy={defer} from={it.agent} />;
           return team ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
         }
         case 'text':

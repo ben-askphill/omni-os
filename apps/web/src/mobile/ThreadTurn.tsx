@@ -31,6 +31,7 @@ import { HtmlRender } from '../components/HtmlRender.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoConnectors, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { askCaption } from '@omni/shared/ask.ts';
+import { leadMessage } from '@omni/shared/members.ts';
 import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
@@ -256,12 +257,19 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     {t.prompts.map((p, k) => {
       const brief = first && k === 0 && !!thread.parent_id && atStart(c.history.history);
       const sent = sentContext(p.text ?? '', p.context);
+      const lead = leadMessage(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a);
+      // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
+      const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
       const words = p.dropped
         ? p.undelivered
           ? `Not delivered · ${p.undelivered}`
           : 'Not sent'
+        : lead
+          ? lead.from
         : p.source === 'pr-watch'
           ? 'PR watch'
+        : p.source === 'team'
+          ? 'Team'
           : brief
             ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
             : k > 0
@@ -273,10 +281,10 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
           event={p.key}
           fold={brief}
           caption={
-            sent.to.length ? (
+            to.length ? (
               <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
                 {words && <span>{words}</span>}
-                <SentTo agents={sent.to} />
+                <SentTo agents={to} />
               </span>
             ) : (
               words

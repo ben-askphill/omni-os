@@ -94,6 +94,17 @@ export const events = {
     });
     return { id, thread_id: threadId, kind, payload: json, created_at: ts, agent };
   },
+  /** The `team` row that makes a thread a one-thread team (runner/team.ts), as stored, or null for any other thread. */
+  teamOf: (threadId: string) =>
+    (db.prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'team' ORDER BY id LIMIT 1`).get(threadId) as { payload: string } | undefined)?.payload ?? null,
+  /** A team thread's lead messages to its members (`source: lead`) and Omni's wakes of its lead (`source: team`), in order. */
+  teamMessages: (threadId: string) =>
+    db
+      .prepare(
+        `SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind = 'user' AND json_extract(payload, '$.source') IN ('lead', 'team')
+         AND json_extract(payload, '$.dropped') IS NOT 1 ORDER BY id`,
+      )
+      .all(threadId) as unknown as EventRow[],
   /** The `ask` event in `parentId` that started `childId` (ask.ts), as stored, or null when that child was no Ask. */
   askFor: (parentId: string, childId: string) =>
     (

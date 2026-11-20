@@ -344,7 +344,8 @@ export const threads = {
       .all() as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
   /**
-   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts), and
+   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts), a
+   * group thread whose member runs counting as running for the threads above it (its own mark comes from its members), and
    * the threads in `agentHosts` (whose own sub-agents still run) with every thread above them. A host whose turn was
    * stopped or failed counts for nothing. An archived thread pins nothing. UNION drops an id met again, so a parent_id
    * cycle ends.
@@ -355,6 +356,8 @@ export const threads = {
         .prepare(
           `WITH RECURSIVE up(id) AS (
              SELECT parent_id FROM threads WHERE status IN ('running','queued') AND archived = 0 AND parent_id IS NOT NULL AND source != 'member'
+             UNION SELECT g.parent_id FROM threads m JOIN threads g ON g.id = m.parent_id
+               WHERE m.source = 'member' AND m.status IN ('running','queued') AND m.archived = 0 AND g.archived = 0 AND g.parent_id IS NOT NULL
              UNION SELECT id FROM threads WHERE id IN (SELECT value FROM json_each(?)) AND status NOT IN ('stopped','failed') AND archived = 0
              UNION SELECT t.parent_id FROM threads t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
            SELECT id FROM up`,

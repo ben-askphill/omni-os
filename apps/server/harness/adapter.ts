@@ -32,6 +32,8 @@ export interface AdapterContext {
   /** The channel browser Omni runs, for the browser MCP to attach to. */
   cdpEndpoint?: string | null;
   omniUrl: string;
+  /** The thread is a team thread and this is its lead (runner/team.ts), so its MCP config carries message_members. */
+  leadsTeam?: boolean;
   /**
    * This spawn's own token (thread-tokens.ts), which the process gets as OMNI_TOKEN in place of the install's. Its MCP
    * servers read the same token from the file OMNI_TOKEN_FILE names. Unset for a harness that runs elsewhere.

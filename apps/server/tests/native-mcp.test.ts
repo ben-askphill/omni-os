@@ -102,7 +102,7 @@ describe('what a thread gets', () => {
     expect(servers()).toEqual({});
     expect(servers(conductor)).toEqual({ omni: expect.objectContaining({ args: [paths.mcpOmni] }) });
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render, set_steps, read_referenced_thread or remember. Build it with npm run dev');
+    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render, set_steps, read_referenced_thread, remember or message_members. Build it with npm run dev');
     expect(nativeMcpCommand('ask')).toBeNull();
   });
 

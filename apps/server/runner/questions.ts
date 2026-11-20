@@ -25,6 +25,7 @@ import { notifyNeedsInput } from '../push-sender.ts';
 import { remoteHolder } from '../ownership.ts';
 import { runningElsewhere, turnBlocked } from '../sync/guard.ts';
 import { runnerPorts } from './ports.ts';
+import { agentName } from '../member-view.ts';
 import { wakePrepared } from './api.ts';
 import { polled, settled } from './question-waits.ts';
 import { saveOwn } from './queue.ts';
@@ -80,12 +81,19 @@ export function crewQuestions(threadId: string): CrewQuestion[] {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
   return continuedLine(threadId)
     .flatMap((id) => threads.descendants(id))
-    .filter((t) => !t.archived)
-    .flatMap((t) =>
-      questionsIn(events.questions(t.id))
+    // A member's session asks in its group thread's transcript, which is read once, there.
+    .filter((t) => !t.archived && t.source !== 'member')
+    .flatMap((t) => {
+      const rows = events.questions(t.id);
+      // A group thread's member asks in its transcript, as itself: the card names it (Q46).
+      const askedBy = new Map(rows.filter((r) => r.agent && r.agent !== (t.role ?? '')).map((r) => [r.id, r.agent!]));
+      return questionsIn(rows)
         .filter((q) => q.state === 'pending')
-        .map((question) => ({ thread_id: t.id, thread_title: t.title, task_id: t.task_id, channel_id: t.channel_id, question })),
-    )
+        .map((question) => {
+          const agent = askedBy.get(question.event_id);
+          return { thread_id: t.id, thread_title: t.title, task_id: t.task_id, channel_id: t.channel_id, question, ...(agent && { member: { agent, name: agentName(agent) } }) };
+        });
+    })
     .sort((a, b) => a.question.event_id - b.question.event_id);
 }
 

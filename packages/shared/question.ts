@@ -176,10 +176,12 @@ export interface CrewQuestion {
   task_id: string | null;
   channel_id: string;
   question: ThreadQuestion;
+  /** The member of a group thread that asks (ADR 0019), when it is not the thread's lead. */
+  member?: { agent: string; name: string };
 }
 
-/** Who asks, on a crew question's card and its push alert: "T-4299 · Build the CSV export". */
-export const crewAsker = (c: Pick<CrewQuestion, 'task_id' | 'thread_title'>) => [c.task_id, c.thread_title].filter(Boolean).join(' · ');
+/** Who asks, on a crew question's card and its push alert: "T-4299 · Build the CSV export", then the member that asks. */
+export const crewAsker = (c: Pick<CrewQuestion, 'task_id' | 'thread_title' | 'member'>) => [c.task_id, c.thread_title, c.member?.name].filter(Boolean).join(' · ');
 
 type EventLike = { id: number; kind: string; payload: string | object };
 const payloadOf = <T>(e: EventLike) => (typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload) as T;
