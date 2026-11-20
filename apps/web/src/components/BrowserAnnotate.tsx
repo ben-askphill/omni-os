@@ -52,7 +52,7 @@ function failure(e: unknown): Phase {
 }
 
 /** The captured screenshot, fitted inside the box it is shown in: its size in CSS pixels per page pixel. */
-function useFit(viewport: { width: number; height: number } | null) {
+export function useFit(viewport: { width: number; height: number } | null) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {

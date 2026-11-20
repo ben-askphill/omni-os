@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { bytes, relTime } from '@omni/shared/format.ts';
 import { artifactUrl, type Artifact } from '../api.ts';
 import { useImageZoom, ZoomableImage, ZoomControls, type ImageZoom } from './ImageZoom.tsx';
+import { ImageAnnotateLayer, type AnnotationSent } from './ImageAnnotate.tsx';
 import { Markdown } from './Markdown.tsx';
 import { PublishedActions } from './Published.tsx';
 import { ErrorNote, Icon, IconButton, IconLink, Loading, Modal, type IconName } from './ui.tsx';
@@ -163,14 +164,20 @@ export function ArtifactActions({ a, onExpand }: { a: Artifact; onExpand?: () =>
   );
 }
 
-/** Header + body, with a full-screen mode. */
-/** `from`: the delegated thread that made it, when a parent thread shows it, linked from its header. */
-export function ArtifactViewer({ a, from }: { a: Artifact; from?: { id: string; title: string } }) {
+/**
+ * Header + body, with a full-screen mode. `from`: the delegated thread that made it, when a parent thread shows it,
+ * linked from its header. `annotateIn`: the thread whose panel shows it; an image then offers Annotate, which marks it
+ * up and sends it to that thread or to `from` (ImageAnnotate.tsx).
+ */
+export function ArtifactViewer({ a, from, annotateIn }: { a: Artifact; from?: { id: string; title: string }; annotateIn?: string }) {
   const [full, setFull] = useState(false);
+  const [annotating, setAnnotating] = useState(false);
+  const [sent, setSent] = useState<AnnotationSent | null>(null);
   const zoom = useImageZoom(artifactUrl(a));
   const fullZoom = useImageZoom(artifactUrl(a));
+  const canAnnotate = !!annotateIn && isImage(a);
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3 shadow-[0_1px_0_var(--line)]">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface text-fg-3">
           <Icon name={kindIcon(a.kind)} size={14} />
@@ -190,11 +197,53 @@ export function ArtifactViewer({ a, from }: { a: Artifact; from?: { id: string; 
           </div>
         </div>
         {isImage(a) && <ZoomControls z={zoom} />}
+        {canAnnotate && (
+          <IconButton
+            icon="annotate"
+            label="Annotate and send"
+            size={15}
+            disabled={!zoom.natural}
+            onClick={() => {
+              setSent(null);
+              setAnnotating(true);
+            }}
+          />
+        )}
         <ArtifactActions a={a} onExpand={() => setFull(true)} />
       </div>
+      {sent && (
+        <div role="status" className="flex items-center gap-2 px-3 py-1.5 text-[11.5px] text-fg-3 shadow-[0_1px_0_var(--line)]">
+          <Icon name="check" size={12} className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            {'Annotation sent to '}
+            {sent.thread === annotateIn ? (
+              'this thread'
+            ) : (
+              <a href={href.thread(sent.thread)} className="font-medium text-fg underline-offset-2 hover:underline">
+                {sent.label}
+              </a>
+            )}
+            .
+          </span>
+          <IconButton icon="x" label="Dismiss" size={12} onClick={() => setSent(null)} />
+        </div>
+      )}
       <div className="min-h-0 flex-1">
         <ArtifactBody a={a} zoom={zoom} />
       </div>
+      {canAnnotate && annotating && zoom.natural && (
+        <ImageAnnotateLayer
+          a={a}
+          threadId={annotateIn}
+          from={from}
+          natural={zoom.natural}
+          onClose={() => setAnnotating(false)}
+          onSent={(s) => {
+            setAnnotating(false);
+            setSent(s);
+          }}
+        />
+      )}
       <Modal
         open={full}
         onClose={() => setFull(false)}

@@ -112,6 +112,7 @@ export function MarkToolbar({
   onStroke,
   onUndo,
   onDelete,
+  onClear,
 }: {
   tool: Tool;
   shape: MarkShape;
@@ -125,6 +126,8 @@ export function MarkToolbar({
   onStroke: (n: number) => void;
   onUndo: () => void;
   onDelete: () => void;
+  /** Clear: every mark goes. Offered where there is no picked area to keep (an image file). Enabled with `canUndo`. */
+  onClear?: () => void;
 }) {
   const current = SHAPES.find((s) => s.shape === shape)!;
   // One Tab stop: the arrow keys, Home and End move between the tools, and Tab comes back to the last one used.
@@ -201,6 +204,19 @@ export function MarkToolbar({
       <span className="flex-1" />
       <IconButton {...ROVING_ITEM} icon="undo" label="Undo the last mark" size={15} disabled={!canUndo} onClick={onUndo} />
       <IconButton {...ROVING_ITEM} icon="trash" label="Delete the selected mark" size={15} disabled={!canDelete} onClick={onDelete} />
+      {onClear && (
+        <button
+          type="button"
+          {...ROVING_ITEM}
+          aria-label="Clear all marks"
+          title="Clear all marks"
+          disabled={!canUndo}
+          onClick={onClear}
+          className="hov press h-8 rounded-full px-2.5 text-[12px] font-medium text-fg-3 transition-colors hover:text-fg disabled:pointer-events-none disabled:opacity-40"
+        >
+          Clear
+        </button>
+      )}
     </div>
   );
 }

@@ -41,13 +41,15 @@ export interface MarkEditorInput {
   focusNote: () => void;
   onArea: (d: Drag) => void;
   onTap: (p: readonly [number, number]) => void;
+  /** The tool it starts on: Select, unless the caller has nothing to pick (an image file has no page under it). */
+  initialTool?: Tool;
 }
 
-export function useMarkEditor({ viewport, shown, scale, adding, setError, focusNote, onArea, onTap }: MarkEditorInput) {
+export function useMarkEditor({ viewport, shown, scale, adding, setError, focusNote, onArea, onTap, initialTool = 'select' }: MarkEditorInput) {
   const stage = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
-  const [tool, setTool] = useState<Tool>('select');
-  const [shape, setShape] = useState<MarkShape>('rect');
+  const [tool, setTool] = useState<Tool>(initialTool);
+  const [shape, setShape] = useState<MarkShape>(isShape(initialTool) ? initialTool : 'rect');
   const [color, setColor] = useState<string>(DEFAULT_MARK_COLOR);
   const [stroke, setStroke] = useState<number>(DEFAULT_MARK_STROKE);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -88,6 +90,11 @@ export function useMarkEditor({ viewport, shown, scale, adding, setError, focusN
     setSelected(-1);
   };
   const undo = () => remove(marks.length - 1);
+  const clear = () => {
+    setTyping(null);
+    setMarks([]);
+    setSelected(-1);
+  };
   const recolor = (hex: string) => {
     setColor(hex);
     if (selected >= 0) setMarks(marks.map((m, i) => (i === selected ? { ...m, color: hex as Mark['color'] } : m)));
@@ -183,5 +190,5 @@ export function useMarkEditor({ viewport, shown, scale, adding, setError, focusN
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  return { stage, overlay, tool, shape, setShape, color, stroke, marks, selected, gesture, setGesture, typing, setTyping, pickTool, recolor, restroke, undo, remove, commitText, down, move, up };
+  return { stage, overlay, tool, shape, setShape, color, stroke, marks, selected, gesture, setGesture, typing, setTyping, pickTool, recolor, restroke, undo, clear, remove, commitText, down, move, up };
 }
