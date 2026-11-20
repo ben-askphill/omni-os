@@ -3,6 +3,7 @@ import { changesView } from '@omni/shared/changes-view.ts';
 import { MAX_LINES } from '@omni/shared/diff.ts';
 import { holdPress, noPick } from '@omni/shared/diff-pick.ts';
 import type { ReviewNote } from '@omni/shared/review-notes.ts';
+import changesJson from '@omni/test-fixtures/wire/changes.json';
 import { describe, expect, it } from 'vitest';
 
 import { changeRows, FRESH_ROWS, notesOnScreen, pickable, pickedRange, showAll, toggleFile } from '../../src/changes/rows';
@@ -161,5 +162,26 @@ describe('review notes on the rows', () => {
     const rows = changeRows(v.groups, 1, FRESH_ROWS, byFile);
     expect(rows.some((r) => r.type === 'more')).toBe(false);
     expect(rows.some((r) => r.type === 'reviewNote')).toBe(true);
+  });
+});
+
+describe('collisions in Changes (ADR 0019)', () => {
+  // The server's recorded GET /threads/:id/changes, with a flag up on README.md.
+  const wire = changesJson as unknown as BranchChanges;
+
+  it('lists the flags still up over the diff, and marks the files they name', () => {
+    const v = changesView(wire)!;
+    const rows = changeRows(v.groups, v.files, FRESH_ROWS, new Map(), wire.collisions);
+    expect(rows[0]).toMatchObject({ type: 'collision', c: { path: 'README.md', agents: ['builder', 'designer'] } });
+    const files = rows.filter((r) => r.type === 'file');
+    expect(files.filter((r) => r.type === 'file' && r.flagged).map((r) => r.type === 'file' && r.file.diff.path)).toEqual(['README.md']);
+  });
+
+  it('leaves a cleared flag out, and a server from before collisions has none', () => {
+    const v = changesView(wire)!;
+    const cleared = wire.collisions!.map((c) => ({ ...c, cleared: 'commit' as const }));
+    const rows = changeRows(v.groups, v.files, FRESH_ROWS, new Map(), cleared);
+    expect(rows.some((r) => r.type === 'collision' || (r.type === 'file' && r.flagged))).toBe(false);
+    expect(changeRows(v.groups, v.files, FRESH_ROWS).some((r) => r.type === 'collision')).toBe(false);
   });
 });

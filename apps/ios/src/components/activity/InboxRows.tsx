@@ -10,6 +10,7 @@ import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../
 import { Icon, type IconName } from '../../ui/Icon';
 import { Text } from '../../ui/Text';
 import { ChannelAvatar } from '../ChannelAvatar';
+import { MarkLine } from '../MarkLine';
 import { AgentsRow, TreeRows, TreeToggle, TreeToggleSpace } from './ThreadTree';
 
 export interface RowAction {
@@ -78,7 +79,7 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
       <View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
+          accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, row.markLine, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
           onPress={onPress}
           style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
         >
@@ -90,6 +91,8 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
               </Text>
               <Text style={[styles.right, { color: colors.fg3 }]}>{right}</Text>
             </View>
+            {/* A group thread at work says who: "Builder asks you · Designer working" (ADR 0019). */}
+            {row.markLine ? <MarkLine faces={row.faces} text={row.markLine} /> : null}
             {row.step ? (
               <Text numberOfLines={1} style={[styles.meta, { color: colors.fg2 }]}>
                 {row.step}

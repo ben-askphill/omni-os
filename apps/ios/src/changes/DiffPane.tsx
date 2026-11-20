@@ -9,6 +9,8 @@ import { FileHeader, GroupHeader, LineRow, MoreRow, NoteRow } from './DiffRows';
 import { NoteCard, type NoteActions } from './ReviewNotes';
 import { changeRows, FRESH_ROWS, pickedRange, showAll, toggleFile, type ChangeRow, type FileNotes } from './rows';
 import { SelectionDock, type PickSource } from './SelectionDock';
+import type { Collision } from '@omni/shared/collisions.ts';
+import { CollisionFlag } from '../components/thread/rows/Group';
 
 export interface PaneEmpty {
   title: string;
@@ -33,11 +35,17 @@ interface DiffPaneProps {
   /** Unresolved review notes placed on these groups (rows.ts notesOnScreen), and what changes them. */
   notes: ReadonlyMap<string, FileNotes>;
   noteActions: NoteActions;
+  /** The files two of the thread's agents both edited (ADR 0019), over the diff while their flags are up. */
+  collisions?: readonly Collision[];
+  /** Takes a flag down, then reloads. */
+  onDismissCollision?: (id: number) => Promise<void>;
 }
 
 const keyOf = (row: ChangeRow) => row.id;
 
-export function DiffPane({ threadId, scope, groups, total, header, empty, source, refreshing, onRefresh, onAdded, headerOffset, notes, noteActions }: DiffPaneProps) {
+const NO_FLAGS: readonly Collision[] = [];
+
+export function DiffPane({ threadId, scope, groups, total, header, empty, source, refreshing, onRefresh, onAdded, headerOffset, notes, noteActions, collisions = NO_FLAGS, onDismissCollision }: DiffPaneProps) {
   const { colors } = useOmniTheme();
   const [rowsState, setRowsState] = useState(FRESH_ROWS);
   const [held, setHeld] = useState<HeldPick>(() => noPick(scope));
@@ -55,7 +63,7 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
     return f && pick ? { file: pick.file, ...pickedRange(pick, pick.file, f.diff.lines)! } : null;
   }, [picked, pick, files]);
 
-  const rows = useMemo(() => changeRows(groups, total, rowsState, notes), [groups, total, rowsState, notes]);
+  const rows = useMemo(() => changeRows(groups, total, rowsState, notes, collisions), [groups, total, rowsState, notes, collisions]);
   const notesRef = useRef(notes);
   notesRef.current = notes;
 
@@ -77,6 +85,12 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
   const renderItem = useCallback(
     ({ item }: { item: ChangeRow }) => {
       switch (item.type) {
+        case 'collision':
+          return (
+            <View style={styles.flag}>
+              <CollisionFlag c={item.c} onDismiss={onDismissCollision ?? (async () => {})} />
+            </View>
+          );
         case 'group':
           return <GroupHeader title={item.title} count={item.count} />;
         case 'file':
@@ -95,7 +109,7 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
           return <NoteRow text="More files changed than are listed here." />;
       }
     },
-    [liveRange, press, toggle, more, noteActions],
+    [liveRange, press, toggle, more, noteActions, onDismissCollision],
   );
 
   return (
@@ -132,6 +146,10 @@ function Empty({ title, body }: PaneEmpty) {
 const styles = StyleSheet.create({
   pane: {
     flex: 1,
+  },
+  flag: {
+    paddingHorizontal: space.s8,
+    paddingBottom: space.s4,
   },
   list: {
     paddingBottom: space.s10,

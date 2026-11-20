@@ -15,6 +15,7 @@ import { Icon } from '../../../ui/Icon';
 import { Text } from '../../../ui/Text';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { mentionPieces } from '@omni/shared/message-context-machine.ts';
+import type { Collision } from '@omni/shared/collisions.ts';
 import { agentColor, agentName } from '../../agent-face';
 import { AgentAvatar } from '../../AgentAvatar';
 import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
@@ -120,20 +121,27 @@ export function FilesRow({ row }: Of<'files'>) {
   );
 }
 
-/** A file two agents both edited: up until the lead's next commit, or until the user dismisses it (Q23). */
+/** A file two agents both edited, flagged in the transcript where it was raised. */
 export function CollisionRow({ row }: Of<'collision'>) {
+  const { dismissCollision } = useRowActions();
+  return <CollisionFlag c={row.c} onDismiss={dismissCollision} />;
+}
+
+/**
+ * A collision flag: the file with its folder, the full path under it, and who was told. It is up until the lead's
+ * next commit, or until the user dismisses it (Q23). The transcript and Changes draw it.
+ */
+export function CollisionFlag({ c, onDismiss }: { c: Collision; onDismiss: (id: number) => Promise<void> }) {
   const { colors } = useOmniTheme();
   const agents = useAgents();
-  const { dismissCollision } = useRowActions();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { c } = row;
   const cleared = c.cleared === 'commit' ? 'Cleared at the commit' : c.cleared === 'dismiss' ? 'Dismissed' : null;
   const dismiss = async () => {
     setBusy(true);
     setError(null);
     try {
-      await dismissCollision(c.id);
+      await onDismiss(c.id);
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : 'Could not dismiss it');
     } finally {

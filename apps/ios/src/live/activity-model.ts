@@ -5,6 +5,7 @@ import type { BackgroundTask, ChannelWithRunning, NeedsYou, PinnedThread, Thread
 import { delegatedIds, isWorking } from '@omni/shared/delegate-count.ts';
 
 import { asksForYou, inboxStatus, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
+import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
 import { canMarkDone, targetOfStub, type ThreadTarget } from '../thread/target';
 import { shortAgo } from './channel-model';
 import { agentsByThread, jobTree, treeSource, type JobTree } from './thread-tree';
@@ -32,6 +33,10 @@ export interface InboxRow {
   owner: string | null;
   /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), as phone web's row shows it. */
   step: string | null;
+  /** A group thread at work says who: "Builder asks you · Designer working" (ADR 0019). Null otherwise. */
+  markLine: string | null;
+  /** Its agents' faces beside that line: the one asking first, then the working ones, two at most (ADR 0019). */
+  faces: AvatarMark | null;
   pinned: boolean;
   /** Work in progress recedes, so what waits on Ben stands out. */
   receded: boolean;
@@ -127,12 +132,15 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
       title: t.title || 'Untitled',
       channel: names.get(t.channel_id) ?? t.channel_id,
       channelId: t.channel_id,
-      glyph: status?.glyph ?? threadGlyph(t),
+      // A group thread shows the busiest of its agents, whatever the lead's own state says (ADR 0019).
+      glyph: groupGlyph(status?.glyph ?? threadGlyph(t), t.members),
       status,
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,
       owner: t.owner ?? null,
       step: t.step ?? null,
+      markLine: markLine(t.members),
+      faces: avatarMark(t.members),
       pinned: !!t.pinned_at,
       receded: status?.glyph === 'running',
       canMarkDone: canMarkDone(t.status),

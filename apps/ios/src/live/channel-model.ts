@@ -1,5 +1,7 @@
 import type { ChannelWithRunning, NeedsYou, ThreadStub } from '@omni/client-core';
 import { statusWord } from '@omni/shared/display.ts';
+import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
+import { glyphFor, type Glyph } from '@omni/shared/status.ts';
 
 type ConductorHandoff = NonNullable<ChannelWithRunning['handoffs']>[number];
 
@@ -57,6 +59,12 @@ export interface ThreadRow {
   owner?: string | null;
   /** The word after the title for a state worth naming. Null for a finished, done thread. */
   statusLabel: string | null;
+  /** The avatar's corner: the thread's status, or the busiest of a group thread's agents (ADR 0019). */
+  glyph: Glyph;
+  /** A group thread at work says who on its second line: "Builder asks you · Designer working". Null otherwise. */
+  markLine: string | null;
+  /** Its agents' faces beside that line: the one asking first, then the working ones, two at most (ADR 0019). */
+  faces: AvatarMark | null;
   /** "now", "5m", "3h", "2d". */
   ago: string;
   pinned: boolean;
@@ -103,6 +111,9 @@ export function threadRow(t: ThreadStub, now: number, technical = true): ThreadR
     status: t.status,
     busy: t.status === 'running' || t.status === 'queued',
     statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusWord(t.status, technical),
+    glyph: groupGlyph(glyphFor(t.status), t.members),
+    markLine: markLine(t.members),
+    faces: avatarMark(t.members),
     ...(t.owner && { owner: t.owner }),
     ago: shortAgo(t.updated_at ?? t.created_at, now),
     pinned: !!t.pinned_at,

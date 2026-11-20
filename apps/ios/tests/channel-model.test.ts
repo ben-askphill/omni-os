@@ -66,6 +66,17 @@ describe('shortAgo', () => {
 });
 
 describe('threadRow', () => {
+  it('marks a group thread with its busiest agent, and says who asks and who works on its second line (ADR 0019)', () => {
+    const seat = (agent: string, name: string, state: 'needs' | 'working' | 'done' | 'failed', lead = false) => ({ agent, name, lead, state, status: 'done', harness: 'claude-code', model: null, effort: '', seated_at: '' });
+    const members = [seat('builder', 'Builder', 'working', true), seat('designer', 'Designer', 'needs'), seat('reviewer', 'Reviewer', 'failed')];
+    const row = threadRow(stub({ id: 'g', status: 'running', members }), NOW);
+    expect(row).toMatchObject({ glyph: 'needs', markLine: 'Designer asks you · Builder working · Reviewer failed' });
+    // The faces: the one asking first, then the working one, and a red dot for the failure.
+    expect(row.faces).toEqual({ faces: [{ agent: 'designer', name: 'Designer', ring: 'needs' }, { agent: 'builder', name: 'Builder', ring: 'working' }], more: 0, failed: true });
+    expect(threadRow(stub({ id: 's', status: 'running' }), NOW)).toMatchObject({ glyph: 'running', markLine: null, faces: null });
+  });
+
+
   it('names only the states worth a word and marks busy threads', () => {
     expect(threadRow(stub({ id: 'a', status: 'running' }), NOW)).toMatchObject({ busy: true, statusLabel: 'Running' });
     expect(threadRow(stub({ id: 'b', status: 'queued' }), NOW)).toMatchObject({ busy: true, statusLabel: 'Queued' });
