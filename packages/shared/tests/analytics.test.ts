@@ -50,6 +50,38 @@ describe('analytics exceptions', () => {
     ]);
   });
 
+  // A failed command's message carries its stderr, which can hold lines shaped like V8 frames.
+  const leaks = (e: unknown) => JSON.stringify(e).match(/acme|gold/i);
+
+  it('reads no frame-shaped line of a message, wherever it sits in the message', () => {
+    for (const message of [
+      'Command failed: theme push\n    at Acme Gold Membership 40 off (acme-checkout.liquid:12:3)\nstderr done',
+      'Command failed: theme push\n    at AcmeGold.apply (acme-gold.liquid:1:1)',
+    ]) {
+      const e = exceptionOf(new Error(message), { source: 'server', handled: true })!;
+      expect(leaks(e)).toBeNull();
+      expect(e.frames[0]).toMatchObject({ file: 'analytics.test.ts' });
+    }
+  });
+
+  it('reads no frame-shaped line of a message changed after the error was made', () => {
+    const err = new Error('Command failed: theme push\n    at AcmeGold.apply (acme-gold.liquid:1:1)\nstderr done');
+    // V8 writes the stack when it is first read, so read it before the message changes.
+    expect(err.stack).toContain('acme-gold');
+    err.message = 'Command failed';
+    const e = exceptionOf(err, { source: 'server', handled: true })!;
+    expect(leaks(e)).toBeNull();
+    expect(e.frames[0]).toMatchObject({ file: 'analytics.test.ts' });
+  });
+
+  it('keeps a function name only when it is a dotted name, `new` or `<anonymous>` included', () => {
+    expect(stackFrames('Error: x\n    at new Foo (a.js:1:2)\n    at Object.<anonymous> (b.js:3:4)').map((f) => f.function)).toEqual(['new Foo', 'Object.<anonymous>']);
+    expect(cleanException({ type: 'Error', frames: [{ file: 'a.js', function: 'Acme Gold Membership' }, { file: 'b.js', function: 'Cart.render' }] })!.frames).toEqual([
+      { file: 'a.js' },
+      { file: 'b.js', function: 'Cart.render' },
+    ]);
+  });
+
   it('reads a WebKit stack', () => {
     expect(stackFrames('render@http://127.0.0.1:4747/assets/index-x.js:3:9\n@http://127.0.0.1:4747/assets/index-x.js:1:1')).toEqual([
       { function: 'render', file: 'index-x.js', line: 3, col: 9 },
