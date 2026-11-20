@@ -26,6 +26,7 @@ import {
   deliveryPhase,
   drop,
   emitThread,
+  groupStopping,
   deliveryCaps,
   isShuttingDown,
   lives,
@@ -197,6 +198,7 @@ export function fenceStale() {
 
 export function interruptThread(threadId: string) {
   // A group thread (ADR 0019, Q13): Stop stops every agent in it, each in the session it runs in.
+  for (const stop of groupStopping) stop(threadId);
   for (const m of members.seated(threadId)) if (!m.lead) stopOne(m.session_thread);
   return stopOne(threadId);
 }

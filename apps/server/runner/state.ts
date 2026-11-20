@@ -190,6 +190,8 @@ export interface ModStatus {
 export const lives = new Map<string, Live>();
 /** Called once a thread's turn is over: ended, failed, stopped or refused before it started (runner/members.ts). */
 export const turnEnded: ((threadId: string, status: ThreadStatus) => void)[] = [];
+/** Cancel group work that has not reached a session yet (runner/members.ts). */
+export const groupStopping: ((threadId: string) => void)[] = [];
 export function endedTurn(threadId: string, status: ThreadStatus) {
   for (const f of turnEnded) {
     try {

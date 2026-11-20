@@ -3,7 +3,7 @@
 // only to the agents it names, which run at once (slice 3, parallel-members.test.ts). Each agent's turn opens with the messages
 // since its last turn that it did not write, without tool calls; a new member's first opens with a small-model catch-up.
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 import { CALLER_HEADER as CALLER } from '../caller-header.ts';
 
@@ -51,7 +51,40 @@ async function groupThread(prompt = 'RICH plan the feature') {
   return t;
 }
 
+/** Hold exactly one small-model call so a test can act while the member's catch-up is in flight. */
+async function holdCatchUp() {
+  const aux = await import('../runner/aux.ts');
+  const started = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<string | null>();
+  const spy = vi.spyOn(aux, 'askHaiku').mockImplementationOnce(() => {
+    started.resolve();
+    return release.promise;
+  });
+  return {
+    started: started.promise,
+    finish() {
+      release.resolve('Catch-up ready.');
+      spy.mockRestore();
+    },
+  };
+}
+
 describe('seating by agent mention', () => {
+  it('Stop cancels member starts still waiting for a catch-up', T, async () => {
+    const t = await groupThread('plain start');
+    const catchUp = await holdCatchUp();
+    try {
+      expect((await say(t.id, 'cancel this part', ['designer', 'Designer'])).status).toBe(200);
+      await catchUp.started;
+      expect((await call(`/threads/${t.id}/stop`, json('POST'))).status).toBe(200);
+    } finally {
+      catchUp.finish();
+    }
+    expect((await say(t.id, 'start fresh', ['designer', 'Designer'])).status).toBe(200);
+    await untilIdle(t.id, 2);
+    expect(readBy(t.id, 'designer')).toEqual([expect.stringContaining('start fresh')]);
+  });
+
   it('seats a named agent, which alone replies, and writes the message once with a joined line', T, async () => {
     const t = await groupThread();
     expect((await say(t.id, 'look at the design', ['designer', 'Designer'])).status).toBe(200);
