@@ -65,7 +65,7 @@ describe('the locks on the roles Omni relies on', () => {
   it("keeps the reviewer's review capability on", async () => {
     expect(await refusal(await send('PUT', '/crew/reviewer', { fields: { review: false } }))).toEqual({
       status: 409,
-      error: "Omni's review rules come with this role. Duplicate it for a reviewer without them. Leave review as the built-in has it.",
+      error: "Omni's review rules come with this agent. Duplicate it for a reviewer without them. Leave review as the built-in has it.",
     });
     // Its other fields are the user's.
     expect((await send('PUT', '/crew/reviewer', { fields: { model: 'opus' } })).status).toBe(200);
@@ -75,7 +75,7 @@ describe('the locks on the roles Omni relies on', () => {
   it('refuses a duplicate of the singletons and hiding them, with why, and copies the reviewer with its capability', async () => {
     expect(await refusal(await send('POST', '/crew/conductor/duplicate', { id: 'conductor-two' }))).toEqual({
       status: 409,
-      error: 'The Conductor is not duplicated: there is one. Make another role with New role.',
+      error: 'The Conductor is not duplicated: there is one. Make another agent with New agent.',
     });
     expect((await send('POST', '/crew/usage-scan/duplicate', { id: 'scan-two' })).status).toBe(409);
     expect(await refusal(await send('POST', '/crew/conductor/hidden', { hidden: true }))).toEqual({ status: 409, error: 'The Conductor is never hidden: it is the front agent in #conductor.' });
@@ -199,7 +199,7 @@ describe('review_of', () => {
     await expect(H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: byClaude.id, model: 'auto' })).rejects.toMatchObject({ status: 409 });
     await expect(H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'builder', review_of: byClaude.id })).rejects.toMatchObject({
       status: 400,
-      message: 'review_of is for a review role. Review roles: reviewer.',
+      message: 'review_of is for a review agent. Review agents: reviewer.',
     });
     await expect(H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: 'no-such-thread' })).rejects.toMatchObject({ status: 404 });
   });

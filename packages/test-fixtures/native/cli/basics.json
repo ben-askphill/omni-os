@@ -4,7 +4,7 @@
       "name": "no arguments prints the usage and exits 64",
       "args": [],
       "expected": {
-        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
+        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
         "stderr": "",
         "exit": 64,
         "requests": [],
@@ -17,7 +17,7 @@
         "--help"
       ],
       "expected": {
-        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
+        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],
@@ -30,7 +30,7 @@
         "-h"
       ],
       "expected": {
-        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
+        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],
@@ -43,7 +43,7 @@
         "help"
       ],
       "expected": {
-        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
+        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],
@@ -57,7 +57,7 @@
         "new"
       ],
       "expected": {
-        "stdout": "omni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stdout": "omni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],
@@ -71,7 +71,7 @@
         "frobnicate"
       ],
       "expected": {
-        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
+        "stdout": "omni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],
@@ -112,7 +112,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni: unknown command frobnicate\n\nomni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
+        "stderr": "omni: unknown command frobnicate\n\nomni: Omni's command line\n\nCommands:\n  new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  send <thread> \"<message>\" [--queue | --interrupt] [--wait] [--json]\n  threads [--needs-you] [--running] [-c <channel>] [-n <count>] [--json]\n  show <thread> [--json]\n  status [--machine <name>] [--json]\n  doctor [--json]\n  open [<thread> | <channel> | .] [--pair]\n\nomni <command> --help shows one command. docs/user/cli.md has the rest.\n\nEnvironment: OMNI_URL (default http://127.0.0.1:4747), OMNI_TOKEN or OMNI_TOKEN_FILE (default: the install's\napi-token). Inside an Omni thread these are set already.\nExit codes: 0 ok, 1 failed (--wait, doctor), 2 needs you (--wait), 3 Omni refused or is unreachable, 64 bad usage.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -125,7 +125,7 @@
         "--help"
       ],
       "expected": {
-        "stdout": "omni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stdout": "omni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],
@@ -241,7 +241,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: unknown option --bogus\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: unknown option --bogus\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -256,7 +256,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: unknown option -x\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: unknown option -x\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -271,7 +271,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: --json takes no value\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: --json takes no value\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -286,7 +286,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: --channel needs a value\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: --channel needs a value\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -301,7 +301,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: --channel needs a value\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: --channel needs a value\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -544,7 +544,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: write a prompt, or pipe one in\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: write a prompt, or pipe one in\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}
@@ -559,7 +559,7 @@
       ],
       "expected": {
         "stdout": "",
-        "stderr": "omni new: write a prompt, or pipe one in\n\nomni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stderr": "omni new: write a prompt, or pipe one in\n\nomni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "exit": 64,
         "requests": [],
         "launched": {}

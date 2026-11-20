@@ -212,7 +212,7 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   const head = i.files?.head.slice(0, 7) ?? '';
   const constraints = [
     `Channel: #${i.source.channel}`,
-    ...(i.role ? [`Crew role: ${i.role}`] : []),
+    ...(i.role ? [`Agent: ${i.role}`] : []),
     workspaceLine(ws, head),
     ...(i.machine
       ? [`Machine: you run on ${neutral(i.machine.to)}. The source ran on ${neutral(i.machine.from)}, so anything it had there outside its checkout, such as a running server or files outside the repo, is not on yours.`]

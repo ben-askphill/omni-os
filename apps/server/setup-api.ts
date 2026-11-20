@@ -231,8 +231,8 @@ export const crewPlace = (): CrewPlace => ({ install: BUNDLED ? 'app' : 'checkou
 export function welcomeText(name: string, place: CrewPlace = crewPlace()) {
   const crew =
     place.install === 'app'
-      ? `- Crew charters (the roles I hand work to) ship with the app. To change one just for you, save a copy with the same name, like \`builder.md\`, in \`${place.personalCrew}/\`. Settings > About shows where Omni keeps its files.`
-      : `- Crew charters live in \`${place.crew}/\`. To change one just for you, copy it into \`${place.personalCrew}/\` and edit that copy.`;
+      ? `- Agent charters (the agents I hand work to) ship with the app. To change one just for you, save a copy with the same name, like \`builder.md\`, in \`${place.personalCrew}/\`. Settings > About shows where Omni keeps its files.`
+      : `- Agent charters live in \`${place.crew}/\`. To change one just for you, copy it into \`${place.personalCrew}/\` and edit that copy.`;
   const general = channels.get(GENERAL)?.name ?? 'General';
   return [
     `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: ask me anything. I answer quick questions here myself, and hand real work to the right agent in the right channel, whose report then shows up here.`,

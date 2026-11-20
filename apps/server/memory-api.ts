@@ -22,7 +22,7 @@ export const memoryApi = new Hono();
 /** Why an agent may not settle a fact: a channel's learning waits in the channel's settings, a role's lesson in Settings > Crew. */
 const agentWrite = (id: string) =>
   memories.get(id)?.role
-    ? `Only ${userName()} approves, edits or deletes a role's lesson. Propose one with remember instead; it waits in Settings > Agents.`
+    ? `Only ${userName()} approves, edits or deletes an agent's lesson. Propose one with remember instead; it waits in Settings > Agents.`
     : 'Only the user approves, edits or deletes a learning. Propose one instead; it waits in the channel settings.';
 
 memoryApi.get('/', (c) => {

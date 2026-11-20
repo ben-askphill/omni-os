@@ -72,6 +72,8 @@ fn wait_and_report(c: &Client, id: &str, mut seen: Seen, as_json: bool) -> Resul
 
 const NEW_FLAGS: &[Spec] = &[
     short_value("channel", "c"),
+    short_value("agent", "a"),
+    // The old name, still accepted.
     short_value("role", "r"),
     short_value("model", "m"),
     short_switch("wait", "w"),
@@ -89,7 +91,7 @@ pub fn new_command(argv: &[String]) -> Result<i32> {
         ("id", string(&sys::uuid())),
         ("prompt", string(&prompt)),
         ("channel", p.value("channel").map(JsValue::str)),
-        ("role", p.value("role").map(JsValue::str)),
+        ("role", p.value("agent").or_else(|| p.value("role")).map(JsValue::str)),
         ("model", p.value("model").map(JsValue::str)),
         // From inside a thread it is a delegation, as the Conductor's delegate makes: filed under it, reporting back.
         ("source", string(if parent.is_some() { "conductor" } else { "capture" })),

@@ -34,10 +34,10 @@ impl Command {
     fn text(self) -> &'static str {
         match self {
             Self::New => {
-                r#"omni new "<prompt>" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]
+                r#"omni new "<prompt>" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]
   Start a thread. The prompt can come on stdin ("-", or piped with no prompt).
-  -c, --channel   channel id (default: the role's channel, else inbox)
-  -r, --role      crew role id (builder, researcher, ...)
+  -c, --channel   channel id (default: the agent's channel, else inbox)
+  -a, --agent     agent id (builder, researcher, ...); -r, --role still work
   -m, --model     model id or alias (opus, sonnet, haiku)
   -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you
       --json      print JSON

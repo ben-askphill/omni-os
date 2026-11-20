@@ -111,7 +111,7 @@ export const CREW_LOCKS: Record<string, CrewLocks> = {
       delegatable: 'Nothing delegates to the Conductor: it is the one that delegates.',
     },
     actions: {
-      duplicate: 'The Conductor is not duplicated: there is one. Make another role with New role.',
+      duplicate: 'The Conductor is not duplicated: there is one. Make another agent with New agent.',
       hide: 'The Conductor is never hidden: it is the front agent in #conductor.',
     },
   },
@@ -129,7 +129,7 @@ export const CREW_LOCKS: Record<string, CrewLocks> = {
   },
   reviewer: {
     fields: {
-      review: "Omni's review rules come with this role. Duplicate it for a reviewer without them.",
+      review: "Omni's review rules come with this agent. Duplicate it for a reviewer without them.",
     },
   },
 };

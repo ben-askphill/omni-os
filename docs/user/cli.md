@@ -26,7 +26,7 @@ The command is a small shell script that starts the `omni` binary the app carrie
 
 | Command | Does |
 | --- | --- |
-| `omni new "<prompt>" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]` | Starts a thread. The prompt can come on stdin |
+| `omni new "<prompt>" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]` | Starts a thread as an agent (`--role` and `-r` still work). The prompt can come on stdin |
 | `omni send <thread> "<message>" [--queue \| --interrupt] [--wait] [--json]` | Messages a thread. A busy thread reads it at its next step unless you queue or interrupt |
 | `omni threads [--needs-you] [--running] [-c <channel>] [-n <count>]` | Lists the latest threads, or what waits on you |
 | `omni show <thread>` | A thread's status, machine, branch, what waits on you and its latest reply |
@@ -60,7 +60,7 @@ if omni new "run the nightly import check" -c volero --wait > report.md; then ec
 Inside an Omni thread the server sets `OMNI_URL`, `OMNI_TOKEN` and `OMNI_THREAD_ID`, so nothing needs configuring. `OMNI_TOKEN` is the thread's own token, not the install's, and the thread folder (`OMNI_THREAD_DIR`) holds a copy in `token` for a shell whose harness drops variables named like a token. There the command never falls back to `data/api-token`: with no token of the thread's it sends nothing and exits 3. A thread's terminal tab and channel actions are yours, not the agent's, and keep using the install's token. `omni doctor` names the token as the thread's own.
 
 - `omni send parent "blocked on the Directus password"` reaches the thread that started this one mid-turn. Its final reply still reports back on its own.
-- `omni new "…" -c volero -r researcher` from inside a thread files the new thread under it, as the Conductor's delegate does, and its report comes back.
+- `omni new "…" -c volero -a researcher` from inside a thread files the new thread under it, as the Conductor's delegate does, and its report comes back.
 - A message from inside a thread counts as the Conductor's, so a thread whose session went cold refuses it, as `message_thread` does.
 
 ## Which server gets the token
