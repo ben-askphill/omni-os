@@ -115,15 +115,18 @@ function toolchain(target: Target): string[] {
   return triples;
 }
 
+/** cargo's arguments to build one crate for every Rust target of the build at once. */
+export function cargoArgs(crate: string, triples: string[]): string[] {
+  return ['build', '--release', '--locked', ...triples.flatMap((triple) => ['--target', triple]), '--target-dir', TARGET_DIR, '-p', crate];
+}
+
 function build(binary: NativeBinary, target: Target, triples: string[], out: string, version: string): void {
   // The omni command reads its version at compile time (crates/omni-cli/src/version.rs).
   const env = { ...process.env, OMNI_CLI_VERSION: version };
-  for (const triple of triples) {
-    say(`Compiling ${binary.file} for ${triple}`);
-    if (!ran('cargo', ['build', '--release', '--locked', '--target', triple, '--target-dir', TARGET_DIR, '-p', binary.crate], true, env).ok) {
-      throw new Error(`cargo build failed for ${triple}`);
-    }
-  }
+  // One cargo run for every arch: cargo compiles the targets side by side, where a run each would wait out the
+  // other's single-threaded link (lto, one codegen unit).
+  say(`Compiling ${binary.file} for ${triples.join(' and ')}`);
+  if (!ran('cargo', cargoArgs(binary.crate, triples), true, env).ok) throw new Error(`cargo build failed for ${triples.join(' and ')}`);
   mkdirSync(join(out, NATIVE_DIR), { recursive: true });
   const built = triples.map((triple) => join(TARGET_DIR, triple, 'release', binary.file));
   const dest = join(out, NATIVE_DIR, binary.file);
