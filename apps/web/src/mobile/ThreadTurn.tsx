@@ -106,13 +106,14 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         {t.children.length > 0 && <Delegation kids={t.children} answers={t.answers} asked={askedOf(t)} />}
       </>
     );
-    if (last && (t.status === 'running' || t.status === 'queued')) {
+    if (t.status === 'running' || t.status === 'queued') {
+      const lead = !t.author || t.author === thread.role;
       return (
         <>
           {t.status === 'queued' ? (
             <NowLine now={{ verb: 'Waiting for a free slot', target: '' }} />
           ) : (
-            <ThinkingLine label={c.status ?? (c.turn === 'starting' ? PHASE.starting.label : 'Thinking')} phase={c.turn ?? 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
+            <ThinkingLine label={(lead && c.status) || (lead && c.turn === 'starting' ? PHASE.starting.label : 'Thinking')} phase={(lead && c.turn) || 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
           )}
           <MoConnectors t={t} onOpen={() => steps(t)} />
           {showsSteps(t.progress) && <MoSteps v={t.progress} failed={t.failed} onActions={() => steps(t)} />}

@@ -194,14 +194,16 @@ function* stepRows(t: IosTurn, open: ReadonlySet<string>, running: boolean): Gen
   }
 }
 
-function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, input: RowsInput): Generator<ThreadRow> {
+function* turnRows(t: IosTurn, i: number, input: RowsInput): Generator<ThreadRow> {
   const { thread } = input;
   for (const [k, p] of t.prompts.entries()) yield promptRow(p, k, i === 0, input);
   for (const [k, r] of t.reports.entries()) yield { kind: 'report', key: `r${t.key}.${k}`, r };
-  const live = last && (t.status === 'running' || t.status === 'queued');
+  const live = t.status === 'running' || t.status === 'queued';
+  const asking = t.questions.some((q) => q.state === 'pending');
+  const label = t.author && t.author !== thread.role ? 'Thinking' : (statusLabel(input.events) ?? 'Thinking');
   // A turn several agents answered is its lanes, as on phone web.
   if (t.lanes) yield* laneRows(t, t.lanes, input);
-  else yield* authored(t, replyRows(t, { live, asking: view.asking, label: statusLabel(input.events) ?? 'Thinking' }, input), input);
+  else yield* authored(t, replyRows(t, { live, asking, label }, input), input);
   for (const f of t.flags ?? []) yield { kind: 'collision', key: `x${f.key}`, c: f };
   for (const it of t.switches) yield { kind: 'switch', key: `w${it.key}`, it, running: thread.status === 'running' };
   for (const it of t.members) yield { kind: 'member', key: `j${it.key}`, text: memberLine(it.p), event: it.p.event };
@@ -293,7 +295,7 @@ export function threadRows(input: RowsInput, prev: readonly ThreadRow[] = []): {
     children: input.children,
   });
   const rows: ThreadRow[] = [];
-  view.turns.forEach((t, i) => rows.push(...turnRows(t, i, i === view.turns.length - 1, view, input)));
+  view.turns.forEach((t, i) => rows.push(...turnRows(t, i, input)));
   return { rows: keepRows(prev, rows), view };
 }
 

@@ -10,6 +10,7 @@ import { turnSteps, type StepsView } from './steps.ts';
 import { authorOf, buildItems, isAsking, isReply, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
 import { laneFold, type LaneState } from './lanes.ts';
 import type { Collision } from './collisions.ts';
+import type { ThreadMember } from './members.ts';
 
 export type TurnStatus = 'running' | 'queued' | 'done' | 'failed' | 'stopped';
 
@@ -35,6 +36,7 @@ export interface TurnThread {
   harness: string;
   /** The agent the thread runs as, its lead: rows from before Omni recorded their author read as its. */
   role?: string | null;
+  members?: readonly Pick<ThreadMember, 'agent' | 'lead' | 'status'>[];
 }
 
 export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnChild = TurnChild> {
@@ -187,6 +189,14 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     return t;
   };
   let cur: TurnView<A, C> | null = null;
+  const lead = thread.role ?? '';
+  const byAgent = new Map<string, TurnView<A, C>>();
+  const promptTurn = (agent: string, key: number, at: string) => {
+    const previous = byAgent.get(agent);
+    const turn = previous && !endOf(previous) && !previous.lanes ? previous : start(key, at);
+    byAgent.set(agent, turn);
+    return turn;
+  };
   const shown: ReportP[] = [];
   /** One lane's replies as a turn: its own steps, answer, result and status. */
   const laneTurn = (agent: string, state: LaneState, items: Item[], at: string): TurnView<A, C> => {
@@ -232,48 +242,71 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
       shown.push(it.p);
       continue;
     }
-    // A message or report after a turn ended starts the next one; one sent while it ran was steered into it.
-    if (it.type === 'user' || it.type === 'report') {
-      if (!cur || endOf(cur)) cur = start(it.key, it.at);
-      if (it.type === 'user') cur.prompts.push({ ...it.p, key: it.key, ...(it.clipped && { clipped: it.clipped }) });
-      else cur.reports.push(it.p);
-    } else if (it.type === 'text') {
+    if (it.type === 'switch') {
+      cur?.switches.push(it);
+      harness = it.p.to.harness;
+      continue;
+    }
+    if (it.type === 'member') {
+      cur?.members.push(it);
+      continue;
+    }
+    if (it.type === 'user') {
+      const to = it.p.to ?? [];
+      if (it.p.source === 'lead') {
+        // The lead's messages to its team and their lanes belong to its planning turn.
+        cur = promptTurn(it.agent ?? lead, it.key, it.at);
+      } else if (to.length > 1) {
+        cur = start(it.key, it.at);
+        for (const agent of to) byAgent.delete(agent);
+      } else {
+        cur = promptTurn(to[0] ?? lead, it.key, it.at);
+      }
+      cur.prompts.push({ ...it.p, key: it.key, ...(it.clipped && { clipped: it.clipped }) });
+    } else if (it.type === 'report') {
+      cur = promptTurn(lead, it.key, it.at);
+      cur.reports.push(it.p);
+    } else if (it.type === 'ask') {
       cur ??= start(it.key, it.at);
-      cur.texts.push(it.p.text);
-      cur.proseKey = it.key;
-      cur.proseClipped = it.clipped ? { key: it.key, clipped: it.clipped } : null;
+    }
+
+    let target: TurnView<A, C> | null = cur;
+    if (isReply(it) || it.type === 'result' || it.type === 'error') {
+      const agent = it.agent ?? lead;
+      target = byAgent.get(agent) ?? null;
+      // Older rows can carry an author even though the prompt had no explicit recipient.
+      if (!target && cur && !cur.author && !cur.lanes && !cur.prompts.at(-1)?.to?.length) target = cur;
+      if (!target && it.type !== 'result') {
+        const at = 'at' in it ? it.at : it.type === 'tools' ? it.calls[0]?.at : '';
+        target = start(it.key, at ?? '');
+        cur ??= target;
+      }
+      if (target) byAgent.set(agent, target);
+    }
+    if (!target) continue;
+    if (it.type === 'text') {
+      target.texts.push(it.p.text);
+      target.proseKey = it.key;
+      target.proseClipped = it.clipped ? { key: it.key, clipped: it.clipped } : null;
     } else if (it.type === 'tools') {
-      const turn: TurnView<A, C> = (cur ??= start(it.key, it.calls[0]?.at ?? ''));
+      const turn = target;
       turn.steps += it.total;
       walk(it.calls, (c) => {
         if (c.result?.is_error) turn.failed++;
       });
     } else if (it.type === 'question') {
-      cur ??= start(it.key, it.at);
-      cur.questions.push(it.q);
+      target.questions.push(it.q);
     } else if (it.type === 'ask') {
-      cur ??= start(it.key, it.at);
-      cur.asks.push(it.p);
+      target.asks.push(it.p);
     } else if (it.type === 'result') {
-      if (cur) cur.result = it.p;
+      target.result = it.p;
     } else if (it.type === 'error') {
-      cur ??= start(it.key, '');
-      cur.error = it.p.text;
+      target.error = it.p.text;
     } else if (it.type === 'cloud') {
-      cur ??= start(it.key, '');
-      cur.cloud = it.p;
-    } else if (it.type === 'switch') {
-      // A thread always starts with a message, so a switch has a turn before it.
-      cur?.switches.push(it);
-      harness = it.p.to.harness;
-      continue;
-    } else if (it.type === 'member') {
-      // A thread always starts with a message, so an agent joins after a turn.
-      cur?.members.push(it);
-      continue;
+      target.cloud = it.p;
     }
-    if (cur && !cur.author && isReply(it)) cur.author = authorOf(it, thread.role);
-    cur?.items.push(it);
+    if (!target.author && isReply(it)) target.author = authorOf(it, thread.role);
+    target.items.push(it);
   }
 
   const starts = turns.map((t) => (t.at ? time(t.at) : -Infinity));
@@ -295,21 +328,22 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     }
   }
 
+  const statuses = new Map([[lead, thread.status], ...(thread.members ?? []).filter((m) => !m.lead).map((m): [string, string] => [m.agent, m.status])]);
+  const latestStatuses = new Map([...byAgent].map(([a, t]) => [t, LIVE[statuses.get(a) ?? '']]));
   turns.forEach((t, i) => {
     t.prose = t.texts.length ? t.texts[t.texts.length - 1] : null;
     const last = i === turns.length - 1;
-    t.status = endOf(t) ?? (last ? (LIVE[thread.status] ?? 'done') : 'stopped');
+    t.status = endOf(t) ?? latestStatuses.get(t) ?? (last ? (LIVE[thread.status] ?? 'done') : 'stopped');
   });
 
   const asking = isAsking(events);
-  const latest = turns[turns.length - 1];
-  const running = thread.status === 'running' && !!latest && latest.status === 'running' && !latest.lanes;
+  const latest = turns.findLast((t) => t.status === 'running' && !t.lanes);
   turns.forEach((t) => {
-    const live = running && t === latest;
-    t.progress = turnSteps(t.items, { live, asking: live && asking });
+    const live = t.status === 'running' && !t.lanes;
+    t.progress = turnSteps(t.items, { live, asking: live && t.questions.some((q) => q.state === 'pending') });
   });
   for (const t of laneTurns) t.progress = turnSteps(t.items, { live: t.status === 'running' });
-  if (!running) return { turns, now: null, asking };
+  if (!latest) return { turns, now: null, asking };
   // The newest call still waiting on its result is what it is doing; with none, it is between calls.
   let open: ToolCall | undefined;
   for (const it of latest.items) {
