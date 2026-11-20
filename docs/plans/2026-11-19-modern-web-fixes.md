@@ -493,7 +493,7 @@ order table vs workstreams: consistent
   - Focus: `.field:focus-visible` and SearchField get a 2px `--fg` ring (or the global `:focus-visible` ring at `index.css:243`), distinct from hover. ImageZoom and LiveBrowser get the global ring, plus `+`/`-`/`0` keys for zoom on ImageZoom and a role on the element with the label. The resize separator gets a visible focus state.
   - Toggle: the off track gets a token with 3:1 against the card in both schemes, or a 1px `--fg-3` border.
   - Scrollbar: a `--scrollbar-thumb` token at 3:1 (based on `--fg-3`), used by `.scroll-thin`. A `@media (prefers-contrast: more)` block strengthens `--line`, `--line-strong` and the thumb.
-  - Transcript: `.scroll-none` becomes `.scroll-thin` on desktop. `.mo-scroll` on the phone stays as is (iOS shows its own indicator while scrolling). Say that in the PR.
+  - Transcript: `.scroll-none` becomes `.scroll-thin` on desktop. `.mo-scroll` on the phone stays as is (iOS shows its own indicator while scrolling). Say that in the PR. Reverted on 2026-11-20: Ben wants no visible bar there (M24's decision line in the audit).
   - Extend `fg4-contrast.test.ts` into a token contrast test covering the new pairs.
 - **Risks and migration**:
   - Token changes go into Claude Design, `apps/ios/src/theme.ts` and the desktop window background in the same PR (repo rule).

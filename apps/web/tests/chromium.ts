@@ -22,7 +22,7 @@ export type Page = {
   waitForTimeout(ms: number): Promise<void>;
   inputValue(selector: string): Promise<string>;
   keyboard: { press(key: string): Promise<void>; type(text: string): Promise<void> };
-  mouse: { click(x: number, y: number): Promise<void>; move(x: number, y: number): Promise<void>; down(): Promise<void>; up(): Promise<void> };
+  mouse: { click(x: number, y: number): Promise<void>; move(x: number, y: number): Promise<void>; down(): Promise<void>; up(): Promise<void>; wheel(dx: number, dy: number): Promise<void> };
   close(): Promise<void>;
 };
 export type Browser = { newPage(options: { viewport: { width: number; height: number } }): Promise<Page>; close(): Promise<void> };

@@ -139,6 +139,32 @@ describe.skipIf(!executablePath)('find in a thread, in Chromium', () => {
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
 
+  // Ben's call (#652): no visible bar beside the quick card, but the wheel still scrolls it (transcript-scrollbar.test.ts).
+  it('scrolls the transcript with the wheel and draws no scrollbar', async () => {
+    const scroller = () =>
+      page.evaluate(() => {
+        const el = document.querySelector('[data-key]')!.closest<HTMLElement>('.overflow-y-auto')!;
+        const box = el.getBoundingClientRect();
+        return { width: getComputedStyle(el).scrollbarWidth, top: el.scrollTop, room: el.scrollHeight - el.clientHeight, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      });
+    const before = await scroller();
+    expect(before.width).toBe('none');
+    expect(before.room).toBeGreaterThan(400);
+    await page.mouse.move(before.x, before.y);
+    await page.mouse.wheel(0, -400);
+    await page.waitForFunction(
+      (top) => document.querySelector('[data-key]')!.closest<HTMLElement>('.overflow-y-auto')!.scrollTop < top - 100,
+      before.top,
+      { timeout: 5_000 },
+    );
+    // Back to the bottom, where the find tests below expect the thread to open.
+    await page.mouse.wheel(0, 2_000);
+    await page.waitForFunction(() => {
+      const el = document.querySelector('[data-key]')!.closest<HTMLElement>('.overflow-y-auto')!;
+      return el.scrollHeight - el.clientHeight - el.scrollTop < 2;
+    }, undefined, { timeout: 5_000 });
+  });
+
   it('finds an early message the client does not hold, loads it, scrolls to it and highlights it', async () => {
     const { hits } = await call<{ hits: { event: number }[] }>(`/threads/${threadId}/find?q=${LONG_THREAD.oldNeedle}`);
     const needle = hits[0].event;

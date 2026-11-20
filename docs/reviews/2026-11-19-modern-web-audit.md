@@ -298,6 +298,7 @@ Method:
 - **Scope**: One class. `.mo-scroll` is a design call.
 - **Support**: None needed.
 - **Confidence**: confirmed on desktop
+- **Decision (2026-11-20)**: Declined. Ben wants no visible bar on the desktop transcript. W11 (#854) showed one, drawn right against the quick card, and it was taken out again. Do not reopen it: `apps/web/tests/transcript-scrollbar.test.ts` fails if the bar comes back.
 
 ### M25. Thread quick card layout follows the viewport, not the thread's width
 - **Where**: `pages/Thread.tsx:206,320,346`, `App.tsx:141-147`, `rail/ListPanel.tsx:31`, `Transcript.tsx:159,162` (`sm:max-w-[80%]`)
