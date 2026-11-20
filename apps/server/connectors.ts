@@ -20,13 +20,106 @@ export interface Connector extends AccessConnector {
 /** The claude.ai page where a claude.ai connector is signed in to again. */
 export const CLAUDE_CONNECTORS_URL = 'https://claude.ai/settings/connectors';
 
+// ---------- what a brief asks for ----------
+//
+// A brief needs an account only when it asks to use it: "check my Slack", "post the summary to Slack", "add a task to
+// the Notion tracker". Naming the product is not that: a brief about how Ben writes Slack replies, or one debugging
+// this check, says "Slack" a dozen times and needs no sign-in. A false hit holds a job that may have nobody watching
+// it, while a miss only lets the job start and meet the signed-out account itself, so every cue leans towards a miss.
+// What a brief quotes (code, quoted lines and strings) is left out first: it is material the job works on, not its ask.
+
+/** Verbs that read an account. Words that are mostly nouns in a brief (reply, message, review) are left out. */
+const READ = 'check|read|search|scan|triage|monitor|summari[sz]e|go through|look through|look in|catch up on|pull|fetch|grab|gather|collect|open|query';
+/** Verbs that send through one. */
+const SEND = 'post|send|forward|ping|notify|dm|share';
+/** Verbs that write to one. */
+const WRITE = 'add|write|save|create|edit|update|put|copy|move|sync|import|export|upload|download|archive|delete';
+
+/** What may follow an account's bare name when it is the thing acted on: the end of a clause, or a joining word. */
+const AFTER = 'for|and|or|to|about|from|with|since|today|tonight|tomorrow|yesterday|now|first|again|every|each|daily|this|last|over|until|before|after|if|when|while';
+
+interface CueWords {
+  /** The account's name, as regex source. */
+  name: string;
+  verbs: string;
+  /** Nouns after the name that make it the account itself: "Slack DMs", "the Notion tracker". */
+  things: string;
+  /** Words after the name that make it something else: "a Slack app", "the Notion API". */
+  not: string;
+  /** Names that count only after "my": "my meetings". */
+  mine?: string;
+  /** Other sure signs, such as a link into the account. */
+  also?: string;
+}
+
+/**
+ * The cue for one account: "my <name>", a verb on it ("search Slack for"), a verb on a list that ends with it ("go
+ * through my inbox and the calendar"), or a verb that reaches it through a preposition ("post the summary to Slack").
+ * The name must be the thing acted on, so "check the Slack formatting skill" is no hit. Every gap stays on one line.
+ */
+function cue({ name, verbs, things, not, mine, also }: CueWords): RegExp {
+  const sp = '[^\\S\\n]+';
+  const owner = `(?:(?:my|our|the|ben'?s|his|her|their)${sp})?`;
+  const gap = (n: number) => `(?:(?:${sp}|,[^\\S\\n]*)[^\\s.;:!?,]+){0,${n}}?`;
+  const named = (n: string) => `(?:${n})(?![\\w-])(?!${sp}(?:${not})\\b)`;
+  const object = `(?:${sp}(?:${things})\\b|(?=[^\\S\\n]*(?:[.,;:!?)]|$)|${sp}(?:${AFTER})\\b))`;
+  const forms = [
+    `\\bmy${sp}${named(name)}${object}`,
+    `\\b(?:${verbs})${sp}${owner}${named(name)}${object}`,
+    `\\b(?:${verbs})${gap(4)}(?:,[^\\S\\n]*|${sp}(?:and|or|&)${sp})${owner}${named(name)}${object}`,
+    `\\b(?:${verbs})${gap(6)}${sp}(?:in|on|to|into|onto|from|via|through|across)${sp}${owner}${named(name)}`,
+    ...(mine ? [`\\bmy${sp}${named(mine)}${object}`] : []),
+    ...(also ? [also] : []),
+  ];
+  return new RegExp(forms.join('|'), 'im');
+}
+
+/** Words after a name that make it a thing built or configured, not the account the job uses. */
+const BUILT = 'api|apis|sdk|integration|integrations|mcp|plugin|plugins|connector|connectors|connection|token|cli|skill|skills';
+
 const CUES: Record<string, RegExp> = {
-  gmail: /\bgmail\b|mail\.google\.com|\bmy (e-?mails?|mail|inbox)\b|\b(check|read|search|scan|triage|draft|reply to|go through)\s+(my\s+|the\s+)?(e-?mails?|mail|inbox)\b/i,
-  calendar: /\bgoogle calendar\b|calendar\.google\.com|\bmy (calendar|meetings?|schedule)\b|\bcalendar (events?|invites?)\b|\b(check|read|scan|search|look at)\s+(my\s+|the\s+)?calendar\b/i,
-  slack: /\bslack\b(?!\s*(app|apps|api|bot|bots|sdk|webhook|webhooks|integration|cli|block kit|notification route)\b)|\b[\w-]+\.slack\.com\b/i,
-  notion: /\bnotion\b(?!\s*(api|sdk|integration)\b)|\bnotion\.(so|site)\b/i,
-  drive: /\bgoogle (drive|docs?|sheets?|slides)\b|\b(docs|drive|sheets)\.google\.com\b/i,
-  granola: /\bgranola\b/i,
+  gmail: cue({
+    name: 'gmail|e-?mails?|mail|inbox',
+    verbs: `${READ}|${SEND}|archive|delete|label|draft|reply to`,
+    things: 'inbox|threads?|messages?|drafts?|labels?|e-?mails?|account',
+    not: `${BUILT}|smtp|merge|server|component|page|cards?|list|view|zero|rules?`,
+    also: 'mail\\.google\\.com',
+  }),
+  calendar: cue({
+    name: '(?:google[^\\S\\n]+)?calendar',
+    verbs: `${READ}|add|create|schedule|book|move|delete|invite|block`,
+    things: 'events?|invites?|invitations?|meetings?|availability|slots?|schedule|entries',
+    not: `${BUILT}|component|view|page|widget|picker|ui|grid`,
+    mine: 'meetings?|schedule|agenda',
+    also: 'calendar\\.google\\.com',
+  }),
+  slack: cue({
+    name: 'slack',
+    verbs: `${READ}|${SEND}`,
+    things: 'dms?|direct messages?|channels?|threads?|mentions?|inbox|workspace|history|conversations?|unreads?|activity',
+    not: `${BUILT}|app|apps|bot|bots|webhook|webhooks|block kit|notification route|formatting|mrkdwn|sign-?in`,
+    also: '\\b[\\w-]+\\.slack\\.com\\b',
+  }),
+  notion: cue({
+    name: 'notion',
+    verbs: `${READ}|${WRITE}|log|file`,
+    things: 'pages?|databases?|db|tasks?|task tracker|tracker|workspace|notes|wiki|boards?|projects?',
+    not: BUILT,
+    also: '\\bnotion\\.(?:so|site)\\b',
+  }),
+  drive: cue({
+    name: 'google[^\\S\\n]+(?:drive|docs?|sheets?|slides)',
+    verbs: `${READ}|${WRITE}|${SEND}`,
+    things: 'folders?|files?|docs?|documents?|sheets?|spreadsheets?|slides|decks?',
+    not: BUILT,
+    also: '\\b(?:docs|drive|sheets|slides)\\.google\\.com\\b',
+  }),
+  granola: cue({
+    name: 'granola',
+    verbs: `${READ}|export|copy|sync|import`,
+    things: 'notes|meetings?|transcripts?|summar(?:y|ies)|folders?',
+    not: BUILT,
+  }),
 };
 
 /** The accounts a sign-in can be checked for: every shared connector but the browser, which needs none. */
@@ -34,8 +127,19 @@ export const CONNECTORS: readonly Connector[] = ACCESS_CONNECTORS.filter((c) => 
 
 export const connectorById = (id: string) => CONNECTORS.find((c) => c.id === id);
 
-/** The connectors a brief names, in catalog order. */
-export const connectorsIn = (text: string): string[] => CONNECTORS.filter((c) => c.cue.test(text)).map((c) => c.id);
+/** A brief without what it quotes: fenced and inline code, quoted lines and quoted strings. */
+export const askOf = (text: string) =>
+  text
+    .replace(/(```|~~~)[\s\S]*?(?:\1|$)/g, ' ')
+    .replace(/`[^`\n]*`/g, ' ')
+    .replace(/^[^\S\n]*>.*$/gm, ' ')
+    .replace(/"[^"\n]*"|“[^”\n]*”/g, ' ');
+
+/** The connectors a brief asks to use, in catalog order. Naming one is not asking to use it. */
+export const connectorsIn = (text: string): string[] => {
+  const ask = askOf(text);
+  return CONNECTORS.filter((c) => c.cue.test(ask)).map((c) => c.id);
+};
 
 /**
  * `connectors:` in an automation's YAML or a role's frontmatter: one id or a list of them. The ids, or the problem
