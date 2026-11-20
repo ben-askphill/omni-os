@@ -51,6 +51,6 @@ describe('phone turn with a cloud agent', () => {
     const v = threadView({ events, thread: { status: 'running', cwd: '', harness: 'cursor-cloud' } as Pick<Thread, 'status' | 'cwd' | 'harness'>, artifacts: [], children: [] });
     expect(v.turns).toHaveLength(1);
     expect(v.turns[0].cloud).toMatchObject({ status: 'RUNNING', branch: 'cursor/move' });
-    expect(v.now).toEqual({ verb: 'Cursor cloud agent: working', target: '' });
+    expect(v.now).toEqual({ verb: 'Cursor Cloud: working', target: '' });
   });
 });

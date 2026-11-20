@@ -1,6 +1,6 @@
 # Harnesses
 
-A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes, Cursor Cloud and [custom harnesses](#custom-harnesses) are the exceptions. They run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
+A harness is the AI CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes, Cursor Cloud and [custom harnesses](#custom-harnesses) are the exceptions. They run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
 
 | Harness | Bills | Install and sign in | Runs as |
 | --- | --- | --- | --- |
@@ -12,7 +12,7 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 | Custom harness | What its server bills | A file in `data/harnesses/`, see [below](#custom-harnesses) | HTTP, the [Runs API](../internals/remote-harness-protocol.md) ([ADR 0017](../adr/0017-custom-harnesses.md)) |
 
 - `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN` and `OMNI_CURSOR_BIN` in `.env` point at a binary that is not on `PATH`. Without one, Codex also tries the copy inside the ChatGPT app.
-- A harness Omni can't use shows why in the model picker, Settings > Agents and the error `delegate` gets. Claude Code is asked with `claude auth status --json`: signed out reads as `claude auth login`, no `claude` on `PATH` as missing, and a CLI too old to answer stays available. For Codex that is one of: signed out (`codex login`), signed in with an API key, no `codex` on `PATH`, a binary that won't run, `codex app-server` exiting before it answers (with the last line it printed), or no answer to a request. A server busy with disk writes does not count as no answer.
+- A harness Omni can't use shows why in the model picker, Settings > Models and the error `delegate` gets. Claude Code is asked with `claude auth status --json`: signed out reads as `claude auth login`, no `claude` on `PATH` as missing, and a CLI too old to answer stays available. For Codex that is one of: signed out (`codex login`), signed in with an API key, no `codex` on `PATH`, a binary that won't run, `codex app-server` exiting before it answers (with the last line it printed), or no answer to a request. A server busy with disk writes does not count as no answer.
 - The Usage card (desktop web and the desktop app; phone and iOS have none) has a row per signed-in account, and each limit says when it resets ("in 2h 10m"; hover or tap for the local time). Claude's rate-limit events drive the 5h and week windows, Codex reports its own, and Cursor's dashboard gives the monthly cycle. Hermes and Cursor Cloud have no plan limit to show. A window whose source sent no reset time shows no reset. An account with no reading of its own yet says **no reading yet** (and never borrows another account's numbers); a stale or missing reading on a lone account still says **no data**.
 - Each harness has its own concurrency cap (12 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`, `OMNI_MAX_CONCURRENT_CURSOR_CLOUD`. A full harness never holds up threads on another.
 - Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Every harness drops `HERMES_API_KEY`, and no harness, terminal or channel action gets a custom harness's key (a secret its file names): those keys go only to their harness's HTTP client. The guard wins over the server environment, a channel or global secret, and any extras, so a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
@@ -27,7 +27,7 @@ Omni asks each harness which models it has, so a model that ships in a new CLI r
 - Omni asks at start and every 15 minutes. A picker that opens on a list older than 5 minutes asks again in the background, so the next open has the new models. **Check for new models** in Settings > Models asks at once.
 - What Claude Code last reported is kept in `data/claude-models.json`, so a restart starts from it. When Claude Code does not answer, the last list stays.
 - **Models in the picker**, in the same section, chooses per harness which models the pickers list (desktop, phone and iOS). By default each harness shows the newest model of each family and its default: when Opus 5.6 ships it shows and Opus 5.5 drops out. **All** shows every model. A switch on a model wins over the rule, and **Reset** clears them. The choice syncs to your other machines.
-- A hidden model still runs. A thread, crew role, channel default or automation that names one keeps it, the picker still shows it while it is the one picked, and Auto picks from every model. The Conductor's `list_harnesses` marks it `hidden`.
+- A hidden model still runs. A thread, agent, channel default or automation that names one keeps it, the picker still shows it while it is the one picked, and Auto picks from every model. The Conductor's `list_harnesses` marks it `hidden`.
 
 ## Accounts
 
@@ -100,13 +100,13 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 - A review goes to Codex, always at high effort, so a different model family checks work Claude most likely wrote. The Conductor's PR reviews skip Auto and pick the family from the builder's model ([Crew](crew.md)).
 - "Quick", "fast", "asap" and the like lower the effort a step on any harness. For code, they also move the thread to Cursor's Composer, a fast and cheap coding model, as does a mechanical change across many files ("rename X across the repo"). This does not happen for the hardest tasks, or when the first message has images, which Cursor Agent cannot see.
 - Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, Hermes or Cursor Cloud. [Auto routing](../internals/auto-routing.md#lanes) explains why.
-- A model picked on the thread, a crew role's or a channel's default all win over Auto. Set a channel's default to Auto in its settings, or `model: auto` in a crew role's frontmatter.
-- In #conductor, a saved channel default takes precedence over the Conductor role's charter. New thread follows saved settings until you pick a model or effort for that draft. Other crew roles keep their own defaults ahead of the channel's.
+- A model picked on the thread, an agent's or a channel's default all win over Auto. Set a channel's default to Auto in its settings, or `model: auto` in an agent's frontmatter.
+- In #conductor, a saved channel default takes precedence over the Conductor agent's charter. New thread follows saved settings until you pick a model or effort for that draft. Other agents keep their own defaults ahead of the channel's.
 - How well it picks, and how to check that again: [Auto routing](../internals/auto-routing.md).
 
 ## Hermes (remote)
 
-Hermes is an always-on agent on your own Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in Settings or `npm run setup`; empty means Hermes is off). The Mac must be on the tailnet.
+Hermes is an always-on AI service on your own Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in Settings or `npm run setup`; empty means Hermes is off). The Mac must be on the tailnet.
 
 The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of that name). It is not an env var or a database column, Omni never writes it to logs, and no local thread, terminal or channel action gets it.
 
@@ -122,19 +122,19 @@ The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of t
 
 ## Custom harnesses
 
-A custom harness is another agent on a server of your own, such as a second Hermes or an agent you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Models > Harnesses lists each one with a Remote mark, its host and the secret its key is in, and Test connection, Edit and Remove under it.
+A custom harness is another AI service on a server of your own, such as a second Hermes or one you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Models > Harnesses lists each one with a Remote mark, its host and the secret its key is in, and Test connection, Edit and Remove under it.
 
-### Connect an agent
+### Connect a harness
 
-**Connect an agent** on the Harnesses card (and on the Harnesses step of setup) adds one without pasting its key. The same sheet runs on desktop web, the phone layout and the desktop app.
+**Connect a harness** on the Harnesses card (and on the Harnesses step of setup) adds one without pasting its key. The same sheet runs on desktop web, the phone layout and the desktop app.
 
 1. **On a Hermes server**, run the pairing helper the sheet shows, pinned to this build: `curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh`. It prints an `omni://connect-agent` link, a QR code when `qrencode` is installed, and an address and code to type. It makes `API_SERVER_KEY` in Hermes's `.env` when there is none (restart Hermes after), and answers one pairing for at most 10 minutes.
 2. **Find.** Click the link (the desktop app opens it), or paste it, a bare address, or the helper's address and code into the sheet. Omni looks at the address without a key and shows what it found: its name and host, whether it is on this machine, the tailnet or https, and chips for what a thread on it can and cannot do. Plain `http://` off the tailnet, an address this machine cannot reach, and A2A or eve agents (later versions) say why they cannot connect.
 3. **Sign in.** With a code, **Pair** redeems it server to server: the key goes into this machine's server and never reaches the page. Without one, pick the secret in Secrets that holds the key, or add it there from the sheet.
 4. **Test.** One short turn on its own session ("Reply with one line: your name and the model you run on"), with the reply, the model, the time it took and its tokens, or which step failed and what came back.
-5. **Connect** saves only after the test passed: a paired key as the global secret `AGENT_<SLUG>_KEY`, the harness file, and with **Make a crew role for it** (on by default) a role of the same id bound to it, delegatable and with no powers. A failure at any step undoes the steps before it.
+5. **Connect** saves only after the test passed: a paired key as the global secret `AGENT_<SLUG>_KEY`, the harness file, and with **Make an agent for it** (on by default) an agent of the same id bound to it, delegatable and with no powers. A failure at any step undoes the steps before it.
 
-A link never reaches out to anything by itself: it fills the sheet in, you press Find to look the agent up, and Connect once its test turn passed. `#/settings/models?connect=<link>` opens the same sheet on a phone or in a browser. **Remove** revokes the key at the agent when it offers that, deletes the secret Connect made for it (a secret you picked yourself stays), and deletes the file here and on your other machines. Editing its address or secret first makes Remove skip the revoke and leave every secret alone, since the paired key may not be the one the file names any more. Hermes gives every machine the same key, so to cut one machine off, change `API_SERVER_KEY` on the server. Agent threads cannot connect, change, test or remove one (403); the Conductor hands you the page instead.
+A link never reaches out to anything by itself: it fills the sheet in, you press Find to look the harness up, and Connect once its test turn passed. `#/settings/models?connect=<link>` opens the same sheet on a phone or in a browser. **Remove** revokes the key at the agent when it offers that, deletes the secret Connect made for it (a secret you picked yourself stays), and deletes the file here and on your other machines. Editing its address or secret first makes Remove skip the revoke and leave every secret alone, since the paired key may not be the one the file names any more. Hermes gives every machine the same key, so to cut one machine off, change `API_SERVER_KEY` on the server. Agent threads cannot connect, change, test or remove one (403); the Conductor hands you the page instead.
 
 You can still write the file by hand, or `POST /api/harnesses/custom/<slug>` with `{ name, url, secret, bills?, family?, cap?, capabilities? }` (`PUT` to change it, `DELETE` to remove it).
 
@@ -154,8 +154,8 @@ capabilities:
 
 - **The key** is the secret the file names, set in Settings > Secrets on each machine. The file syncs to your other machines; the key does not, and a machine without it shows the harness as not ready, naming the secret. The key goes only on that server's requests, never into a thread's environment. A file cannot name one of Omni's own credentials or any `OMNI_` name.
 - **The URL** is `https://`, or plain `http://` only to this machine or a Tailscale address. Omni never follows a redirect.
-- **A crew role binds to it by id**: `harness: custom:hermes-hetzner` with `model: default`. The Conductor sees it in `list_harnesses`. Auto never picks it.
-- **What it runs like**: a Hermes thread. No worktree, browser, Omni tools, channel secrets or plan meter; Omni's prompt goes as `instructions`; it cannot run the Conductor or any delegate-only role, or run below Full access. Its replies come from a server outside Omni.
+- **An agent binds to it by id**: `harness: custom:hermes-hetzner` with `model: default`. The Conductor sees it in `list_harnesses`. Auto never picks it.
+- **What it runs like**: a Hermes thread. No worktree, browser, Omni tools, channel secrets or plan meter; Omni's prompt goes as `instructions`; it cannot run the Conductor or any delegate-only agent, or run below Full access. Its replies come from a server outside Omni.
 - **Only you** add, change or remove one: an agent thread, a Google or Omni Connect session and an app paired by code get a 403. It takes the install token or a browser paired with it.
 - **Removing one** keeps its threads readable. They do not run again, on it or on any other harness, until a harness with that id is back.
 

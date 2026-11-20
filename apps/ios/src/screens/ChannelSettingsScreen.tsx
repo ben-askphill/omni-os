@@ -162,7 +162,7 @@ function ChannelSettingsForm({ channel, machineDefault, navigation }: { channel:
         ) : null}
         <ListRow
           title="Default model"
-          detail="What a new thread here starts on. A thread or crew role that picks its own wins."
+          detail="What a new thread here starts on. A thread or agent that picks its own wins."
           value={runLabel(form.run, harnesses.data)}
           chevron
           onPress={() => setPicking(true)}

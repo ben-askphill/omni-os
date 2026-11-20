@@ -242,7 +242,7 @@ describe('the Review PR action', () => {
     expect((await send('POST', '/crew/builder/hidden', { hidden: true })).status).toBe(200);
     await expect(requestPRReview('scratch', 'acme/shop', 12)).rejects.toMatchObject({
       status: 409,
-      message: 'Review PR runs as Builder, which is hidden on this machine. Show it in Settings > Crew to use Review PR.',
+      message: 'Review PR runs as Builder, which is hidden on this machine. Show it in Settings > Agents to use Review PR.',
     });
     await send('POST', '/crew/builder/hidden', { hidden: false });
   });

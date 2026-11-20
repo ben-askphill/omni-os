@@ -220,8 +220,8 @@ export function ThreadQuickCard({
         </QuickRow>
       )}
       {artifactCount > 0 && (
-        <QuickRow icon="layers" onClick={() => onOpen('artifacts')} label="Artifacts">
-          <span>{plural(artifactCount, 'artifact')}</span>
+        <QuickRow icon="layers" onClick={() => onOpen('artifacts')} label="Files">
+          <span>{plural(artifactCount, 'file')}</span>
         </QuickRow>
       )}
       <div className={DIVIDER}>

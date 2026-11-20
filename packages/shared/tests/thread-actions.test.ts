@@ -9,7 +9,7 @@ describe('the thread action menu', () => {
     expect(THREAD_ACTIONS.length).toBeLessThanOrEqual(10);
     expect(menu().map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
       ['Organize', ['Pin thread', 'Mark as done', 'Rename thread', 'Move to folder', 'Archive thread']],
-      ['Continue', ['Fork thread', 'Reference a thread', 'Ask a crew role…']],
+      ['Continue', ['Fork thread', 'Reference a thread', 'Ask an agent…']],
       ['Send to', ['Send to Grok Bot']],
     ]);
   });

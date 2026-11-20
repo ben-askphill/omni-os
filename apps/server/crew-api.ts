@@ -28,7 +28,7 @@ crewApi.get('/crew', (c) => {
 
 crewApi.get('/crew/:id', (c) => {
   const detail = crewDetail(c.req.param('id'));
-  return detail ? c.json(detail) : c.json({ error: 'No crew role with this id.' }, 404);
+  return detail ? c.json(detail) : c.json({ error: 'No agent with this id.' }, 404);
 });
 
 const context = (): CrewSaveContext => ({ catalog: getCatalog(), channelExists: (id) => !!channels.get(id) });
@@ -92,7 +92,7 @@ function write(c: Context, save: (body: CrewSave) => unknown, body: unknown, ok:
   const refused = guard(c, 'save');
   if (refused) return refused;
   const parsed = crewSave.safeParse(body);
-  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid crew role' }, 400);
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid agent' }, 400);
   return guard(c, 'save', parsed.data) ?? run(c, () => save(parsed.data), ok);
 }
 

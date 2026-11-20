@@ -365,7 +365,7 @@ Settled 2026-11-18: Ben took the recommendation for all eleven. On 2026-11-20 he
 
 Why:
 
-- **D1**: the recommendation was Crew, since the glossary said "crew role" and Settings already used "agent" for harnesses and accounts. Ben picked Agent instead, as the thread's quick-actions card already says, so `GLOSSARY.md` now has **Agent** with "crew role" under _Avoid_. The UI strings that still say crew role, and the ones that use "agent" for a harness, are listed on PR #874 for a rename follow-up.
+- **D1**: the recommendation was Crew, since the glossary said "crew role" and Settings already used "agent" for harnesses and accounts. Ben picked Agent instead, as the thread's quick-actions card already says, so `GLOSSARY.md` now has **Agent** with "crew role" under _Avoid_. The follow-up to PR #874 renamed the UI: Settings > Crew is Settings > Agents, every "crew role" the user reads says agent, and "agent" for a harness says harness.
 - **D2**: files keep hand edits, agent-readable diffs and read-every-time behavior, and reuse the automation editor, store and sync handler. A table makes field-level sync easier but splits the source between shipped files and rows.
 - **D3**: replace-only is why a copied charter silently misses fixes like #785. Add-to keeps both.
 - **D4**: the same leak as the automations bug. A user who does Shopify work can duplicate a template from the docs or the Conductor can write one.

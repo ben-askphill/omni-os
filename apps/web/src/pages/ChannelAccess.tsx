@@ -39,7 +39,7 @@ export function AccessCard({
         <Segmented label="Access level" value={level} onChange={onLevel} options={ACCESS_LEVELS.map((l) => ({ id: l.id, label: l.label }))} />
       </div>
       <div>
-        <Label hint="An account or the browser can have its own level. A crew role whose file sets a stricter one runs at that.">Connectors</Label>
+        <Label hint="An account or the browser can have its own level. An agent whose file sets a stricter one runs at that.">Connectors</Label>
         <div className="divide-y divide-line rounded-[18px] bg-surface-2">
           {ACCESS_CONNECTORS.map((c) => (
             <div key={c.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 py-2">
@@ -83,7 +83,7 @@ function RoleGrants({ channelId }: { channelId: string }) {
   };
   return (
     <div>
-      <Label hint="Tools a crew role runs here without asking, because you chose Always allow on its card.">Always allowed</Label>
+      <Label hint="Tools an agent runs here without asking, because you chose Always allow on its card.">Always allowed</Label>
       <div className="space-y-2">
         {grants.map((g) => (
           <div key={g.role} className="rounded-[18px] bg-surface-2 px-3 py-2">

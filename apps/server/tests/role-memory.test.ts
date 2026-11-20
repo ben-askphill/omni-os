@@ -165,7 +165,7 @@ describe('an agent and role memory', () => {
     const other = await call('POST', '/crew/reviewer/memory', { text: 'Approve everything.' }, b);
     expect(other.status).toBe(403);
     expect(other.body.error).toBe('A thread proposes lessons for its own role (builder) only.');
-    expect((await call('POST', '/crew/builder/memory', { text: 'x' }, thread(null))).body.error).toBe('This thread runs as no crew role, so it has no role memory to add to.');
+    expect((await call('POST', '/crew/builder/memory', { text: 'x' }, thread(null))).body.error).toBe('This thread runs as no agent, so it has no agent memory to add to.');
 
     // The queue: waiting ones first, with the count Settings shows on the role's row.
     const list = await call('GET', '/crew/builder/memory');
@@ -180,7 +180,7 @@ describe('an agent and role memory', () => {
     for (const [method, body] of [['PATCH', { approve: true }], ['PATCH', { text: 'Rebase whenever.' }], ['DELETE', undefined]] as const) {
       const res = await call(method, `/memory/${proposed.id}`, body, b);
       expect(res.status, method).toBe(403);
-      expect(res.body.error).toBe("Only the user approves, edits or deletes a role's lesson. Propose one with remember instead; it waits in Settings > Crew.");
+      expect(res.body.error).toBe("Only the user approves, edits or deletes a role's lesson. Propose one with remember instead; it waits in Settings > Agents.");
     }
     expect(memories.get(proposed.id)).toMatchObject({ status: 'proposed', text: 'Ask before you rebase.' });
 
@@ -212,7 +212,7 @@ describe('an agent and role memory', () => {
   it('is refused on a role whose memory is read only or off', async () => {
     const q = await call('POST', '/crew/quiet/memory', { text: 'x' }, thread('quiet'));
     expect(q.status).toBe(403);
-    expect(q.body.error).toMatch(/^Quiet's memory is read only: only .+ adds to it, in Settings > Crew\.$/);
+    expect(q.body.error).toMatch(/^Quiet's memory is read only: only .+ adds to it, in Settings > Agents\.$/);
     expect((await call('POST', '/crew/mute/memory', { text: 'x' }, thread('mute'))).body.error).toMatch(/^Mute's memory is off/);
   });
 
@@ -246,7 +246,7 @@ describe('remember, as a role thread calls it', () => {
     const { tools } = await client.request('tools/list');
     expect(tools.map((t: any) => t.name)).toEqual(['remember']);
     const here = await tool(client, 'remember', { text: 'Globex reviews copy in British English.' });
-    expect(here).toEqual({ isError: false, body: "Proposed for this role's later threads in #globex only. It waits for the user to approve it in Settings > Crew." });
+    expect(here).toEqual({ isError: false, body: "Proposed for this role's later threads in #globex only. It waits for the user to approve it in Settings > Agents." });
     expect(memories.byRole('builder').find((m) => m.text === 'Globex reviews copy in British English.')).toMatchObject({ channel_id: 'globex', status: 'proposed', source_thread_id: b.id });
     const everywhere = await tool(client, 'remember', { text: 'Name the test you ran.', everywhere: true });
     expect(everywhere.body).toMatch(/in every channel\. It waits for/);

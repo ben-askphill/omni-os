@@ -345,7 +345,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             />
           </Field>
         )}
-        <Field label="Default model" hint="What a new thread here starts on. A thread or crew role that picks its own wins.">
+        <Field label="Default model" hint="What a new thread here starts on. A thread or agent that picks its own wins.">
           <RunDefaultsField channel={existing?.id} value={f.run} onChange={(v) => set('run', v)} />
         </Field>
         {existing && (
@@ -526,7 +526,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
             <div className="text-[13px] font-medium text-fg">No thread excerpts to remote agents</div>
-            <div className="text-[12px] text-fg-3">An Ask from this channel to an agent on another server sends only your question: no excerpt of the thread, not even its title or this channel's name. Asks to local roles still carry the excerpt.</div>
+            <div className="text-[12px] text-fg-3">An Ask from this channel to an agent on another server sends only your question: no excerpt of the thread, not even its title or this channel's name. Asks to local agents still carry the excerpt.</div>
           </div>
           <Toggle checked={f.remoteExcerptsOff} onChange={(v) => set('remoteExcerptsOff', v)} label="No thread excerpts to remote agents" />
         </div>

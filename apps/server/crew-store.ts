@@ -203,7 +203,7 @@ export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts:
     if (shipped !== null || own !== null) throw refused(`A role "${id}" already exists.`, 409);
     if (RESERVED_CREW.includes(id)) throw refused(`"${id}" is a built-in role's id.`, 409);
   } else if (shipped === null && own === null) {
-    throw refused(`No crew role "${id}".`, 404);
+    throw refused(`No agent "${id}".`, 404);
   }
 
   const text = savedText(save, shipped, own);
@@ -249,7 +249,7 @@ const roleIn = (id: string, shipped: string | null, text: string): CrewRole =>
  */
 export function draftCrew(id: string | undefined, save: CrewSave, own?: string | null): { markdown: string; detail: CrewDetail } {
   const texts = id ? crewTexts(id) : { shipped: null, own: null };
-  if (id && texts.shipped === null && texts.own === null) throw refused(`No crew role "${id}".`, 404);
+  if (id && texts.shipped === null && texts.own === null) throw refused(`No agent "${id}".`, 404);
   const markdown = savedText(save, texts.shipped, own === undefined ? texts.own : own);
   const role = { ...roleIn(id ?? 'new-role', texts.shipped, markdown), hidden: (id && getCrew(id)?.hidden) || false };
   // A form read from a file that does not parse would come out blank, and a save from it would empty the role.
@@ -266,7 +266,7 @@ const OVERLAY_KEYS = ['charter_mode', 'based_on'];
  */
 export function duplicateCrew(from: string, to: string, name: string | undefined, ctx: CrewSaveContext): CrewDetail {
   const { shipped, own } = crewTexts(from);
-  if (shipped === null && own === null) throw refused(`No crew role "${from}".`, 404);
+  if (shipped === null && own === null) throw refused(`No agent "${from}".`, 404);
   const locked = shipped !== null && CREW_LOCKS[from]?.actions?.duplicate;
   if (locked) throw refused(locked, 409);
   const source =
@@ -282,7 +282,7 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : und
 export function deleteCrew(id: string) {
   const { shipped, own } = crewTexts(id);
   if (shipped !== null) throw refused('A built-in role cannot be deleted. Hide it, or reset your edit.', 409);
-  if (own === null) throw refused(`No crew role "${id}".`, 404);
+  if (own === null) throw refused(`No agent "${id}".`, 404);
   removeOwn(id);
 }
 
@@ -304,7 +304,7 @@ function removeOwn(id: string) {
 /** Hide a built-in on this machine, or show it again. */
 export function setCrewHidden(id: string, hidden: boolean): CrewDetail {
   const { shipped, own } = crewTexts(id);
-  if (shipped === null) throw refused(own === null ? `No crew role "${id}".` : 'Only a built-in role is hidden. Delete a role of your own instead.', own === null ? 404 : 409);
+  if (shipped === null) throw refused(own === null ? `No agent "${id}".` : 'Only a built-in agent is hidden. Delete an agent of your own instead.', own === null ? 404 : 409);
   const locked = CREW_LOCKS[id]?.actions?.hide;
   if (hidden && locked) throw refused(locked, 409);
   updateUserConfig({ crew: { [id]: hidden ? { hidden: true } : null } });

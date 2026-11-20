@@ -12,10 +12,10 @@ describe('the device a browser tab reaches', () => {
     expect(windowTitle('Settings', undefined)).toBe('Settings · Omni');
   });
 
-  it("leads with the other Mac's name when the tab is on another device", () => {
+  it("leads with the other Mac's name when the tab is on another machine", () => {
     expect(windowTitle('Omni', away)).toBe("Ben's Mac mini · Omni");
     expect(windowTitle('#volero', away)).toBe("Ben's Mac mini · #volero · Omni");
-    expect(deviceHint(away)).toBe("This browser is on another device. Omni runs on Ben's Mac mini");
+    expect(deviceHint(away)).toBe("This browser is on another machine. Omni runs on Ben's Mac mini");
   });
 });
 

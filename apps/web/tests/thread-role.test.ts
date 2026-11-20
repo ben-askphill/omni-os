@@ -52,9 +52,9 @@ describe('the crew role of a thread', () => {
     expect(html).toContain('aria-label="Store ops"');
   });
 
-  it('has a Role row in Details, right under Channel', () => {
+  it('has an Agent row in Details, right under Channel', () => {
     const html = details(thread({ role: 'builder' }));
-    expect(rows(html).slice(0, 3)).toEqual(['Channel', 'Role', 'Harness']);
+    expect(rows(html).slice(0, 3)).toEqual(['Channel', 'Agent', 'Harness']);
     expect(html).toContain('data-role="builder"');
     expect(html).toContain('Builder');
   });
@@ -63,7 +63,7 @@ describe('the crew role of a thread', () => {
     const t = thread({ role: null, source: 'manual' });
     expect(header(t)).not.toContain('data-role');
     expect(header(t)).not.toContain('Runs as');
-    expect(rows(details(t))).not.toContain('Role');
+    expect(rows(details(t))).not.toContain('Agent');
   });
 
   it('keeps a role it no longer lists by the id it ran with', () => {
@@ -74,6 +74,6 @@ describe('the crew role of a thread', () => {
   it('leaves it out of the Conductor own header, but keeps it in Details', () => {
     const t = thread({ role: 'conductor', channel_id: 'conductor' });
     expect(header(t)).not.toContain('data-role');
-    expect(rows(details(t))).toContain('Role');
+    expect(rows(details(t))).toContain('Agent');
   });
 });

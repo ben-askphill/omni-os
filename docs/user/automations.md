@@ -1,6 +1,6 @@
 # Automations
 
-Omni ships no automations, so a fresh install lists none. Yours are YAML files in `data/automations/`, one per automation: make one with New on the Automations page, ask the Conductor, or add a file there by hand. The first-run screens offer three starter routines (Morning plan, Mail follow-ups, Weekly review), each off; one you turn on there becomes your own file in `data/automations/`, run as the Admin role in General.
+Omni ships no automations, so a fresh install lists none. Yours are YAML files in `data/automations/`, one per automation: make one with New on the Automations page, ask the Conductor, or add a file there by hand. The first-run screens offer three starter routines (Morning plan, Mail follow-ups, Weekly review), each off; one you turn on there becomes your own file in `data/automations/`, run as the Admin agent in General.
 
 A server also loads shared automations from `automations/` beside it (`OMNI_AUTOMATIONS_DIR` names another folder), under yours: the same id in `data/automations/` wins. Omni's own builds leave it empty, and the desktop app does not ship it.
 
@@ -8,7 +8,7 @@ A server also loads shared automations from `automations/` beside it (`OMNI_AUTO
 
 The Automations page edits every field of an automation and writes the result into its YAML. New makes one, Edit on a card opens it, and the toggle turns it on or off. Desktop web, phone web and the desktop app share the editor.
 
-- The Form tab covers name, on or off, a schedule (cron, timezone, catch-up) or an event with its options, channel, machine, role, harness, model, effort, prompt and the run rules below it ([Quiet runs, approval and dry runs](#quiet-runs-approval-and-dry-runs)). The YAML tab edits the file as text.
+- The Form tab covers name, on or off, a schedule (cron, timezone, catch-up) or an event with its options, channel, machine, agent, harness, model, effort, prompt and the run rules below it ([Quiet runs, approval and dry runs](#quiet-runs-approval-and-dry-runs)). The YAML tab edits the file as text.
 - Every save, the toggle included, writes `data/automations/<id>.yaml`. Editing a shared one writes your own copy there first, with the file's comments and any keys the form does not know kept. Its card then says Edited, and updates to the shared file stop reaching it until Reset to shipped in the editor drops your copy.
 - Omni refuses a save it would load as invalid (a bad cron, both `cron` and `on`, an unknown channel, harness or model), and writes nothing.
 - With sync on, a file saved in Omni reaches your other machines too, and so does a Delete of it. A file you edit by hand, or saved in Omni before sync was set up, stays on its machine until its next save in Omni with sync on.
@@ -40,7 +40,7 @@ Scan my usage on the Automations page suggests automations from your own history
 1. Omni reads the first message you typed in each thread you started in the last 90 days, plus the slash commands you used. It leaves out threads an automation started and every thread below one or continued from one, threads the Conductor, a team lead or another agent started and every thread below or continued from those (their first message is a brief an agent wrote), earlier scans, forks of the same ask, and channels set to **Leave out of usage scans** (Channel settings, Advanced; iOS Channel Settings too). Pick one channel in the dialog to scan only that.
 2. It groups asks that share a slash command, a linked site (GitHub PRs, Shopify admin, claude.ai pages) or a phrase: 6 or more asks over 3 or more weeks. No model runs for this.
 3. Secrets are masked before any text goes further or is grouped: token patterns in any case, and the values in Omni's secret store in any case, URL-encoded, form-encoded, in base64 and JSON-escaped. A slash command that holds a secret is dropped. A value only part of which appears (cut off, or quoted in a thread title a model wrote) is not caught. Haiku labels each group on this machine through your Claude Code login, as it does thread titles.
-4. A thread in #Inbox with the usage-scan role (`crew/usage-scan.md`) gets the groups, a few masked examples each, when they usually come in and the automations you already have. It replies with the patterns and up to 3 suggestions, each split 10/90: the small safe part a run does on its own, and the rest, where the run stops and explains the problem for you. It does not read transcripts.
+4. A thread in #Inbox with the usage-scan agent (`crew/usage-scan.md`) gets the groups, a few masked examples each, when they usually come in and the automations you already have. It replies with the patterns and up to 3 suggestions, each split 10/90: the small safe part a run does on its own, and the rest, where the run stops and explains the problem for you. It does not read transcripts.
 5. Nothing is created until you answer in that thread. It then saves only the ones you picked, with `save_automation`, and every one starts off. Turn each on here when you are happy with it.
 
 Omni holds the lead to this: until you have replied in the thread, or answered a question it asked, a save from it is refused, and whatever it saves is written with `enabled: false`. It cannot change, turn on, run or delete an existing automation. A scan that finds nothing repeating says so and starts no thread.
@@ -93,7 +93,7 @@ expires: 8h     # an unanswered draft is skipped after this; needs approve
 
 ## Sign-in check
 
-A thread whose brief or role needs an account (Gmail, Google Calendar, Slack, Notion, Google Drive, Granola) checks that it is signed in on this machine before any harness starts. Only Claude Code reports its connectors' sign-ins: the check reads the newest session's server list and, when that is old or says signed out, `claude mcp list`. A signed-out account holds the thread as **Sign in needed** with the account, the machine and how to sign in. Nothing runs and nothing is spent. Try again checks again; Start anyway starts it without the check. An account whose state Omni cannot read never holds a thread.
+A thread whose brief or agent needs an account (Gmail, Google Calendar, Slack, Notion, Google Drive, Granola) checks that it is signed in on this machine before any harness starts. Only Claude Code reports its connectors' sign-ins: the check reads the newest session's server list and, when that is old or says signed out, `claude mcp list`. A signed-out account holds the thread as **Sign in needed** with the account, the machine and how to sign in. Nothing runs and nothing is spent. Try again checks again; Start anyway starts it without the check. An account whose state Omni cannot read never holds a thread.
 
 An automation names the accounts it reads with `connectors:`:
 
@@ -101,7 +101,7 @@ An automation names the accounts it reads with `connectors:`:
 connectors: [slack, calendar]   # gmail, calendar, slack, notion, drive, granola
 ```
 
-A role names them the same way in its frontmatter. A brief that names one ("check my Slack") counts too. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
+An agent names them the same way in its frontmatter. A brief that names one ("check my Slack") counts too. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
 
 ## Choose a machine
 

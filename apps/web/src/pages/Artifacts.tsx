@@ -75,14 +75,14 @@ function FilesPage() {
           right={
             <>
               <LayoutSwitch value={layout} onChange={setLayout} />
-              <RefreshButton onClick={res.reload} busy={res.loading && !!res.data} label="Refresh artifacts" />
+              <RefreshButton onClick={res.reload} busy={res.loading && !!res.data} label="Refresh files" />
             </>
           }
         >
           <SearchField value={q} onChange={setQ} placeholder="Search files" label="Search files" />
           <div className="scroll-thin max-w-full overflow-x-auto">
             <Segmented
-              label="Filter artifacts"
+              label="Filter files"
               value={filter}
               onChange={setFilter}
               size="sm"
@@ -100,11 +100,11 @@ function FilesPage() {
         ) : res.loading && !res.data ? (
           <Loading />
         ) : list.length === 0 ? (
-          <Empty icon="layers" title={res.data?.length ? 'Nothing matches this search and filter' : 'No artifacts yet'}>
+          <Empty icon="layers" title={res.data?.length ? 'Nothing matches this search and filter' : 'No files yet'}>
             {res.data?.length ? 'Try another search or filter.' : 'Ask for a report, audit or mockup and it lands here and in the thread’s side panel.'}
           </Empty>
         ) : layout === 'list' ? (
-          <ul key={filter} className="rise divide-y divide-[var(--line)] overflow-hidden rounded-[var(--r-xl)] bg-surface" aria-label="Artifacts">
+          <ul key={filter} className="rise divide-y divide-[var(--line)] overflow-hidden rounded-[var(--r-xl)] bg-surface" aria-label="Files">
             {list.map((a, i) => (
               <li key={a.id} style={{ '--i': i } as CSSProperties}>
                 <a href={href.thread(a.thread_id, a.id)} className="flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-3 md:px-4">

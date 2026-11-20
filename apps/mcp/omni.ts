@@ -200,7 +200,7 @@ server.registerTool(
       `Without create it edits the role; on a built-in it writes ${USER}'s overlay. Only the fields you pass change, and an empty string removes one, so a built-in's value comes back. ` +
       `charter is the whole text of ${USER}'s file for the role: the charter of their own role, or what is added to a built-in's (charter_mode append, the default) or replaces it (replace). ` +
       'Start from get_crew_role\'s charters.own and send all of it. ' +
-      `Powers (mcp, delegate_only, tools, delegatable, review, memory, memory_writes) are ${USER}'s to set in Settings > Crew, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
+      `Powers (mcp, delegate_only, tools, delegatable, review, memory, memory_writes) are ${USER}'s to set in Settings > Agents, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
     inputSchema: {
       id: crewId,
       create: z.boolean().optional().describe(`Make a new role of ${USER}'s own. Needs fields.name.`),
@@ -263,7 +263,7 @@ server.registerTool(
   'remember',
   {
     description:
-      `Propose a lesson for one crew role's later threads, for ${USER} to approve in Settings > Crew: a correction ${USER} made to how that role works, or a step a crewmate of that role missed. ` +
+      `Propose a lesson for one crew role's later threads, for ${USER} to approve in Settings > Agents: a correction ${USER} made to how that role works, or a step a crewmate of that role missed. ` +
       'One short sentence that still makes sense in a new thread, about how the role should work, never about one task. ' +
       'A lesson about a client or a channel, for every role there, goes to propose_learning instead. ' +
       `It waits for ${USER} unless they let that role keep its lessons at once; the answer's status says which. Never put secrets, credentials or personal data in it.`,
@@ -452,7 +452,7 @@ server.registerTool(
       'Pass channel to see them as that channel does: cursor-cloud needs the channel\'s GitHub repo. ' +
       'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks hermes, cursor-cloud or a custom harness. ' +
       `A model marked hidden is one ${USER} left out of the pickers in Settings. It still runs: pass it when asked for it. ` +
-      `Only ${USER} connects, changes or removes a custom harness, since it decides where briefs and keys go: when asked to add an agent, hand ${USER} the page #/settings/models (Connect an agent), or the pairing link its helper printed, and say they press Connect there.`,
+      `Only ${USER} connects, changes or removes a custom harness, since it decides where briefs and keys go: when asked to add a harness, hand ${USER} the page #/settings/models (Connect a harness), or the pairing link its helper printed, and say they press Connect there.`,
     inputSchema: {
       channel: z.string().optional().describe('Channel id the thread would run in. Cursor Cloud is unavailable in a channel with no GitHub repo.'),
     },

@@ -31,7 +31,7 @@ export function pickerOptions(visibleChannels: Channels, channel: string, crew: 
   }));
   if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
   const roleOptions: PickerOption<string>[] = [
-    { value: '', label: 'No role', sub: 'No charter', avatar: false, icon: 'user' },
+    { value: '', label: 'No agent', sub: 'No charter', avatar: false, icon: 'user' },
     ...crew
       .filter((r) => r.delegatable !== false || r.id === CONDUCTOR_CHANNEL)
       .map((r) => ({

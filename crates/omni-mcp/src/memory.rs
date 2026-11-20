@@ -21,7 +21,7 @@ pub fn tool() -> Tool {
             "Propose a lesson for this crew role's later threads: a correction {user} made to how this role works, or a step it missed that every later thread of it should take. \
              One short sentence that still makes sense in a new thread, about how to work, never about this one task. Never put secrets, credentials or personal data in it. \
              It holds in this channel only, unless you pass everywhere: true for a lesson about the role that holds in every channel. \
-             It waits for {user}'s approval in Settings > Crew, unless {user} lets this role keep its lessons at once; the answer says which."
+             It waits for {user}'s approval in Settings > Agents, unless {user} lets this role keep its lessons at once; the answer says which."
         ),
         input: vec![
             Field::new("text", Schema::string().min(1).max(MAX_TEXT)).describe("The lesson, in one short sentence."),
@@ -37,7 +37,7 @@ pub fn tool() -> Tool {
 pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
     let role = std::env::var("OMNI_ROLE").ok().filter(|role| !role.is_empty());
     let Some(role) = role.as_deref().and_then(|role| js::encode_uri_component(&JsString::from(role))) else {
-        return Outcome::Refused("This thread runs as no crew role, so there is no role memory to add to.".into());
+        return Outcome::Refused("This thread runs as no agent, so there is no agent memory to add to.".into());
     };
     let text = arguments.get("text").cloned().unwrap_or(JsValue::Null);
     let everywhere = arguments.get("everywhere").is_some_and(|v| matches!(v, JsValue::Bool(true)));
@@ -58,6 +58,6 @@ pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
     Outcome::Text(JsString::from(if approved {
         format!("Kept for this role's later threads in {scope}: {user} lets this role keep its lessons at once.")
     } else {
-        format!("Proposed for this role's later threads in {scope}. It waits for {user} to approve it in Settings > Crew.")
+        format!("Proposed for this role's later threads in {scope}. It waits for {user} to approve it in Settings > Agents.")
     }))
 }

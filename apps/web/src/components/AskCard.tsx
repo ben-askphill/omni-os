@@ -100,7 +100,7 @@ export function AskChip({ threadId, role, options, onOptions }: { threadId: stri
 /** Ask… from the thread menu: pick a role, write the question, choose what goes along and what the answer does. */
 export function AskSheet({ thread, open, onClose, onSent }: { thread: Thread; open: boolean; onClose: () => void; onSent?: (s: AskSent) => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Ask a crew role">
+    <Modal open={open} onClose={onClose} title="Ask an agent">
       {open && <AskForm thread={thread} onClose={onClose} onSent={onSent} />}
     </Modal>
   );
@@ -128,15 +128,15 @@ function AskForm({ thread, onClose, onSent }: { thread: Thread; onClose: () => v
       setBusy(false);
     }
   };
-  if (!role) return <p className="px-6 pb-6 text-[13px] text-fg-2">No crew role can be asked from here. Add one in Settings &gt; Crew, or connect an agent in Settings &gt; Models.</p>;
+  if (!role) return <p className="px-6 pb-6 text-[13px] text-fg-2">No agent can be asked from here. Add one in Settings &gt; Agents, or connect a harness in Settings &gt; Models.</p>;
   return (
     <>
       <div className="space-y-4 px-6 pb-5">
-        <p className="text-[13px] leading-5 text-fg-2">Omni starts a thread on the role with your question. Its answer comes back here as a report.</p>
+        <p className="text-[13px] leading-5 text-fg-2">Omni starts a thread as the agent with your question. Its answer comes back here as a report.</p>
         <div>
-          <Label htmlFor="ask-role">Role</Label>
+          <Label htmlFor="ask-role">Agent</Label>
           <div className="flex items-center gap-2">
-            <Picker id="ask-role" size="field" label="Role" value={role.id} options={picks} onChange={setRoleId} />
+            <Picker id="ask-role" size="field" label="Agent" value={role.id} options={picks} onChange={setRoleId} />
             {role.remote && <RemoteMark />}
           </div>
         </div>

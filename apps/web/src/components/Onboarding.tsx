@@ -306,7 +306,7 @@ export function SetupWizard() {
                 body={
                   rerun
                     ? 'Save to keep these settings.'
-                    : 'Ask a first question and Omni opens on the answer, in General. Or leave it empty: the Conductor waits in #conductor with a welcome message, and hands bigger work to the right crew role.'
+                    : 'Ask a first question and Omni opens on the answer, in General. Or leave it empty: the Conductor waits in #conductor with a welcome message, and hands bigger work to the right agent.'
                 }
               >
                 {!rerun && (

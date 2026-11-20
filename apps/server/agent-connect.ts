@@ -430,7 +430,7 @@ function freeRoleId(slug: string): string {
     const { shipped, own } = crewTexts(id);
     if (shipped === null && own === null) return id;
   }
-  throw refused('Could not find a free id for the crew role. Untick Make a crew role, or remove some roles.', 409);
+  throw refused('Could not find a free id for the agent. Untick Make an agent for it, or remove some agents.', 409);
 }
 
 /** The starter role's charter. {{user}} is filled in when a thread starts. */

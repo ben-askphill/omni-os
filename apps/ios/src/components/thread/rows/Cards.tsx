@@ -140,7 +140,7 @@ export function CloudRow({ row }: Of<'cloud'>) {
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <View style={styles.line}>
         <HarnessLogo harness="cursor-cloud" size={15} />
-        <Text style={[styles.cardTitle, { color: colors.fg }]}>{p.name || 'Cursor cloud agent'}</Text>
+        <Text style={[styles.cardTitle, { color: colors.fg }]}>{p.name || 'Cursor Cloud'}</Text>
         <View style={styles.grow} />
         <StatusDot glyph={glyphFor(st.status)} />
         <Text style={[styles.caption, { color: colors.fg3 }]}>{st.label}</Text>

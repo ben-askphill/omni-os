@@ -65,7 +65,7 @@ export function useFileMenu({
   const files = got?.rows ?? [];
   const asks: FileMention[] =
     at && roles?.length && startsMessage(text, at)
-      ? roleRows(roles, at.query).map((r) => ({ insert: r.id, name: r.name, detail: r.remote ? 'Ask a remote agent' : 'Ask a crew role', kind: 'role', remote: r.remote }))
+      ? roleRows(roles, at.query).map((r) => ({ insert: r.id, name: r.name, detail: r.remote ? 'Ask a remote agent' : 'Ask an agent', kind: 'role', remote: r.remote }))
       : [];
   const rows = asks.length ? [...asks, ...files] : files;
   const open = !!here && dismissed !== here && rows.length > 0;
@@ -157,7 +157,7 @@ export function FileMenu({
       ref={ref}
       id={id}
       role="listbox"
-      aria-label={rows.some((r) => r.kind === 'role') ? (rows.some((r) => r.kind === 'machine') ? 'Roles, machines and files' : 'Files and roles') : rows.some((r) => r.kind === 'machine') ? 'Machines and files' : 'Files'}
+      aria-label={rows.some((r) => r.kind === 'role') ? (rows.some((r) => r.kind === 'machine') ? 'Agents, machines and files' : 'Files and agents') : rows.some((r) => r.kind === 'machine') ? 'Machines and files' : 'Files'}
       // Keep focus (and the phone keyboard) in the composer.
       onMouseDown={(e) => e.preventDefault()}
       className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[var(--r-2xl)] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}

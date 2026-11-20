@@ -40,7 +40,7 @@ function askRole(from: Thread, id: string): AskTarget {
   const role = askableRoles(crew, from.role).find((r) => r.id === id);
   if (!role) {
     const ids = askableRoles(crew, from.role).map((r) => r.id);
-    throw refused(`No crew role "${id}" to ask from this thread. Roles: ${ids.join(', ') || 'none'}.`, 404);
+    throw refused(`No agent "${id}" to ask from this thread. Agents: ${ids.join(', ') || 'none'}.`, 404);
   }
   const ch = channels.get(from.channel_id);
   const channelRun = { harness: ch?.default_harness ?? undefined, model: ch?.default_model ?? undefined, effort: ch?.default_effort ?? undefined };

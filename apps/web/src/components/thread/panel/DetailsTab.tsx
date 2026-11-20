@@ -163,7 +163,7 @@ export function DetailsTab({
           </a>
         </Row>
         {roleName && thread.role && (
-          <Row k="Role">
+          <Row k="Agent">
             <span className="inline-flex items-center gap-[var(--sp-2)]" data-role={thread.role}>
               {isCrewRole(thread.role) && <CrewMark role={thread.role} size={14} className="text-fg-2" />}
               {roleName}
@@ -186,7 +186,7 @@ export function DetailsTab({
         </Row>}
         {code && <Row k="Working dir">
           {remote ? (
-            <span className="text-fg-3">{cloud ? 'Cursor cloud agent, not an Omni worktree' : 'Hermes server, not an Omni worktree'}</span>
+            <span className="text-fg-3">{cloud ? 'Cursor Cloud, not an Omni worktree' : 'Hermes server, not an Omni worktree'}</span>
           ) : (
             <span className="font-mono text-[12px]">{cwd}</span>
           )}
@@ -229,7 +229,7 @@ export function DetailsTab({
 
       {!code ? null : remote ? (
         <div className={`rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
-          <div className={`caption ${CAPTION}`}>{cloud ? 'Cursor cloud agent' : 'Remote session'}</div>
+          <div className={`caption ${CAPTION}`}>{cloud ? 'Cursor Cloud' : 'Remote session'}</div>
           {cloud ? (
             <p className={`${ROW_X} pb-[var(--sp-4)] text-[12.5px] leading-relaxed text-fg-2`}>
               This thread runs on Cursor's Linux cloud, on its own clone of the channel repo. It pushes a branch and Cursor opens the PR. Another message here

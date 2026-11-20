@@ -69,15 +69,15 @@ describe('ChannelRail', () => {
     expect(top.indexOf('aria-label="Inbox"')).toBeLessThan(top.indexOf('rail-scroll'));
   });
 
-  it('folds Pull requests, Library and Automations into one More menu button, current while one of them is open', () => {
+  it('folds Pull requests, Artifacts and Automations into one More menu button, current while one of them is open', () => {
     state.channels = [];
     const onInbox = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'inbox' } }));
-    for (const label of ['Pull requests', 'Library', 'Automations']) expect(onInbox).not.toContain(`aria-label="${label}"`);
+    for (const label of ['Pull requests', 'Artifacts', 'Automations']) expect(onInbox).not.toContain(`aria-label="${label}"`);
     const more = (html: string) => html.slice(html.lastIndexOf('<button', html.indexOf('aria-haspopup="menu"')), html.indexOf('</button>', html.indexOf('aria-haspopup="menu"')));
     expect(more(onInbox)).toContain('aria-label="More"');
     expect(more(onInbox)).toContain('aria-expanded="false"');
     expect(more(onInbox)).not.toContain('aria-current');
-    for (const [kind, label] of [['prs', 'Pull requests'], ['library', 'Library'], ['automations', 'Automations']] as const) {
+    for (const [kind, label] of [['prs', 'Pull requests'], ['library', 'Artifacts'], ['automations', 'Automations']] as const) {
       const html = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind } }));
       expect(more(html)).toContain(`aria-label="More, ${label} open"`);
       expect(more(html)).toContain('aria-current="page"');

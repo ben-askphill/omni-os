@@ -101,7 +101,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
 /** The workspace pages behind the rail's "More" disc, in menu order. */
 export const MORE_PAGES = [
   { kind: 'prs', label: 'Pull requests', icon: 'pr', to: href.pullRequests() },
-  { kind: 'library', label: 'Library', icon: 'layers', to: href.artifacts() },
+  { kind: 'library', label: 'Artifacts', icon: 'layers', to: href.artifacts() },
   { kind: 'automations', label: 'Automations', icon: 'zap', to: href.automations() },
 ] as const satisfies readonly { kind: RailSelection['kind']; label: string; icon: IconName; to: string }[];
 

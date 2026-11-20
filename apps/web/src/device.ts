@@ -11,4 +11,4 @@ export function threadTitle(title: string | null | undefined, channel: string): 
   return `${title?.trim() || 'Untitled'} · ${channel === 'conductor' ? 'Conductor' : `#${channel}`}`;
 }
 
-export const deviceHint = (d: Device) => (d.here ? `Omni runs here, on ${d.name}` : `This browser is on another device. Omni runs on ${d.name}`);
+export const deviceHint = (d: Device) => (d.here ? `Omni runs here, on ${d.name}` : `This browser is on another machine. Omni runs on ${d.name}`);

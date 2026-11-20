@@ -48,10 +48,10 @@ function HarnessesCard({ channel }: { channel?: string }) {
     <Card
       entry="harnesses"
       title="Harnesses"
-      subtitle="The agents Omni can start a thread on. Omni checks each one again when a picker opens."
+      subtitle="The harnesses Omni can start a thread on. Omni checks each one again when a picker opens."
       actions={
         <Button size="sm" icon="plus" onClick={() => setConnecting(true)}>
-          Connect an agent
+          Connect a harness
         </Button>
       }
     >
@@ -129,7 +129,7 @@ function CustomHarnessActions({ harness, onEdit, onChanged }: { harness: Harness
     try {
       const r = await api.del<{ revoked: boolean | null; secret: string | null }>(`/harnesses/custom/${encodeURIComponent(slug)}`);
       setNote(
-        [r.revoked === true && 'Its key was revoked at the agent.', r.revoked === false && 'The agent did not revoke its key: change the key on the server to cut it off.', r.secret && `${r.secret} was removed from Secrets.`]
+        [r.revoked === true && 'Its key was revoked on its server.', r.revoked === false && 'Its server did not revoke its key: change the key there to cut it off.', r.secret && `${r.secret} was removed from Secrets.`]
           .filter(Boolean)
           .join(' ') || null,
       );
@@ -269,7 +269,7 @@ function ChannelDefaultsCard() {
     <Card
       entry="channel-model"
       title="Default model for new threads"
-      subtitle="Without one, Auto picks from the prompt. A thread or crew role that picks its own model wins."
+      subtitle="Without one, Auto picks from the prompt. A thread or agent that picks its own model wins."
       actions={<Origin of={own.length ? 'mixed' : 'default'} label={own.length ? `${own.length} of ${listed.length} channels set one` : 'Auto everywhere'} />}
     >
       <div className="flex min-h-7 items-center gap-1 text-[12.5px] text-fg-3">
@@ -385,7 +385,7 @@ function ChannelModelCard({ channel }: { channel: Channel }) {
     <Card
       entry="channel-model"
       title="Default model for new threads"
-      subtitle="What a new thread in this channel starts on. A thread or crew role that picks its own wins. Saved when you pick."
+      subtitle="What a new thread in this channel starts on. A thread or agent that picks its own wins. Saved when you pick."
       actions={
         <>
           <Origin of={set ? 'channel' : 'default'} label={set ? `Set on #${channel.name}` : 'Built-in default: Auto'} />

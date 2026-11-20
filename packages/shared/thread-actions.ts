@@ -82,7 +82,7 @@ export const THREAD_ACTIONS: readonly Spec[] = [
   },
   { id: 'reference', group: 'continue', icon: 'message', when: (f) => f.row && !f.archived, label: () => 'Reference a thread', hint: 'Attach another thread, not its messages', key: '@' },
   // Ask from a thread (ask.ts): a crew role answers here, from a thread of its own.
-  { id: 'ask', group: 'continue', icon: 'message', when: (f) => f.row && !f.archived, label: () => 'Ask a crew role…', hint: 'Another agent answers here, from a thread of its own', key: 'A' },
+  { id: 'ask', group: 'continue', icon: 'message', when: (f) => f.row && !f.archived, label: () => 'Ask an agent…', hint: 'Another agent answers here, from a thread of its own', key: 'A' },
   { id: 'grok', group: 'send', icon: 'grok', when: (f) => f.grokBot, label: () => 'Send to Grok Bot', hint: "This thread's text", key: 'G' },
 ];
 

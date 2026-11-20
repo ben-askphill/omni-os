@@ -23,7 +23,7 @@ export function CapabilityChips({ can, cannot }: { can: readonly string[]; canno
         <Chip key={c}>{c}</Chip>
       ))}
       {cannot.map((c) => (
-        <Chip key={c} tone="outline" title={`Threads on a remote agent have no ${c.toLowerCase()} on this machine`}>
+        <Chip key={c} tone="outline" title={`Threads on a remote harness have no ${c.toLowerCase()} on this machine`}>
           No {c.toLowerCase()}
         </Chip>
       ))}
@@ -44,7 +44,7 @@ type Step = 'pending' | 'in_progress' | 'completed';
 
 export function ConnectAgentSheet({ open, initial, onClose, onConnected }: { open: boolean; initial?: string; onClose: () => void; onConnected?: (c: Connected) => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Connect an agent" roomy>
+    <Modal open={open} onClose={onClose} title="Connect a harness" roomy>
       {open && <ConnectBody key={initial ?? ''} initial={initial} onClose={onClose} onConnected={onConnected} />}
     </Modal>
   );
@@ -153,18 +153,18 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
             <strong className="font-medium">{done.harness.name}</strong> on {done.harness.host} is connected. Threads can run on it now
             {done.role ? (
               <>
-                , and the crew role <strong className="font-medium">{done.role.name}</strong> is bound to it.
+                , and the agent <strong className="font-medium">{done.role.name}</strong> is bound to it.
               </>
             ) : (
               '.'
             )}
           </p>
-          <p className="text-[13px] text-fg-3">Its key is in Secrets on this machine only. In a thread, start a message with @{done.role?.id ?? 'its-role'} to ask it something.</p>
+          <p className="text-[13px] text-fg-3">Its key is in Secrets on this machine only. In a thread, start a message with @{done.role?.id ?? 'its-id'} to ask it something.</p>
         </div>
         <ModalFooter>
           {done.role && (
             <a className="mr-auto text-[13px] text-fg-2 underline underline-offset-2" href={href.settingsSection('crew', 'crew-roles')} onClick={onClose}>
-              Edit the role
+              Edit the agent
             </a>
           )}
           <Button variant="primary" onClick={onClose}>
@@ -177,7 +177,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
   return (
     <>
       <div className="space-y-5 px-6 pb-5">
-        <p className="text-[13px] leading-5 text-fg-2">An agent on your own server, such as Hermes, becomes a harness threads run on. Nothing is saved until its test turn passes and you press Connect.</p>
+        <p className="text-[13px] leading-5 text-fg-2">An AI service on your own server, such as Hermes, becomes a harness threads run on. Nothing is saved until its test turn passes and you press Connect.</p>
         <ol className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Steps">
           {steps.map((s) => (
             <li key={s.label}>
@@ -194,8 +194,8 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
           }}
         >
           <div>
-            <Label htmlFor="connect-input" hint="The link its pairing helper printed, or the agent's address">
-              Agent address, link or code
+            <Label htmlFor="connect-input" hint="The link its pairing helper printed, or the server's address">
+              Address, link or code
             </Label>
             <div className="flex gap-2">
               <input
@@ -219,7 +219,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
           {/* A link only fills the sheet in: Omni reaches out to the address once the user has read it and pressed Find. */}
           {initial && !found && text === initial && (
             <p data-from-link className="text-[12.5px] text-fg-2">
-              Opened from a link. Check this is the agent you meant, then press Find.
+              Opened from a link. Check this is the harness you meant, then press Find.
             </p>
           )}
           {!codeInText && (
@@ -251,7 +251,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
               paired ? (
                 <p className="text-[13px] text-fg-2">
                   Paired with {paired.host}. The key is in this machine's server and is never shown.
-                  {paired.sharedKey && ' The agent gives every machine that pairs the same key: to cut one off, change the key on the server.'}
+                  {paired.sharedKey && ' The server gives every machine that pairs the same key: to cut one off, change the key on the server.'}
                 </p>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
@@ -307,10 +307,10 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
             </div>
             <div className="flex items-start justify-between gap-3">
               <span className="min-w-0">
-                <span className="block text-[12.5px] font-medium text-fg-2">Make a crew role for it</span>
-                <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">A role bound to this agent, so you can ask it from a thread with @ and the Conductor can delegate to it.</span>
+                <span className="block text-[12.5px] font-medium text-fg-2">Make an agent for it</span>
+                <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">An agent bound to this harness, so you can ask it from a thread with @ and the Conductor can delegate to it.</span>
               </span>
-              <Toggle checked={role} onChange={setRole} label="Make a crew role for it" />
+              <Toggle checked={role} onChange={setRole} label="Make an agent for it" />
             </div>
           </section>
         )}
@@ -393,7 +393,7 @@ function SecretPick({ value, onChange, suggested }: { value: string; onChange: (
   };
   return (
     <div className="space-y-2">
-      <p className="text-[12.5px] text-fg-3">It offers no pairing code, so it signs in with a key you keep in Secrets. Omni sends it only to this agent, never to a thread.</p>
+      <p className="text-[12.5px] text-fg-3">It offers no pairing code, so it signs in with a key you keep in Secrets. Omni sends it only to this harness, never to a thread.</p>
       <div className="flex flex-wrap items-center gap-2">
         <Picker label="Secret" size="field" value={value} options={options} onChange={onChange} className="min-w-0 flex-1" />
         <Button size="sm" variant="ghost" onClick={() => setAdding((a) => !a)}>
@@ -403,7 +403,7 @@ function SecretPick({ value, onChange, suggested }: { value: string; onChange: (
       {adding && (
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <input aria-label="Secret name" className="field font-mono" value={newName} onChange={(e) => setNewName(e.target.value.toUpperCase())} />
-          <input aria-label="Key" className="field" type="password" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder="The agent's key" autoComplete="off" />
+          <input aria-label="Key" className="field" type="password" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder="The harness's key" autoComplete="off" />
           <Button variant="primary" busy={busy} disabled={!newName.trim() || !newValue.trim()} onClick={() => void add()}>
             Save key
           </Button>

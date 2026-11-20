@@ -113,7 +113,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
 
   const harness = harnesses.data?.find((h) => h.id === draft?.harness);
   const model = harness?.models.find((m) => m.id === draft?.model);
-  const harnessOptions: PickerOption<string>[] = [{ value: '', label: 'Default', sub: 'The role or channel decides', avatar: false }, ...(harnesses.data ?? []).map((h) => ({ value: h.id, label: h.name, sub: h.available ? h.plan : 'Not set up here', avatar: false as const }))];
+  const harnessOptions: PickerOption<string>[] = [{ value: '', label: 'Default', sub: 'The agent or channel decides', avatar: false }, ...(harnesses.data ?? []).map((h) => ({ value: h.id, label: h.name, sub: h.available ? h.plan : 'Not set up here', avatar: false as const }))];
   const modelOptions: PickerOption<string>[] = [{ value: '', label: 'Default', avatar: false }, ...(harness?.models ?? []).map((m) => ({ value: m.id, label: m.label, sub: m.note, avatar: false as const }))];
   if (draft?.model && !modelOptions.some((o) => o.value === draft.model)) modelOptions.push({ value: draft.model, label: draft.model, avatar: false });
   const effortOptions: PickerOption<string>[] = [{ value: '', label: 'Default', avatar: false }, ...(model?.efforts ?? []).map((e) => ({ value: e, label: e, avatar: false as const }))];
@@ -256,8 +256,8 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
             >
               <Picker size="field" label="Machine" value={draft.machine} onChange={(v) => set('machine', v)} options={machineOptions} disabled={!self} />
             </Field>
-            <Field label="Role">
-              <Picker size="field" label="Role" value={draft.role} onChange={(v) => set('role', v)} options={roleOptions} />
+            <Field label="Agent">
+              <Picker size="field" label="Agent" value={draft.role} onChange={(v) => set('role', v)} options={roleOptions} />
             </Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label="Harness">

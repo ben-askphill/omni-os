@@ -11,7 +11,7 @@ describe('Settings sections on the phone', () => {
   it('lists the catalog in its order, without the desktop app', () => {
     const ids = settingsGroups().flatMap((g) => g.rows.map((r) => r.id));
     expect(ids).toEqual(['general', 'appearance', 'notifications', 'models', 'accounts', 'threads', 'channels', 'workspace', 'machines', 'sync', 'access', 'worktrees', 'secrets', 'extras', 'about']);
-    expect(settingsGroups().map((g) => g.title)).toEqual(['Omni', 'Assistant', 'Spaces', 'Devices', 'Developer', 'Extras', 'App']);
+    expect(settingsGroups().map((g) => g.title)).toEqual(['Omni', 'Assistant', 'Spaces', 'Machines', 'Developer', 'Extras', 'App']);
   });
 
   it('leaves Crew out until the app has its screen (crew plan slice S8), in the list and in search', () => {

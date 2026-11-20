@@ -107,7 +107,7 @@ export function MoComposer({
   const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
   const submitAsk = async () => {
     if (!ask?.question || busy) return;
-    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @role.');
+    if (att.files.length || context.length) return setError('An Ask carries no files or context. Remove them, or send this as a message without the @agent.');
     const raw = text;
     setBusy(true);
     setError(null);

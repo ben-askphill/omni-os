@@ -80,7 +80,7 @@ describe('the thread quick card', () => {
     expect(mine).toMatch(/>Agent<\/span><span class="min-w-0 truncate ">Builder</);
     const theirs = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ owner: 'Maya Jansen', role: null }) }));
     expect(theirs).toMatch(/data-owner="Maya Jansen">.*?>Maya Jansen</);
-    expect(theirs).toMatch(/>Agent<\/span><span class="min-w-0 truncate text-fg-3">No crew role</);
+    expect(theirs).toMatch(/>Agent<\/span><span class="min-w-0 truncate text-fg-3">No agent</);
   });
 
   it('lists machine, checkout, harness, branch and a door into the inspector', () => {
@@ -91,7 +91,7 @@ describe('the thread quick card', () => {
     expect(html).toContain('BenBook');
     expect(html).toContain('omni/t1');
     expect(html).toContain('All details');
-    expect(html).toContain('2 artifacts');
+    expect(html).toContain('2 files');
   });
 
   it('mutes the branch row on a thread with no branch', () => {

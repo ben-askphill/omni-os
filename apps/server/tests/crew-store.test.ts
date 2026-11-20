@@ -114,7 +114,7 @@ describe('a role of the user own', () => {
     expect((await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', harness: 'nope' } })))[1]).toMatch(/^Run defaults: unknown harness "nope" \(this machine has: /);
     expect(await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', channel: 'nowhere' } }))).toEqual([400, 'No channel "nowhere" for the role\'s default channel.']);
     expect((await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', mcp: ['shopify'] } })))[1]).toMatch(/Unknown MCP server "shopify"/);
-    expect(await error(await send('PUT', '/crew/x', { charter: 'nothing here' }))).toEqual([404, 'No crew role "x".']);
+    expect(await error(await send('PUT', '/crew/x', { charter: 'nothing here' }))).toEqual([404, 'No agent "x".']);
     expect(await error(await send('DELETE', '/crew/builder'))).toEqual([409, 'A built-in role cannot be deleted. Hide it, or reset your edit.']);
   });
 
@@ -213,7 +213,7 @@ describe('hiding a built-in', () => {
 
     const res = await send('POST', '/threads', { channel: 'inbox', role: 'reviewer', prompt: 'review it' });
     expect(res.status).toBe(409);
-    expect((await json(res)).error).toMatch(/^The crew role "reviewer" is hidden on this machine\. Show it in Settings, or pick one of: /);
+    expect((await json(res)).error).toMatch(/^The agent "reviewer" is hidden on this machine\. Show it in Settings > Agents, or pick one of: /);
 
     await send('POST', '/crew/reviewer/hidden', { hidden: false });
     expect(getCrew('reviewer')?.hidden).toBe(false);
@@ -235,11 +235,11 @@ describe('a new thread role', () => {
   it('refuses an id no role has, naming the valid ones, instead of running with no charter', async () => {
     const res = await send('POST', '/threads', { channel: 'inbox', role: 'biulder', prompt: 'fix it' });
     expect(res.status).toBe(400);
-    expect((await json(res)).error).toBe('No crew role "biulder". Roles: conductor, builder, reviewer, usage-scan.');
+    expect((await json(res)).error).toBe('No agent "biulder". Agents: conductor, builder, reviewer, usage-scan.');
   });
 
   it('lets only delegatable roles take delegated work', () => {
-    expect(crewForNewThread('usage-scan', true)).toEqual({ refused: 'The crew role "usage-scan" cannot be delegated to. Roles: builder, reviewer.', status: 409 });
+    expect(crewForNewThread('usage-scan', true)).toEqual({ refused: 'The agent "usage-scan" cannot be delegated to. Agents: builder, reviewer.', status: 409 });
     expect(crewForNewThread('usage-scan', false)).toMatchObject({ role: { id: 'usage-scan' } });
     expect(crewForNewThread('builder', true)).toMatchObject({ role: { id: 'builder' } });
     expect(crewForNewThread(null, true)).toEqual({ role: null });

@@ -28,7 +28,7 @@ export function RoleMemory({ role }: { role: Pick<CrewRole, 'id' | 'name' | 'mem
 
   const channelOptions = useMemo<PickerOption<string>[]>(
     () => [
-      { value: '', label: 'Every channel', sub: 'Every thread of this role', avatar: false, icon: 'globe' },
+      { value: '', label: 'Every channel', sub: 'Every thread of this agent', avatar: false, icon: 'globe' },
       ...channels.filter((c) => !c.archived && c.id !== 'conductor').map((c) => ({ value: c.id, label: c.name, sub: `Only its threads in #${c.id}`, channelIcon: c.icon, avatarBg: c.avatar_bg })),
     ],
     [channels],
@@ -53,7 +53,7 @@ export function RoleMemory({ role }: { role: Pick<CrewRole, 'id' | 'name' | 'mem
   const mode = role.memory ?? 'read-write';
   const note =
     mode === 'off'
-      ? 'Memory is off for this role: its threads get none of these lessons. Turn it on under Memory in the form.'
+      ? 'Memory is off for this agent: its threads get none of these lessons. Turn it on under Memory in the form.'
       : mode === 'read'
         ? 'Its threads get the lessons you approved. Only you add them.'
         : role.memoryWrites === 'auto'
