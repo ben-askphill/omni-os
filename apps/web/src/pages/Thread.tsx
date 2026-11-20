@@ -255,7 +255,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
         {/* transcript, with the quick card in its own column so it never covers the conversation */}
         <div className="relative flex min-h-0 flex-1">
           <div className="relative min-h-0 min-w-0 flex-1">
-            <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
+            {/* No visible scrollbar beside the quick card, on purpose: see .scroll-none in index.css. */}
+            <div ref={scrollRef} onScroll={onScroll} className="scroll-none h-full overflow-y-auto [overflow-anchor:none]">
               {/* A size container too: the reply bubbles widen to 80% by the transcript's width (Transcript.tsx, @lg). */}
               <div ref={contentRef} className="@container mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
                 {/* Queued means waiting for a slot: nothing is working yet. */}

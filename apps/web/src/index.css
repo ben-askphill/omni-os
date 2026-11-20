@@ -385,6 +385,15 @@
     scrollbar-width: thin;
     scrollbar-color: var(--line-control) transparent;
   }
+  /* Scrolls by wheel, trackpad and keys with no bar drawn: the desktop thread transcript, a design call (#652). The
+     modern web audit's M24 turned it back into .scroll-thin (#854); tests/transcript-scrollbar.test.ts keeps it off.
+     The -webkit- rule covers Safari before 18.2, which has no scrollbar-width. */
+  .scroll-none {
+    scrollbar-width: none;
+  }
+  .scroll-none::-webkit-scrollbar {
+    display: none;
+  }
 
   /* Headline type: SF Pro, tight. */
   .font-display {
