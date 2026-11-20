@@ -24,39 +24,52 @@ const feed = () => {
 };
 
 describe('display switches', () => {
-  it('starts a new install with both off', async () => {
+  it('starts a new install with every switch off', async () => {
     forget();
     expect(raw.prepare('SELECT COUNT(*) AS n FROM threads').get()).toEqual({ n: 0 });
-    expect(await get()).toEqual({ technical: false, shopify: false });
+    expect(await get()).toEqual({ technical: false, shopify: false, openItems: false });
   });
 
   it('keeps technical detail on for an install that already has threads, and the add-on where a channel has a store', async () => {
     await r.start('hello');
     db.channels.create({ id: 'shop', name: 'Shop', store_domain: 'acme.myshopify.com' });
     forget();
-    expect(await get()).toEqual({ technical: true, shopify: true });
+    expect(await get()).toEqual({ technical: true, shopify: true, openItems: false });
     // Seeded once: a later read keeps what was saved.
     db.channels.update('shop', { store_domain: '' });
-    expect(await get()).toEqual({ technical: true, shopify: true });
+    expect(await get()).toEqual({ technical: true, shopify: true, openItems: false });
+  });
+
+  it('reads the Open items card off for a value saved before it existed', async () => {
+    const before = raw.prepare('SELECT value FROM kv WHERE key = ?').get(DISPLAY_KEY) as { value: string };
+    raw.prepare('UPDATE kv SET value = ? WHERE key = ?').run(JSON.stringify({ technical: true, shopify: true }), DISPLAY_KEY);
+    expect(await get()).toEqual({ technical: true, shopify: true, openItems: false });
+    raw.prepare('UPDATE kv SET value = ? WHERE key = ?').run(before.value, DISPLAY_KEY);
+  });
+
+  it('turns the Open items card on and off', async () => {
+    expect(await (await put({ openItems: true })).json()).toEqual({ technical: true, shopify: true, openItems: true });
+    expect(await (await put({ openItems: false })).json()).toEqual({ technical: true, shopify: true, openItems: false });
+    expect((await put({ openItems: 1 })).status).toBe(400);
   });
 
   it('sets either switch, tells the clients and refuses a body that is not booleans', async () => {
     const f = feed();
     const res = await put({ technical: false });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ technical: false, shopify: true });
+    expect(await res.json()).toEqual({ technical: false, shopify: true, openItems: false });
     expect(f.seen).toContain('display');
     f.stop();
     expect((await put({ technical: 'no' })).status).toBe(400);
     expect((await put({})).status).toBe(400);
-    expect(await get()).toEqual({ technical: false, shopify: true });
+    expect(await get()).toEqual({ technical: false, shopify: true, openItems: false });
   });
 
   it('takes the value another machine saved and tells the clients', async () => {
     const f = feed();
     const ts = new Date(Date.now() + 60_000).toISOString();
-    await applyChange({ seq: 1, machine_id: 'other-mac', entity: 'kv', entity_id: DISPLAY_KEY, op: 'upsert', data: { value: { technical: true, shopify: false } }, ts }, { machineId: 'this-mac' });
-    expect(await get()).toEqual({ technical: true, shopify: false });
+    await applyChange({ seq: 1, machine_id: 'other-mac', entity: 'kv', entity_id: DISPLAY_KEY, op: 'upsert', data: { value: { technical: true, shopify: false, openItems: true } }, ts }, { machineId: 'this-mac' });
+    expect(await get()).toEqual({ technical: true, shopify: false, openItems: true });
     expect(f.seen).toContain('display');
     f.stop();
   });

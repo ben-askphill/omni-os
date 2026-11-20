@@ -1,5 +1,5 @@
 // How much engineering Omni shows, for every client: the web and phone layouts, the desktop app and the iOS app read
-// the two switches (GET /api/display) and the words here. Pure.
+// the switches (GET /api/display) and the words here. Pure.
 //
 // `technical`: Settings > Appearance > Show technical details. Off, Omni reads as a workspace: five status words, plain
 // names for the run controls, and no pull requests, branches, worktrees, token counts or context ring outside a
@@ -7,31 +7,42 @@
 // the switch everywhere.
 // `shopify`: Settings > General > Shopify add-on. The Store card (store domain, client portal slug) on a channel's
 // settings, the store link on its page and the store field in setup.
+// `openItems`: Settings > Threads > Open items card. The questions, decisions and blockers a finished turn left, listed
+// under the transcript with answer fields. Off, nothing finds them (apps/server/runner/aux.ts) and no client shows one.
 
 import { MARK, STATUS, glyphFor, type Glyph, type Mark } from './status.ts';
 
 export interface DisplayPrefs {
   technical: boolean;
   shopify: boolean;
+  openItems: boolean;
 }
 
-/** A new install: plain words, no add-on. An install from before the switches keeps both on (apps/server/display.ts). */
-export const DEFAULT_DISPLAY: DisplayPrefs = { technical: false, shopify: false };
+/**
+ * A new install: plain words, no add-on, no Open items card. An install from before the switches keeps the first two
+ * on (apps/server/display.ts). The card stays off on every install, and a saved value from before it has none, so it
+ * reads off until it is turned on.
+ */
+export const DEFAULT_DISPLAY: DisplayPrefs = { technical: false, shopify: false, openItems: false };
+
+const KEYS = ['technical', 'shopify', 'openItems'] as const;
 
 export function parseDisplay(v: unknown): DisplayPrefs {
   const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
-  return {
-    technical: typeof o.technical === 'boolean' ? o.technical : DEFAULT_DISPLAY.technical,
-    shopify: typeof o.shopify === 'boolean' ? o.shopify : DEFAULT_DISPLAY.shopify,
-  };
+  const out = { ...DEFAULT_DISPLAY };
+  for (const k of KEYS) if (typeof o[k] === 'boolean') out[k] = o[k];
+  return out;
 }
+
+/** Whether two values hold the same switches. */
+export const sameDisplay = (a: DisplayPrefs, b: DisplayPrefs): boolean => KEYS.every((k) => a[k] === b[k]);
 
 /** A PUT /api/display body: the switches it sets, or null when it sets none or one is not a boolean. */
 export function parseDisplayPatch(v: unknown): Partial<DisplayPrefs> | null {
   if (!v || typeof v !== 'object') return null;
   const o = v as Record<string, unknown>;
   const out: Partial<DisplayPrefs> = {};
-  for (const k of ['technical', 'shopify'] as const) {
+  for (const k of KEYS) {
     if (!(k in o)) continue;
     if (typeof o[k] !== 'boolean') return null;
     out[k] = o[k];

@@ -17,8 +17,8 @@ vi.mock('../src/store.tsx', async (importOriginal) => ({
   useFeed: () => {},
 }));
 
-beforeAll(() => takeDisplay({ technical: false, shopify: false }));
-afterAll(() => takeDisplay({ technical: true, shopify: true }));
+beforeAll(() => takeDisplay({ technical: false, shopify: false, openItems: false }));
+afterAll(() => takeDisplay({ technical: true, shopify: true, openItems: false }));
 
 const thread = (over: Partial<Thread> = {}) =>
   ({
@@ -109,9 +109,9 @@ describe('Pull requests outside a code project', () => {
   const prs = (channels: ChannelWithRunning[]) => paletteItems('pull', channels, [], { name: 'home' }, null).some((i) => i.id === 'p:prs');
 
   it('has no way in until a channel has a repo or the switch is on', () => {
-    expect(prsShown({ technical: false, shopify: false }, plain)).toBe(false);
-    expect(prsShown({ technical: false, shopify: false }, code)).toBe(true);
-    expect(prsShown({ technical: true, shopify: false }, plain)).toBe(true);
+    expect(prsShown({ technical: false, shopify: false, openItems: false }, plain)).toBe(false);
+    expect(prsShown({ technical: false, shopify: false, openItems: false }, code)).toBe(true);
+    expect(prsShown({ technical: true, shopify: false, openItems: false }, plain)).toBe(true);
     expect(prs(plain)).toBe(false);
     expect(prs(code)).toBe(true);
   });

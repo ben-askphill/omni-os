@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { storeOpenItems } from '@omni/shared/open-items.ts';
 import type { Thread } from '../src/api.ts';
 import { OpenItemsCard } from '../src/components/thread/OpenItemsCard.tsx';
+import { readDisplay, takeDisplay } from '../src/display.ts';
 
 const base = (JSON.parse(readFileSync(resolve(WIRE_FIXTURES, 'recent.json'), 'utf8')) as Thread[])[0];
 const OPEN = storeOpenItems([
@@ -17,7 +18,17 @@ const OPEN = storeOpenItems([
 const render = (t: Partial<Thread>, mobile = false) =>
   renderToStaticMarkup(createElement(OpenItemsCard, { thread: { ...base, status: 'done', ...t }, onThread: () => {}, onSpawn: () => {}, mobile }));
 
+describe('OpenItemsCard with the setting off', () => {
+  it('is off by default and shows nothing for a turn that left items open', () => {
+    expect(readDisplay().openItems).toBe(false);
+    expect(render({ open_items: OPEN })).toBe('');
+  });
+});
+
 describe('OpenItemsCard', () => {
+  beforeAll(() => takeDisplay({ ...readDisplay(), openItems: true }));
+  afterAll(() => takeDisplay({ ...readDisplay(), openItems: false }));
+
   it('lists what a finished turn left open, each with an answer, a new thread and a dismiss', () => {
     const html = render({ open_items: OPEN });
     expect(html).toContain('aria-label="Open items"');

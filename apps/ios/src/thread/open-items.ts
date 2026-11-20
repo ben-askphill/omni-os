@@ -9,11 +9,12 @@ import type { OutboxItem } from '../send/outbox';
 export type OpenAnswers = Readonly<Record<string, string>>;
 
 /**
- * The items the card lists, or none while it should not show: the turn is still going, or a message waits to be read
- * (it clears the items once the agent takes it). A delegated thread never has any, since the server makes none for it.
+ * The items the card lists, or none while it should not show: the Open items card is off in Settings (`on`, the
+ * server's display switch, off by default), the turn is still going, or a message waits to be read (it clears the
+ * items once the agent takes it). A delegated thread never has any, since the server makes none for it.
  */
-export function shownOpenItems(thread: Pick<Thread, 'status' | 'open_items'>, waiting: boolean): OpenItem[] {
-  if (thread.status !== 'done' || waiting) return [];
+export function shownOpenItems(thread: Pick<Thread, 'status' | 'open_items'>, waiting: boolean, on: boolean): OpenItem[] {
+  if (!on || thread.status !== 'done' || waiting) return [];
   return readOpenItems(thread.open_items);
 }
 

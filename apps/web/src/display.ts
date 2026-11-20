@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import { anyRepo, DEFAULT_DISPLAY, parseDisplay, showsCode, type CodeChannel, type DisplayPrefs } from '@omni/shared/display.ts';
+import { anyRepo, DEFAULT_DISPLAY, parseDisplay, sameDisplay, showsCode, type CodeChannel, type DisplayPrefs } from '@omni/shared/display.ts';
 import { api } from './api.ts';
 
 /**
- * Show technical details and the Shopify add-on (GET /api/display), for the whole Web UI: desktop, phone layout and
+ * Show technical details, the Shopify add-on and the Open items card (GET /api/display), for the whole Web UI: desktop, phone layout and
  * the desktop app. One snapshot for the page, so a pure helper reads it as a component does. The last value this
  * browser saw is its first, so a page that opens does not flash the other way while the server answers.
  */
@@ -20,7 +20,7 @@ const subscribe = (fn: () => void) => (listeners.add(fn), () => listeners.delete
 
 /** Puts a value in place for this page without asking the server: what it answered, or a test's choice. */
 export function takeDisplay(next: DisplayPrefs) {
-  if (next.technical === current.technical && next.shopify === current.shopify) return;
+  if (sameDisplay(next, current)) return;
   current = next;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
@@ -56,6 +56,8 @@ export async function saveDisplay(patch: Partial<DisplayPrefs>): Promise<void> {
 }
 
 export const useDisplay = (): DisplayPrefs => useSyncExternalStore(subscribe, readDisplay, readDisplay);
+/** Whether a finished turn's Open items card shows (Settings > Threads). */
+export const useOpenItemsCard = (): boolean => useDisplay().openItems;
 /** Whether the status words and control names read technical. */
 export const useTechnical = (): boolean => useDisplay().technical;
 /** Whether the Pull requests page has a way in (rail, sidebar, palette, phone tab, Overview card): the switch, or a channel with a repo. */

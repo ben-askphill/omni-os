@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { closePipesAfterExit } from '../child.ts';
 import { config, paths } from '../config.ts';
 import { events, threads, type Thread } from '../db.ts';
+import { displayPrefs } from '../display.ts';
 import { harnessEnv } from '../harness/env-guard.ts';
 import { parseOpenItems, storeOpenItems } from '@omni/shared/open-items.ts';
 import { userName, userPossessive } from '../profile.ts';
@@ -193,9 +194,10 @@ export function suggestNextThread(threadId: string, runText: string) {
  * What the agent's answer leaves for Ben to resolve before the thread can be closed: questions it asked him, decisions
  * it left to him and blockers only he can clear. Derived here rather than emitted by the agent, so every harness gets it
  * without a tool or an output convention of its own (docs/adr/decisions.log, T-BLOCKCARD). Most turns leave none.
+ * Only while Settings > Threads > Open items card is on: off, no call runs and the thread keeps none.
  */
 export function suggestOpenItems(threadId: string, runText: string) {
-  if (!config.suggestions) return;
+  if (!config.suggestions || !displayPrefs().openItems) return;
   const call = ++suggestSeq;
   openCalls.set(threadId, call);
   const t = threads.get(threadId);

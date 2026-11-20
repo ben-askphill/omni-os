@@ -8,6 +8,7 @@ import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { storeOpenItems, type OpenItem } from '@omni/shared/open-items.ts';
 import type { Thread } from '../src/api.ts';
 import { OpenItemsCard } from '../src/components/thread/OpenItemsCard.tsx';
+import { readDisplay, takeDisplay } from '../src/display.ts';
 
 // What Ben types on the card belongs to that set of items: it never comes back prefilled on a later turn's card.
 const base = (JSON.parse(readFileSync(resolve(WIRE_FIXTURES, 'recent.json'), 'utf8')) as Thread[])[0];
@@ -27,6 +28,8 @@ const type = (item: OpenItem, text: string) =>
   });
 
 beforeEach(() => {
+  // Settings > Threads > Open items card, off by default.
+  takeDisplay({ ...readDisplay(), openItems: true });
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);

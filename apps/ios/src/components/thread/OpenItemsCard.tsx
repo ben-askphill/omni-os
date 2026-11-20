@@ -27,6 +27,8 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
   const hub = useLiveHub();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const outbox = useStore(live.send.state).outbox.item;
+  // Settings > Threads > Open items card, off by default and until the server says.
+  const on = useStore(hub.display)?.openItems === true;
   const [answers, setAnswers] = useState<OpenAnswers>({});
   const [busy, setBusy] = useState<Busy | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
     setAnsweredFor(thread.open_items);
     setAnswers((a) => answersAfter(answeredFor, thread.open_items, a));
   }
-  const items = shownOpenItems(thread, answersWait(waiting, outbox));
+  const items = shownOpenItems(thread, answersWait(waiting, outbox), on);
   if (!items.length) return null;
 
   const reply = answersReply(items, answers);

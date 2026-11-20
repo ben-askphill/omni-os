@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import { readOpenItems } from '@omni/shared/open-items.ts';
 import { startRunner } from './runner-boot.ts';
 
@@ -7,9 +7,11 @@ const h = await startRunner({ OMNI_SUGGESTIONS: '1' });
 const r = h.runner;
 const { threadsApi } = await import('../threads-api.ts');
 const { threadRoutesApi } = await import('../thread-routes-api.ts');
+const { displayPrefs, setDisplayPrefs } = await import('../display.ts');
 const T = { timeout: 20_000 };
 
 const openCalls = () => h.invocations().filter((i) => i.entrypoint === 'omni-os-open-items');
+const suggestCalls = () => h.invocations().filter((i) => i.entrypoint === 'omni-os-suggest');
 const items = (id: string) => readOpenItems(h.thread(id).open_items);
 const patch = (id: string, body: unknown) =>
   threadsApi.request(`/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -20,7 +22,34 @@ const FAKE = [
   { kind: 'blocker', text: 'The APNs key is missing from the secret store, so push alerts cannot be tested.' },
 ];
 
+describe('runner: open items with the Open items card off', () => {
+  it('is off by default and runs no call for a turn that leaves items open', T, async () => {
+    expect(displayPrefs().openItems).toBe(false);
+    const n = openCalls().length;
+    const s = suggestCalls().length;
+    const t = await h.start('OPEN_ITEMS');
+    await h.untilResults(t.id, 1);
+    // The reply suggestion still runs beside it: once it has, the open items call would have too.
+    await h.until('suggest call ran', () => suggestCalls().length > s);
+    await new Promise((res) => setTimeout(res, 500));
+    expect(openCalls().length).toBe(n);
+    expect(h.thread(t.id).open_items).toBeNull();
+  });
+
+  it("leaves items saved while it was on out of the Conductor's summary once it is off", T, async () => {
+    setDisplayPrefs({ openItems: true });
+    const t = await h.start('OPEN_ITEMS');
+    await h.until('open items', () => h.thread(t.id).open_items);
+    setDisplayPrefs({ openItems: false });
+    expect(await (await threadRoutesApi.request(`/${t.id}/summary`)).json()).not.toHaveProperty('open_items');
+  });
+});
+
 describe('runner: open items after a turn', () => {
+  beforeAll(() => {
+    setDisplayPrefs({ openItems: true });
+  });
+
   it('stores what a turn ending on questions, decisions and blockers leaves open, without touching updated_at', T, async () => {
     const t = await h.start('OPEN_ITEMS');
     await h.untilResults(t.id, 1);

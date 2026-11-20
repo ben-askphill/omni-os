@@ -69,11 +69,11 @@ metaApi.put('/model-visibility/:harness', async (c) => {
   return c.json(setHarnessModelPrefs(harness, prefs));
 });
 
-// Show technical details and the Shopify add-on (display.ts). A PUT sets either or both and answers with both.
+// Show technical details, the Shopify add-on and the Open items card (display.ts). A PUT sets any of them and answers with all.
 metaApi.get('/display', (c) => c.json(displayPrefs()));
 metaApi.put('/display', async (c) => {
   const patch = parseDisplayPatch(await c.req.json().catch(() => null));
-  if (!patch) return c.json({ error: 'Send { technical, shopify } as booleans.' }, 400);
+  if (!patch) return c.json({ error: 'Send { technical, shopify, openItems } as booleans.' }, 400);
   return c.json(setDisplayPrefs(patch));
 });
 
