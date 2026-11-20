@@ -82,15 +82,14 @@
                         "description": "Every step in order, the same list each call unless the plan changed. 3 to 6, each a few plain words."
                       },
                       "current": {
+                        "description": "The index (from 0) of the step you are on now, 0 when left out. The ones before it are done. Pass the number of steps once all are done.",
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991,
-                        "description": "The index (from 0) of the step you are on now. The ones before it are done. Pass the number of steps once all are done."
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
-                      "steps",
-                      "current"
+                      "steps"
                     ]
                   },
                   "execution": {
@@ -180,15 +179,14 @@
                         "description": "Every step in order, the same list each call unless the plan changed. 3 to 6, each a few plain words."
                       },
                       "current": {
+                        "description": "The index (from 0) of the step you are on now, 0 when left out. The ones before it are done. Pass the number of steps once all are done.",
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991,
-                        "description": "The index (from 0) of the step you are on now. The ones before it are done. Pass the number of steps once all are done."
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
-                      "steps",
-                      "current"
+                      "steps"
                     ]
                   },
                   "execution": {
@@ -206,7 +204,7 @@
       }
     },
     {
-      "name": "the marker on a step, and every step done",
+      "name": "the marker on a step, a missing marker on the first, and every step done",
       "server": "steps",
       "env": {
         "OMNI_USER": "Ben",
@@ -288,6 +286,23 @@
               }
             }
           }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "Find candidate apps",
+                  "Read each listing",
+                  "Compare prices"
+                ]
+              }
+            }
+          }
         }
       ],
       "expected": {
@@ -343,6 +358,18 @@
             },
             "jsonrpc": "2.0",
             "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Showing step 1 of 3, \"Find candidate apps\". Call set_steps again when it changes."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 5
           }
         ],
         "requests": [],
@@ -463,21 +490,6 @@
             "id": 7,
             "method": "tools/call",
             "params": {
-              "name": "set_steps",
-              "arguments": {
-                "steps": [
-                  "One"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "send": {
-            "jsonrpc": "2.0",
-            "id": 8,
-            "method": "tools/call",
-            "params": {
               "name": "html_render",
               "arguments": {
                 "steps": [
@@ -577,26 +589,13 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool set_steps: Invalid input: expected number, received undefined at current"
-                }
-              ],
-              "isError": true
-            },
-            "jsonrpc": "2.0",
-            "id": 7
-          },
-          {
-            "result": {
-              "content": [
-                {
-                  "type": "text",
                   "text": "MCP error -32602: Tool html_render not found"
                 }
               ],
               "isError": true
             },
             "jsonrpc": "2.0",
-            "id": 8
+            "id": 7
           }
         ],
         "requests": [],

@@ -979,7 +979,8 @@ server.registerTool(
       `Move a thread to another of ${USER}'s machines, only when ${USER} asks. A running turn stops here and the other machine resumes the same ` +
       'session, then runs the messages that were queued for it. An idle thread moves between turns: the next message runs on the other machine. A worktree thread takes its commits and uncommitted changes along. ' +
       'With to "here", take over a thread another machine holds: that machine hands it to this one on its next sync, the same way. ' +
-      'It runs in the background after this answers; the thread shows where it is.',
+      'It runs in the background after this answers; the thread shows where it is. ' +
+      'A delegated thread (one that reports to the thread that delegated it) never moves, and neither does a thread whose delegated threads are still running: do not try those.',
     inputSchema: {
       thread_id: z.string(),
       to: z.string().describe('The machine, by id or name (ignoring case), from list_devices, or "here" to take the thread over from the machine that holds it.'),

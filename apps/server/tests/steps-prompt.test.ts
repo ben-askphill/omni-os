@@ -18,6 +18,8 @@ describe('the step line in the system prompt', () => {
     for (const prompt of [buildSystemPrompt(thread, channel), buildSystemPrompt(thread, channel, getCrew('builder')), buildSystemPrompt({ ...thread, harness: 'codex' }, channel)]) {
       expect(prompt).toContain(SECTION);
       expect(prompt).toContain('call set_steps before you start, with 3 to 6 steps');
+      // The argument shape, for a harness whose model calls the tool before it has loaded its schema.
+      expect(prompt).toContain('set_steps takes `steps`, the list as plain strings, and `current`');
     }
   });
 

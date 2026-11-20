@@ -289,6 +289,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Progress',
           `For a task with more than one stage, call set_steps before you start, with 3 to 6 steps in the plain words ${name} would use ("Find candidate apps", "Compare prices"), then again each time a step starts or finishes. Omni shows the list as the thread's progress. Skip it for a quick answer.`,
+          // Spelled out because a harness that defers MCP tools (Claude Code) has the model call it before it has
+          // seen the schema, and it guessed step objects or left out current.
+          'set_steps takes `steps`, the list as plain strings, and `current`, the index (from 0) of the step you are on: `{"steps": ["Find candidate apps", "Compare prices"], "current": 0}`. Pass the number of steps as `current` once all are done.',
         ]),
   ];
   if (thread.source === 'team') {

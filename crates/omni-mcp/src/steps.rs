@@ -21,8 +21,10 @@ pub fn tool() -> Tool {
             // No length limits: a schema limit makes the harness refuse the whole call over one extra character.
             Field::new("steps", Schema::array(Schema::string()).min(1))
                 .describe("Every step in order, the same list each call unless the plan changed. 3 to 6, each a few plain words."),
-            Field::new("current", Schema::int().min(0)).describe(
-                "The index (from 0) of the step you are on now. The ones before it are done. Pass the number of steps once all are done.",
+            // Optional: a caller that has not loaded the schema (a deferred tool) often leaves it out, and the
+            // transcript reader (`packages/shared/steps.ts`) already reads a missing one as 0.
+            Field::new("current", Schema::int().min(0)).optional().describe(
+                "The index (from 0) of the step you are on now, 0 when left out. The ones before it are done. Pass the number of steps once all are done.",
             ),
         ],
         stops_when_cancelled: true,
