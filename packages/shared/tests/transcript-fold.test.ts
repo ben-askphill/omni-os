@@ -205,6 +205,24 @@ describe('reply heads', () => {
     ]);
   });
 
+  it("keeps a team lead's turn under one head while it messages its members, and ends it at Ben's message", () => {
+    const msg = (id: number, to: string) => row(id, 'tool_use', { id: `c${id}`, name: 'mcp__omni-team__message_members', input: { to: [to], message: 'Your part' } }, 'builder');
+    const { items } = buildItems([
+      row(1, 'user', { text: 'Ship the page.', source: 'conductor' }),
+      row(2, 'assistant_text', { text: 'Splitting it three ways.' }, 'builder'),
+      msg(3, 'copywriter'),
+      row(4, 'user', { text: 'Write the copy.', source: 'lead', to: ['copywriter'] }, 'builder'),
+      msg(5, 'designer'),
+      row(6, 'user', { text: 'Draw the hero.', source: 'lead', to: ['designer'] }, 'builder'),
+      row(7, 'user', { text: 'Make it blue.', source: 'ben' }),
+      row(8, 'assistant_text', { text: 'Noted.' }, 'builder'),
+    ]);
+    expect([...replyHeads(items, 'builder')]).toEqual([
+      [2, 'builder'],
+      [8, 'builder'],
+    ]);
+  });
+
   it('puts no head on replies in a thread with no agent', () => {
     const { items } = buildItems([row(1, 'user', { text: 'Hi.' }), row(2, 'assistant_text', { text: 'Hello.' })]);
     expect(replyHeads(items, null).size).toBe(0);

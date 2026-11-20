@@ -99,7 +99,7 @@ describe('delegate_team', () => {
     const [brief, ...rest] = H.byKind(t.id, 'user');
     expect(rest).toEqual([]);
     expect(brief.p.source).toBe('conductor');
-    expect(brief.p.text).toMatch(/^Plan the launch page\n\n## Your team's parts\n\n### Copywriter \(agent id `copywriter`\)\n\n\*\*Copy\*\*: write the copy/);
+    expect(brief.p.text).toMatch(/^Plan the launch page\n\nYour team's parts:\n\nCopywriter \(agent id copywriter\)\n- Copy: write the copy/);
     // The lead planned first, and nobody else ran.
     expect(H.claudeTexts(t.id)).toHaveLength(1);
     for (const p of PARTS) expect(H.spawns(sessionOf(t.id, p.role))).toEqual([]);
@@ -189,9 +189,9 @@ describe('delegate_team', () => {
     expect(H.db.members.seated(t.id).map((m) => m.agent)).toEqual(['lead', 'copywriter', 'designer']);
     await H.untilResults(t.id, 1);
     const brief = H.byKind(t.id, 'user')[0].p.text as string;
-    expect(brief).toContain('### Copywriter (agent id `copywriter`)\n\n1. **Headline**: write the headline\n\n2. **Body**: write the body');
+    expect(brief).toContain('Copywriter (agent id copywriter)\n- Headline: write the headline\n- Body: write the body');
     // A part that names no agent is the lead's own.
-    expect(brief).toContain('## Parts for you\n\n**Wrap up**: sum it up');
+    expect(brief).toContain('Parts for you:\n- Wrap up: sum it up');
   });
 
   it("refuses a team whose every part is the lead's, and a member the server cannot seat", T, async () => {

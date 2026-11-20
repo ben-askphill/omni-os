@@ -381,7 +381,7 @@ describe('teams and parents', () => {
     await retry(thread.id);
     await r.untilResults(thread.id, 1);
     expect(realpathSync(r.spawns(thread.id)[0].cwd)).toBe(realpathSync(thread.cwd));
-    expect(r.claudeTexts(thread.id)[0]).toMatch(/^split the work\n\n## Your team's parts/);
+    expect(r.claudeTexts(thread.id)[0]).toMatch(/^split the work\n\nYour team's parts:/);
     // The member runs on the thread's worktree once the lead gives it its part.
     expect(r.thread(r.db.members.of(thread.id, 'researcher')!.session_thread).cwd).toBe(thread.cwd);
   });

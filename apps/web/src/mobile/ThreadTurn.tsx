@@ -259,6 +259,8 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
                 ? leadLine(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a)
               : p.source === 'pr-watch'
                 ? 'PR watch'
+              : p.source === 'team'
+                ? 'Team'
               : brief
                 ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
                 : k > 0

@@ -50,14 +50,15 @@ export interface TeamPart {
 export function teamBrief(prompt: string, lead: string, parts: TeamPart[]): string {
   const byAgent = new Map<string, TeamPart[]>();
   for (const p of parts) byAgent.set(p.agent, [...(byAgent.get(p.agent) ?? []), p]);
-  const section = (agent: string, list: TeamPart[]) =>
-    `### ${agentName(agent || null)} (agent id \`${agent}\`)\n\n${list.map((p, i) => `${list.length > 1 ? `${i + 1}. ` : ''}**${p.title}**: ${p.prompt.trim()}`).join('\n\n')}`;
+  // Plain lines, not Markdown: the brief is the thread's first message, and a message shows as written.
+  const line = (p: TeamPart) => `- ${p.title}: ${p.prompt.trim().replace(/\n/g, '\n  ')}`;
+  const section = (agent: string, list: TeamPart[]) => `${agentName(agent || null)} (agent id ${agent})\n${list.map(line).join('\n')}`;
   const others = [...byAgent].filter(([a]) => a !== lead);
   const own = byAgent.get(lead);
   return [
     prompt.trim(),
-    `## Your team's parts\n\n${others.map(([a, list]) => section(a, list)).join('\n\n')}`,
-    ...(own ? [`## Parts for you\n\n${own.map((p) => `**${p.title}**: ${p.prompt.trim()}`).join('\n\n')}`] : []),
+    `Your team's parts:\n\n${others.map(([a, list]) => section(a, list)).join('\n\n')}`,
+    ...(own ? [`Parts for you:\n${own.map(line).join('\n')}`] : []),
   ].join('\n\n');
 }
 

@@ -475,13 +475,15 @@ export const authorOf = (it: ReplyItem, lead: string | null | undefined) => it.a
 /**
  * Where an author line goes (ADR 0019, How it looks): the key of each reply item that opens a run of replies from one
  * agent, with that agent's id. Ben's message, a report, a switch or another agent's reply ends a run; a turn's result
- * line and mod lines do not. A reply with no author (no agent wrote it and the thread has no lead) gets no head.
+ * line and mod lines do not, nor does a team lead's own message to its members, which it sends from inside its turn.
+ * A reply with no author (no agent wrote it and the thread has no lead) gets no head.
  */
 export function replyHeads(items: readonly Item[], lead: string | null | undefined): Map<number, string> {
   const out = new Map<number, string>();
   let run: string | null = null;
   for (const it of items) {
     if (QUIET.has(it.type)) continue;
+    if (it.type === 'user' && it.p.source === 'lead' && it.agent === run) continue;
     if (!isReply(it)) {
       run = null;
       continue;
