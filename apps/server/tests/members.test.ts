@@ -341,4 +341,19 @@ describe('cards and the thread', () => {
     expect(JSON.stringify(r.json)).toMatch(/Designer is still working/);
     await untilIdle(t.id, 2);
   });
+
+  it('blocks moves and forks and stops a running member after it was removed', T, async () => {
+    const t = await groupThread('plain start');
+    await say(t.id, 'TOOL:15000 long edit', ['designer', 'Designer']);
+    const sid = sessionOf(t.id, 'designer');
+    await H.untilTool(t.id);
+    expect((await call(`/threads/${t.id}/members/designer`, json('DELETE'))).status).toBe(200);
+    const handoff = await call(`/threads/${t.id}/handoff`, json('POST', { to: 'another-machine' }));
+    const fork = await call(`/threads/${t.id}/continue`, json('POST', { harness: 'claude-code', model: 'sonnet', text: 'go on', request_id: 'r1', revision: 'x' }));
+    const stopped = await call(`/threads/${t.id}/stop`, json('POST'));
+    expect(stopped.status).toBe(200);
+    expect(handoff.json.error).toMatch(/Designer is still working/);
+    expect(fork.json.error).toMatch(/Designer is still working/);
+    await H.untilStatus(sid, 'stopped');
+  });
 });

@@ -142,7 +142,7 @@ export function seat(threadId: string, agent: string, prompt = '', run?: MemberR
 }
 
 /** Member threads whose agent was removed mid-turn: the turn finishes, then the left line is written (Q12). */
-const leaving = new Set<string>();
+const leaving = new Map<string, MemberRow>();
 
 /** The left line, after the member's last reply, and its session closed. It never resumes: a new seat starts a new one. */
 function leave(m: MemberRow) {
@@ -175,7 +175,7 @@ export function unseat(threadId: string, agent: string): void {
   const live = lives.get(sid);
   if (live?.turn && !live.closing) {
     drop(sid, live.takeHeld());
-    leaving.add(sid);
+    leaving.set(sid, m);
     emitThread(threadId);
     return;
   }
@@ -321,7 +321,7 @@ interface Round {
   /** Named, and not finished yet. */
   pending: Set<string>;
   /** Handed the message: only a turn that ends after that answers it. */
-  handed: Set<string>;
+  handed: Map<string, string>;
   snap?: string | null;
   cancelled?: boolean;
 }
@@ -381,7 +381,7 @@ function startRound(
   named: string[],
   m: { request: string; prompt: string; attachments?: Attachment[]; context?: MessageContext[]; source?: Step['source'] },
 ) {
-  const round: Round = { row, pending: new Set(named), handed: new Set() };
+  const round: Round = { row, pending: new Set(named), handed: new Map() };
   rounds.set(threadId, [...(rounds.get(threadId) ?? []), round]);
   const steps: Step[] = named.map((agent) => ({ agent, row, request: m.request, prompt: m.prompt, attachments: m.attachments, context: m.context, source: m.source }));
   void start(threadId, round, steps);
@@ -394,14 +394,18 @@ export function pendingAgents(threadId: string): Set<string> {
 }
 
 /** Cancel starts that Stop reached before delivery. Handed turns still settle their checkpoints when they end. */
-groupStopping.push((threadId) => {
+groupStopping.push((threadId, stop) => {
+  const sessions = memberSessions(threadId);
   // When only members were working, stop the group too, before their completion can wake its lead.
-  if (pendingAgents(threadId).size && threads.get(threadId)?.status === 'done' && !lives.get(threadId)?.turn) threads.update(threadId, { status: 'stopped' });
+  if ((pendingAgents(threadId).size || sessions.some(memberWorking)) && threads.get(threadId)?.status === 'done' && !lives.get(threadId)?.turn) {
+    threads.update(threadId, { status: 'stopped' });
+  }
   for (const round of rounds.get(threadId) ?? []) {
     round.cancelled = true;
     for (const agent of round.pending) if (!round.handed.has(agent)) round.pending.delete(agent);
     finishIfDone(threadId, round);
   }
+  for (const m of sessions) if ((!m.removed_at && !leaving.has(m.session_thread)) || memberWorking(m)) stop(m.session_thread);
 });
 
 /** Called once every agent a message named has answered it (runner/team.ts wakes a team's lead from here). */
@@ -467,7 +471,7 @@ async function handTo(threadId: string, round: Round, step: Step) {
     event: { kind: 'routed', payload: { text: step.prompt, source: step.source ?? 'ben' } },
     byOmni: true,
   };
-  round.handed.add(step.agent);
+  round.handed.set(step.agent, m.session_thread);
   // An agent at work hears it as a steer (or after its turn, on a harness that cannot steer); an idle one starts a turn.
   deliver(m.session_thread, msg);
 }
@@ -476,9 +480,9 @@ async function handTo(threadId: string, round: Round, step: Step) {
  * `agent`'s turn ended (or it was removed, or the message never reached it: `any`): it has answered every message
  * handed to it. A message is over once each agent it named has.
  */
-function settle(threadId: string, agent: string, any = false) {
+function settle(threadId: string, agent: string, any = false, session?: string) {
   for (const round of rounds.get(threadId) ?? []) {
-    if (!round.pending.has(agent) || (!any && !round.handed.has(agent))) continue;
+    if (!round.pending.has(agent) || (!any && round.handed.get(agent) !== session)) continue;
     round.pending.delete(agent);
     finishIfDone(threadId, round);
   }
@@ -567,10 +571,10 @@ function cloudFinished(m: MemberRow, status: ThreadStatus) {
 
 /** A session's turn ended: a removal waiting on it goes through, and the messages it answered may be over. */
 turnEnded.push((sessionThread: string, status: ThreadStatus) => {
-  const m = members.bySession(sessionThread);
+  const m = leaving.get(sessionThread) ?? members.bySession(sessionThread);
   if (!m) return;
   if (leaving.has(sessionThread)) leave(m);
-  settle(m.thread_id, m.agent);
+  settle(m.thread_id, m.agent, false, sessionThread);
   cloudFinished(m, status);
   emitThread(m.thread_id);
 });
@@ -578,16 +582,24 @@ turnEnded.push((sessionThread: string, status: ThreadStatus) => {
 // ---------- views ----------
 
 /** Every session the thread's agents run in: its own, and each member's, removed ones included. */
-export const sessionThreads = (threadId: string): string[] => [threadId, ...members.all(threadId).filter((m) => !m.lead).map((m) => m.session_thread)];
+export const sessionThreads = (threadId: string): string[] => [threadId, ...memberSessions(threadId).map((m) => m.session_thread)];
+
+function memberSessions(threadId: string): MemberRow[] {
+  const sessions = new Map([...leaving.values()].filter((m) => m.thread_id === threadId).map((m) => [m.session_thread, m]));
+  for (const m of members.all(threadId)) if (!m.lead) sessions.set(m.session_thread, m);
+  return [...sessions.values()];
+}
+
+function memberWorking(m: MemberRow) {
+  const s = threads.get(m.session_thread);
+  return !!s && (s.status === 'running' || s.status === 'queued' || !!lives.get(s.id)?.turn);
+}
 
 /** Why the thread cannot move or fork while any of its agents runs, or null (Q14). */
 export function busyAgents(threadId: string): string | null {
-  const busy = seatedOf(threadId).filter((m) => !m.lead).filter((m) => {
-    const s = threads.get(m.session_thread);
-    return s && (s.status === 'running' || s.status === 'queued' || lives.get(s.id)?.turn);
-  });
+  const busy = [...new Set(memberSessions(threadId).filter(memberWorking).map((m) => agentName(m.agent)))];
   if (!busy.length) return null;
-  return `${busy.map((m) => agentName(m.agent)).join(' and ')} ${busy.length === 1 ? 'is' : 'are'} still working in this thread. Wait until every agent is idle.`;
+  return `${busy.join(' and ')} ${busy.length === 1 ? 'is' : 'are'} still working in this thread. Wait until every agent is idle.`;
 }
 
 export const memberOf = (sessionThread: string) => members.bySession(sessionThread);

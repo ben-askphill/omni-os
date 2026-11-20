@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolveDelivery } from '../delivery.ts';
 import { config } from '../config.ts';
-import { events, members, threads, type ThreadStatus } from '../db.ts';
+import { events, threads, type ThreadStatus } from '../db.ts';
 import { lostTo } from '../ownership.ts';
 import { machineName } from '../sync/guard.ts';
 import { detachThread } from '../browser.ts';
@@ -198,8 +198,7 @@ export function fenceStale() {
 
 export function interruptThread(threadId: string) {
   // A group thread (ADR 0019, Q13): Stop stops every agent in it, each in the session it runs in.
-  for (const stop of groupStopping) stop(threadId);
-  for (const m of members.seated(threadId)) if (!m.lead) stopOne(m.session_thread);
+  for (const stop of groupStopping) stop(threadId, stopOne);
   return stopOne(threadId);
 }
 
