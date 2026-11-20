@@ -2,9 +2,9 @@
 // the switches (GET /api/display) and the words here. Pure.
 //
 // `technical`: Settings > Appearance > Show technical details. Off, Omni reads as a workspace: five status words, plain
-// names for the run controls, and no pull requests, branches, worktrees, token counts or context ring outside a
-// channel with a repo. A channel with a repo always shows its code detail; the status words and control names follow
-// the switch everywhere.
+// names for the run controls, and no pull requests, branches, worktrees or token counts outside a channel with a repo.
+// A channel with a repo always shows its code detail; the status words and control names follow the switch everywhere.
+// The context ring is not code detail: every thread shows it, whatever the switch says.
 // `shopify`: Settings > General > Shopify add-on. The Store card (store domain, client portal slug) on a channel's
 // settings, the store link on its page and the store field in setup.
 // `openItems`: Settings > Threads > Open items card. The questions, decisions and blockers a finished turn left, listed
@@ -54,8 +54,8 @@ export function parseDisplayPatch(v: unknown): Partial<DisplayPrefs> | null {
 export type CodeChannel = { repo_path?: string | null } | null | undefined;
 
 /**
- * Whether a thread or channel shows its code detail (pull requests, branch, worktree, changes, terminal, token counts,
- * the context ring): the switch is on, or the channel has a repo.
+ * Whether a thread or channel shows its code detail (pull requests, branch, worktree, changes, terminal, token counts):
+ * the switch is on, or the channel has a repo.
  */
 export const showsCode = (prefs: Pick<DisplayPrefs, 'technical'>, channel?: CodeChannel): boolean => prefs.technical || !!channel?.repo_path;
 

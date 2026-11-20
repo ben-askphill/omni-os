@@ -84,9 +84,6 @@ const SOURCE_NOTE: Record<ContextUsage['source'], string> = {
 };
 
 /** The thread's billed cost for the hover, once Cursor has reported it. */
-/** How full the window is, in percent, before a quiet ring shows: it matters only near the limit. */
-const QUIET_FROM = 70;
-
 const costTip = (s: ThreadSpend | null | undefined) => (s?.cents != null ? ` Cost so far: ${formatCents(s.cents)}.` : '');
 
 /** Whether the thread's harness reports a context window, so a meter has something to show. */
@@ -136,28 +133,17 @@ export function contextPercentLabel(context: ContextUsage | null): string | null
 }
 
 /**
- * The context meter next to the send button: a ring that fills as the thread's window does, with used,
- * window and percent on hover. Clicking it opens what fills the window and a Compact action.
+ * The context meter in the thread header: a ring that fills as the thread's window does, with used, window and
+ * percent on hover. Clicking it opens what fills the window and a Compact action. It shows on every thread whose
+ * harness reports a window, whatever Show technical details says.
  */
-export function ContextMeter({
-  thread,
-  pushed,
-  onCompacted,
-  quiet = false,
-}: {
-  thread: Thread;
-  pushed: ContextUsage | null;
-  onCompacted?: (t: Thread) => void;
-  /** Show technical details is off outside a repo channel: the ring shows only once the window is filling (QUIET_FROM). */
-  quiet?: boolean;
-}) {
+export function ContextMeter({ thread, pushed, onCompacted }: { thread: Thread; pushed: ContextUsage | null; onCompacted?: (t: Thread) => void }) {
   const { metered, view, context, percent, refreshing, load } = useContextView(thread, pushed);
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useDismissable(open, () => setOpen(false), { root: wrap });
 
   if (!metered) return null;
-  if (quiet && (percent == null || percent < QUIET_FROM)) return null;
   const level = contextLevel(percent);
   const approx = contextApprox(context) ? '~' : '';
   const tip = context ? `Context: ${contextSummary(context)}.${costTip(context.spend)} Click for details.` : 'Context: no reading yet. Click for details.';
