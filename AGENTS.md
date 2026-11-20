@@ -2,7 +2,8 @@
 
 Project context and conventions live in `CLAUDE.md`. Read it first.
 
-- Desktop app: `apps/desktop/` (Electron). It loads the Web UI and runs the bundled server on Electron's own Node. It replaced the SwiftUI Mac app and the Linux launcher (ADR 0010). Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`, read via `apps/web/src/desktop.ts`), always gated on it being there. The page tells it the active layout (`setLayout`) so macOS traffic lights sit in the channel rail (the default), or in the classic sidebar when that is on. It raises native notifications for questions, failures, finishes, crew reports and watched PRs. On macOS the Window menu opens the Activity Monitor, which reads Claude transcripts from `~/.claude/projects` only. It imports `@omni/shared` only. QA harness: `apps/desktop/scripts/qa.ts`. See `apps/desktop/README.md`.
+- Desktop app: `apps/desktop/` (Electron). It loads the Web UI and runs the bundled server on Electron's own Node. One codebase builds it for macOS and as a Linux AppImage. It replaced the SwiftUI Mac app and the Linux launcher (ADR 0010). Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`, read via `apps/web/src/desktop.ts`), always gated on it being there. The page tells it the active layout (`setLayout`) so macOS traffic lights sit in the channel rail, or in the classic sidebar when that is on. It raises native notifications for questions, failures, finishes, crew reports and watched PRs. On macOS the Window menu opens the Activity Monitor, which reads Claude transcripts from `~/.claude/projects` only (Claude Code threads never get `CLAUDE_CONFIG_DIR`). It imports `@omni/shared` only. QA harness: `apps/desktop/scripts/qa.ts`. See `apps/desktop/README.md`.
+- Words: use the canonical domain terms in [GLOSSARY.md](GLOSSARY.md), not the ones it lists under _Avoid_.
 
 ## Standing rules
 
