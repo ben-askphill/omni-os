@@ -889,3 +889,31 @@ describe('files', () => {
     hub.close();
   });
 });
+
+describe('agents', () => {
+  it("loads this machine's agents when the hub opens, and again once the feed says an agent file changed", async () => {
+    const t = fakeTransport();
+    let image = '/api/crew/builder/avatar?v=aaa';
+    const { fetch, calls } = fakeFetch((path) => (path === '/api/crew' ? { body: [{ id: 'builder', name: 'Builder', avatar: { image } }] } : {}));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    expect(hub.agents.get()?.[0]?.avatar?.image).toBe('/api/crew/builder/avatar?v=aaa');
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    // A new avatar reached this machine with the crew file (sync), and the server says so.
+    image = '/api/crew/builder/avatar?v=bbb';
+    feed?.sink.message(frame({ type: 'crew' }));
+    await settle();
+    expect(hub.agents.get()?.[0]?.avatar?.image).toBe('/api/crew/builder/avatar?v=bbb');
+    expect(calls.filter((c) => c === '/api/crew')).toHaveLength(2);
+    hub.close();
+  });
+});
+
+describe('agent avatars', () => {
+  it("reads an uploaded avatar from the agent's own path, with the session's token", async () => {
+    const hub = createLiveHub({ session: session(), transport: fakeTransport().transport, fetch: fakeFetch(() => ({})).fetch });
+    expect(await hub.avatarSource('de sign', '0123ab')).toEqual({ uri: `${BASE}/api/crew/de%20sign/avatar?v=0123ab`, headers: { Authorization: 'Bearer token' } });
+    hub.close();
+  });
+});

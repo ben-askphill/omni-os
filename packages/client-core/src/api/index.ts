@@ -14,6 +14,7 @@ import { crewApi } from './crew.ts';
 import { detailApi } from './detail.ts';
 import { harnessesApi } from './harnesses.ts';
 import { machinesApi } from './machines.ts';
+import { membersApi } from './members.ts';
 import { memoryApi } from './memory.ts';
 import { messagesApi } from './messages.ts';
 import { needsYouApi } from './needs-you.ts';
@@ -40,6 +41,7 @@ export * from './detail.ts';
 export * from './events.ts';
 export * from './harnesses.ts';
 export * from './machines.ts';
+export * from './members.ts';
 export * from './memory.ts';
 export * from './messages.ts';
 export * from './needs-you.ts';
@@ -59,6 +61,7 @@ export function createOmniApi(http: HttpClient) {
     ...channelsApi(http),
     ...crewApi(http),
     ...threadsApi(http),
+    ...membersApi(http),
     ...detailApi(http),
     ...messagesApi(http),
     ...recoveryApi(http),

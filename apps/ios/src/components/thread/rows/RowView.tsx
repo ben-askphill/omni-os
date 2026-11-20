@@ -19,6 +19,7 @@ import {
   StepsRow,
   SwitchRow,
 } from './Cards';
+import { AuthorRow, CollisionRow, FilesRow, LanesRow, LockRow, MemberRow, REPLY_INSET } from './Group';
 import { CallRow, ModRow, NoteRow } from './Steps';
 import { ThinkingRow } from './ThinkingRow';
 
@@ -43,14 +44,21 @@ const VIEWS: Views = {
   now: NowRow,
   thinking: ThinkingRow,
   progress: ProgressRow,
+  author: AuthorRow,
+  lanes: LanesRow,
+  files: FilesRow,
+  collision: CollisionRow,
+  member: MemberRow,
+  lock: LockRow,
 };
 
-const GAP: Partial<Record<RowKind, number>> = { call: space.s2, note: space.s4, mod: space.s2, switch: space.s4, prompt: space.s9 };
+const GAP: Partial<Record<RowKind, number>> = { call: space.s2, note: space.s4, mod: space.s2, switch: space.s4, prompt: space.s9, member: space.s4, lock: space.s2, files: space.s4 };
 
 export const RowView = memo(function RowView({ row }: { row: ThreadRow }) {
   const Draw = VIEWS[row.kind] as ComponentType<{ row: ThreadRow }>;
   return (
-    <View style={{ paddingTop: GAP[row.kind] ?? space.s6 }}>
+    // A reply's rows sit beside its author's avatar, not under it.
+    <View style={{ paddingTop: GAP[row.kind] ?? space.s6, paddingLeft: row.inset ? REPLY_INSET : 0 }}>
       <Draw row={row} />
     </View>
   );

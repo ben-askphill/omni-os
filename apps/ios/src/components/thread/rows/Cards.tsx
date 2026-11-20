@@ -18,6 +18,7 @@ import { glyphFor, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
 import { QuestionCard } from '../QuestionCard';
 import { useRowActions } from './actions';
+import { MentionText, SentTo } from './Group';
 
 type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
 
@@ -35,18 +36,14 @@ function LoadWhole({ label, onPress }: { label: string; onPress: () => void }) {
 export function PromptRow({ row }: Of<'prompt'>) {
   const { colors } = useOmniTheme();
   const { loadWhole, threadId } = useRowActions();
-  const { p, caption } = row;
+  const { p, caption, to, chips } = row;
   return (
     <View style={styles.end}>
-      <ContextChips records={p.context} />
-      {showsBubble(p) ? (
+      <ContextChips records={chips} />
+      {showsBubble({ ...p, context: chips }) ? (
         <View style={[styles.bubble, { backgroundColor: colors.surface2 }, p.dropped && styles.dim]}>
           {p.attachments?.length ? <AttachmentRow threadId={threadId} items={p.attachments} /> : null}
-          {p.text ? (
-            <Text selectable style={[styles.bubbleText, { color: colors.fg }]}>
-              {p.text}
-            </Text>
-          ) : null}
+          {p.text ? <MentionText text={p.text} records={p.context} style={[styles.bubbleText, { color: colors.fg }]} /> : null}
           {p.items?.length ? (
             <View style={styles.wake}>
               {p.items.map((it, i) => (
@@ -59,9 +56,10 @@ export function PromptRow({ row }: Of<'prompt'>) {
           ) : null}
         </View>
       ) : null}
-      {caption ? <View style={styles.line}>
+      {caption || to.length ? <View style={[styles.line, styles.captionLine]}>
         {p.dropped || caption === 'Sent while it ran' ? <Icon name={p.dropped ? 'x' : p.mode === 'interrupt' ? 'stop' : 'send'} size={11} color={colors.fg3} /> : null}
-        <Text style={[styles.caption, { color: colors.fg3 }]}>{caption}</Text>
+        {caption ? <Text style={[styles.caption, { color: colors.fg3 }]}>{caption}</Text> : null}
+        <SentTo agents={to} />
       </View> : null}
       {p.clipped ? <LoadWhole label="Load whole message" onPress={() => loadWhole(p.key)} /> : null}
     </View>
@@ -322,6 +320,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, paddingHorizontal: space.s6, paddingVertical: space.s6, gap: space.s4 },
   cardTitle: { fontSize: fontSize.ui, fontWeight: weight.semibold },
   line: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
+  captionLine: { flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '92%' },
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s4 },
   stepMark: { width: 12, height: 19, alignItems: 'center', justifyContent: 'center' },
   grow: { flex: 1 },

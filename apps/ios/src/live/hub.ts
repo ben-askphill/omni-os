@@ -11,6 +11,7 @@ import {
   type Artifact,
   type BackgroundTask,
   type ChannelWithRunning,
+  type CrewRole,
   type Fetch,
   type HarnessInfo,
   type HistoryEvent,
@@ -118,6 +119,13 @@ export interface LiveHub {
   readonly claudeArtifacts: Store<ClaudeArtifactsLiveState>;
   /** Show technical details and the Shopify add-on (GET /api/display). Null until the server answers, or from a server without them. */
   readonly display: Store<DisplayPrefs | null>;
+  /**
+   * This machine's agents (GET /api/crew), for names, avatars and mentions. Loaded on open and again whenever the feed
+   * says an agent file changed, so an avatar set on another machine arrives with its crew file. Null until it loads.
+   */
+  readonly agents: Store<readonly CrewRole[] | null>;
+  /** Reads the agents again, after the app changed one. */
+  refreshAgents(): Promise<void>;
   /** Sets a display switch for every client. Resolves to the failure's message, or null. */
   setDisplay(patch: Partial<DisplayPrefs>): Promise<string | null>;
   refreshChannels(): Promise<void>;
@@ -143,6 +151,8 @@ export interface LiveHub {
   uploadLimitMb(): Promise<number>;
   /** Where an uploaded file of a thread is read from, and the credentials that go with it. Null without a server. */
   fileSource(threadId: string, name: string, options?: { download?: boolean }): Promise<FileSource | null>;
+  /** Where an agent's uploaded avatar is read from (`agentFace`'s image), with the credentials. Null without a server. */
+  avatarSource(agent: string, v: string): Promise<FileSource | null>;
   /** Opens or closes a folder for every client. Resolves to the failure's message, or null. */
   setFolderCollapsed(folderId: string, collapsed: boolean): Promise<string | null>;
   /** Hears every feed message while subscribed, for a screen that refetches on its own kind (the Changes screen's review notes). */
@@ -217,6 +227,17 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   const library = createLibraryLive({ api: background, withAuth, now });
   const claudeArtifacts = createClaudeArtifactsLive({ api: background, withAuth });
   const display = createStore<DisplayPrefs | null>(null);
+  const agents = createStore<readonly CrewRole[] | null>(null);
+
+  /** The agents again: on open, on a feed reconnect and when the feed says an agent file changed. A failed load keeps the list. */
+  async function refreshAgents() {
+    if (!background) return;
+    try {
+      agents.set(await withAuth(() => background.crew()));
+    } catch {
+      /* keep the last list: names and avatars change rarely */
+    }
+  }
 
   /** The display switches again: on open, on a feed reconnect and when the feed says they changed. An older server has none. */
   async function refreshDisplay() {
@@ -275,6 +296,12 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       },
     );
     return uploadLimit;
+  }
+
+  async function avatarSource(agent: string, v: string): Promise<FileSource | null> {
+    const token = http ? await session.token() : null;
+    if (!http || !token) return null;
+    return { uri: http.url(apiPath`/crew/${agent}/avatar`, { v }), headers: { Authorization: `Bearer ${token}` } };
   }
 
   async function fileSource(threadId: string, name: string, opts?: { download?: boolean }): Promise<FileSource | null> {
@@ -420,6 +447,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         if (isRecord(message) && message.type === NEEDS_YOU) void refreshNeedsYou();
         if (isRecord(message) && message.type === 'tasks' && Array.isArray(message.tasks)) setTasks(message.tasks);
         if (isRecord(message) && message.type === 'display') void refreshDisplay();
+        if (isRecord(message) && message.type === 'crew') void refreshAgents();
         activity.applyFeed(message);
         library.applyFeed(message);
         claudeArtifacts.applyFeed(message);
@@ -436,6 +464,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         void library.refresh();
         void claudeArtifacts.reload();
         void refreshDisplay();
+        void refreshAgents();
       },
       onState: (state) => {
         // The feed is connected, so the server is up: a list that never loaded asks again now.
@@ -650,6 +679,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     void activity.refresh();
     void library.refresh();
     void refreshDisplay();
+    void refreshAgents();
   }
   recomputeLink();
 
@@ -663,11 +693,14 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     library: library.state,
     claudeArtifacts: claudeArtifacts.state,
     display,
+    agents,
+    refreshAgents,
     setDisplay,
     refreshChannels,
     request: (call) => withAuth(() => call(requireApi())),
     uploadLimitMb,
     fileSource,
+    avatarSource,
     applyThread(thread) {
       for (const t of openThreads) t.applyThread(thread);
       channelReads.edit();

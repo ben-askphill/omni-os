@@ -1,3 +1,4 @@
+import type { ThreadMember } from '@omni/shared/members.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { apiPath, sendWithFiles, type HttpClient, type WithFiles } from '../http.ts';
@@ -59,12 +60,16 @@ export interface Thread {
   updated_at: string;
   /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), from @omni/shared/steps.ts. Absent otherwise. */
   step?: string;
+  /** A group thread's agents, the lead first, while an agent besides the lead is seated (@omni/shared/members.ts). */
+  members?: ThreadMember[];
+  /** Why it takes no new messages: its lead agent was deleted or is hidden. */
+  read_only?: string;
 }
 
 /** The part of a thread the channel list sends for each of its threads. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at' | 'updated_at' | 'folder_id' | 'harness' | 'pinned_at' | 'done_at' | 'parent_id' | 'source' | 'limit_state'> &
-  /** For the thread tree's child rows, and `setup` for the Starting dot. Older servers leave them out. */
-  Partial<Pick<Thread, 'model' | 'branch' | 'setup' | 'owner'>>;
+  /** For the thread tree's child rows, `setup` for the Starting dot and `members` for a group thread's mark. Older servers leave them out. */
+  Partial<Pick<Thread, 'model' | 'branch' | 'setup' | 'owner' | 'members'>>;
 
 export interface ListThreads {
   channel?: string;
