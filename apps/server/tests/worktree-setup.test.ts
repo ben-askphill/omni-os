@@ -367,23 +367,23 @@ describe('channels without worktrees', () => {
 });
 
 describe('teams and parents', () => {
-  it("a child that cannot be prepared reports it to its parent, and a lead's worktree failing holds the go until Retry", async () => {
+  it("a team thread whose worktree cannot be prepared holds its brief until Retry, and the lead then plans first", async () => {
     const empty = repo({ empty: true });
-    const { lead, members } = await r.runner.createTeam({
+    const { thread } = await r.runner.createTeam({
       channel: channel(empty),
       prompt: 'split the work',
-      tasks: [{ prompt: 'part one' }],
+      role: 'builder',
+      tasks: [{ prompt: 'part one', role: 'researcher' }],
     });
-    await failed(lead.id);
-    await failed(members[0].id);
-    // The member's failure reached the waiting lead as its report; the lead still waits for its worktree.
-    await r.until('the report on the lead', () => r.byKind(lead.id, 'crew_report').length === 1);
-    expect(r.byKind(lead.id, 'crew_report')[0].p.text).toMatch(/could not prepare/);
-    expect(r.spawns(lead.id)).toEqual([]);
+    await failed(thread.id);
+    expect(r.spawns(thread.id)).toEqual([]);
     commit(empty);
-    await retry(lead.id);
-    await r.untilResults(lead.id, 1);
-    expect(realpathSync(r.spawns(lead.id)[0].cwd)).toBe(realpathSync(lead.cwd));
+    await retry(thread.id);
+    await r.untilResults(thread.id, 1);
+    expect(realpathSync(r.spawns(thread.id)[0].cwd)).toBe(realpathSync(thread.cwd));
+    expect(r.claudeTexts(thread.id)[0]).toMatch(/^split the work\n\n## Your team's parts/);
+    // The member runs on the thread's worktree once the lead gives it its part.
+    expect(r.thread(r.db.members.of(thread.id, 'researcher')!.session_thread).cwd).toBe(thread.cwd);
   });
 });
 

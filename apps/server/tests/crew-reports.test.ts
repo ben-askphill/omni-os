@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
+import { legacyTeam } from './legacy-team.ts';
 
 // Crew reports as durable requests (apps/server/runner/queue.ts): saved for the parent before it is woken, keyed by the
 // child and its completion, so a second report of the same completion adds nothing, and a parent Ben stopped keeps
@@ -138,10 +139,10 @@ describe('crew reports', () => {
     expect(woke).not.toContain('Relay what matters');
   });
 
-  it('a team lead still waits for every member, and its go is saved once', T, async () => {
+  it('a lead of a team made before one-thread teams still waits for every member, and its go is saved once', T, async () => {
     const conductor = await H.start('conductor');
     await H.untilResults(conductor.id, 1);
-    const { lead, members } = await H.runner.createTeam({
+    const { lead, members } = await legacyTeam(H, {
       channel: 'scratch',
       prompt: 'Compare two mics',
       title: 'Mics',

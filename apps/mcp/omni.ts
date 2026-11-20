@@ -650,7 +650,7 @@ server.registerTool(
   {
     description:
       `The questions the threads you delegated to (at any depth, team members included) asked ${USER} with ask_user_question ` +
-      `and still wait on: the thread and task id that asked, and the questions. ${USER} answers them on your thread, where ` +
+      `and still wait on: the thread and task id that asked, \`member\` when a member of a team or group thread asked rather than its lead, and the questions. ${USER} answers them on your thread, where ` +
       `their cards show; you cannot answer for them. A thread waiting here is blocked on ${USER}, not stuck. thread_id ` +
       'defaults to your own thread.',
     inputSchema: { thread_id: z.string().optional() },
@@ -660,7 +660,13 @@ server.registerTool(
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
     const { items } = await call(`/threads/${encodeURIComponent(id)}/crew-questions`);
     return text(
-      items.map((c: any) => ({ thread_id: c.thread_id, thread_title: c.thread_title, task_id: c.task_id, questions: c.question.questions.map((q: any) => q.question) })),
+      items.map((c: any) => ({
+        thread_id: c.thread_id,
+        thread_title: c.thread_title,
+        task_id: c.task_id,
+        ...(c.member && { member: c.member.name }),
+        questions: c.question.questions.map((q: any) => q.question),
+      })),
     );
   },
 );

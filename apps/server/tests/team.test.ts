@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
+import { legacyTeam } from './legacy-team.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
 let app: { request: (path: string, init?: RequestInit) => Response | Promise<Response> };
@@ -141,6 +142,9 @@ describe('delegate_team', () => {
     const members = (await call('GET', `/threads/${t.id}`)).json.thread.members as { agent: string; state: string }[];
     expect(members.find((m) => m.agent === 'copywriter')!.state).toBe('needs');
     expect(H.claudeTexts(t.id)).toHaveLength(1);
+    // The Conductor's crew_questions names the member that asks, on the team thread's one task id.
+    const crew = (await call('GET', `/threads/${conductor.id}/crew-questions`)).json.items;
+    expect(crew.map((c: any) => [c.thread_id, c.task_id, c.member])).toEqual([[t.id, 'T-9', { agent: 'copywriter', name: 'Copywriter' }]]);
 
     // Ben answers; once the copywriter finishes, the lead wakes with both, the failure said.
     expect((await call('POST', `/threads/${t.id}/questions/${asked.json.id}/answer`, { answers: [{ selected: ['Casual'], other: null }] })).status).toBe(200);
@@ -257,5 +261,35 @@ describe('seating by an agent thread', () => {
     await H.untilResults(mine.id, 1);
     expect((await call('POST', `/threads/${mine.id}/messages`, { prompt: '@Critic look', context: [mention('critic', 'Critic')] })).status).toBe(200);
     expect(H.db.members.seated(mine.id).map((m) => m.agent)).toEqual(['lead', 'critic']);
+  });
+});
+
+describe('a team made before one-thread teams', () => {
+  it('keeps its tree: the members run, then the lead once with every reply, then one report to the Conductor', T, async () => {
+    const conductor = await idle('be the conductor');
+    const { lead, members } = await legacyTeam(H, {
+      channel: 'scratch',
+      title: 'Mic research',
+      prompt: 'Research the mic',
+      parent_id: conductor.id,
+      task_id: 'T-8',
+      tasks: [
+        { title: 'Price', prompt: 'find the price' },
+        { title: 'Reviews', prompt: 'THINK:600 find reviews' },
+      ],
+    });
+    expect(members.map((m) => [m.parent_id, m.source, m.task_id])).toEqual([
+      [lead.id, 'team', 'T-8.1'],
+      [lead.id, 'team', 'T-8.2'],
+    ]);
+    await H.until('first report on the lead', () => H.byKind(lead.id, 'crew_report').length === 1);
+    expect(H.spawns(lead.id)).toHaveLength(0);
+    await H.untilResults(lead.id, 1);
+    expect(H.flow(lead.id)).toEqual(['user', 'crew_report', 'crew_report', 'user', 'assistant_text', 'result']);
+    expect(H.byKind(lead.id, 'user')[1].p).toMatchObject({ text: 'All 2 reports are in.', source: 'team' });
+    await H.untilResults(conductor.id, 2);
+    expect(H.byKind(conductor.id, 'crew_report').map((e) => e.p.thread_id)).toEqual([lead.id]);
+    // Its lead gets no message_members: it is not a team thread.
+    expect((await tell(lead.id, ['researcher'], 'hi')).status).toBe(409);
   });
 });

@@ -1,5 +1,6 @@
 // The PRs a thread's crew opened, so the Conductor that delegated work sees what came of it. Each thread it delegated
-// to, at any depth (a team's members under their lead), gives the PR from its branch. Asked of GitHub on every read
+// to, at any depth (a team made before one-thread teams: its members under their lead), gives the PR from its branch.
+// A team thread gives one: its members' sessions share its branch. Asked of GitHub on every read
 // and never stored, so a merge or a close shows on the parent as soon as it shows on the child.
 import { channels, threads } from './db.ts';
 import { openPRStates, threadPRMarks, type BranchPRMark, type PRMergeState } from './github.ts';
@@ -20,7 +21,8 @@ export interface CrewPR extends BranchPRMark, Partial<PRMergeState> {
  * gh cannot read is left out. A repo with an open one costs a second call for the merge states (openPRStates).
  */
 export async function crewPRs(threadId: string): Promise<CrewPR[]> {
-  const crew = threads.descendants(threadId).flatMap((t) => {
+  // A member of a group thread works on that thread's branch, and the thread's lead opens its one PR (ADR 0019).
+  const crew = threads.descendants(threadId).filter((t) => t.source !== 'member').flatMap((t) => {
     const repo = t.branch ? channels.get(t.channel_id)?.github_repo : null;
     return repo ? [{ t, repo, branch: t.branch! }] : [];
   });

@@ -164,30 +164,32 @@ describe('delegating, live', () => {
     }
   });
 
-  it('a delegate_team lead and its conductor work while the members run', T, async () => {
+  it('a team thread and its conductor work while the members run', T, async () => {
     const conductor = await H.start('be the conductor');
     await H.untilResults(conductor.id, 1);
-    const { lead, members } = await H.runner.createTeam({
+    const { thread } = await H.runner.createTeam({
       channel: 'scratch',
       title: 'Mic research',
       prompt: 'Research the mic',
+      role: 'researcher',
       parent_id: conductor.id,
       task_id: 'T-9',
-      tasks: [
-        { title: 'Price', prompt: 'THINK:400 find the price' },
-        { title: 'Reviews', prompt: 'THINK:600 find reviews' },
-      ],
+      tasks: [{ title: 'Reviews', prompt: 'find reviews', role: 'writer' }],
     });
-    await H.until('members running', () => members.every((m) => H.thread(m.id).status === 'running'));
+    await H.untilResults(thread.id, 1);
+    const member = H.db.members.of(thread.id, 'writer')!.session_thread;
+    const { messageMembers } = await import('../runner/team.ts');
+    messageMembers(thread.id, ['writer'], 'THINK:800 find reviews');
+    await H.until('the member running', () => H.thread(member).status === 'running');
+    // The team thread's mark comes from its working member; the Conductor above it waits on its crew.
     const ids = D.delegatingIds();
-    expect(ids.has(lead.id)).toBe(true);
     expect(ids.has(conductor.id)).toBe(true);
     expect(H.thread(conductor.id).status).toBe('done');
+    expect(D.withDelegating(H.thread(thread.id)).members?.find((m) => m.agent === 'writer')?.state).toBe('working');
 
-    await H.untilResults(lead.id, 1);
-    await H.untilResults(conductor.id, 2);
+    await H.until('the second report', () => H.byKind(conductor.id, 'crew_report').length === 2, 15_000);
+    await H.untilResults(conductor.id, 3);
     expect(D.delegatingIds().has(conductor.id)).toBe(false);
-    expect(D.delegatingIds().has(lead.id)).toBe(false);
   });
 });
 
