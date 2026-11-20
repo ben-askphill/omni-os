@@ -108,14 +108,14 @@ describe('a role of the user own', () => {
 
   it('refuses a taken, reserved or malformed id, a missing name, and run defaults this machine cannot run', async () => {
     const error = async (res: Response) => [res.status, (await json(res)).error];
-    expect(await error(await send('POST', '/crew', { id: 'builder', fields: { name: 'B' } }))).toEqual([409, 'A role "builder" already exists.']);
+    expect(await error(await send('POST', '/crew', { id: 'builder', fields: { name: 'B' } }))).toEqual([409, 'An agent "builder" already exists.']);
     expect((await send('POST', '/crew', { id: 'Store Ops', fields: { name: 'S' } })).status).toBe(400);
-    expect(await error(await send('POST', '/crew', { id: 'x', charter: 'no name' }))).toEqual([400, 'Give the role a name.']);
+    expect(await error(await send('POST', '/crew', { id: 'x', charter: 'no name' }))).toEqual([400, 'Give the agent a name.']);
     expect((await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', harness: 'nope' } })))[1]).toMatch(/^Run defaults: unknown harness "nope" \(this machine has: /);
-    expect(await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', channel: 'nowhere' } }))).toEqual([400, 'No channel "nowhere" for the role\'s default channel.']);
+    expect(await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', channel: 'nowhere' } }))).toEqual([400, 'No channel "nowhere" for the agent\'s default channel.']);
     expect((await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', mcp: ['shopify'] } })))[1]).toMatch(/Unknown MCP server "shopify"/);
     expect(await error(await send('PUT', '/crew/x', { charter: 'nothing here' }))).toEqual([404, 'No agent "x".']);
-    expect(await error(await send('DELETE', '/crew/builder'))).toEqual([409, 'A built-in role cannot be deleted. Hide it, or reset your edit.']);
+    expect(await error(await send('DELETE', '/crew/builder'))).toEqual([409, 'A built-in agent cannot be deleted. Hide it, or reset your edit.']);
   });
 
   it('refuses every write from an agent thread', async () => {

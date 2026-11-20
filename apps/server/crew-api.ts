@@ -38,7 +38,7 @@ crewApi.post('/crew', async (c) => {
   if (refused) return refused;
   const body = await c.req.json().catch(() => null);
   const id = z.object({ id: z.string() }).safeParse(body);
-  if (!id.success) return c.json({ error: 'Give the role an id.' }, 400);
+  if (!id.success) return c.json({ error: 'Give the agent an id.' }, 400);
   const { id: _, ...rest } = body as { id: string };
   return write(c, (save) => saveCrew(id.data.id, save, context(), { create: true }), rest, 201);
 });

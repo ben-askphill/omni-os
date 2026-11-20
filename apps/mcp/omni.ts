@@ -84,7 +84,7 @@ server.registerTool(
 
 server.registerTool(
   'list_crew',
-  { description: 'List crew roles you can delegate to, with their charters summarized.' },
+  { description: 'List the agents you can delegate to, with their charters summarized.' },
   // GET /api/crew leaves hidden roles out. The Conductor and usage-scan are not delegatable, and delegate refuses them.
   // `tools: no-edits` (the reviewer): it has no file-edit tools, so send it work that reports rather than changes files.
   async () =>
@@ -145,7 +145,7 @@ server.registerTool(
 // crew guard (apps/server/crew-guard.ts) decides every write: only a thread running as the Conductor, never under an
 // automation, only after Ben answered in it, and never a role's powers.
 
-const crewId = z.string().trim().min(1).max(64).describe('Crew role id: lowercase letters, digits and dashes. Use list_crew.');
+const crewId = z.string().trim().min(1).max(64).describe('Agent id: lowercase letters, digits and dashes. Use list_crew.');
 
 /** A role as get_crew_role and the writes return it: what a save may change, and the powers and locks it may not. */
 const crewRoleView = (d: any) => {
@@ -182,9 +182,9 @@ server.registerTool(
   'get_crew_role',
   {
     description:
-      'One crew role, to edit with save_crew_role: its fields, its powers and locks, and its charters as written. ' +
-      `charters.built_in is the shipped charter (null for a role of ${USER}'s own), charters.own the text of ${USER}'s file (their whole role, or their addition to or replacement of a built-in) ` +
-      'and charters.effective the charter its threads run with. Roles list_crew leaves out (the Conductor, usage-scan, hidden ones) are here by id.',
+      'One agent, to edit with save_crew_role: its fields, its powers and locks, and its charters as written. ' +
+      `charters.built_in is the shipped charter (null for an agent of ${USER}'s own), charters.own the text of ${USER}'s file (their whole agent, or their addition to or replacement of a built-in) ` +
+      'and charters.effective the charter its threads run with. Agents list_crew leaves out (the Conductor, usage-scan, hidden ones) are here by id.',
     inputSchema: { id: crewId },
   },
   async ({ id }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}`))),
@@ -194,16 +194,16 @@ server.registerTool(
   'save_crew_role',
   {
     description:
-      `Create a crew role or change one, only once ${USER} agreed in this thread to the exact change you proposed. Omni refuses it before ${USER} answers, and in a thread an automation started. ` +
-      `create: true makes a role of ${USER}'s own, with an id that never changes, fields.name, fields.description and its charter. ` +
-      'A new role has no powers: no conductor tools, not delegate-only, not a review role. It works in its own thread like any crewmate, and list_crew and delegate offer it at once. ' +
-      `Without create it edits the role; on a built-in it writes ${USER}'s overlay. Only the fields you pass change, and an empty string removes one, so a built-in's value comes back. ` +
-      `charter is the whole text of ${USER}'s file for the role: the charter of their own role, or what is added to a built-in's (charter_mode append, the default) or replaces it (replace). ` +
+      `Create an agent or change one, only once ${USER} agreed in this thread to the exact change you proposed. Omni refuses it before ${USER} answers, and in a thread an automation started. ` +
+      `create: true makes an agent of ${USER}'s own, with an id that never changes, fields.name, fields.description and its charter. ` +
+      'A new agent has no powers: no conductor tools, not delegate-only, not a review agent. It works in its own thread like any other agent, and list_crew and delegate offer it at once. ' +
+      `Without create it edits the agent; on a built-in it writes ${USER}'s overlay. Only the fields you pass change, and an empty string removes one, so a built-in's value comes back. ` +
+      `charter is the whole text of ${USER}'s file for the agent: the charter of their own agent, or what is added to a built-in's (charter_mode append, the default) or replaces it (replace). ` +
       'Start from get_crew_role\'s charters.own and send all of it. ' +
-      `Powers (mcp, delegate_only, tools, delegatable, review, memory, memory_writes) are ${USER}'s to set in Settings > Agents, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
+      `Powers (mcp, delegate_only, tools, delegatable, review, memory, memory_writes) are ${USER}'s to set in Settings > Agents, and Omni refuses a save that names one. The agent syncs to ${USER}'s other machines.`,
     inputSchema: {
       id: crewId,
-      create: z.boolean().optional().describe(`Make a new role of ${USER}'s own. Needs fields.name.`),
+      create: z.boolean().optional().describe(`Make a new agent of ${USER}'s own. Needs fields.name.`),
       fields: z
         // Keys past these go to the API as sent, so a power gets the crew guard's refusal and its reason instead of
         // vanishing from the save.
@@ -232,8 +232,8 @@ server.registerTool(
   'reset_crew_role',
   {
     description:
-      `Drop ${USER}'s edit of a built-in crew role, so it runs as shipped again, only once ${USER} agreed in this thread. ` +
-      `Refused for a role of ${USER}'s own, which only ${USER} deletes, in Settings, and for an edit that sets the role's powers, which only ${USER} resets.`,
+      `Drop ${USER}'s edit of a built-in agent, so it runs as shipped again, only once ${USER} agreed in this thread. ` +
+      `Refused for an agent of ${USER}'s own, which only ${USER} deletes, in Settings, and for an edit that sets the agent's powers, which only ${USER} resets.`,
     inputSchema: { id: crewId },
   },
   async ({ id }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}/reset`, { method: 'POST' }))),
@@ -246,7 +246,7 @@ server.registerTool(
   'crew_memory',
   {
     description:
-      `List a crew role's memory: lessons every thread of that role gets in its prompt once ${USER} approved them (each in every channel, or only in the channel it names), and proposals still waiting for ${USER}. ` +
+      `List an agent's memory: lessons every thread of that agent gets in its prompt once ${USER} approved them (each in every channel, or only in the channel it names), and proposals still waiting for ${USER}. ` +
       'Read them before proposing one with remember, so you do not repeat a lesson.',
     inputSchema: { role: crewId },
   },
@@ -263,10 +263,10 @@ server.registerTool(
   'remember',
   {
     description:
-      `Propose a lesson for one crew role's later threads, for ${USER} to approve in Settings > Agents: a correction ${USER} made to how that role works, or a step a crewmate of that role missed. ` +
-      'One short sentence that still makes sense in a new thread, about how the role should work, never about one task. ' +
-      'A lesson about a client or a channel, for every role there, goes to propose_learning instead. ' +
-      `It waits for ${USER} unless they let that role keep its lessons at once; the answer's status says which. Never put secrets, credentials or personal data in it.`,
+      `Propose a lesson for one agent's later threads, for ${USER} to approve in Settings > Agents: a correction ${USER} made to how that agent works, or a step a thread of that agent missed. ` +
+      'One short sentence that still makes sense in a new thread, about how the agent should work, never about one task. ' +
+      'A lesson about a client or a channel, for every agent there, goes to propose_learning instead. ' +
+      `It waits for ${USER} unless they let that agent keep its lessons at once; the answer's status says which. Never put secrets, credentials or personal data in it.`,
     inputSchema: {
       role: crewId,
       text: z.string().min(1).max(500),
@@ -283,14 +283,14 @@ server.registerTool(
   'delegate',
   {
     description:
-      'Hand a task to a crew role in a channel. Creates a new thread that runs in the background. ' +
+      'Hand a task to an agent in a channel. Creates a new thread that runs in the background. ' +
       `Its final reply is reported back to you automatically as a [crew report] message; do not poll for it. A delegate-only thread (the Conductor) gets it shown in its transcript for ${USER}, and is woken by it only with follow_up. ` +
       'Only for real work: answer a quick question yourself. ' +
-      'Without a harness/model/effort it uses the role\'s defaults, and with none set anywhere, Auto: Omni reads the brief and ' +
+      'Without a harness/model/effort it uses the agent\'s defaults, and with none set anywhere, Auto: Omni reads the brief and ' +
       'picks the harness, model and effort for it, and the result says why in auto_reason. Use list_harnesses for valid ids.',
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "acme". Use list_channels.'),
-      role: z.string().describe('Crew role id, e.g. "researcher". Use list_crew.'),
+      role: z.string().describe('Agent id, e.g. "researcher". Use list_crew.'),
       prompt: z.string().describe('The task brief (there is no `brief` parameter; the brief goes here): Goal, Done when and Proof back. It cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
@@ -298,9 +298,9 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'Override the role default harness: claude-code, codex, cursor, hermes, cursor-cloud, or a custom harness id (custom:<slug>) from list_harnesses. cursor runs the cursor-agent CLI on this machine; ' +
+          'Override the agent\'s default harness: claude-code, codex, cursor, hermes, cursor-cloud, or a custom harness id (custom:<slug>) from list_harnesses. cursor runs the cursor-agent CLI on this machine; ' +
             'cursor-cloud launches a Cursor cloud agent on Cursor\'s Linux machines that pushes a branch and opens a PR (no Mac build or screenshots). ' +
-            'A custom harness is a remote agent the user set up on their own server: it gets no Omni tools, worktree or browser, and never takes a delegate-only role. Use list_harnesses.',
+            'A custom harness is a remote AI service the user set up on their own server: it gets no Omni tools, worktree or browser, and never runs a delegate-only agent. Use list_harnesses.',
         ),
       model: z
         .string()
@@ -311,7 +311,7 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'For a PR review: the id of the thread whose work it reviews (the builder thread). The role must be a review role (reviewer). ' +
+          'For a PR review: the id of the thread whose work it reviews (the builder thread). The agent must be a review agent (reviewer). ' +
             'Leave harness, model and effort off: Omni runs the review on the other model family from that thread\'s run, and refuses the same family ' +
             'or a run that does not say its family. When it refuses, tell the user and ask.',
         ),
@@ -328,7 +328,7 @@ server.registerTool(
         .string()
         .max(80)
         .optional()
-        .describe(`The person accountable for the result, by name, when it is not ${USER}: someone ${USER} named as owning this work. The role you pick is the agent that does it. Leave it off otherwise; the thread then takes yours.`),
+        .describe(`The person accountable for the result, by name, when it is not ${USER}: someone ${USER} named as owning this work. The agent you pick is what does it. Leave it off otherwise; the thread then takes yours.`),
       base: z
         .string()
         .optional()
@@ -369,7 +369,7 @@ server.registerTool(
       channel: z.string().describe('Channel id, e.g. "inbox". Use list_channels.'),
       title: z.string().describe('Short title for the lead thread, e.g. "Shure MV7+ research".'),
       prompt: z.string().describe('What the team is for and what the combined answer should look like. The lead gets this with every report.'),
-      role: z.string().optional().describe('Crew role id for the lead, and for every task that names none. Use list_crew.'),
+      role: z.string().optional().describe('Agent id for the lead, and for every task that names none. Use list_crew.'),
       task_id: z.string().optional().describe('Short id like T-12 for the team. Members get T-12.1, T-12.2 unless they name their own.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the lead thread in, by name or id. Same rules as delegate.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
@@ -860,7 +860,7 @@ server.registerTool(
           catchup: z.boolean().optional(),
           channel: z.string(),
           machine: z.string().optional(),
-          role: z.string().optional(),
+          role: z.string().optional().describe('Agent id the runs start as. Use list_crew.'),
           harness: z.string().optional(),
           model: z.string().optional(),
           effort: z.string().optional(),
@@ -1180,7 +1180,7 @@ server.registerTool(
   'list_automations',
   {
     description:
-      'List the automations on this machine: id, name, enabled, its schedule (cron, timezone, next run) or event trigger (on), channel, role and run defaults, ' +
+      'List the automations on this machine: id, name, enabled, its schedule (cron, timezone, next run) or event trigger (on), channel, agent (role) and run defaults, ' +
       'the start of its prompt, any error that stops it running, and its last three runs with their thread ids. Event deliveries are list_automation_deliveries.',
     inputSchema: {},
   },

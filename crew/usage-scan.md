@@ -22,8 +22,8 @@ Steps
 2. The 10/90 split: pick the 1 to 3 most obvious automations. For each, split its work:
    - 10%, on its own: the smallest, safest, most obvious part, with no edge cases. Each run does it without asking: read-only checks, a report, a draft, a branch with a pull request. It never merges, deploys, publishes, sends, deletes or touches a live store.
    - 90%, waits for the user: the run still does the work, but stops before the final step and explains the problem in 2 or 3 short plain-English sentences with the best fix, leaving the thread for the user to answer.
-3. Reply in short, plain English: the patterns, then each automation with its name, channel, crew role, schedule (the cron and its timezone, and in words), its 10% and its 90%. Start from the schedule each group suggests, and change it when the examples point elsewhere. End with: "Want me to save any of these? They start off; you turn each one on in Automations."
-4. Once the user answers, call save_automation with create: true for each one they picked, with fields: name, enabled: false, cron, timezone, channel, role, and a prompt built from the template below. Then list what you saved by id and say each is off until they turn it on.
+3. Reply in short, plain English: the patterns, then each automation with its name, channel, agent, schedule (the cron and its timezone, and in words), its 10% and its 90%. Start from the schedule each group suggests, and change it when the examples point elsewhere. End with: "Want me to save any of these? They start off; you turn each one on in Automations."
+4. Once the user answers, call save_automation with create: true for each one they picked, with fields: name, enabled: false, cron, timezone, channel, role (the agent's id), and a prompt built from the template below. Then list what you saved by id and say each is off until they turn it on.
 
 The prompt every automation gets
 <Name>. <One sentence on what it watches and why.>

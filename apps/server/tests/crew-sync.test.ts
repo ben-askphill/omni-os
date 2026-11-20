@@ -69,9 +69,9 @@ describe('agent writes to /api/crew', () => {
     for (const caller of [builder, plain, below, 'no-such-thread']) {
       const { status, body } = await call('PUT', '/crew/builder', edit, caller);
       expect(status).toBe(403);
-      expect(body.error).toMatch(/^(Crew roles change from Settings|This thread runs under the automation)/);
+      expect(body.error).toMatch(/^(Agents change from Settings|This thread runs under the automation)/);
     }
-    expect((await call('PUT', '/crew/builder', edit, scan)).body.error).toBe('A usage scan cannot change crew roles.');
+    expect((await call('PUT', '/crew/builder', edit, scan)).body.error).toBe('A usage scan cannot change agents.');
     expect((await call('POST', '/crew', { id: 'from-agent', fields: { name: 'From an agent' } }, builder)).status).toBe(403);
     expect(existsSync(ownPath('builder'))).toBe(false);
     expect(getCrew('from-agent')).toBeUndefined();
@@ -106,7 +106,7 @@ describe('agent writes to /api/crew', () => {
     ] as const) {
       const res = await call(method, path, body, conductor);
       expect(res.status).toBe(403);
-      expect(res.body.error).toMatch(/(deletes|hides or shows) crew roles, in Settings\.$/);
+      expect(res.body.error).toMatch(/(deletes|hides or shows) agents, in Settings\.$/);
     }
     expect(getCrew('scratch')).toBeDefined();
     expect(getCrew('builder')?.hidden).toBe(false);
@@ -293,7 +293,7 @@ describe('crew files across machines', () => {
     expect(getCrew('conductor')).toMatchObject({ delegateOnly: true, mcp: ['omni'] });
     const refused = db.prepare(`SELECT entity_id, reason FROM sync_refused WHERE entity = 'crew_file' AND reason LIKE 'crew role %' ORDER BY entity_id`).all() as { entity_id: string; reason: string }[];
     expect(refused.map((r) => r.entity_id)).toEqual(['conductor', 'reviewer', 'usage-scan']);
-    expect(refused.find((r) => r.entity_id === 'reviewer')?.reason).toBe("crew role reviewer: Omni's review rules come with this role. Duplicate it for a reviewer without them.");
+    expect(refused.find((r) => r.entity_id === 'reviewer')?.reason).toBe("crew role reviewer: Omni's review rules come with this agent. Duplicate it for a reviewer without them.");
 
     await relay.push([signAs(file('reviewer', { markdown: '---\ncharter_mode: append\n---\nAlso check style.\n' }))]);
     expect((await worker.syncNow()).error).toBeUndefined();

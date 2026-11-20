@@ -125,7 +125,7 @@ describe('the bundled server', () => {
     const done = (await (await fetch(`http://127.0.0.1:${port}/api/setup/complete`, { method: 'POST', headers: auth, body: '{}' })).json()) as { threadId: string };
     const welcome = (await (await fetch(`http://127.0.0.1:${port}/api/threads/${done.threadId}`, { headers: auth })).json()) as { events: { kind: string; payload: string }[] };
     const text = (JSON.parse(welcome.events.find((e) => e.kind === 'assistant_text')?.payload ?? '{}') as { text?: string }).text ?? '';
-    expect(text).toContain('Crew charters (the roles I hand work to) ship with the app.');
+    expect(text).toContain('Agent charters (the agents I hand work to) ship with the app.');
     expect(text).toContain(`in \`${join(data, 'crew')}/\`. Settings > About shows where Omni keeps its files.`);
   }, 60_000);
 

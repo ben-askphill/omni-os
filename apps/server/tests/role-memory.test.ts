@@ -180,7 +180,7 @@ describe('an agent and role memory', () => {
     for (const [method, body] of [['PATCH', { approve: true }], ['PATCH', { text: 'Rebase whenever.' }], ['DELETE', undefined]] as const) {
       const res = await call(method, `/memory/${proposed.id}`, body, b);
       expect(res.status, method).toBe(403);
-      expect(res.body.error).toBe("Only the user approves, edits or deletes a role's lesson. Propose one with remember instead; it waits in Settings > Agents.");
+      expect(res.body.error).toBe("Only the user approves, edits or deletes an agent's lesson. Propose one with remember instead; it waits in Settings > Agents.");
     }
     expect(memories.get(proposed.id)).toMatchObject({ status: 'proposed', text: 'Ask before you rebase.' });
 
@@ -246,7 +246,7 @@ describe('remember, as a role thread calls it', () => {
     const { tools } = await client.request('tools/list');
     expect(tools.map((t: any) => t.name)).toEqual(['remember']);
     const here = await tool(client, 'remember', { text: 'Globex reviews copy in British English.' });
-    expect(here).toEqual({ isError: false, body: "Proposed for this role's later threads in #globex only. It waits for the user to approve it in Settings > Agents." });
+    expect(here).toEqual({ isError: false, body: "Proposed for this agent's later threads in #globex only. It waits for the user to approve it in Settings > Agents." });
     expect(memories.byRole('builder').find((m) => m.text === 'Globex reviews copy in British English.')).toMatchObject({ channel_id: 'globex', status: 'proposed', source_thread_id: b.id });
     const everywhere = await tool(client, 'remember', { text: 'Name the test you ran.', everywhere: true });
     expect(everywhere.body).toMatch(/in every channel\. It waits for/);
@@ -255,7 +255,7 @@ describe('remember, as a role thread calls it', () => {
 
   it('says when the role keeps it at once, and passes the refusal on', T, async () => {
     const kept = await tool(await connect(thread('checker', 'acme').id, MEMORY_SERVER), 'remember', { text: 'Read the error before you retry.' });
-    expect(kept.body).toBe("Kept for this role's later threads in #acme only: the user lets this role keep its lessons at once.");
+    expect(kept.body).toBe("Kept for this agent's later threads in #acme only: the user lets this agent keep its lessons at once.");
     // A thread that runs as another role than its server names is held to its own.
     const b = thread('builder', 'acme');
     const t = h.db.threads.get(b.id)!;
@@ -321,9 +321,9 @@ describe('role memory in a thread\'s prompt', () => {
     expect(mute).not.toContain('Kept for later.');
   });
 
-  it("tells the Conductor to propose a crew role's lessons with remember, and a channel's with propose_learning", () => {
+  it("tells the Conductor to propose an agent's lessons with remember, and a channel's with propose_learning", () => {
     const p = prompt(thread('conductor', 'conductor').id);
-    expect(p).toContain('propose it with remember for that role');
+    expect(p).toContain('propose it with remember for that agent');
     expect(p).toContain('goes to propose_learning instead');
   });
 });

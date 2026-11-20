@@ -24,7 +24,7 @@ function reviewParent(origin: Thread): Thread {
 export async function requestPRReview(channel: string, repo: string, number: number) {
   // Refused before GitHub is asked, with a way out, rather than the role check's list of other roles.
   const builder = getCrew(REVIEW_PR_ROLE);
-  if (!builder) throw refusal(`Review PR runs as the ${REVIEW_PR_ROLE} role, and this machine has none.`, 409);
+  if (!builder) throw refusal(`Review PR runs as the ${REVIEW_PR_ROLE} agent, and this machine has none.`, 409);
   if (builder.hidden) throw refusal(`Review PR runs as ${builder.name}, which is hidden on this machine. Show it in Settings > Agents to use Review PR.`, 409);
   const pr = await getPR(repo, number);
   // A fork's branch with the same name does not belong to a thread in the base repo.

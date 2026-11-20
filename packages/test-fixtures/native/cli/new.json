@@ -181,6 +181,196 @@
       }
     },
     {
+      "name": "a prompt with an agent: --agent, and --role and -r still work",
+      "args": [
+        "new",
+        "-c",
+        "acme",
+        "fix it",
+        "--agent",
+        "builder",
+        "-m",
+        "opus"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/threads",
+          "replies": [
+            {
+              "json": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "channel_id": "acme",
+                "title": "Fix the cart",
+                "status": "running",
+                "role": null,
+                "model": "claude-haiku-4-5",
+                "harness": "claude-code",
+                "effort": "low",
+                "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                "queued_harness": null,
+                "queued_model": null,
+                "queued_effort": null,
+                "session_id": "11111111-1111-4111-8111-111111111111",
+                "has_run": 0,
+                "cwd": "/tmp/omni-fixtures/acme",
+                "branch": null,
+                "parent_id": null,
+                "task_id": null,
+                "source": "manual",
+                "automation": null,
+                "last_text": null,
+                "suggestion": null,
+                "next_title": null,
+                "next_prompt": null,
+                "open_items": null,
+                "archived": 0,
+                "folder_id": null,
+                "pinned_at": null,
+                "done_at": null,
+                "setup": null,
+                "setup_error": null,
+                "resume_blocked": null,
+                "limit_state": null,
+                "limit_resets_at": null,
+                "limit_elsewhere": 0,
+                "goal_objective": null,
+                "goal_status": null,
+                "goal_checks": 0,
+                "continued_from": null,
+                "created_at": "2020-01-01T10:30:00.000Z",
+                "updated_at": "2020-01-01T10:30:00.000Z"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Started 11111111 in #acme: Fix the cart\n{url}/#/t/11111111-1111-4111-8111-111111111111\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token",
+              "content-type": "application/json"
+            },
+            "body": {
+              "id": "{uuid}",
+              "prompt": "fix it",
+              "channel": "acme",
+              "role": "builder",
+              "model": "opus",
+              "source": "capture"
+            }
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "-a names the agent, and wins over --role",
+      "args": [
+        "new",
+        "-c",
+        "acme",
+        "fix it",
+        "--role",
+        "researcher",
+        "-a",
+        "builder",
+        "-m",
+        "opus"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/threads",
+          "replies": [
+            {
+              "json": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "channel_id": "acme",
+                "title": "Fix the cart",
+                "status": "running",
+                "role": null,
+                "model": "claude-haiku-4-5",
+                "harness": "claude-code",
+                "effort": "low",
+                "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                "queued_harness": null,
+                "queued_model": null,
+                "queued_effort": null,
+                "session_id": "11111111-1111-4111-8111-111111111111",
+                "has_run": 0,
+                "cwd": "/tmp/omni-fixtures/acme",
+                "branch": null,
+                "parent_id": null,
+                "task_id": null,
+                "source": "manual",
+                "automation": null,
+                "last_text": null,
+                "suggestion": null,
+                "next_title": null,
+                "next_prompt": null,
+                "open_items": null,
+                "archived": 0,
+                "folder_id": null,
+                "pinned_at": null,
+                "done_at": null,
+                "setup": null,
+                "setup_error": null,
+                "resume_blocked": null,
+                "limit_state": null,
+                "limit_resets_at": null,
+                "limit_elsewhere": 0,
+                "goal_objective": null,
+                "goal_status": null,
+                "goal_checks": 0,
+                "continued_from": null,
+                "created_at": "2020-01-01T10:30:00.000Z",
+                "updated_at": "2020-01-01T10:30:00.000Z"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Started 11111111 in #acme: Fix the cart\n{url}/#/t/11111111-1111-4111-8111-111111111111\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token",
+              "content-type": "application/json"
+            },
+            "body": {
+              "id": "{uuid}",
+              "prompt": "fix it",
+              "channel": "acme",
+              "role": "builder",
+              "model": "opus",
+              "source": "capture"
+            }
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
       "name": "a piped prompt loses its last line ends",
       "args": [
         "new"
@@ -495,7 +685,7 @@
         "--help"
       ],
       "expected": {
-        "stdout": "omni new \"<prompt>\" [-c <channel>] [-r <role>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the role's channel, else inbox)\n  -r, --role      crew role id (builder, researcher, ...)\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
+        "stdout": "omni new \"<prompt>\" [-c <channel>] [-a <agent>] [-m <model>] [--wait] [--json] [--open]\n  Start a thread. The prompt can come on stdin (\"-\", or piped with no prompt).\n  -c, --channel   channel id (default: the agent's channel, else inbox)\n  -a, --agent     agent id (builder, researcher, ...); -r, --role still work\n  -m, --model     model id or alias (opus, sonnet, haiku)\n  -w, --wait      wait for the turn to end and print the reply; exit 0 done, 1 failed or stopped, 2 needs you\n      --json      print JSON\n  -o, --open      open the new thread in the desktop app or the browser\n  Inside an Omni thread, the new thread is filed under it and reports back to it.\n",
         "stderr": "",
         "exit": 0,
         "requests": [],

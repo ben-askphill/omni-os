@@ -121,7 +121,7 @@ describe('the Conductor crew tools', () => {
     const names = tools.map((t) => t.name);
     for (const name of ['list_crew', 'get_crew_role', 'save_crew_role', 'reset_crew_role', 'send_to_grok_bot']) expect(names).toContain(name);
     expect(names.filter((t) => /crew/.test(t) && /delete|hide|duplicate/.test(t))).toEqual([]);
-    expect(tools.find((t) => t.name === 'save_crew_role')!.description).toMatch(/^Create a crew role or change one, only once .+ agreed in this thread/);
+    expect(tools.find((t) => t.name === 'save_crew_role')!.description).toMatch(/^Create an agent or change one, only once .+ agreed in this thread/);
   });
 
   it('create a role once Ben agreed, with no powers, which list_crew and Settings > Crew then show and sync sends', T, async () => {
@@ -172,7 +172,7 @@ describe('the Conductor crew tools', () => {
     expect((await tool(client, 'reset_crew_role', { id: 'builder' })).body).toMatchObject({ kind: 'shipped', charters: { own: null } });
     expect(existsSync(ownPath('builder'))).toBe(false);
     const own = await tool(client, 'reset_crew_role', { id: 'store-migrations' });
-    expect(own).toMatchObject({ isError: true, body: 'Only an edited built-in role can be reset.' });
+    expect(own).toMatchObject({ isError: true, body: 'Only an edited built-in agent can be reset.' });
     expect((await tool(client, 'save_crew_role', { id: 'builder' })).body).toMatch(/^Pass the fields, charter or charter_mode to change\.$/);
   });
 
@@ -207,8 +207,8 @@ describe('the Conductor crew tools', () => {
     expect(replace).toMatchObject({ isError: true, body: expect.stringMatching(/^Add to the built-in only: the scan's steps come with each release\. Save your text as an addition/) });
     expect(existsSync(ownPath('usage-scan'))).toBe(false);
     // A reserved id is never a role of the user's own, and a role that exists is never made again.
-    expect((await tool(client, 'save_crew_role', { ...migrations, id: 'reviewer', fields: { name: 'Mine' } })).body).toBe('A role "reviewer" already exists.');
-    expect((await tool(client, 'save_crew_role', migrations)).body).toBe('A role "store-migrations" already exists.');
+    expect((await tool(client, 'save_crew_role', { ...migrations, id: 'reviewer', fields: { name: 'Mine' } })).body).toBe('An agent "reviewer" already exists.');
+    expect((await tool(client, 'save_crew_role', migrations)).body).toBe('An agent "store-migrations" already exists.');
     // Adding to a locked role's charter is allowed, and every lock still holds after it.
     const added = await tool(client, 'save_crew_role', { id: 'conductor', charter: 'Reply in Dutch.' });
     expect(added.body).toMatchObject({ charter_mode: 'append', powers: { mcp: ['omni'], delegate_only: true, delegatable: false }, locks: { fields: { delegate_only: expect.any(String) } } });
@@ -231,7 +231,7 @@ describe('the Conductor crew tools', () => {
     const dispatcher = thread('dispatcher');
     benAgrees(dispatcher);
     const fromDispatcher = await tool(await connect(dispatcher), 'save_crew_role', { ...migrations, id: 'dispatched-role' });
-    expect(fromDispatcher.body).toMatch(/^Crew roles change from Settings, or from the Conductor once .+ agrees in its thread\.$/);
+    expect(fromDispatcher.body).toMatch(/^Agents change from Settings, or from the Conductor once .+ agrees in its thread\.$/);
     expect(getCrew('nightly-role')).toBeUndefined();
     expect(getCrew('dispatched-role')).toBeUndefined();
   });

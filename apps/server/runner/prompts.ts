@@ -83,7 +83,7 @@ function commandLineLines(thread: Thread, role?: CrewRole) {
   return [
     '',
     '## Omni from the shell',
-    `The \`omni\` command reaches this Omni from your shell in any harness. \`omni send parent "…"\` messages the thread that started you (or any thread by id), \`omni new "…" -c <channel> -r <role>\` starts a thread under yours, \`omni show <id>\` reads one and \`omni threads --needs-you\` lists what waits on ${userName()}. Use it instead of curl against OMNI_URL; \`omni --help\` has the rest.`,
+    `The \`omni\` command reaches this Omni from your shell in any harness. \`omni send parent "…"\` messages the thread that started you (or any thread by id), \`omni new "…" -c <channel> -a <agent>\` starts a thread under yours, \`omni show <id>\` reads one and \`omni threads --needs-you\` lists what waits on ${userName()}. Use it instead of curl against OMNI_URL; \`omni --help\` has the rest.`,
   ];
 }
 
@@ -161,8 +161,8 @@ function noEditsLines(thread: Thread, role?: CrewRole) {
     '',
     '## No file edits',
     isProviderHarness(thread.harness)
-      ? 'This role does not edit files. Omni cannot take the edit tools away on this harness, so the rule is yours to keep: do not change, create or delete files, and do not commit or push.'
-      : 'This role does not edit files: your file-edit tools are off. The shell is still yours for reading, `gh`, git and running checks. Do not use it to change, create or delete files, or to commit or push, either.',
+      ? 'This agent does not edit files. Omni cannot take the edit tools away on this harness, so the rule is yours to keep: do not change, create or delete files, and do not commit or push.'
+      : 'This agent does not edit files: your file-edit tools are off. The shell is still yours for reading, `gh`, git and running checks. Do not use it to change, create or delete files, or to commit or push, either.',
     'Report what you found instead, and leave the changes to the thread that owns the work.',
   ];
 }
@@ -182,13 +182,13 @@ function roleMemorySection(thread: Thread, channel: Channel, role?: CrewRole) {
   const how = !tool
     ? ''
     : conductor
-      ? `To keep a lesson about how a crew role works (a correction ${name} made, a step a crewmate missed), propose it with remember for that role. It waits for ${name}'s approval unless they let that role keep its lessons at once. A lesson about a client or channel goes to propose_learning instead.`
+      ? `To keep a lesson about how an agent works (a correction ${name} made, a step one of its threads missed), propose it with remember for that agent. It waits for ${name}'s approval unless they let that agent keep its lessons at once. A lesson about a client or channel goes to propose_learning instead.`
       : `When ${name} corrects how you work, or you find a step every later ${role.name} thread should take, propose it with remember: one short sentence about how to work, never about this one task, and never a secret. ${kept}, and it holds in this channel only unless you pass everywhere: true.`;
   if (!facts.length && !how) return [];
   return [
     '',
     `## Your memory as ${role.name}`,
-    facts.length ? `Lessons ${name} approved for this role, from earlier threads. Follow them unless the task says otherwise.` : '',
+    facts.length ? `Lessons ${name} approved for this agent, from earlier threads. Follow them unless the task says otherwise.` : '',
     ...facts,
     how,
   ];
@@ -251,7 +251,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? [
           '',
           '## Thread delegation',
-          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
+          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another agent.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
           SESSION_CACHE_RULE,
         ]
       : []),
@@ -311,6 +311,6 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work. Their replies are all you get: read_referenced_thread cannot open member threads.',
     );
   }
-  if (role) lines.push('', `## Your role: ${role.name}`, role.charter);
+  if (role) lines.push('', `## Your agent: ${role.name}`, role.charter);
   return lines.filter((l) => l !== '').join('\n').replace(/\n## /g, '\n\n## ');
 }

@@ -2,7 +2,7 @@
 
 Besides the two clients:
 
-- The `omni` command: `omni new "prompt" -c volero -r researcher [--wait]` starts a thread from any terminal, and `send`, `threads`, `show`, `status`, `doctor` and `open` do the rest. The desktop app puts it on your PATH and on every thread's. `omni open --pair` prints a link that pairs a browser, such as your phone. See [The omni command](cli.md)
+- The `omni` command: `omni new "prompt" -c volero -a researcher [--wait]` starts a thread from any terminal, and `send`, `threads`, `show`, `status`, `doctor` and `open` do the rest. The desktop app puts it on your PATH and on every thread's. `omni open --pair` prints a link that pairs a browser, such as your phone. See [The omni command](cli.md)
 - MCP from other apps: Claude Desktop, claude.ai, ChatGPT, Cursor, Codex and Grok list, start and steer threads through Omni's MCP server. `npm run mcp:config` prints the setup; see [Omni as an MCP server](external-mcp.md)
 - claude-bar hotkey prompt: set `"target": "omni"` in its config to send captures here
 - Desktop app Quick Prompt: Ctrl-Option-Space (Ctrl+Alt+Space off the Mac) in any app opens a floating prompt, in the Conductor's channel unless you pick another. Return asks: the answer comes in the panel, with a follow-up box, Copy, Keep as thread and Make it a task ([Quick asks](threads.md#quick-asks)). Shift-Return starts a task thread instead, and Cmd-Return (Ctrl-Return off the Mac) starts it and opens it. Recent asks sit under the empty field. Settings > Desktop app turns it on or off, changes the shortcut and opens Omni at login. Settings > Extras starts Wispr Flow with it on a Mac. On Linux under Wayland the shortcut needs the desktop portal and a binding in the compositor

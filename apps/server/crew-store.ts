@@ -180,9 +180,9 @@ function check(id: string, role: CrewRole, builtIn: CrewRole | null, ctx: CrewSa
   if (role.error) throw refused(role.error.replace(/^bad frontmatter/, 'The frontmatter is not valid YAML'));
   const run = crewRunProblem(role, ctx.catalog);
   if (run) throw refused(`Run defaults: ${run}.`);
-  if (role.channel && !ctx.channelExists(role.channel)) throw refused(`No channel "${role.channel}" for the role's default channel.`);
+  if (role.channel && !ctx.channelExists(role.channel)) throw refused(`No channel "${role.channel}" for the agent's default channel.`);
   const unknown = role.mcp.filter((s) => !OMNI_MCP.has(s));
-  if (unknown.length) throw refused(`Unknown MCP server ${unknown.map((s) => `"${s}"`).join(', ')}. A role can name: ${[...OMNI_MCP].join(', ')}.`);
+  if (unknown.length) throw refused(`Unknown MCP server ${unknown.map((s) => `"${s}"`).join(', ')}. An agent can name: ${[...OMNI_MCP].join(', ')}.`);
   for (const [key, why] of Object.entries(CREW_LOCKS[id]?.fields ?? {}) as [CrewLockedField, string][]) {
     if (!builtIn || LOCKED_VALUE[key](role) === LOCKED_VALUE[key](builtIn)) continue;
     throw refused(key === 'charter_mode' ? `${why} Save your text as an addition (charter_mode: append).` : `${why} Leave ${key} as the built-in has it.`, 409);
@@ -197,18 +197,18 @@ function check(id: string, role: CrewRole, builtIn: CrewRole | null, ctx: CrewSa
  * shipped charter it was written against (`based_on`), which is how a replacing overlay notices a release changed it.
  */
 export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts: { create?: boolean } = {}): CrewDetail {
-  if (!CREW_ID.test(id)) throw refused('A role id is lowercase letters, digits and dashes, up to 64 characters.');
+  if (!CREW_ID.test(id)) throw refused('An agent id is lowercase letters, digits and dashes, up to 64 characters.');
   const { shipped, own } = crewTexts(id);
   if (opts.create) {
-    if (shipped !== null || own !== null) throw refused(`A role "${id}" already exists.`, 409);
-    if (RESERVED_CREW.includes(id)) throw refused(`"${id}" is a built-in role's id.`, 409);
+    if (shipped !== null || own !== null) throw refused(`An agent "${id}" already exists.`, 409);
+    if (RESERVED_CREW.includes(id)) throw refused(`"${id}" is a built-in agent's id.`, 409);
   } else if (shipped === null && own === null) {
     throw refused(`No agent "${id}".`, 404);
   }
 
   const text = savedText(save, shipped, own);
   const role = roleIn(id, shipped, text);
-  if (shipped === null && !splitCrewFile(text).meta.name) throw refused('Give the role a name.');
+  if (shipped === null && !splitCrewFile(text).meta.name) throw refused('Give the agent a name.');
   check(id, role, shipped === null ? null : parseCrewFile(id, shipped), ctx);
   writeOwn(id, text);
   return crewDetail(id)!;
@@ -234,7 +234,7 @@ function savedText(save: CrewSave, shipped: string | null, own: string | null): 
     else if (own === null) doc.set('charter_mode', 'append');
     if (own === null || save.charter !== undefined || save.charter_mode) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
   } else if (save.charter_mode) {
-    throw refused('Only an edit of a built-in role adds to or replaces its charter.');
+    throw refused('Only an edit of a built-in agent adds to or replaces its charter.');
   }
   return serialize(doc, save.charter === undefined ? oldBody : save.charter.trim());
 }
@@ -281,7 +281,7 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : und
 /** Delete a role of the user's own. A built-in is hidden or reset instead. */
 export function deleteCrew(id: string) {
   const { shipped, own } = crewTexts(id);
-  if (shipped !== null) throw refused('A built-in role cannot be deleted. Hide it, or reset your edit.', 409);
+  if (shipped !== null) throw refused('A built-in agent cannot be deleted. Hide it, or reset your edit.', 409);
   if (own === null) throw refused(`No agent "${id}".`, 404);
   removeOwn(id);
 }
@@ -289,7 +289,7 @@ export function deleteCrew(id: string) {
 /** Drop the user's overlay on a built-in, so the shipped role loads as it is. */
 export function resetCrew(id: string): CrewDetail {
   const { shipped, own } = crewTexts(id);
-  if (shipped === null || own === null) throw refused('Only an edited built-in role can be reset.', 409);
+  if (shipped === null || own === null) throw refused('Only an edited built-in agent can be reset.', 409);
   removeOwn(id);
   return crewDetail(id)!;
 }

@@ -168,7 +168,7 @@ function askedRun(input: CreateThreadInput, role: CrewRole | undefined) {
   if (!input.review_of) return own;
   if (!role?.review) {
     const reviewers = listCrew().filter((r) => r.review && !r.hidden).map((r) => r.id);
-    throw refusal(`review_of is for a review role. ${reviewers.length ? `Review roles: ${reviewers.join(', ')}.` : 'None here: turn review on for one in Settings > Agents.'}`, 400);
+    throw refusal(`review_of is for a review agent. ${reviewers.length ? `Review agents: ${reviewers.join(', ')}.` : 'None here: turn review on for one in Settings > Agents.'}`, 400);
   }
   const reviewed = threads.get(input.review_of);
   if (!reviewed) throw refusal(`No thread "${input.review_of}" to review.`, 404);

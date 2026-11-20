@@ -639,7 +639,7 @@ const FIXTURES: [(&str, usize); 10] = [
     ("connection", 52),
     ("doctor", 27),
     ("http", 26),
-    ("new", 25),
+    ("new", 27),
     ("open", 22),
     ("send", 18),
     ("show", 23),

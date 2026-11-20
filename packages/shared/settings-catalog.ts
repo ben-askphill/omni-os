@@ -10,7 +10,7 @@ export const SETTINGS_GROUPS = [
   { id: 'omni', title: '' },
   { id: 'assistant', title: 'Assistant' },
   { id: 'spaces', title: 'Spaces' },
-  { id: 'devices', title: 'Machines' },
+  { id: 'devices', title: 'Connections' },
   { id: 'developer', title: 'Developer' },
   { id: 'extras', title: 'Extras' },
   { id: 'app', title: '' },

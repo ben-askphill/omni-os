@@ -18,16 +18,16 @@ pub fn tool() -> Tool {
     Tool {
         name: "remember",
         description: format!(
-            "Propose a lesson for this crew role's later threads: a correction {user} made to how this role works, or a step it missed that every later thread of it should take. \
+            "Propose a lesson for this agent's later threads: a correction {user} made to how this agent works, or a step it missed that every later thread of it should take. \
              One short sentence that still makes sense in a new thread, about how to work, never about this one task. Never put secrets, credentials or personal data in it. \
-             It holds in this channel only, unless you pass everywhere: true for a lesson about the role that holds in every channel. \
-             It waits for {user}'s approval in Settings > Agents, unless {user} lets this role keep its lessons at once; the answer says which."
+             It holds in this channel only, unless you pass everywhere: true for a lesson about the agent that holds in every channel. \
+             It waits for {user}'s approval in Settings > Agents, unless {user} lets this agent keep its lessons at once; the answer says which."
         ),
         input: vec![
             Field::new("text", Schema::string().min(1).max(MAX_TEXT)).describe("The lesson, in one short sentence."),
             Field::new("everywhere", Schema::Boolean)
                 .optional()
-                .describe("true: for this role in every channel. Leave it out for this channel only."),
+                .describe("true: for this agent in every channel. Leave it out for this channel only."),
         ],
         // The proposal is saved once the request lands, whether or not the call is still wanted.
         stops_when_cancelled: false,
@@ -56,8 +56,8 @@ pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
     let scope = channel.map_or_else(|| "every channel".to_owned(), |c| format!("{c} only"));
     let approved = fact.get("status").and_then(JsValue::as_js_string).is_some_and(|s| s.eq_str("approved"));
     Outcome::Text(JsString::from(if approved {
-        format!("Kept for this role's later threads in {scope}: {user} lets this role keep its lessons at once.")
+        format!("Kept for this agent's later threads in {scope}: {user} lets this agent keep its lessons at once.")
     } else {
-        format!("Proposed for this role's later threads in {scope}. It waits for {user} to approve it in Settings > Agents.")
+        format!("Proposed for this agent's later threads in {scope}. It waits for {user} to approve it in Settings > Agents.")
     }))
 }
