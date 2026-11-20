@@ -89,63 +89,72 @@
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "init",
       "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[\"omni-ask:connected\",\"omni-render:connected\",\"omni-steps:connected\",\"omni-threads:connected\"]}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 235,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "user",
       "payload": "{\"text\":\"STEPS:1500 pick a review app\",\"source\":\"manual\"}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 236,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"mcp__omni-steps__set_steps\",\"input\":{\"steps\":[\"Find candidate apps\",\"Read the reviews\",\"Compare prices\"],\"current\":0},\"parent\":null}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 237,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_result",
       "payload": "{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"Showing step 1 of 3, \\\"Find candidate apps\\\". Call set_steps again when it changes.\",\"is_error\":false,\"truncated\":false}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 238,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_2\",\"name\":\"WebSearch\",\"input\":{\"query\":\"shopify review apps\"},\"parent\":null}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 239,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_result",
       "payload": "{\"tool_use_id\":\"toolu_fake_2\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 240,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_3\",\"name\":\"mcp__omni-steps__set_steps\",\"input\":{\"steps\":[\"Find candidate apps\",\"Read the reviews\",\"Compare prices\"],\"current\":1},\"parent\":null}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 241,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_result",
       "payload": "{\"tool_use_id\":\"toolu_fake_3\",\"text\":\"Showing step 2 of 3, \\\"Read the reviews\\\". Call set_steps again when it changes.\",\"is_error\":false,\"truncated\":false}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     },
     {
       "id": 242,
       "thread_id": "00000000-0000-4000-8000-000000000084",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_4\",\"name\":\"WebFetch\",\"input\":{\"url\":\"https://apps.shopify.com/judgeme\"},\"parent\":null}",
-      "created_at": "2026-01-05T09:00:00.000Z"
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "agent": null
     }
   ],
   "artifacts": [],

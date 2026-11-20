@@ -487,7 +487,8 @@ async function scenario() {
   got.set('thread-stream-snapshot.sse', snap.slice(0, snap.indexOf('\n\n', snap.indexOf('"kind":"sync"')) + 2));
 
   // After everything above is kept, so the lists and streams stay as they were.
-  const rich = (await call('POST', '/threads', { channel: 'acme', prompt: 'RICH fix the cart total', title: 'Fix the cart total' })) as Thread;
+  // Started as an agent, so its replies carry their author (group threads slice 1).
+  const rich = (await call('POST', '/threads', { channel: 'acme', prompt: 'RICH fix the cart total', title: 'Fix the cart total', role: 'builder' })) as Thread;
   const settled = (turns: number, extra: (d: Detail) => boolean = () => true) =>
     eventually(async () => {
       const d = await detail(rich.id);

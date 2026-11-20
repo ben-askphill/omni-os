@@ -254,6 +254,10 @@ A message that starts a turn shows in the transcript as soon as you send it, abo
 
 While a turn runs, a thinking line stays up for the whole turn, tool calls included. It has the Omni mark, the label ("Thinking" or the agent's status) with a vermilion shimmer, and the time since your last message. It shows on desktop web, phone web, the desktop app and the iOS app. Reduce Motion stops the mark and the shimmer. A delegated thread's brief (its first message) folds to the first 6 lines, with Show more, when it is longer than 8 lines. Other long messages on desktop keep the character cut with Show all.
 
+### Who wrote a reply
+
+Each reply says which agent wrote it: the agent's avatar in a 24px gutter on the left, its name and the time beside it, and the reply under the name. Replies in a row from one agent share one head; your message, a report or a run switch starts the next. With **Show technical details** on, the harness and model it ran on show between the name and the time. A thread started as an agent shows that agent (its lead) on every reply, older threads included: Omni records the agent on each transcript row from now on, and rows from before that read as the lead's. The Conductor wears its channel's look until you give the Conductor agent an image or icon. A thread with no agent shows its replies without a head, as before. Desktop web, phone web and the desktop app show it; the iOS app gets it later.
+
 Replies render as Markdown on desktop web, phone web and the desktop app. A `mermaid` code fence draws as a diagram in light and dark. A fence that fails to parse keeps its source visible. Wide diagrams scroll sideways on a phone.
 
 Open a call under a step's **N actions** to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).

@@ -7,6 +7,8 @@ export interface EventRow {
   /** JSON text. */
   payload: string;
   created_at: string;
+  /** The agent that wrote it, by id. Null on Ben's and Omni's rows; a server from before it was recorded leaves it out. */
+  agent?: string | null;
 }
 
 /** A row of a history page. A clipped one comes whole from `api.event`. */
