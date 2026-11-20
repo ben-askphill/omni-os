@@ -15,8 +15,18 @@ A thread today is one agent with one harness session. The glossary defined it as
 - **One worktree, parallel turns, own powers.** Every agent in a thread works in the thread's one worktree and branch. Their turns run at the same time, and each agent keeps its own powers and run. When two agents touch the same file, Omni tells each running agent which files the other changed this turn. The thread flags every file both of them edited (a **collision**).
 - **Agents do not seat agents.** An `@name` in an agent's reply is plain text. It seats no one and wakes no one. The one exception is the Conductor. It can seat agents, but only in a delegated thread it creates in the client channel, never in its own #conductor thread.
 - **A team is one thread.** `delegate_team` makes a single thread in the client channel, with a lead and the members seated. The Conductor posts each member's part as a message that names that member. The members run in parallel. Once every one of them has finished, Omni wakes the lead with their replies, and the lead writes the crew report. Ordinary delegation does not change: `delegate` still makes a thread of its own with a task id and a crew report.
-- **The status mark shows the busiest agent.** A thread's mark is Needs you when any of its agents waits on Ben, else Working when any of them runs, else Done. Avatars on the mark show which agents are running.
+- **The status mark shows the busiest agent.** A thread's mark is Needs you when any of its agents waits on Ben, else Working when any of them runs, else Done. Avatars on the mark show which agents are running and which one waits on Ben (see How it looks).
 - **Seating replaces Ask for new messages.** An agent mention no longer starts a thread under this one with a report card. Asks already sent stay readable as they are.
+
+## How it looks
+
+Ben picked these on 2026-11-20 from a throwaway prototype that draws each screen on desktop and phone (branch `prototype/group-threads`, never merged). The variants he turned down stay behind its switcher.
+
+- **Who wrote a reply.** An agent's avatar sits in a gutter left of its reply, at 24px, with its name and the time on the line beside it. Replies in a row from one agent share one head. Ben's messages stay right-hand bubbles.
+- **Agent mentions.** The composer keeps one `@` menu. Agents come first: the thread's members, then the agents a mention would seat. Machines and files follow. A line under the composer says who gets the message: the lead when it names no agent, else the named agents, and that a new one joins the thread and stays until Ben removes it.
+- **The member list.** The members' avatars sit at the right of the thread header. They open the member list, a popover on desktop and a sheet on the phone, with Remove on each member. The quick-actions card keeps a Lead row and a Members row, with their avatars.
+- **Parallel turns.** While several agents answer one message, the turn splits into a lane per agent, each with its steps and the files it changed. A collision flag sits above the lanes and names the file. The phone shows one lane at a time, with a tab per agent.
+- **The status mark in a list.** On desktop, the agents' avatars are the mark while any of them runs or waits on Ben. The agent waiting on Ben comes first and on top, with the Needs you ring and the Needs you diamond on its corner. Agents that run follow in the Working ring. The mark shows two avatars at most, else one and a count. Other states keep today's mark. On the phone, the row's second line says who asks and who works, with their avatars ("Builder asks you · Designer working").
 
 ## Supersedes
 
@@ -36,6 +46,7 @@ The reasons below follow from Ben's decisions. The session that settled them did
 - **Members see tool calls.** Tool output is most of a turn's size, and it would fill every member's context. A member that needs the files reads the shared worktree.
 - **Several copies of one agent.** `@builder` would no longer name one agent, and two sessions with one charter would split one role's work.
 - **A lead that hears every message.** It would answer messages meant for members and spend a turn on each one.
+- **Other layouts.** For each screen in How it looks, the prototype drew two to four layouts: a byline or a card per reply, a To line of recipient chips above the composer, a members strip under the title, collisions inline in the transcript or in a dock over the composer, and the mark with avatars beside it. Ben did not record why he turned them down.
 
 ## Consequences
 

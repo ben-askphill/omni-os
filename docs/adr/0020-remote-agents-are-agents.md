@@ -12,6 +12,13 @@
 - **Worktree read, per channel, off by default.** In a channel that allows it, Omni gives the remote agents in that channel's threads a read tool scoped to the thread's worktree. It lists, reads and searches files there and nothing else: no writes, nothing outside the worktree. The switch is per channel and off by default, so a client channel stays closed until Ben turns it on. Only Ben sets it: an agent thread cannot, as it cannot change "No thread excerpts to remote agents" today. It reuses or extends that switch. Which one is open in the plan.
 - **What ADR 0017 keeps.** Keys stay on the server. The network rule stands, and so does syncing the file but not the key. Only Ben adds, changes or removes a remote agent. A remote agent still gets no channel or global secret, no install token, no Omni tools besides the read tool, and no way to write.
 
+## How it looks
+
+Ben picked these on 2026-11-20 from the same prototype as [ADR 0019](0019-group-threads.md#how-it-looks) (branch `prototype/group-threads`, never merged).
+
+- **An agent is a page.** In Settings > Agents, an agent opens as a page of its own, its avatar large on top. Avatar is a card on it. A remote agent's page adds a Server card (address, kind, key, how many turns at once, Test connection and Remove) and an In threads card that says where it may read files. A local agent's page has its run and powers, as today's editor does.
+- **A remote lead says so quietly.** Each fact sits where it matters, with no banner. The crumbs read "Hermes · talks only", and the composer's placeholder says a local agent changes files. A reply that could not read files ends with a lock line ("Remote agents can't read files in #Volero") linking Channel settings. The quick-actions card has a Files row ("Can't read or change", or "Can read, can't change" where the channel allows it).
+
 ## Supersedes
 
 - ADR 0017: "The UI calls it a custom harness (E1)" (the UI calls it a remote agent), and "A remote agent gets nothing else (E6, E7, E9)" (except the read tool, in a channel that allows it). Its Not yet list's "remote mark in pickers" goes too, since there are no pickers to mark.
@@ -28,6 +35,7 @@ The reasons below follow from Ben's decisions. The session that settled them did
 - **Put the changed files in the prompt.** The prompt would grow on every turn and carry files whether the agent needs them or not. A read tool fetches only what the agent asks for, and only where the channel allows it.
 - **A thread token or Omni's MCP tools for remote agents.** An outside server would get the API a local thread has. The read tool is the only door, and it opens on one worktree.
 - **Worktree read on by default.** A client channel's files would reach an outside server before Ben had decided they may.
+- **Other layouts.** The prototype also drew the agent editor as today's modal with the server folded at its foot, and a remote lead's limits as a notice card on top of the thread. Ben did not record why he turned them down.
 
 ## Consequences
 
