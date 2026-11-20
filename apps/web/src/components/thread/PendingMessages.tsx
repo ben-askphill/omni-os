@@ -11,7 +11,8 @@ import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';
 import { MentionText } from '../../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../../message-context/agent-mention.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
 import { isImeEnter } from '../../ime.ts';
 
@@ -189,11 +190,18 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
   const kept = (m?.attachments ?? []).filter((f) => d.keep.includes(f.name));
   const saving = d.status === 'saving';
   const empty = !d.prompt.trim() && !hasContext(m?.context);
+  // The box is plain text, so no mention shows as a pill in it: every agent the message goes to is on the line over it.
+  const editing = sentContext('', m?.context);
   const pick = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col items-end">
       <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
         <Icon name="pencil" size={12} /> Editing · {label}
+        {editing.to.length ? (
+          <span className="ml-1">
+            <SentTo agents={editing.to} />
+          </span>
+        ) : null}
       </div>
       <div className="w-full max-w-[92%] rounded-[22px] rounded-tr-lg border border-line-strong bg-surface px-4 py-3 sm:max-w-[80%]">
         <textarea
@@ -211,7 +219,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           }}
           className="w-full resize-none bg-transparent text-[14px] leading-[1.55] text-fg outline-none"
         />
-        <ContextChips records={m?.context} className="mt-2" />
+        <ContextChips records={editing.chips} className="mt-2" />
         {kept.length + d.added.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {kept.map((f) => (
@@ -349,15 +357,21 @@ export function PendingBubble({
   children?: ReactNode;
 }) {
   const files = m.attachments ?? [];
+  const sent = sentContext(m.text, m.context);
   return (
     <div className="flex flex-col items-end">
       <div className="flex w-full flex-col items-end opacity-70">
         <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
           <Icon name={icon} size={12} /> {label}
           {files.length && !threadId ? <span className="text-fg-3">· {plural(files.length, 'file')}</span> : null}
+          {sent.to.length ? (
+            <span className="ml-1">
+              <SentTo agents={sent.to} />
+            </span>
+          ) : null}
         </div>
         {threadId && files.length ? <Attachments threadId={threadId} items={files} href={href} lazy={false} /> : null}
-        <ContextChips records={chipRecords(m.text, m.context)} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+        <ContextChips records={sent.chips} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
         {(m.text || !hasContext(m.context)) && (
           <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
             <MentionText text={m.text} records={m.context} />

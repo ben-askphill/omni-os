@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newContext } from '../message-context.ts';
 import { parseContexts, readContexts } from '../message-context-kinds.ts';
-import { chipRecords, machineMention, mentionBody, mentionPieces, mentionSpans, mentionsMachine } from '../message-context-machine.ts';
+import { chipRecords, machineMention, mentionBody, mentionPieces, mentionSpans, mentionsMachine, sentContext } from '../message-context-machine.ts';
+import { agentMention, agentMentionBody } from '../message-context-agent.ts';
 
 const AT = new Date('2026-11-19T12:00:00.000Z');
 const ids = (() => {
@@ -79,5 +80,30 @@ describe('machine mentions inline', () => {
     const other = { id: 'x', kind: 'thread_reference', v: 1, label: 'T-1', note: '', body: {} };
     expect(chipRecords(text, [pro, other])).toEqual([other]);
     expect(chipRecords('build it', [pro, other])).toEqual([pro, other]);
+  });
+});
+
+describe("a sent message's context", () => {
+  const builder = newContext(agentMention, agentMentionBody({ id: 'builder', name: 'Builder' }), '', ids);
+  const designer = newContext(agentMention, agentMentionBody({ id: 'designer', name: 'Designer' }), '', ids);
+  const other = { id: 'x', kind: 'thread_reference', v: 1, label: 'T-1', note: '', body: {} };
+
+  it('names the agents the text does not, once each, for the line over the bubble, and keeps them out of the chips', () => {
+    const again = newContext(agentMention, agentMentionBody({ id: 'designer', name: 'Designer' }), '', ids);
+    expect(sentContext('Rework the cart drawer', [builder, other, designer, again])).toEqual({
+      chips: [other],
+      to: [
+        { agent: 'builder', name: 'Builder' },
+        { agent: 'designer', name: 'Designer' },
+      ],
+    });
+  });
+
+  it('leaves an agent the text names inline to its pill', () => {
+    expect(sentContext('@Builder take the totals', [builder, designer, pro])).toEqual({ chips: [pro], to: [{ agent: 'designer', name: 'Designer' }] });
+  });
+
+  it('reads anything but a list as nothing', () => {
+    expect(sentContext('hi', 'not a list')).toEqual({ chips: [], to: [] });
   });
 });

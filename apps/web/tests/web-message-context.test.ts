@@ -20,7 +20,9 @@ import { MentionText } from '../src/message-context/MentionText.tsx';
 import { editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMentions } from '../src/message-context/machine-tokens.ts';
 import { referencesFor } from '../src/message-context/thread-picker.ts';
 import { newThreadScope } from '../src/components/composer/MessageEditor.tsx';
-import { chipRecords, machineMention, mentionBody, type MachineIdentity } from '@omni/shared/message-context-machine.ts';
+import { chipRecords, machineMention, mentionBody, sentContext, type MachineIdentity } from '@omni/shared/message-context-machine.ts';
+import { agentMention, agentMentionBody } from '@omni/shared/message-context-agent.ts';
+import { SentTo } from '../src/message-context/agent-mention.tsx';
 import { addDraftContext, draftContext, removeDraftContext, settleDraftContext } from '../src/message-context/draft.ts';
 import { sendKey } from '../src/requests.ts';
 import type { UserP } from '@omni/shared/transcript-fold.ts';
@@ -329,5 +331,27 @@ describe('machine mentions in a composer', () => {
     // Text that lost its @name keeps the chip.
     expect(chipRecords('run the ingest', records)).toHaveLength(1);
     settleDraftContext(thread, records.map((r) => r.id));
+  });
+});
+
+describe('agent mentions on a sent message', () => {
+  const ids = (() => {
+    let n = 0;
+    return { id: () => `a${++n}` };
+  })();
+  const builder = newContext(agentMention, agentMentionBody({ id: 'builder', name: 'Builder' }), '', ids);
+  // An agent this machine no longer lists keeps the name the message was sent with.
+  const gone = newContext(agentMention, agentMentionBody({ id: 'custom-7f3a', name: 'Copywriter' }), '', ids);
+
+  it('names the agents the text does not on the line over the bubble, and draws no chip for them', () => {
+    const sent = sentContext('Rework the cart drawer', [builder, gone]);
+    expect(renderToStaticMarkup(createElement(ContextChips, { records: sent.chips }))).toBe('');
+    const html = renderToStaticMarkup(createElement(SentTo, { agents: sent.to }));
+    expect(textOf(html).replace(/\s+/g, ' ').trim()).toBe('To Builder Copywriter');
+    expect(html).toContain('data-sent-to="builder"');
+  });
+
+  it('draws nothing when the text names every agent', () => {
+    expect(renderToStaticMarkup(createElement(SentTo, { agents: sentContext('@Builder go', [builder]).to }))).toBe('');
   });
 });

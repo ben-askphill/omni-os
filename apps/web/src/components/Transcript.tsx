@@ -31,7 +31,8 @@ import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../message-context/agent-mention.tsx';
 import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
@@ -142,6 +143,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
+  const sent = useMemo(() => sentContext(text, p.context), [text, p.context]);
   const body = (
     <>
       {pieces.map(({ text: t, hit }, i) =>
@@ -173,10 +175,11 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
             <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
+        <SentTo agents={sent.to} />
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
-      <ContextChips records={chipRecords(text, p.context)} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
+      <ContextChips records={sent.chips} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
           data-find-event={event}
