@@ -6,9 +6,9 @@ export function isBusy(thread: Pick<Thread, 'status'>): boolean {
   return thread.status === 'running' || thread.status === 'queued';
 }
 
-/** Nothing runs while the worktree is being prepared, so there is nothing to stop. */
-export function canStop(thread: Pick<Thread, 'status' | 'setup'>): boolean {
-  return isBusy(thread) && !thread.setup;
+/** Stop applies to the whole thread, including members still working after its lead finishes. */
+export function canStop(thread: Pick<Thread, 'status' | 'setup' | 'members'>): boolean {
+  return !thread.setup && (isBusy(thread) || !!thread.members?.some((m) => !m.lead && (m.state === 'working' || m.state === 'needs')));
 }
 
 type SteerFacts = Pick<Thread, 'status' | 'harness' | 'queued_harness'> & Partial<Pick<Thread, 'role'>>;

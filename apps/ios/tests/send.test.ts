@@ -8,7 +8,7 @@ import { addDraftContext, draftContext } from '../src/context/draft';
 import { createLiveHub } from '../src/live/hub';
 import type { OmniSession } from '../src/live/session';
 import { threadKey } from '../src/live/thread-key';
-import { composerPlaceholder, sendLabel, sendModeFor } from '../src/send/rules';
+import { canStop, composerPlaceholder, sendLabel, sendModeFor } from '../src/send/rules';
 
 const BASE = 'http://omni.test';
 
@@ -230,6 +230,15 @@ describe('steer or queue while a turn runs', () => {
     expect(composerPlaceholder(cursor, null)).toBe('Queue for after this turn');
     expect(sendLabel(running, null)).toBe('Send to the running turn');
     expect(sendLabel(cursor, null)).toBe('Send after this turn');
+  });
+
+  it('offers Stop after the lead finishes while a member works or waits for an answer', () => {
+    const reviewer = { agent: 'reviewer', name: 'Reviewer', lead: false, harness: 'claude-code', model: null, effort: '', seated_at: '', status: 'running' };
+    const lead = { status: 'done', setup: null } as const;
+    expect(canStop({ ...lead, members: [{ ...reviewer, state: 'working' }] })).toBe(true);
+    expect(canStop({ ...lead, members: [{ ...reviewer, state: 'needs' }] })).toBe(true);
+    expect(canStop({ ...lead, members: [{ ...reviewer, status: 'queued', state: 'working' }] })).toBe(true);
+    expect(canStop({ ...lead, members: [{ ...reviewer, status: 'done', state: 'done' }] })).toBe(false);
   });
 });
 
