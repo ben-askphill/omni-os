@@ -20,7 +20,8 @@ import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
-import { chipRecords } from '@omni/shared/message-context-machine.ts';
+import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { SentTo } from '../message-context/agent-mention.tsx';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
@@ -252,28 +253,37 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     <>
     {t.prompts.map((p, k) => {
       const brief = first && k === 0 && !!thread.parent_id && atStart(c.history.history);
+      const sent = sentContext(p.text ?? '', p.context);
+      const words = p.dropped
+        ? p.undelivered
+          ? `Not delivered · ${p.undelivered}`
+          : 'Not sent'
+        : p.source === 'pr-watch'
+          ? 'PR watch'
+          : brief
+            ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
+            : k > 0
+              ? 'Sent while it ran'
+              : undefined;
       return (
       <Fragment key={k}>
         <MoBubble
           event={p.key}
           fold={brief}
           caption={
-            p.dropped
-              ? p.undelivered
-                ? `Not delivered · ${p.undelivered}`
-                : 'Not sent'
-              : p.source === 'pr-watch'
-                ? 'PR watch'
-              : brief
-                ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
-                : k > 0
-                  ? 'Sent while it ran'
-                  : undefined
+            sent.to.length ? (
+              <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                {words && <span>{words}</span>}
+                <SentTo agents={sent.to} />
+              </span>
+            ) : (
+              words
+            )
           }
           above={
             <>
               {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} lazy={!last} /> : null}
-              <ContextChips records={chipRecords(p.text ?? '', p.context)} align="end" className="w-full max-w-[86%]" />
+              <ContextChips records={sent.chips} align="end" className="w-full max-w-[86%]" />
             </>
           }
         >
