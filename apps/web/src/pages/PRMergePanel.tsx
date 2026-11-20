@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, errorText, type Channel, type PRDetail as PRDetailT } from '../api.ts';
 import { Button, Chip, ErrorNote, Picker, SlideToConfirm, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
+import { useIsMobile } from '../store.tsx';
 import { checkTone } from '@omni/shared/thread-glance.ts';
 import { autoMergeView } from '@omni/shared/pr-auto-merge.ts';
 import { PRAutoMerge } from './PRAutoMerge.tsx';
@@ -16,7 +17,9 @@ const MERGE_METHODS: PickerOption<MergeMethod>[] = [
 
 /**
  * The merge card on an open pull request, kept to one block above the tabs: method, delete-branch and auto-merge on one
- * row, then what stands in the way (with Rerun failed checks beside the failing count), the slide and a one-line note.
+ * row, then what stands in the way (with Rerun failed checks beside the failing count), the merge control and a one-line
+ * note. The desktop shell gets a plain button named for the method: a mouse drag on the slide often fell short and never
+ * registered. The phone layout shows this card too (its channel PR screen) and keeps the slide, as its thread PR screen does.
  * After a merge it shows gh's output in place of the card; `onMerged` reloads the pull request.
  */
 export function PRMergePanel({
@@ -36,11 +39,14 @@ export function PRMergePanel({
   const [deleteBranch, setDeleteBranch] = useState(true);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [merged, setMerged] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
+  const phone = useIsMobile();
   const open = !p.state || p.state === 'OPEN';
 
-  // Thrown errors spring the slider back; the message stays visible under it.
+  // A failed merge leaves the card as it was, with gh's message under the control. The slide springs back on a throw.
   const doMerge = async () => {
     setMergeError(null);
+    setMerging(true);
     try {
       const r = await api.post<{ ok: boolean; output: string }>(`/channels/${encodeURIComponent(channel.id)}/prs/${n}/merge`, {
         method,
@@ -52,6 +58,8 @@ export function PRMergePanel({
     } catch (e) {
       setMergeError(errorText(e));
       throw e;
+    } finally {
+      setMerging(false);
     }
   };
 
@@ -61,6 +69,7 @@ export function PRMergePanel({
   const blocked = conflicting || failed > 0 || warnings.length > 0 || rerun.can;
   const code = 'font-mono text-[length:var(--fs-code)] text-fg-2';
   const auto = autoMergeView(p.autoMergeRequest);
+  const methodLabel = MERGE_METHODS.find((m) => m.value === method)?.label ?? 'Merge';
 
   return (
     <>
@@ -91,15 +100,21 @@ export function PRMergePanel({
             </div>
           )}
           <RerunNote outcome={rerun.outcome} className="mt-3" />
-          {/* A control's width, not the card's: it shrinks on a phone and still holds the longest label. */}
-          <SlideToConfirm
-            className="mt-3 w-full max-w-[20rem]"
-            label={conflicting ? 'Resolve conflicts first' : `Slide to ${MERGE_METHODS.find((m) => m.value === method)?.label.toLowerCase()}`}
-            busyLabel="Merging"
-            doneLabel="Merged"
-            disabled={conflicting}
-            onConfirm={doMerge}
-          />
+          {phone ? (
+            // A control's width, not the card's: it shrinks on a phone and still holds the longest label.
+            <SlideToConfirm
+              className="mt-3 w-full max-w-[20rem]"
+              label={conflicting ? 'Resolve conflicts first' : `Slide to ${methodLabel.toLowerCase()}`}
+              busyLabel="Merging"
+              doneLabel="Merged"
+              disabled={conflicting}
+              onConfirm={doMerge}
+            />
+          ) : (
+            <Button variant="primary" className="mt-3" disabled={conflicting} busy={merging} onClick={() => void doMerge().catch(() => {})}>
+              {conflicting ? 'Resolve conflicts first' : merging ? 'Merging' : methodLabel}
+            </Button>
+          )}
           <p className="mt-2 px-1 text-[length:var(--fs-12)] leading-[1.45] text-fg-3" title={`${p.headRefName} into ${p.baseRefName} on ${channel.github_repo}`}>
             Runs <span className={code}>gh pr merge</span>
             {deleteBranch ? ', then deletes the branch' : ''}. Can’t be undone from here.
