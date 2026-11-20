@@ -8,6 +8,7 @@ import { takeApiParam } from './api-base.ts';
 import { desktop } from './desktop.ts';
 import { prefetchWhenIdle } from './lazy.tsx';
 import { parseHash } from './router.ts';
+import './posthog.ts';
 import './index.css';
 // The channel rail's faces (index.css :root[data-layout="rail"]). Each @font-face downloads only when used.
 import '@fontsource/adwaita-sans/400.css';

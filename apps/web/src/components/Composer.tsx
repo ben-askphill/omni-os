@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTechnical } from '../display.ts';
+import { posthog } from '../posthog.ts';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -189,6 +190,8 @@ export function NewThreadComposer({
         att.files,
       );
       keepLocalFiles(t.id, att.files);
+      posthog.capture('thread_created', { has_attachments: att.files.length > 0, has_context: refs.length > 0 });
+      posthog.logger.info('Thread created from composer', { has_attachments: att.files.length > 0, has_context: refs.length > 0 });
       drafts.delete(key);
       settleDraftContext(key, refs.map((r) => r.id));
       setText('');
@@ -216,6 +219,8 @@ export function NewThreadComposer({
         att.files,
       );
       keepLocalFiles(t.id, att.files);
+      posthog.capture('quick_answer_requested', { has_attachments: att.files.length > 0, has_context: quickRefs.length > 0 });
+      posthog.logger.info('Quick answer requested from composer', { has_attachments: att.files.length > 0, has_context: quickRefs.length > 0 });
       drafts.delete(key);
       settleDraftContext(key, refs.map((r) => r.id));
       setText('');
@@ -490,6 +495,7 @@ export function ReplyComposer({
     onSending?.();
     try {
       const t = await sendReply(prompt, mode, files, context, sendThere ? undefined : 'ask');
+      posthog.capture('thread_message_sent', { has_attachments: files.length > 0, has_context: context.length > 0, delivery_mode: mode ?? 'start' });
       onSent?.(t, mode);
     } catch (e) {
       // Unless Ben started a new message meanwhile.

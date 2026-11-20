@@ -1,6 +1,7 @@
 import type { Device } from '@omni/shared/handoff.ts';
 import { runOnRows } from '@omni/shared/thread-machine.ts';
 import { runOnOptions } from '../components/RunOnPicker.tsx';
+import { posthog } from '../posthog.ts';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { api, errorText, useApi, type Automation, type Thread, type SyncStatus } from '../api.ts';
 import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
@@ -248,6 +249,7 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
     setError(null);
     try {
       await api.post(`/automations/${encodeURIComponent(a.id)}/enabled`, { enabled: v });
+      posthog.capture('automation_toggled', { enabled: v });
       onChanged();
     } catch (e) {
       setEnabled(!v);
@@ -263,6 +265,7 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
     setError(null);
     try {
       const t = await api.post<Thread>(`/automations/${encodeURIComponent(a.id)}/run`, dry ? { dry: true } : undefined);
+      posthog.capture('automation_run_requested', { dry_run: dry });
       navigate(`/t/${t.id}`);
     } catch (e) {
       setError(errorText(e));
@@ -477,6 +480,7 @@ function DeleteAutomationDialog({ a, onClose, onDeleted }: { a: Automation | nul
     setError(null);
     try {
       await api.del(`/automations/${encodeURIComponent(a.id)}`);
+      posthog.capture('automation_deleted');
       onDeleted();
       close();
     } catch (e) {
@@ -562,6 +566,7 @@ function UsageScanDialog({ open, onClose }: { open: boolean; onClose: () => void
     setError(null);
     try {
       const r = await api.post<{ thread: Thread }>('/usage-scan', scope ? { channel: scope } : {});
+      posthog.capture('usage_scan_started', { scoped_to_channel: !!scope });
       close();
       navigate(`/t/${r.thread.id}`);
     } catch (e) {

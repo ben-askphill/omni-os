@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api, errorText, useApi } from '../api.ts';
+import { posthog } from '../posthog.ts';
 import { agentKeyName, groupedCode, KIND_LABEL, NETWORK_LABEL, normalizeCode, parseConnectInput, slugFrom, type AgentTest, type FoundAgent, type PairedAgent } from '@omni/shared/connect-agent.ts';
 import { Button, CheckItem, Chip, CopyButton, ErrorNote, Label, LinkButton, Modal, ModalFooter, Picker, Toggle, type PickerOption } from './ui.tsx';
 import { href } from '../router.ts';
@@ -128,6 +129,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
     setError(null);
     try {
       const c = await api.post<Connected>('/harnesses/connect', { slug, name, role, ...(paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }) });
+      posthog.capture('harness_connected', { created_role: !!c.role, connection_method: paired ? 'pairing' : 'secret' });
       setDone(c);
       onConnected?.(c);
     } catch (e) {
