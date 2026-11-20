@@ -37,10 +37,19 @@ const base = {
 } as unknown as PRDetailT;
 
 let pr: PRDetailT = base;
+let posts: { path: string; body: unknown }[] = [];
+let postFails: string | null = null;
+// The phone layout takes over below DESKTOP_QUERY (store.tsx); each test picks a side.
+let phone = false;
 
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
   actual.api.get = vi.fn(async () => pr) as typeof actual.api.get;
+  actual.api.post = vi.fn(async (path: string, body: unknown) => {
+    posts.push({ path, body });
+    if (postFails) throw new Error(postFails);
+    return { ok: true, output: 'Squashed and merged #771' };
+  }) as typeof actual.api.post;
   return actual;
 });
 
@@ -61,10 +70,16 @@ async function show(p: PRDetailT) {
 }
 
 const merge = () => host.querySelector('section[aria-label="Merge"]')!;
+const mergeButton = () => [...merge().querySelectorAll<HTMLButtonElement>('button:not([aria-label])')].find((b) => /^(Squash and merge|Merge commit|Rebase and merge)$/.test(b.textContent ?? ''));
 const tab = (name: string) => [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((t) => t.textContent?.startsWith(name));
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  posts = [];
+  postFails = null;
+  phone = false;
+  const real = window.matchMedia.bind(window);
+  vi.stubGlobal('matchMedia', (q: string) => (q === '(min-width: 768px)' ? { ...real(q), matches: !phone, addEventListener() {}, removeEventListener() {} } : real(q)));
   location.hash = '#/c/shop/prs/771';
 });
 
@@ -89,18 +104,44 @@ it('links the parent thread, then the thread that opened the PR, on one line', a
   expect(links.map((a) => a.textContent)).toEqual(['Rust rewrite', 'Remove TS twins']);
 });
 
-it('keeps method, delete branch and auto-merge on the merge card, with the slide and a one-line note', async () => {
+it('keeps method, delete branch and auto-merge on the merge card, with a merge button and a one-line note', async () => {
   await show(base);
   const card = merge();
   expect(card.querySelector('button[aria-label^="Merge method"]')).not.toBeNull();
   expect(card.querySelector('[role="switch"]')?.getAttribute('aria-label')).toBe('Delete branch after merge');
   expect(card.querySelector('[aria-label="Auto-merge"]')?.textContent).toContain('Turn on auto-merge');
-  const slide = card.querySelector('button[aria-label="Slide to squash and merge"]');
+  // The desktop shell gets a plain button named for the method; a mouse drag on the slide often never registered.
+  expect(mergeButton()?.textContent).toBe('Squash and merge');
+  expect(card.querySelector('.sld')).toBeNull();
+  expect(card.querySelector('p')?.textContent).toBe('Runs gh pr merge, then deletes the branch. Can’t be undone from here.');
+  expect(card.textContent).not.toContain('Rerun failed checks');
+});
+
+it('merges from the button with the method and delete-branch, then shows what gh said', async () => {
+  await show(base);
+  await act(async () => mergeButton()!.click());
+  expect(posts).toEqual([{ path: '/channels/shop/prs/771/merge', body: { method: 'squash', delete_branch: true, confirm: true } }]);
+  expect(merge()).toBeNull();
+  expect(host.textContent).toContain('Squashed and merged #771');
+});
+
+it('keeps the card and shows the error when the merge fails', async () => {
+  postFails = 'Pull request is not mergeable';
+  await show(base);
+  await act(async () => mergeButton()!.click());
+  expect(merge()).not.toBeNull();
+  expect(merge().textContent).toContain('Pull request is not mergeable');
+  expect(mergeButton()?.textContent).toBe('Squash and merge');
+});
+
+it('keeps the slide on the phone layout, which shows this card on its channel PR screen', async () => {
+  phone = true;
+  await show(base);
+  const slide = merge().querySelector('button[aria-label="Slide to squash and merge"]');
   expect(slide).not.toBeNull();
   // A control's width, not the card's, and it shrinks on a phone.
   expect(slide!.closest('.sld')?.className).toMatch(/\bw-full\b.*\bmax-w-\[20rem\]/);
-  expect(card.querySelector('p')?.textContent).toBe('Runs gh pr merge, then deletes the branch. Can’t be undone from here.');
-  expect(card.textContent).not.toContain('Rerun failed checks');
+  expect(mergeButton()).toBeUndefined();
 });
 
 it('says what auto-merge does under the slide while it is on', async () => {
@@ -116,7 +157,8 @@ it('offers Rerun failed checks beside what blocks the merge', async () => {
   expect(text).toContain('Has conflicts');
   expect(text).toContain('1 check failing');
   expect(text).toContain('Rerun failed checks');
-  expect(merge().querySelector('button[aria-label="Resolve conflicts first"]')).not.toBeNull();
+  const blocked = [...merge().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Resolve conflicts first');
+  expect(blocked?.disabled).toBe(true);
 });
 
 it('shows Conversation, Checks and Changes, counting the files in the diff', async () => {
