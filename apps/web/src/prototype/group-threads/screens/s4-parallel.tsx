@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import { AGENTS, CHANNELS, COLLIDED, PARALLEL, THREAD, type AgentId } from '../data.ts';
 import { Messages } from '../messages.tsx';
-import { AgentAvatar, ComposerBox, DesktopThread, Facepile, PhoneComposer, PhoneThread, RunPill, TechLine, ThreadHead, Thinking } from '../parts.tsx';
+import { AgentAvatar, ComposerBox, DesktopThread, Facepile, HeadFaces, PhoneComposer, PhoneThread, RunPill, TechLine, ThreadHead, Thinking } from '../parts.tsx';
 import { Button, Icon, IconButton, StatusDot } from '../../../components/ui.tsx';
 import type { Screen } from './types.ts';
 
@@ -42,17 +42,19 @@ const RUNS: Run[] = [
     files: [COLLIDED, 'packages/shared/status.ts'],
   },
 ];
+/** The phone header's sub line: the channel, then the running agents' ringed faces, no "2 working" label. */
+const PHONE_SUB = (
+  <span className="inline-flex items-center gap-1.5">
+    #Omni OS · <Facepile ids={['builder', 'designer']} size={14} ring={['builder', 'designer']} />
+  </span>
+);
 const other = (id: AgentId) => AGENTS[id === 'builder' ? 'designer' : 'builder'].name;
 
 const head = (
   <ThreadHead
     channel={CHANNELS.omni}
     title={THREAD.title}
-    right={
-      <span className="mr-1 flex items-center gap-1.5 text-[12px] text-fg-3">
-        <Facepile ids={['builder', 'designer']} size={22} ring={['builder', 'designer']} /> 2 working
-      </span>
-    }
+    right={<HeadFaces ids={['builder', 'designer']} running={['builder', 'designer']} />}
   />
 );
 
@@ -191,7 +193,7 @@ const desktopB = () => (
 );
 
 const phoneB = () => (
-  <PhoneThread title={THREAD.title} sub="2 working · #Omni OS" composer={<PhoneComposer stop />}>
+  <PhoneThread title={THREAD.title} sub={PHONE_SUB} composer={<PhoneComposer stop />}>
     <Messages list={PARALLEL} phone />
     <div className="space-y-3">
       <div className="grid grid-cols-2 rounded-full bg-surface-2 p-1" role="tablist">

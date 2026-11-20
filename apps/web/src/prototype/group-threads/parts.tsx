@@ -254,12 +254,23 @@ export function ThreadHead({ channel, title, crumbs, right, status = 'working' }
       {right}
       <div className="flex shrink-0 items-center gap-1">
         <IconButton icon="check" label="Mark done" />
-        <StatusPill mark={status} />
+        {/* The header's avatars say who works, ringed while running; no Working label beside them (Ben, 2026-11-20). */}
+        {status !== 'working' && <StatusPill mark={status} />}
         <IconButton icon="search" label="Find in thread" />
         <IconButton icon="more" label="More" />
         <IconButton icon="panel" label="Panel" pressed />
       </div>
     </div>
+  );
+}
+
+/** The members' avatars at the header's right, running ones ringed: the only sign in the header of who is working. */
+export function HeadFaces({ ids, running = [] }: { ids: AgentId[]; running?: AgentId[] }) {
+  const said = running.length ? `${running.map((id) => AGENTS[id].name).join(' and ')} working` : 'No one working';
+  return (
+    <span className="mr-1 flex items-center" title={said} aria-label={said}>
+      <Facepile ids={ids} size={22} ring={running} />
+    </span>
   );
 }
 
@@ -379,13 +390,12 @@ export const QuickCaption = ({ children }: { children: ReactNode }) => <div clas
 export { DIVIDER };
 
 /** The quick card's usual top rows: machine and folder. */
-export function QuickTop() {
+/** `empty`: a remote-led thread before a local member works there. Same rows, nothing in them (Ben, 2026-11-20). */
+export function QuickTop({ empty }: { empty?: boolean }) {
   return (
     <>
-      <QuickRow icon="monitor">omarchy</QuickRow>
-      <QuickRow icon="folder">
-        <span className="min-w-0 truncate font-mono text-[11.5px]">~/omni-os/data/worktrees/9a1c0e52</span>
-      </QuickRow>
+      <QuickRow icon="monitor">{empty ? null : 'omarchy'}</QuickRow>
+      <QuickRow icon="folder">{empty ? null : <span className="min-w-0 truncate font-mono text-[11.5px]">~/omni-os/data/worktrees/9a1c0e52</span>}</QuickRow>
       <QuickDivider />
       <QuickRow icon="user">
         <span className="shrink-0 text-fg-3">Owner</span>
@@ -395,6 +405,7 @@ export function QuickTop() {
   );
 }
 
+/** `branch`: null says "No branch"; an empty string leaves the row empty, as a remote-led thread's is. */
 export function QuickBottom({ status = 'Working · 2 agents', branch = 'omni/9a1c0e52' }: { status?: string; branch?: string | null }) {
   return (
     <>
@@ -402,7 +413,7 @@ export function QuickBottom({ status = 'Working · 2 agents', branch = 'omni/9a1
         <span className="truncate">{status}</span>
       </QuickRow>
       <QuickRow icon="branch">
-        {branch ? <span className="min-w-0 truncate font-mono text-[11.5px]">{branch}</span> : <span className="text-fg-3">No branch</span>}
+        {branch ? <span className="min-w-0 truncate font-mono text-[11.5px]">{branch}</span> : branch === null ? <span className="text-fg-3">No branch</span> : null}
       </QuickRow>
       <div className={DIVIDER}>
         <QuickRow icon="sidebar" chevron>

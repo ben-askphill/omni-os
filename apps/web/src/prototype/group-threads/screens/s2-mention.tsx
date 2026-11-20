@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react';
 import { AGENTS, CHANNELS, GROUP, THREAD, type AgentId, type Msg } from '../data.ts';
 import { Messages } from '../messages.tsx';
-import { AgentAvatar, ComposerBox, DesktopThread, MENU, MachinePill, MentionPill, PhoneComposer, PhoneThread, RemoteTag, RunPill, ThreadHead } from '../parts.tsx';
+import { AgentAvatar, ComposerBox, DesktopThread, HeadFaces, MENU, MachinePill, MentionPill, PhoneComposer, PhoneThread, RemoteTag, RunPill, ThreadHead } from '../parts.tsx';
 import { Icon, StatusDot } from '../../../components/ui.tsx';
 import { useParams } from '../url-state.ts';
 import type { Screen } from './types.ts';
@@ -110,7 +110,7 @@ function DesktopA() {
   const closed = useClosed();
   return (
     <DesktopThread
-      head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} />}
+      head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} right={<HeadFaces ids={['builder', 'reviewer', 'hermes']} running={['reviewer', 'hermes']} />} />}
       composer={
         <ComposerBox text={closed ? picked : typed} menu={closed ? null : <MixedMenu />} hint={closed ? HINT_PICKED : null}>
           <RunPill label="Builder · Opus 5.5" />

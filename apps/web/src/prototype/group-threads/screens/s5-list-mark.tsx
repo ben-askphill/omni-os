@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 import type { Mark } from '@omni/shared/status.ts';
 import { AGENTS, CHANNELS, GROUP, THREAD, type AgentId } from '../data.ts';
 import { Messages } from '../messages.tsx';
-import { AgentAvatar, ComposerBox, DesktopThread, Facepile, RunPill, ThreadHead } from '../parts.tsx';
+import { AgentAvatar, ComposerBox, DesktopThread, Facepile, HeadFaces, RunPill, ThreadHead } from '../parts.tsx';
 import { Icon, IconButton, StatusDot } from '../../../components/ui.tsx';
 import { MoHeader, MoRound } from '../../../mobile/parts.tsx';
 import type { Screen } from './types.ts';
@@ -22,6 +22,8 @@ interface Row {
   running: AgentId[];
   /** The agent that waits on Ben, when one does. */
   asks?: AgentId;
+  /** An agent whose turn failed while others still work: the mark keeps the working faces, the row gets a red dot. */
+  failed?: AgentId;
   lead: AgentId;
   time: string;
   active?: boolean;
@@ -30,6 +32,7 @@ interface Row {
 const ROWS: Row[] = [
   { title: THREAD.title, mark: 'working', running: ['builder', 'designer'], lead: 'builder', time: '12:20', active: true },
   { title: 'Inbox first paint on the phone', mark: 'question', running: ['designer'], asks: 'builder', lead: 'builder', time: '11:58' },
+  { title: 'Machine tiles on the dashboard', mark: 'failed', running: ['builder'], failed: 'designer', lead: 'builder', time: '11:52' },
   { title: 'Release notes for 0.1.44', mark: 'question', running: [], asks: 'writer', lead: 'writer', time: '11:40' },
   { title: 'Terms for the Restage pilot', mark: 'working', running: ['nomos', 'researcher', 'reviewer', 'writer'], lead: 'nomos', time: '11:12' },
   { title: 'Sync errors on the VPS last week', mark: 'done', running: [], lead: 'hermes', time: '10:30' },
@@ -43,7 +46,12 @@ const names = (ids: AgentId[]) => (ids.length <= 2 ? ids.map((i) => AGENTS[i].na
 
 /** What the row says in words, for its tooltip and for screen readers, whatever it draws. */
 const said = (r: Row) =>
-  [r.asks ? `${AGENTS[r.asks].name} needs you` : null, r.running.length ? `${names(r.running)} working` : null, !r.asks && !r.running.length ? (r.mark === 'failed' ? 'Failed' : 'Done') : null]
+  [
+    r.asks ? `${AGENTS[r.asks].name} needs you` : null,
+    r.running.length ? `${names(r.running)} working` : null,
+    r.failed ? `${AGENTS[r.failed].name} failed` : null,
+    !r.asks && !r.running.length ? (r.mark === 'failed' ? 'Failed' : 'Done') : null,
+  ]
     .filter(Boolean)
     .join(', ');
 
@@ -129,8 +137,17 @@ function DesktopRow({ r, kind }: { r: Row; kind: Kind }) {
       )}
       <span className="min-w-0 flex-1 truncate">{r.title}</span>
       {kind === 'pile' && r.running.length > 0 && <Facepile ids={r.running} size={16} max={2} />}
+      {kind === 'face' && r.failed && <FailDot id={r.failed} />}
     </a>
   );
+}
+
+/**
+ * A failure beside agents still working (Ben, 2026-11-20): Failed outranks Working in the order, not in the mark, so the
+ * mark keeps the working faces and the row carries a red dot.
+ */
+function FailDot({ id }: { id: AgentId }) {
+  return <span title={`${AGENTS[id].name} failed`} className="h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--needs)]" />;
 }
 
 /** C's second line: who asks Ben, then who works, in faces and words. */
@@ -148,6 +165,13 @@ function SecondLine({ r, size, phone }: { r: Row; size: number; phone?: boolean 
         <>
           <Facepile ids={r.running} size={size} max={3} ring={r.running} />
           <span className="truncate">{r.running.length > 2 ? `${r.running.length} working` : `${names(r.running)} working`}</span>
+          {r.failed && (
+            <>
+              <span>·</span>
+              <FailDot id={r.failed} />
+              <span className="shrink-0 text-fg-2">{AGENTS[r.failed].name} failed</span>
+            </>
+          )}
         </>
       ) : (
         !r.asks && (
@@ -190,7 +214,7 @@ const desktop = (kind: Kind) => () => (
     <Panel kind={kind} />
     <div className="min-w-0 flex-1">
       <DesktopThread
-        head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} />}
+        head={<ThreadHead channel={CHANNELS.omni} title={THREAD.title} right={<HeadFaces ids={['builder', 'reviewer', 'hermes']} running={['reviewer', 'hermes']} />} />}
         composer={
           <ComposerBox>
             <RunPill label="Builder · Opus 5.5" />
@@ -214,7 +238,8 @@ function PhoneRow({ r, kind, last }: { r: Row; kind: Kind; last?: boolean }) {
       <span className="relative grid h-9 w-9 shrink-0 place-items-center">
         <AgentAvatar a={lead} size={36} />
         <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-          <StatusDot mark={r.mark} size={8} />
+          {/* A failure beside a working agent ranks first in the order, not in the mark: the dot stays Working. */}
+          <StatusDot mark={r.failed && r.running.length ? 'working' : r.mark} size={8} />
         </span>
       </span>
     );
@@ -242,7 +267,7 @@ function PhoneRow({ r, kind, last }: { r: Row; kind: Kind; last?: boolean }) {
 
 const phone = (kind: Kind) => () => (
   <div className="flex h-full flex-col bg-bg">
-    <MoHeader onBack={() => {}} title="Omni OS" sub="7 threads · 3 at work" right={<MoRound icon="plus" label="New thread" ink />} />
+    <MoHeader onBack={() => {}} title="Omni OS" sub="8 threads · 4 at work" right={<MoRound icon="plus" label="New thread" ink />} />
     <div className="mo-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-10">
       <div className="flex flex-col">
         {ROWS.map((r, i) => (

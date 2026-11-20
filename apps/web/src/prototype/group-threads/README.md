@@ -49,16 +49,15 @@ Ben answered the plan's open questions on PR #895. The screens draw the answers 
 
 - **Initials.** Two letters, unique across agents: Researcher RS, Reviewer RV (`INITIALS` in `parts.tsx`; `monograms()` would give RE and RV). Below 18px the disc is its color only.
 - **Joining.** A quiet "Reviewer and Hermes joined" line under the message that seated them (`Msg.joined`, `JoinedLine`).
-- **Pills.** An agent pill carries the agent's avatar in its own color: an image's main color tints it, an initials disc's pale swatch fills it. A machine pill keeps today's blue and a device icon (screen 2). Omni's code maps `--accent` to `--live`, so "the accent color" could also mean the same blue as machine pills; the prototype reads it as the agent's own color.
+- **Pills.** An agent pill carries the agent's avatar in its own color (Ben confirmed): an image's main color tints it, an initials disc's pale swatch fills it. A machine pill keeps today's blue and a device icon (screen 2).
 - **Placeholder and hint.** With no `@`, the placeholder names the lead ("Reply to Builder") on desktop and phone. The "Goes to Designer only" hint shows once an agent is named.
 - **Stop.** One **Stop all** in the composer while agents run; the lanes lost their own Stop (screen 4).
 - **Collision flag.** Folder and file (`ui/status.tsx`), the full path on hover.
 - **Connect.** **Add remote agent** next to **New agent**, above the agent list (screen 7). The In threads card names the new channel switch.
+- **Header (Q54).** The members' avatars are the header's only sign of who works: running ones get a ring, and the Working label is gone (screens 2 to 5).
+- **Failed beside working (Q68).** A row where one agent failed while another works keeps the working face as its mark and adds a red dot at the row's end; on the phone the second line says "Designer failed" with the dot (screen 5).
+- **Remote-led details panel (Q57).** The same rows as a local thread's quick card; machine, folder and branch show empty (screen 6).
 
 ## UI questions the prototype raised
 
-These were Q48 to Q58 in the [group threads plan](../../../../../docs/plans/2026-11-20-group-threads.md) on PR #895. Ben answered all but two on 2026-11-20.
-
-- Still open: the header shows the member facepile and the Working pill side by side; which one says who is working (Q54)?
-- Still open: a remote-led thread has no machine, folder or branch for the quick card's top rows (Q57). The prototype shows the server and "No worktree until a local agent joins".
-- Answered: unique initials (Q48), color only below 18px (Q49), when the hint shows (Q50), the model picker changes only the lead's model (Q51), the join line (Q52), pill colors (Q53), lanes stay in the history (Q55), folder and file in the flag (Q56), where Connect lives (Q58).
+These were Q48 to Q58 in the [group threads plan](../../../../../docs/plans/2026-11-20-group-threads.md) on PR #895. Ben answered all of them on 2026-11-20, and Q59 to Q68 after them. The plan's section 5 has each answer.

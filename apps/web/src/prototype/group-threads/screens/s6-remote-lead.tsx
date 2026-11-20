@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import { AGENTS, CHANNELS, REMOTE_THREAD, type Msg } from '../data.ts';
 import { Messages } from '../messages.tsx';
-import { AgentAvatar, ComposerBox, DesktopThread, PhoneComposer, PhoneThread, QuickBottom, QuickCard, QuickDivider, QuickRow, RemoteTag, TechRow, ThreadHead } from '../parts.tsx';
+import { AgentAvatar, ComposerBox, DesktopThread, PhoneComposer, PhoneThread, QuickBottom, QuickCard, QuickRow, QuickTop, RemoteTag, TechRow, ThreadHead } from '../parts.tsx';
 import { Button, Icon } from '../../../components/ui.tsx';
 import { useParams } from '../url-state.ts';
 import type { Screen } from './types.ts';
@@ -98,17 +98,12 @@ const phoneA = () => (
   </PhoneThread>
 );
 
+/** The same rows a local thread's quick card has (Ben, 2026-11-20); machine, folder and branch stay empty here. */
 function QuickRemote() {
   const read = useRead();
   return (
     <QuickCard>
-      <QuickRow icon="globe">
-        <span className="truncate">Hermes’s server</span>
-      </QuickRow>
-      <QuickRow icon="folder">
-        <span className="truncate text-fg-3">No worktree until a local agent joins</span>
-      </QuickRow>
-      <QuickDivider />
+      <QuickTop empty />
       <QuickRow icon="delegate">
         <span className="shrink-0 text-fg-3">Lead</span>
         <AgentAvatar a={AGENTS.hermes} size={18} />
@@ -120,7 +115,7 @@ function QuickRemote() {
         <span className="truncate">{read ? 'Can read, can’t change' : 'Can’t read or change'}</span>
       </QuickRow>
       <TechRow id="hermes" />
-      <QuickBottom status="Done · Hermes" branch={null} />
+      <QuickBottom status="Done · Hermes" branch="" />
     </QuickCard>
   );
 }
