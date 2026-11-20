@@ -73,6 +73,7 @@ module.exports = {
     x64ArchFiles: 'Contents/Resources/omni/node_modules/**',
     ...signing,
   },
+  // A release's DMG is made by scripts/mac-release-package.ts with resources/dmg/DS_Store, which holds these same places.
   dmg: {
     contents: [
       { x: 140, y: 190, type: 'file' },

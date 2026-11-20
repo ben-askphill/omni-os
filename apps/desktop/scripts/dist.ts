@@ -6,7 +6,7 @@
 //
 //   --dir         the unpacked app only (release/mac-<arch>/Omni.app, release/linux-unpacked), no DMG or AppImage
 //   --prepackaged packs an app built and signed before into the DMG, zip, AppImage and update feed, and builds
-//                 nothing. The release workflow packs its signed Mac app this way
+//                 nothing. The release workflow packs its signed Mac app with scripts/mac-release-package.ts instead
 //   --skip-web    use apps/web/dist as it is
 //   --host-glibc  a Linux build that only has to run on this machine (stage.ts)
 //   --native      required (the default) or off: whether the Rust binaries go in (stage.ts)
