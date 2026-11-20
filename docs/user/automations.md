@@ -101,7 +101,7 @@ An automation names the accounts it reads with `connectors:`:
 connectors: [slack, calendar]   # gmail, calendar, slack, notion, drive, granola
 ```
 
-An agent names them the same way in its frontmatter. A brief that names one ("check my Slack") counts too. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
+An agent names them the same way in its frontmatter. A brief that asks to use one counts too ("check my Slack", "post the summary to Slack", "add a task to the Notion tracker"). A brief that only mentions one does not: one about how you write Slack replies starts with Slack signed out, and so does anything inside code, quoted lines or quoted strings. Accounts the check does not know (Figma, Vercel, Expo and other claude.ai connectors) never hold a thread. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
 
 ## Choose a machine
 
