@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   blankCrewDraft,
   CHANGED_CHARTER_ACTIONS,
@@ -17,29 +17,34 @@ import {
 } from '@omni/shared/crew-settings.ts';
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
-import { CrewAvatar } from '../components/CrewAvatar.tsx';
+import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
+import { AVATAR_UPLOAD_MAX_BYTES } from '@omni/shared/agent-avatar.ts';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
-import { useApp } from '../store.tsx';
+import { useApp, useIsMobile } from '../store.tsx';
+import { href, navigate } from '../router.ts';
+import { squareAvatar } from '../agent-avatar-upload.ts';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 import { remoteRoleNote } from '@omni/shared/crew-settings.ts';
 import { Card, LockNote } from './settings-parts.tsx';
 
-// Settings > Crew: every crew role this machine has, hidden ones included, and an editor for each (plan slice S3,
-// docs/plans/2026-11-18-user-defined-crew.md). Saves go to /api/crew (apps/server/crew-api.ts): a role of your own is
-// its whole file in data/crew/, an edit of a built-in is an overlay that adds to its charter or replaces it. The
-// editor's Memory tab holds the role's lessons (slice S6, components/RoleMemory.tsx), which save one by one. The same
-// page is the phone's Settings section and the desktop app's.
+// Settings > Agents: every agent this machine has, hidden ones included. Each opens as a page of its own
+// (`#/settings/crew/<id>`, group threads slice 1): its avatar on top, an Avatar card that uploads an image, and the
+// editor (plan slice S3, docs/plans/2026-11-18-user-defined-crew.md). New agent opens the editor in a dialog. Saves go
+// to /api/crew (apps/server/crew-api.ts): a role of your own is its whole file in data/crew/, an edit of a built-in is
+// an overlay that adds to its charter or replaces it. The editor's Memory tab holds the role's lessons (slice S6,
+// components/RoleMemory.tsx), which save one by one. The same page is the phone's Settings section and the desktop app's.
 
 type CrewDetail = CrewDetailView<CrewRole>;
 
-export function CrewSection() {
+/** The list of agents, or one agent's page when `agent` names one. */
+export function CrewSection({ agent }: { agent?: string } = {}) {
   const { subscribe } = useApp();
   const roles = useApi<CrewRole[]>('/crew?all=1');
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');
-  const [editing, setEditing] = useState<{ id: string | null } | null>(null);
+  const [creating, setCreating] = useState(false);
   const reload = roles.reload;
   // A save here, by the Conductor or on another machine, or a lesson proposed or settled (the waiting counts).
   useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect' || (e.type === 'memory' && !!e.role)) && reload()), [subscribe, reload]);
@@ -49,6 +54,8 @@ export function CrewSection() {
     model: (h: string, id: string) => harnesses.data?.find((x) => x.id === h)?.models.find((m) => m.id === id)?.label,
   };
 
+  if (agent) return <AgentPage key={agent} id={agent} roles={roles.data} onSaved={reload} />;
+
   return (
     <>
       <Card
@@ -56,7 +63,7 @@ export function CrewSection() {
         title="Agents"
         subtitle="A thread started as an agent runs with its charter. The Conductor hands work to the ones it may delegate to."
         actions={
-          <Button size="sm" icon="plus" onClick={() => setEditing({ id: null })}>
+          <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
             New agent
           </Button>
         }
@@ -69,9 +76,9 @@ export function CrewSection() {
           <ul className="-mx-1 divide-y divide-line" aria-label="Agents">
             {roles.data.map((r) => (
               <li key={r.id}>
-                <button type="button" onClick={() => setEditing({ id: r.id })} className="hov group flex w-full min-w-0 items-start gap-3 rounded-[14px] px-1 py-2.5 text-left [--hov:var(--surface-2)]">
+                <a href={href.agent(r.id)} className="hov group flex w-full min-w-0 items-start gap-3 rounded-[14px] px-1 py-2.5 text-left [--hov:var(--surface-2)]">
                   <span className={r.hidden ? 'opacity-50' : undefined}>
-                    <CrewAvatar role={r} size={30} />
+                    <AgentAvatar agent={r} size={30} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -88,15 +95,150 @@ export function CrewSection() {
                     </span>
                   </span>
                   <Icon name="chevronRight" size={14} className="mt-1 shrink-0 text-fg-3" />
-                </button>
+                </a>
               </li>
             ))}
           </ul>
         )}
         <p className="text-[12.5px] text-fg-3">Yours live in data/crew/ and sync to your other machines. Hiding a built-in is for this machine only.</p>
       </Card>
-      <CrewEditor target={editing} roles={roles.data} onClose={() => setEditing(null)} onOpen={(id) => setEditing({ id })} onSaved={reload} />
+      <Modal open={creating} onClose={() => setCreating(false)} title="New agent" roomy dismiss="confirm">
+        {creating && (
+          <EditorBody
+            id={null}
+            waiting={0}
+            view="edit"
+            setView={() => {}}
+            onClose={() => setCreating(false)}
+            onOpen={(id) => navigate(href.agent(id))}
+            onSaved={reload}
+          />
+        )}
+      </Modal>
     </>
+  );
+}
+
+/**
+ * One agent as a page (ADR 0019, How it looks): its avatar, name and description on top, the Avatar card, then the
+ * editor. A save keeps the page open and reads the agent again; Cancel and Delete go back to the list.
+ */
+function AgentPage({ id, roles, onSaved }: { id: string; roles: CrewRole[] | undefined; onSaved: () => void }) {
+  const { crew } = useApp();
+  const phone = useIsMobile();
+  const [view, setView] = useState<View>('edit');
+  // Each save opens the editor again on the agent as saved.
+  const [round, setRound] = useState(0);
+  const listed = roles?.find((r) => r.id === id) ?? crew.find((r) => r.id === id);
+  const back = () => navigate(href.settingsSection('crew'));
+  const saved = () => {
+    onSaved();
+    setView('edit');
+    setRound((n) => n + 1);
+  };
+  if (roles && !listed)
+    return (
+      <div className="space-y-3 pt-6">
+        <ErrorNote>No agent "{id}" on this machine.</ErrorNote>
+        <Button size="sm" icon="chevronLeft" onClick={back}>
+          Agents
+        </Button>
+      </div>
+    );
+  const name = listed?.name ?? id;
+  return (
+    <div className="space-y-5 pt-6 pb-16 md:pt-10">
+      <a href={href.settingsSection('crew')} className="inline-flex items-center gap-1 text-[12.5px] text-fg-3 hover:text-fg max-md:hidden">
+        <Icon name="chevronLeft" size={12} /> Agents
+      </a>
+      <header className={phone ? 'flex flex-col items-center gap-2 text-center' : 'flex items-center gap-4'}>
+        {listed ? <AgentAvatar agent={listed} size={phone ? 88 : 72} /> : <span className="rounded-full bg-surface-2" style={{ width: phone ? 88 : 72, height: phone ? 88 : 72 }} />}
+        <div className="min-w-0">
+          <h1 className={`font-display leading-tight font-semibold ${phone ? 'text-[22px]' : 'text-[26px]'}`}>{name}</h1>
+          {listed?.description && <p className="mt-1 text-[13px] text-fg-3">{listed.description}</p>}
+        </div>
+      </header>
+      {listed && <AvatarCard agent={listed} onSaved={saved} />}
+      <Card title={view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : 'Agent'} subtitle={view === 'edit' ? 'Its name, charter, run defaults, powers and memory.' : undefined}>
+        <EditorBody
+          key={`${id}:${round}`}
+          id={id}
+          page
+          waiting={listed?.memoryWaiting ?? 0}
+          view={view}
+          setView={setView}
+          onClose={back}
+          onOpen={(to) => navigate(href.agent(to))}
+          onSaved={saved}
+        />
+      </Card>
+    </div>
+  );
+}
+
+/** Where an agent's face comes from, in a line under it. */
+function avatarSource(agent: CrewRole) {
+  if (agent.avatar?.image) return 'An image you uploaded. It syncs to your other machines with the agent.';
+  if (agent.avatar?.icon) return 'Its icon, on its color. An uploaded image takes its place.';
+  if (agent.kind !== 'own' && !agent.avatar?.bg && ['conductor', 'researcher', 'builder', 'store-ops', 'inbox'].includes(agent.id)) return 'Its built-in mark. An uploaded image takes its place.';
+  return 'No image yet: its initials, on a color from its id.';
+}
+
+/**
+ * The Avatar card: the agent's face, where it comes from, and Upload or Remove image. A picked file is cropped square
+ * from its center and scaled to 256px here (agent-avatar-upload.ts), then saved at once (PUT /api/crew/:id/avatar).
+ * The icon and color stay in the editor's form, as the look an agent shows without an image.
+ */
+function AvatarCard({ agent, onSaved }: { agent: CrewRole; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const put = async (image: () => Promise<string | null>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.put(`/crew/${encodeURIComponent(agent.id)}/avatar`, { image: await image() });
+      onSaved();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card entry="agent-avatar" title="Avatar" subtitle={`Shown on every message ${agent.name} writes.`}>
+      <div className="flex flex-wrap items-center gap-4">
+        <AgentAvatar agent={agent} size={60} />
+        <div className="min-w-0 flex-1 basis-48">
+          <div className="text-[12.5px] text-fg-3">{avatarSource(agent)}</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" icon="image" busy={busy} onClick={() => input.current?.click()}>
+              {agent.avatar?.image ? 'Replace image' : 'Upload image'}
+            </Button>
+            {agent.avatar?.image && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => void put(async () => null)}>
+                Remove image
+              </Button>
+            )}
+          </div>
+          <div className="mt-1.5 text-[11.5px] text-fg-3">PNG, JPEG or WebP up to {AVATAR_UPLOAD_MAX_BYTES / 1024 / 1024} MB. Omni crops it square from the center.</div>
+          <input
+            ref={input}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            aria-label={`Upload an avatar for ${agent.name}`}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void put(() => squareAvatar(file));
+            }}
+          />
+        </div>
+      </div>
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
   );
 }
 
@@ -113,36 +255,6 @@ function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtIn
 }
 
 type View = 'edit' | 'compare' | 'duplicate';
-
-function CrewEditor({
-  target,
-  roles,
-  onClose,
-  onOpen,
-  onSaved,
-}: {
-  target: { id: string | null } | null;
-  roles: CrewRole[] | undefined;
-  onClose: () => void;
-  onOpen: (id: string) => void;
-  onSaved: () => void;
-}) {
-  const { crew } = useApp();
-  const [view, setView] = useState<View>('edit');
-  const id = target?.id ?? null;
-  // Each role opens on its form.
-  useEffect(() => setView('edit'), [id]);
-  // Settings' list has hidden roles too; the app's crew list, which pickers use, leaves them out.
-  const name = id ? ((roles ?? crew).find((r) => r.id === id)?.name ?? crew.find((r) => r.id === id)?.name ?? id) : null;
-  const title = !id ? 'New agent' : view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : `Edit ${name}`;
-  // From the list, which reloads when a lesson is proposed or decided anywhere.
-  const waiting = (id && roles?.find((r) => r.id === id)?.memoryWaiting) || 0;
-  return (
-    <Modal open={!!target} onClose={onClose} title={title} roomy dismiss="confirm">
-      {target && <EditorBody key={id ?? '+new'} id={id} waiting={waiting} view={view} setView={setView} onClose={onClose} onOpen={onOpen} onSaved={onSaved} />}
-    </Modal>
-  );
-}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -178,8 +290,14 @@ function Switch({ label, hint, checked, onChange, locked }: { label: string; hin
   );
 }
 
+/** A dialog's footer, or on the agent page a row of its own under the form. */
+function Footer({ page, children }: { page?: boolean; children: ReactNode }) {
+  return page ? <div className="flex items-center justify-end gap-2 border-t border-line pt-4">{children}</div> : <ModalFooter>{children}</ModalFooter>;
+}
+
 function EditorBody({
   id,
+  page,
   waiting,
   view,
   setView,
@@ -188,6 +306,8 @@ function EditorBody({
   onSaved,
 }: {
   id: string | null;
+  /** On the agent page, not in a dialog: a save stays (`onSaved` opens it again on the saved agent), Cancel goes back. */
+  page?: boolean;
   /** Lessons its threads proposed that wait for the user: the Memory tab's count. */
   waiting: number;
   view: View;
@@ -267,10 +387,11 @@ function EditorBody({
       setBusy(false);
     }
   };
-  const act = async (fn: () => Promise<unknown>, close = true) => {
+  // On the page a save stays and reads the agent again (onSaved); a delete leaves it.
+  const act = async (fn: () => Promise<unknown>, close = true, leave = false) => {
     if (!(await work(fn))) return;
     onSaved();
-    if (close) onClose();
+    if (close && (!page || leave)) onClose();
   };
 
   // The file a save would write, nothing written (POST /api/crew/draft): how the two tabs turn into each other.
@@ -302,19 +423,26 @@ function EditorBody({
     if (!draft || problem) return;
     void act(async () => {
       const body = mode === 'markdown' ? { markdown } : base ? { markdown: (await drafted(crewSaveBody(draft, base.detail), base.own)).markdown } : crewSaveBody(draft, d);
-      await (id ? api.put(`/crew/${encodeURIComponent(id)}`, body) : api.post('/crew', { id: theId, ...body }));
+      if (id) await api.put(`/crew/${encodeURIComponent(id)}`, body);
+      else {
+        await api.post('/crew', { id: theId, ...body });
+        // A new agent opens on its page, where its avatar is uploaded.
+        onOpen(theId);
+      }
     });
   };
   const path = (p = '') => `/crew/${encodeURIComponent(id ?? '')}${p}`;
 
-  if (detail.error) return <div className="px-6 pb-6"><ErrorNote onRetry={detail.reload}>{detail.error}</ErrorNote></div>;
-  if (!draft) return <div className="px-6 pb-6"><Loading /></div>;
+  const pad = page ? '' : 'px-6 pb-6';
+  if (detail.error) return <div className={pad}><ErrorNote onRetry={detail.reload}>{detail.error}</ErrorNote></div>;
+  if (!draft) return <div className={pad}><Loading /></div>;
 
-  if (view === 'compare' && d) return <CompareView detail={d} busy={busy} error={error} onBack={() => setView('edit')} onPick={(body) => void act(() => api.put(path(), body))} />;
+  if (view === 'compare' && d) return <CompareView detail={d} page={page} busy={busy} error={error} onBack={() => setView('edit')} onPick={(body) => void act(() => api.put(path(), body))} />;
   if (view === 'duplicate' && d)
     return (
       <DuplicateView
         from={d.role}
+        page={page}
         busy={busy}
         error={error}
         onBack={() => setView('edit')}
@@ -327,7 +455,7 @@ function EditorBody({
 
   return (
     <form onSubmit={save} autoComplete="off">
-      <div className="space-y-5 px-6 pb-5">
+      <div className={page ? 'space-y-5 pb-5' : 'space-y-5 px-6 pb-5'}>
         {role && (
           <div className="flex flex-wrap items-center gap-2">
             <RoleChips role={role} />
@@ -356,7 +484,7 @@ function EditorBody({
                 {can.edited && (
                   <InlineConfirm label="Reset to built-in" icon="undo" confirmLabel="Reset" busyLabel="Resetting" onConfirm={() => act(() => api.post(path('/reset')))} />
                 )}
-                {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete agent" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()))} />}
+                {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete agent" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()), true, true)} />}
               </div>
             )}
             {refusedActions.duplicate && <LockNote>{refusedActions.duplicate}</LockNote>}
@@ -415,7 +543,7 @@ function EditorBody({
               <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick an agent for a task.">
                 <textarea id="crew-desc" aria-describedby={fieldHintId('crew-desc')} className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
               </Field>
-              <Field label="Avatar" hint={builtIn ? 'Without one, the built-in mark.' : 'Without one, its initials.'}>
+              <Field label="Icon" hint={`Shown when there is no uploaded image. ${builtIn ? 'Without one, the built-in mark.' : 'Without one, its initials.'}`}>
                 <IconPicker
                   inputId="crew-icon"
                   svg={false}
@@ -423,10 +551,10 @@ function EditorBody({
                   name={draft.name || theId || 'Agent'}
                   avatarBg={draft.bg}
                   onChange={(v) => set('icon', v)}
-                  preview={<CrewAvatar role={{ id: theId, name: draft.name || theId || 'Agent', avatar: draft.icon || draft.bg ? { icon: draft.icon || undefined, bg: draft.bg || undefined } : undefined }} size={36} />}
+                  preview={<AgentAvatar agent={{ id: theId, name: draft.name || theId || 'Agent', avatar: draft.icon || draft.bg ? { icon: draft.icon || undefined, bg: draft.bg || undefined } : undefined }} size={36} />}
                 />
               </Field>
-              <Field label="Avatar background">
+              <Field label="Icon background">
                 <AvatarColorPicker icon={draft.icon} name={draft.name || theId || 'Agent'} value={draft.bg} manual={!!draft.bg} onChange={(v) => set('bg', v)} onAuto={() => set('bg', '')} />
               </Field>
             </Section>
@@ -536,27 +664,27 @@ function EditorBody({
         )}
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
-      <ModalFooter>
+      <Footer page={page}>
         <Button variant="ghost" onClick={onClose} disabled={busy}>
           Cancel
         </Button>
         <Button type="submit" variant="primary" busy={busy} disabled={!!problem} title={problem ?? undefined}>
           {id ? 'Save' : 'Create'}
         </Button>
-      </ModalFooter>
+      </Footer>
     </form>
   );
 }
 
 /** A built-in's charter beside the one this role runs with, and the three ways out of a changed built-in. */
-function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDetail; busy: boolean; error: string | null; onBack: () => void; onPick: (body: object) => void }) {
+function CompareView({ detail, page, busy, error, onBack, onPick }: { detail: CrewDetail; page?: boolean; busy: boolean; error: string | null; onBack: () => void; onPick: (body: object) => void }) {
   const rows = lineDiff(detail.charters.builtIn ?? '', detail.charters.effective);
   const own = detail.charters.own ?? '';
   const changes = rows.filter((r) => r.kind !== 'same').length;
   const region = useScrollRegion<HTMLDivElement>('Built-in and your charter, line by line', 'both');
   return (
     <div>
-      <div className="space-y-3 px-6 pb-5">
+      <div className={page ? 'space-y-3 pb-5' : 'space-y-3 px-6 pb-5'}>
         <p className="text-[12.5px] text-fg-3">
           {detail.role.charterMode === 'append' ? 'The built-in charter, and what your additions put after it.' : 'The built-in charter, and the one you replaced it with.'} {changes ? `${changes} changed ${changes === 1 ? 'line' : 'lines'}.` : 'No difference.'}
         </p>
@@ -597,16 +725,16 @@ function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDeta
         )}
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
-      <ModalFooter>
+      <Footer page={page}>
         <Button variant="ghost" icon="chevronLeft" onClick={onBack} disabled={busy}>
           Back
         </Button>
-      </ModalFooter>
+      </Footer>
     </div>
   );
 }
 
-function DuplicateView({ from, busy, error, onBack, onDuplicate }: { from: CrewRole; busy: boolean; error: string | null; onBack: () => void; onDuplicate: (id: string, name: string) => void }) {
+function DuplicateView({ from, page, busy, error, onBack, onDuplicate }: { from: CrewRole; page?: boolean; busy: boolean; error: string | null; onBack: () => void; onDuplicate: (id: string, name: string) => void }) {
   const [name, setName] = useState(`${from.name} copy`);
   const [id, setId] = useState<string | null>(null);
   const theId = id ?? crewIdFrom(name);
@@ -617,7 +745,7 @@ function DuplicateView({ from, busy, error, onBack, onDuplicate }: { from: CrewR
         onDuplicate(theId, name.trim());
       }}
     >
-      <div className="space-y-4 px-6 pb-5">
+      <div className={page ? 'space-y-4 pb-5' : 'space-y-4 px-6 pb-5'}>
         <p className="text-[12.5px] text-fg-3">
           A new agent of your own with everything {from.name} has now: its fields and its whole charter.{from.kind !== 'own' && ' Unlike the built-in, it does not change with a release.'}
         </p>
@@ -629,14 +757,14 @@ function DuplicateView({ from, busy, error, onBack, onDuplicate }: { from: CrewR
         </Field>
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
-      <ModalFooter>
+      <Footer page={page}>
         <Button variant="ghost" icon="chevronLeft" onClick={onBack} disabled={busy}>
           Back
         </Button>
         <Button type="submit" variant="primary" busy={busy} disabled={!name.trim() || !theId}>
           Duplicate
         </Button>
-      </ModalFooter>
+      </Footer>
     </form>
   );
 }

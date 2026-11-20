@@ -5,6 +5,7 @@ import { glyphLabel, showsCode } from '@omni/shared/display.ts';
 import { useDisplay } from '../display.ts';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
+import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { OpenItemsCard } from '../components/thread/OpenItemsCard.tsx';
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
@@ -164,9 +165,24 @@ export function ThreadScreen() {
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
-  const sub = conductor
-    ? `Conductor · ${plural(crew.length, 'crew thread')}`
-    : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)].filter(Boolean).join(' · ');
+  // The agent it runs as, its lead, with its avatar beside its name.
+  const agentName = conductor ? null : crewRoleName(thread.role, roles);
+  const lead = agentName && thread.role ? (roles.find((r) => r.id === thread.role) ?? { id: thread.role, name: agentName }) : null;
+  const sub = conductor ? (
+    `Conductor · ${plural(crew.length, 'crew thread')}`
+  ) : (
+    <>
+      #{ch?.name ?? thread.channel_id}
+      {lead && agentName && (
+        <>
+          {' · '}
+          <AgentAvatar agent={{ ...lead, name: agentName }} size={14} className="inline-grid align-[-2px]" /> {agentName}
+        </>
+      )}
+      {' · '}
+      {ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)}
+    </>
+  );
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
@@ -174,7 +190,7 @@ export function ThreadScreen() {
   const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
   const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
-  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status, turn };
+  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, agents: roles, ch, changes, pr, now, shell, status, turn };
 
   const openFromCard = (tab: PanelTab) => {
     setQuick(false);

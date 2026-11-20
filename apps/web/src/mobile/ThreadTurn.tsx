@@ -1,5 +1,5 @@
 import { PHASE, type TurnPhase } from '@omni/shared/status.ts';
-import { Fragment, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, SwitchLine } from '../components/Transcript.tsx';
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
@@ -8,6 +8,8 @@ import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
+import { agentLook, type AgentLook } from '../components/AgentAvatar.tsx';
+import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
 import { Avatar } from '../components/ui.tsx';
 import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
@@ -27,6 +29,7 @@ import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
 import type { useShell, useThread } from './shell.tsx';
 import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
+import { isReply, replyAt } from '@omni/shared/transcript-fold.ts';
 
 /** A worktree thread's changes since its base, again whenever a turn starts or ends. */
 export function useBranchChanges(thread: Thread | null, busy: boolean) {
@@ -58,6 +61,8 @@ export type TurnCtx = {
   pr: ReturnType<typeof useThreadPR>[0];
   now: number;
   shell: ReturnType<typeof useShell>;
+  /** This machine's agents, for each reply's author line. */
+  agents: readonly AgentLook[];
   /** The running turn's latest status (`statusLabel`), null for the default. */
   status: string | null;
   /** What the running turn is doing (`turnPhase`), for the thinking line's dot. */
@@ -75,7 +80,7 @@ function askedOf(t: TurnView): { name: string; remote: string | null } | undefin
 }
 
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
-  const { conductor, conductorChannel, ch, thread, changes, pr, now, shell } = c;
+  const { conductor, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
     // Ben's Asks go above the card that shows the threads they started (packages/shared/ask.ts).
@@ -105,23 +110,11 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         </>
       );
     }
-    // The Conductor's answer introduces what it delegated, so it reads before the card, under its own name and face:
-    // the icon and background saved for it, else the Omni mark.
+    // A finished Conductor answer introduces what it delegated: its author line says who wrote it, with no outcome line.
     const quiet = conductor && t.status === 'done';
     return (
       <>
-        {quiet && (t.prose || delegated) ? (
-          <div className="flex items-center gap-2 text-[12.5px] leading-none text-fg-3">
-            {conductorChannel && hasOwnLook(conductorChannel) ? (
-              <Avatar name={conductorChannel.name} omni channelIcon={conductorChannel.icon} avatarBg={conductorChannel.avatar_bg} size={20} />
-            ) : (
-              <OmniMark size={20} />
-            )}
-            Conductor
-          </div>
-        ) : (
-          (t.result || t.error || t.status !== 'done') && <Outcome t={t} harness={t.harness} limit={last ? limitLabel(thread, now) : null} />
-        )}
+        {!quiet && (t.result || t.error || t.status !== 'done') && <Outcome t={t} harness={t.author ? null : t.harness} limit={last ? limitLabel(thread, now) : null} />}
         {t.error && <Clamped text={t.error} />}
         {t.cloud && <CloudAgentCard p={t.cloud} />}
         {/* Pages html_render showed go above the reply, as on desktop. */}
@@ -139,6 +132,33 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         {showsSteps(t.progress) && <MoSteps v={t.progress} failed={t.failed} onActions={() => steps(t)} />}
       </>
     );
+}
+
+/**
+ * The Conductor's face on its answers: the icon and background saved for its channel, else the Omni mark, unless Ben
+ * gave the Conductor agent an image or icon of its own.
+ */
+function conductorFace(c: TurnCtx, look: AgentLook) {
+  if (look.avatar?.image || look.avatar?.icon) return undefined;
+  const ch = c.conductorChannel;
+  return ch && hasOwnLook(ch) ? <Avatar name={ch.name} omni channelIcon={ch.icon} avatarBg={ch.avatar_bg} size={24} /> : <OmniMark size={24} />;
+}
+
+/**
+ * What the turn's agent wrote, under its author line (ADR 0019): its avatar in the gutter, its name and the time, and
+ * the reply indented beside the avatar. Turns are parted by Ben's messages, so each one opens a run of its own. A turn
+ * no agent wrote (a thread with no agent) shows as it always did.
+ */
+function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNode }) {
+  const look = t.author ? agentLook(t.author, c.agents) : null;
+  if (!look) return <>{children}</>;
+  const first = t.items.find(isReply);
+  return (
+    <div className="flex flex-col gap-2">
+      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={{ harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
+      <div className={`flex min-w-0 flex-col gap-4 ${REPLY_INDENT} empty:hidden`}>{children}</div>
+    </div>
+  );
 }
 
 /** One turn: the prompts that started it, what came back, and how it ended. */
@@ -183,10 +203,12 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     {t.reports.map((r, k) => (
       <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} remote={r.remote ? (r.harness_name ?? r.harness ?? '') : undefined} />
     ))}
-    {t.questions.map((q) => (
-      <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
-    ))}
-    <TurnBody t={t} last={last} c={c} />
+    <Reply t={t} c={c}>
+      {t.questions.map((q) => (
+        <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
+      ))}
+      <TurnBody t={t} last={last} c={c} />
+    </Reply>
     {t.switches.map((it) => (
       <SwitchLine key={it.key} it={it} running={thread.status === 'running'} />
     ))}

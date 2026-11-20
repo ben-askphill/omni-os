@@ -32,8 +32,9 @@ export type Route =
    * No section is the Settings hub: General on the desktop, the list of sections on a phone. `focus`: a search
    * result's entry (@omni/shared/settings-catalog.ts) to scroll to. `connect`: a pairing link that opens Models'
    * Connect an agent sheet filled in (`#/settings/models?connect=<link>`, or the desktop app's `#/connect-agent?...`).
+   * `agent`: one agent's page in Settings > Agents (`#/settings/crew/<id>`).
    */
-  | { name: 'settings'; section?: SettingsSection; focus?: string; connect?: string }
+  | { name: 'settings'; section?: SettingsSection; focus?: string; connect?: string; agent?: string }
   /** `source: 'claude'`: Ben's claude.ai Artifacts (components/ClaudeArtifacts.tsx) in place of the files threads made. */
   | { name: 'artifacts'; source?: 'claude' }
   /** Every channel's pull requests in one list: the phone's PRs tab, a Workspace page on the desktop. */
@@ -90,6 +91,7 @@ export function parseHash(hash: string): Route {
     const connect = section === 'models' ? q.get('connect') || undefined : undefined;
     if (section) return { name: 'settings', section, focus: q.get('focus') || undefined, ...(connect && { connect }) };
   }
+  if (a === 'settings' && b && c && !d && settingsSectionNamed(b) === 'crew') return { name: 'settings', section: 'crew', agent: c };
   // An omni://connect-agent link, as the desktop app opens it.
   if (a === CONNECT_ROUTE && !b) return { name: 'settings', section: 'models', connect: linkOfConnectPage(queryPart) };
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
@@ -224,6 +226,8 @@ export const href = {
   settingsPage: () => settingsHash(),
   /** One Settings section: General, Workspace, Machines or Secrets. */
   settingsSection: (section: SettingsSection, focus?: string) => settingsHash(section, focus),
+  /** One agent's page in Settings > Agents. */
+  agent: (id: string) => `${settingsHash('crew')}/${encodeURIComponent(id)}`,
   artifacts: () => '#/artifacts',
   /** The Claude Artifacts list on the Artifacts page. */
   claudeArtifacts: () => '#/artifacts/claude',

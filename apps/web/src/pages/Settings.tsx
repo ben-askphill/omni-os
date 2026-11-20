@@ -62,7 +62,8 @@ import { scrollBehavior } from '../motion.ts';
 // /api/setup: as you change them, except a form with a URL, which saves with Save changes so a half-typed address
 // never reaches the server.
 
-export function SettingsPage({ section, focus }: { section?: SettingsSection; focus?: string }) {
+/** `agent`: one agent's page in Agents (`#/settings/crew/<id>`), in place of the section's header and list. */
+export function SettingsPage({ section, focus, agent }: { section?: SettingsSection; focus?: string; agent?: string }) {
   // The desktop app's own section is no page in a browser or on a phone.
   const current = section && sectionShows(section, desktop !== null) ? section : 'general';
   const def = sectionDef(current);
@@ -72,8 +73,8 @@ export function SettingsPage({ section, focus }: { section?: SettingsSection; fo
   const route = useRoute();
   const connect = route.name === 'settings' && current === 'models' ? route.connect : undefined;
   useEffect(() => {
-    if (section && hash.split('?')[0] !== settingsHash(current)) navigate(connect ? connectPageHash(connect) : settingsHash(current, current === section ? focus : undefined), { replace: true });
-  }, [hash, section, current, focus, connect]);
+    if (section && !agent && hash.split('?')[0] !== settingsHash(current)) navigate(connect ? connectPageHash(connect) : settingsHash(current, current === section ? focus : undefined), { replace: true });
+  }, [hash, section, current, focus, connect, agent]);
   useFocus(current, focus);
   const layout = useLayout();
 
@@ -87,16 +88,24 @@ export function SettingsPage({ section, focus }: { section?: SettingsSection; fo
           </aside>
         )}
         <div className="min-w-0 max-w-2xl flex-1">
-          <PageHeader eyebrow={<span className="max-md:hidden">Settings</span>} title={def.title} subtitle={def.blurb}>
-            {def.scoped && (
-              <div className="mt-4">
-                <ScopeBar />
+          {agent && current === 'crew' ? (
+            <div className="px-4 md:px-8">
+              <CrewSection agent={agent} />
+            </div>
+          ) : (
+            <>
+              <PageHeader eyebrow={<span className="max-md:hidden">Settings</span>} title={def.title} subtitle={def.blurb}>
+                {def.scoped && (
+                  <div className="mt-4">
+                    <ScopeBar />
+                  </div>
+                )}
+              </PageHeader>
+              <div className="space-y-5 px-4 pt-2 pb-16 md:px-8">
+                <SectionBody section={current} />
               </div>
-            )}
-          </PageHeader>
-          <div className="space-y-5 px-4 pt-2 pb-16 md:px-8">
-            <SectionBody section={current} />
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

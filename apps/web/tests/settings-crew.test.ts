@@ -4,9 +4,9 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Channel, CrewRole } from '../src/api.ts';
 
-// Settings > Crew's editor: the Form and Markdown tabs are one draft, so an edit in either survives a switch to the
-// other and a save from it, and a key only the file has stays. Hide shows the role hidden at once. The Memory tab counts
-// the lessons that wait for you and adds one of yours.
+// Settings > Agents' agent page (`#/settings/crew/builder`): the editor's Form and Markdown tabs are one draft, so an
+// edit in either survives a switch to the other and a save from it, and a key only the file has stays. Hide shows the
+// role hidden at once. The Memory tab counts the lessons that wait for you and adds one of yours.
 
 const state = vi.hoisted(() => ({ channels: [] as Channel[], crew: [] as CrewRole[] }));
 vi.mock('../src/store.tsx', async (importOriginal) => ({
@@ -84,11 +84,8 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root.render(createElement(CrewSection)));
-  await flush();
-  // Open Builder's editor.
-  const row = [...host.querySelectorAll<HTMLButtonElement>('ul[aria-label="Agents"] button')].find((b) => b.textContent?.includes('Builder'))!;
-  await act(async () => row.click());
+  // Builder's page, as #/settings/crew/builder opens it.
+  await act(async () => root.render(createElement(CrewSection, { agent: 'builder' })));
   await flush();
 });
 
@@ -147,10 +144,9 @@ it('shows the role hidden once Hide is done, offering Show', async () => {
   expect(calls.some((c) => c.url === '/api/crew/builder/hidden' && c.body.hidden === true)).toBe(true);
   expect(button('Hide')).toBeUndefined();
   expect(button('Show')).toBeDefined();
-  const dialog = host.querySelector('dialog')!;
-  expect(dialog.textContent).toContain('Hidden');
-  // The title keeps the role's name, though the app's crew list no longer has it.
-  expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe('Edit Builder');
+  expect(host.textContent).toContain('Hidden');
+  // The page keeps the role's name, though the app's crew list no longer has it.
+  expect(host.querySelector('h1')?.textContent).toBe('Builder');
 });
 
 it("counts the lessons that wait on the Memory tab, and adds one of yours for every channel", async () => {

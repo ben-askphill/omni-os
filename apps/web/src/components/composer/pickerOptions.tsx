@@ -1,6 +1,7 @@
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { CHANNEL_KIND } from '../../format.ts';
-import { CrewMark, isCrewRole, StaticMark } from '../brand.tsx';
+import { StaticMark } from '../brand.tsx';
+import { AgentAvatar } from '../AgentAvatar.tsx';
 import type { PickerOption } from '../ui.tsx';
 import type { useApp } from '../../store.tsx';
 
@@ -19,8 +20,8 @@ export function channelAvatar(c: Channels[number]): Pick<PickerOption<string>, '
 /**
  * The new-thread composer's Channel and Role pickers: the channels still open (plus the one in use) and the crew. A role
  * the Conductor may not delegate to (usage-scan) is left out, as list_crew leaves it out; the Conductor stays, since
- * the composer attaches it in #conductor. Each role wears its avatar, as CrewAvatar draws it: its own look, else a
- * built-in's mark, else its initials.
+ * the composer attaches it in #conductor. Each role wears its avatar, as AgentAvatar draws it: its uploaded image, its
+ * icon, a built-in's mark, else its initials disc.
  */
 export function pickerOptions(visibleChannels: Channels, channel: string, crew: Crew) {
   const channelOptions: PickerOption<string>[] = visibleChannels.map((c) => ({
@@ -39,9 +40,7 @@ export function pickerOptions(visibleChannels: Channels, channel: string, crew: 
         label: r.name,
         sub: r.description,
         avatar: r.name,
-        channelIcon: r.avatar?.icon,
-        avatarBg: r.avatar?.bg,
-        lead: !r.avatar && isCrewRole(r.id) ? <CrewMark role={r.id} size={13} /> : undefined,
+        face: (size: number) => <AgentAvatar agent={r} size={size} />,
       })),
   ];
   return { channelOptions, roleOptions };

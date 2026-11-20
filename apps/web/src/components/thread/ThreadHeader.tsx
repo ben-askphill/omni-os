@@ -3,7 +3,8 @@ import type { Channel, ModStatus, Thread } from '../../api.ts';
 import { headerShowsRole } from '@omni/shared/crew-role.ts';
 import { ChannelStack } from '../ChannelStack.tsx';
 import { ContinueCrumbs } from '../ContinueLinks.tsx';
-import { CrewMark, harnessLabel, isCrewRole } from '../brand.tsx';
+import { harnessLabel } from '../brand.tsx';
+import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { threadAccountLabel, type ThreadAccount } from '@omni/shared/harness-accounts.ts';
 import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
@@ -24,11 +25,12 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
-/** The crew role the thread runs as, beside the crumbs: its mark when it has one, and its name. */
+/** The agent the thread runs as, its lead, beside the crumbs: its avatar and its name. */
 function RoleChip({ role, name }: { role: string; name: string }) {
+  const look = useAgent(role);
   return (
     <Chip className="ml-1 gap-1 font-normal" title={`Runs as ${name}`}>
-      {isCrewRole(role) && <CrewMark role={role} size={12} className="text-fg-3" />}
+      {look && <AgentAvatar agent={{ ...look, name }} size={14} />}
       <span data-role={role}>{name}</span>
     </Chip>
   );

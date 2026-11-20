@@ -23,6 +23,7 @@ import { CAPTION, CARD_PAD, DIVIDER, ROW } from './panel/inset.ts';
 import { NO_CREW_ROLE } from '@omni/shared/thread-owner.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { OwnerField } from './OwnerField.tsx';
+import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { markLabel, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../../display.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
@@ -154,6 +155,7 @@ export function ThreadQuickCard({
   const crew = useCrewRoles();
   // Who it is for and who does it, as separate rows (thread-owner.ts); the harness has its own row below.
   const agent = crewRoleName(thread.role, crew);
+  const look = useAgent(thread.role);
 
   return (
     <section
@@ -186,6 +188,7 @@ export function ThreadQuickCard({
       </QuickRow>
       <QuickRow icon="delegate">
         <span className="shrink-0 text-fg-3">Agent</span>
+        {look && agent && <AgentAvatar agent={{ ...look, name: agent }} size={18} />}
         <span className={`min-w-0 truncate ${agent ? '' : 'text-fg-3'}`}>{agent ?? NO_CREW_ROLE}</span>
       </QuickRow>
       <QuickRow icon="info" label={term('harnessAndModel', technical)}>

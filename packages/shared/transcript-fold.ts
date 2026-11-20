@@ -432,6 +432,9 @@ export const isReply = (it: Item): it is ReplyItem => REPLY.has(it.type);
 /** Rows between two replies that do not part them: how a turn ended, and a mod's log lines. */
 const QUIET = new Set<Item['type']>(['result', 'mod']);
 
+/** When a reply item was written, for its author line: a group of calls by its first call. A cloud run has no one time. */
+export const replyAt = (it: ReplyItem): string | null => (it.type === 'tools' ? (it.calls[0]?.at ?? null) : it.type === 'cloud' ? null : it.at);
+
 /** Who wrote a reply item: the agent its row names, else the thread's lead (rows from before Omni recorded it). */
 export const authorOf = (it: ReplyItem, lead: string | null | undefined) => it.agent ?? lead ?? null;
 

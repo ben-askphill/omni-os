@@ -7,9 +7,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { Channel, Thread } from '../src/api.ts';
 import type { TurnView } from '../src/mobile/ThreadCards.tsx';
 
-// The "Conductor" line over a finished Conductor answer on the phone. It names the Conductor as the turn's author, so
-// it wears the icon and background saved for the Conductor, as its rows and header do (packages/shared/channel-icon.ts
-// hasOwnLook). Without one it keeps the live Omni mark, delegating while its crew runs.
+// The author line over a finished Conductor answer on the phone (AuthorLine). It names the Conductor as the turn's
+// author, so it wears the icon and background saved for the Conductor, as its rows and header do
+// (packages/shared/channel-icon.ts hasOwnLook). Without one it keeps the live Omni mark, delegating while its crew runs.
 vi.mock('../src/store.tsx', () => ({
   useApp: () => ({ channels: [], channel: () => undefined, needsYou: null, profile: null, tasks: [] }),
   useNow: () => Date.parse('2026-01-05T12:00:00.000Z'),
@@ -32,19 +32,19 @@ const conductor = (over: Partial<Channel> = {}) => ({ id: 'conductor', name: 'Co
 const turn: TurnView = {
   key: 1, at: '2026-01-05T11:58:00.000Z', prompts: [], steps: 0, progress: null, failed: 0, texts: ['All three PRs are open.'], prose: 'All three PRs are open.',
   proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done',
-  items: [], switches: [], harness: 'claude-code',
+  items: [], switches: [], harness: 'claude-code', author: 'conductor',
 };
 
 const ctx = (over: Partial<TurnCtx> = {}): TurnCtx =>
   ({
-    thread, view: { turns: [] }, history: { history: {} }, conductor: true, conductorChannel: conductor(), crew: [], ch: conductor(),
+    thread, view: { turns: [] }, history: { history: {} }, conductor: true, conductorChannel: conductor(), crew: [], agents: [], ch: conductor(),
     changes: null, pr: null, now: Date.parse('2026-01-05T12:00:00.000Z'), shell: { open: vi.fn() }, status: null, ...over,
   }) as unknown as TurnCtx;
 
 /** The quiet line naming the Conductor: from the start of its row to its name. */
 const label = (c: TurnCtx) => {
   const markup = renderToStaticMarkup(createElement(Turn, { t: turn, first: true, last: true, c }));
-  const at = markup.indexOf('Conductor</div>');
+  const at = markup.indexOf('>Conductor</span>');
   expect(at).toBeGreaterThan(-1);
   return markup.slice(markup.lastIndexOf('<div', at), at);
 };

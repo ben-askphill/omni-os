@@ -54,7 +54,7 @@ export const SCREENS: Record<ScreenKey, ScreenSpec> = {
   settings: { tab: 'channels', parent: () => '/channels' },
   search: { parent: () => '/' },
   page: {
-    parent: (r) => (r.name === 'channel' ? `/c/${encodeURIComponent(r.id)}` : r.name === 'new-channel' ? '/channels' : '/settings'),
+    parent: (r) => (r.name === 'channel' ? `/c/${encodeURIComponent(r.id)}` : r.name === 'new-channel' ? '/channels' : r.name === 'settings' && r.agent ? '/settings/crew' : '/settings'),
   },
   notfound: { parent: () => '/' },
 };

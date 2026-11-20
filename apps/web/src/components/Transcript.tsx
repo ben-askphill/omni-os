@@ -15,12 +15,16 @@ import { PRWakeList } from './thread/PRWatch.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
-import { COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, useCopy } from './ui.tsx';
+import { Avatar, COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, useCopy } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
+import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
+import { useAgent, type AgentLook } from './AgentAvatar.tsx';
+import { OmniMark } from './brand.tsx';
+import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
@@ -28,7 +32,7 @@ import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
 import { chipRecords } from '@omni/shared/message-context-machine.ts';
-import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
@@ -333,6 +337,8 @@ interface ItemRowProps {
   onCard?: boolean;
   /** Not one of the newest rows: it skips rendering while out of view (`.tx-row`). */
   defer?: boolean;
+  /** An agent's reply in a thread with an agent: it sits in under its author line (REPLY_INDENT). */
+  indent?: boolean;
 }
 
 /**
@@ -341,7 +347,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer, indent }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -411,7 +417,7 @@ const ItemRow = memo(
     const shown = Array.isArray(body) ? body.length > 0 : !!body;
     // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
     return shown ? (
-      <div data-key={it.key} className={defer ? 'tx-row space-y-4' : 'space-y-4'}>
+      <div data-key={it.key} className={`${defer ? 'tx-row ' : ''}space-y-4${indent ? ` ${REPLY_INDENT}` : ''}`}>
         {body}
       </div>
     ) : null;
@@ -439,8 +445,16 @@ export const Transcript = memo(function Transcript({
   limit = null,
   elsewhere = false,
   code = true,
+  lead = null,
+  harness,
+  model,
 }: {
   threadId: string;
+  /** The agent the thread runs as: its replies carry its author line, and rows from before Omni recorded one read as its. */
+  lead?: string | null;
+  /** The thread's run now, for the author line's harness and model on replies after its last switch. */
+  harness?: string;
+  model?: string | null;
   /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
   code?: boolean;
   /** Every row held, anchors included. */
@@ -484,6 +498,30 @@ export const Transcript = memo(function Transcript({
   const since = useMemo(() => (running ? turnStart(events) : null), [events, running]);
   const phase = useMemo(() => (running ? turnPhase(events) : 'working'), [events, running]);
 
+  // Who wrote each run of replies: an author line over its first item (ADR 0019).
+  const heads = useMemo(() => replyHeads(items, lead), [items, lead]);
+  // The run each head's reply came from: before the first switch, the run it moved from; after one, the run it moved to.
+  const run = useMemo<ReplyRun | null>(() => (harness ? { harness, model } : null), [harness, model]);
+  const runs = useMemo(() => {
+    const out = new Map<number, ReplyRun | null>();
+    if (!heads.size) return out;
+    const first = items.find((it): it is SwitchItem => it.type === 'switch');
+    let now: ReplyRun | null = first ? { harness: first.p.from.harness, model: first.p.from.modelLabel } : run;
+    for (const it of items) {
+      if (it.type === 'switch') now = { harness: it.p.to.harness, model: it.p.to.modelLabel };
+      if (heads.has(it.key)) out.set(it.key, now);
+    }
+    return out;
+  }, [items, heads, run]);
+  const leadLook = useAgent(lead);
+  const { crew: agents, channel } = useApp();
+  // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
+  const conductorLook = channel(CONDUCTOR_CHANNEL);
+  const faceOf = (look: AgentLook) =>
+    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon ? (
+      conductorLook && hasOwnLook(conductorLook) ? <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} /> : <OmniMark size={24} />
+    ) : undefined;
+
   // Mod log lines are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
   const last = items[lastIdx];
@@ -507,6 +545,24 @@ export const Transcript = memo(function Transcript({
     return { folded, liveSteps: liveSteps as StepsView | null };
   }, [items, running, asking, latestStatus]);
 
+  // A turn that runs with no reply of the lead's open yet (Ben just wrote): its live steps and thinking line get a head.
+  const liveHead = running && !!leadLook && (() => {
+    const at = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'result');
+    const it = items[at];
+    return !it || !isReply(it) || (it.agent ?? lead) !== lead;
+  })();
+  const author = (key: number) => {
+    const id = heads.get(key);
+    if (!id) return null;
+    const it = items.find((x) => x.key === key);
+    const look = agents.find((a) => a.id === id) ?? (id === lead ? leadLook : null) ?? { id, name: id };
+    return (
+      <div key={`h${key}`} className="mb-2">
+        <AuthorLine agent={look} at={it && isReply(it) ? replyAt(it) : null} run={runs.get(key)} face={faceOf(look)} />
+      </div>
+    );
+  };
+
   const edgeRow = (key: number) => {
     const edge = edges?.get(key);
     return edge && history ? <HistoryEdgeRow key={edge.type === 'earlier' ? 'earlier' : `gap:${edge.after}`} edge={edge} history={history} /> : null;
@@ -519,6 +575,7 @@ export const Transcript = memo(function Transcript({
           {!fromStart && team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null}
           {items.flatMap((it, idx) => [
             edgeRow(it.key),
+            author(it.key),
             <ItemRow
               key={it.key}
               it={it}
@@ -537,11 +594,25 @@ export const Transcript = memo(function Transcript({
               answers={it.type === 'tools' ? answersFor(it.calls, answers) : it.type === 'ask' && answers.has(it.p.thread_id) ? { [it.p.thread_id]: answers.get(it.p.thread_id)! } : undefined}
               onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
               defer={defers(idx, items.length, LIVE_ROWS)}
+              indent={!!lead && isReply(it)}
             />,
           ])}
           {edgeRow(-1)}
-          {liveSteps && <StepsCard key="live-steps" v={liveSteps} cwd={cwd} byId={byId} />}
-          {running && !asking && <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />}
+          {liveHead && leadLook && (liveSteps || !asking) && (
+            <div key="live-head" className="mb-2">
+              <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} />
+            </div>
+          )}
+          {liveSteps && (
+            <div className={lead ? REPLY_INDENT : undefined}>
+              <StepsCard key="live-steps" v={liveSteps} cwd={cwd} byId={byId} />
+            </div>
+          )}
+          {running && !asking && (
+            <div className={lead ? REPLY_INDENT : undefined}>
+              <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />
+            </div>
+          )}
         </div>
       </TaskCtx.Provider>
     </HistoryCtx.Provider>
