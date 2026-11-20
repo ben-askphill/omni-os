@@ -9,6 +9,7 @@ import { threadBases, threads, type Thread } from './db.ts';
 import { userName } from './profile.ts';
 import { filesOffMachine } from './thread-files.ts';
 import { busyAgents } from './runner/members.ts';
+import { clearCommitted } from './runner/collisions.ts';
 import { addEvent, emitThread } from './runner/state.ts';
 
 const exec = promisify(execFile);
@@ -56,6 +57,8 @@ export async function commitThread(id: string, message: string): Promise<{ sha: 
   const sha = await git(t.cwd, 'rev-parse', 'HEAD');
   const files = (await git(t.cwd, 'diff-tree', '--no-commit-id', '--name-only', '-r', '--root', 'HEAD')).split('\n').filter(Boolean).length;
   addEvent(id, 'member', { event: 'committed', agent: '', name: userName(), commit: { sha, message: subject.split('\n')[0].slice(0, 200), files } });
+  // The commit takes down the collision flags raised before it, as an agent's commit does (Q23).
+  await clearCommitted(id);
   emitThread(id);
   return { sha, files };
 }

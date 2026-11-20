@@ -194,6 +194,12 @@ describe('a thread led by a remote agent', () => {
     const prompt = buildSystemPrompt(member, H.db.channels.get('repo')!, getCrew('builder2')!);
     expect(prompt).toMatch(/Edit files only\. Nomos is a remote agent and talks only, so .+ commits and opens the pull request: never run git commit/);
 
+    // A collision flag raised before the commit (two members changed one file) comes down with it, as an agent's does.
+    const before = git(cwd, 'rev-parse', 'HEAD');
+    H.db.events.add(lead.id, 'collision', { key: 'k-notes', path: 'notes.md', agents: ['builder2', 'designer'], head: before });
+    const { collisionsOf } = await import('../runner/collisions.ts');
+    expect(collisionsOf(lead.id)).toHaveLength(1);
+
     // Only Ben commits: an agent thread is refused.
     const agent = await call(`/threads/${lead.id}/commit`, json('POST', { message: 'Add the notes' }, { [CALLER]: lead.id }));
     expect(agent.status).toBe(403);
@@ -203,6 +209,8 @@ describe('a thread led by a remote agent', () => {
     expect(git(cwd, 'log', '-1', '--format=%s')).toBe('Add the notes');
     expect(git(cwd, 'status', '--porcelain')).toBe('');
     expect(H.byKind(lead.id, 'member').map((e) => e.p.event)).toContain('committed');
+    expect(collisionsOf(lead.id)).toEqual([]);
+    expect(H.byKind(lead.id, 'collision_cleared').map((e) => e.p)).toEqual([{ keys: ['k-notes'], by: 'commit' }]);
     // Nothing left to commit.
     expect((await call(`/threads/${lead.id}/commit`, json('POST', { message: 'again' }))).status).toBe(409);
   });
