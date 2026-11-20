@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { busiest, groupGlyph, groupMark, recipients, replyTo, routingHint, type MemberState } from '../members.ts';
+import { busiest, groupGlyph, groupMark, recipients, replyTo, routingHint, seatRun, type MemberState } from '../members.ts';
 import { threadGlyph, threadMark } from '../status.ts';
 import { agentMention, mentionedAgents } from '../message-context-agent.ts';
 
@@ -58,5 +58,21 @@ describe('agent mention records', () => {
     const rec = (agent: string) => ({ id: agent, kind: 'agent_mention', v: 1, label: `@${agent}`, body: { agent, name: agent } });
     expect(mentionedAgents([rec('b'), { id: 'm', kind: 'machine_mention', body: {} }, rec('a'), rec('b')]).map((a) => a.agent)).toEqual(['b', 'a']);
     expect(mentionedAgents('nope')).toEqual([]);
+  });
+});
+
+describe('seatRun', () => {
+  const seats = [
+    { agent: 'nomos', lead: true, harness: 'custom:nomos', model: 'default' },
+    { agent: 'builder', lead: false, harness: 'claude-code', model: 'claude-haiku-4-5' },
+  ];
+  it("gives a member's reply its own run, never the lead's", () => {
+    expect(seatRun(seats, 'builder')).toEqual({ harness: 'claude-code', model: 'claude-haiku-4-5' });
+  });
+  it('leaves the lead, an agent with no seat and a thread with no members to the thread run', () => {
+    expect(seatRun(seats, 'nomos')).toBeNull();
+    expect(seatRun(seats, 'designer')).toBeNull();
+    expect(seatRun(undefined, 'builder')).toBeNull();
+    expect(seatRun(seats, null)).toBeNull();
   });
 });

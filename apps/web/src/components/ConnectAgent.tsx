@@ -129,7 +129,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
     setBusy('connect');
     setError(null);
     try {
-      const c = await api.post<Connected>('/harnesses/connect', { slug, name, ...(paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }) });
+      const c = await api.post<Connected>('/harnesses/connect', { slug, name, ...(found?.description && { description: found.description }), ...(paired ? { draft: paired.draft } : { url: found?.url, secret, ...eveKind }) });
       setDone(c);
       onConnected?.(c);
     } catch (e) {
@@ -175,7 +175,7 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
   return (
     <>
       <div className="space-y-5 px-6 pb-5">
-        <p className="text-[13px] leading-5 text-fg-2">An AI service on your own server, such as Hermes or an eve agent, becomes a harness threads run on. Nothing is saved until its test turn passes and you press Connect.</p>
+        <p className="text-[13px] leading-5 text-fg-2">An AI agent on your own server, such as Hermes or an eve agent, becomes an agent here: you mention it, seat it or start a thread as it, and it talks only. Nothing is saved until its test turn passes and you press Connect.</p>
         <ol className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Steps">
           {/* CheckItem is the list item itself. */}
           {steps.map((s) => (

@@ -53,5 +53,7 @@ describe('lock lines and commit lines in the transcript', () => {
     const { items } = buildItems([row(1, 'member', { event: 'committed', agent: '', name: 'Ben', commit: { sha: 'abc', message: 'Add the notes', files: 1 } })]);
     expect(items[0]).toMatchObject({ type: 'member', p: { event: 'committed', commit: { files: 1 } } });
     expect(memberLine((items[0] as Extract<(typeof items)[0], { type: 'member' }>).p)).toBe('Ben committed 1 file: Add the notes');
+    // With no name set, the line still starts with a capital.
+    expect(memberLine({ event: 'committed', agent: '', name: 'the user', commit: { sha: 'abc', message: '', files: 2 } })).toBe('The user committed 2 files');
   });
 });

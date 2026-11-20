@@ -112,12 +112,13 @@ describe('connecting makes an agent', () => {
     const paired = await call('/harnesses/connect/pair', json('POST', { url: eve.url, code: eve.code, name: 'Nomos', kind: 'eve' }));
     await call('/harnesses/connect/test', json('POST', { draft: paired.json.draft }));
     // An older client still sends role: false. The agent is what connecting is for, so it is made anyway.
-    const done = await call('/harnesses/connect', json('POST', { slug: 'nomos', name: 'Nomos', draft: paired.json.draft, role: false }));
+    const done = await call('/harnesses/connect', json('POST', { slug: 'nomos', name: 'Nomos', draft: paired.json.draft, role: false, description: found.json.description }));
     expect(done.status).toBe(201);
     expect(done.json.role).toEqual({ id: 'nomos', name: 'Nomos' });
 
     const nomos = (await crew()).find((r) => r.id === 'nomos');
-    expect(nomos).toMatchObject({ name: 'Nomos', harness: 'custom:nomos', charter: '', server: { harness: 'custom:nomos', kind: 'eve', builtIn: false, available: true, secret: 'AGENT_NOMOS_KEY' } });
+    // Its description is the one the server offered, as Find showed it.
+    expect(nomos).toMatchObject({ name: 'Nomos', description: 'An eve agent for tests.', harness: 'custom:nomos', charter: '', server: { harness: 'custom:nomos', kind: 'eve', builtIn: false, available: true, secret: 'AGENT_NOMOS_KEY' } });
     const image = await app.request(nomos.avatar.image);
     expect(Buffer.from(await image.arrayBuffer()).toString('base64')).toBe(AVATAR.split(',')[1]);
   });
@@ -221,11 +222,14 @@ describe("a remote agent's server card", () => {
     const test = await call('/crew/nomos/server/test', json('POST', {}));
     expect(test.json).toMatchObject({ ok: true });
     expect(await image()).toBe(OTHER_AVATAR.split(',')[1]);
+    // The page says the image is the one its server offered.
+    expect((await crew()).find((r) => r.id === 'nomos').server).toMatchObject({ avatarOffered: true });
     // Ben's own upload stays through the next offer.
     expect((await call('/crew/nomos/avatar', json('PUT', { image: AVATAR }))).status).toBe(200);
     eve.offer = { ...eve.offer, avatar: OTHER_AVATAR };
     await call('/crew/nomos/server/test', json('POST', {}));
     expect(await image()).toBe(AVATAR.split(',')[1]);
+    expect((await crew()).find((r) => r.id === 'nomos').server.avatarOffered).toBeUndefined();
     // Only Ben tests or removes a server.
     expect((await call('/crew/nomos/server/test', json('POST', {}, { [CALLER]: randomUUID() }))).status).toBe(403);
   });

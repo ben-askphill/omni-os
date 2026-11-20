@@ -31,6 +31,8 @@ export interface RemoteServer {
   available: boolean;
   /** Why it cannot run, when it cannot. */
   fix?: string;
+  /** Its avatar is the one the server offered, which Test connection reads again (Q29). */
+  avatarOffered?: boolean;
 }
 
 /** The connection status line on the Server card, shown with technical details off too (Q30). */

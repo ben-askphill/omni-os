@@ -10,18 +10,24 @@ export function lastResultIdOf(events: readonly HistoryEvent[]) {
   return 0;
 }
 
-/** What the rows say about the turn: the init and result payloads, and whether the thread is between turns. */
-export function useTurnState(events: readonly HistoryEvent[]) {
-  const init = useMemo(() => {
-    for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'init') return parsePayload<InitP>(events[k]);
-    return null;
-  }, [events]);
-  const lastResult = useMemo(() => {
-    for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'result') return parsePayload<ResultP>(events[k]);
-    return null;
-  }, [events]);
+/**
+ * What the rows say about the turn: the init and result payloads, and whether the thread is between turns. The init and
+ * result are the lead's: a seated member's rows (ADR 0019) carry its own run, cwd and MCP servers, not the thread's.
+ */
+export function useTurnState(events: readonly HistoryEvent[], lead?: string | null) {
+  const init = useMemo(() => lastOfLead(events, 'init', lead, parsePayload<InitP>), [events, lead]);
+  const lastResult = useMemo(() => lastOfLead(events, 'result', lead, parsePayload<ResultP>), [events, lead]);
   const between = useMemo(() => betweenTurns(events), [events]);
   return { init, lastResult, betweenTurns: between };
+}
+
+/** The newest `kind` row the lead wrote: one with no agent (from before Omni recorded it) counts as the lead's. */
+function lastOfLead<T>(events: readonly HistoryEvent[], kind: string, lead: string | null | undefined, parse: (e: HistoryEvent) => T): T | null {
+  for (let k = events.length - 1; k >= 0; k--) {
+    const e = events[k];
+    if (e.kind === kind && (!e.agent || !lead || e.agent === lead)) return parse(e);
+  }
+  return null;
 }
 
 /** The header's interrupt: stopping state until the turn ends, and the error when the stop is refused. */

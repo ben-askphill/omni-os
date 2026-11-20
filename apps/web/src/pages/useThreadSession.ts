@@ -267,7 +267,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   // The server's pending rows and the in-flight send drawn in the transcript: the Sending bubbles leave both out.
   const listed = useMemo(() => [...queued, ...sends.map(asPending).filter((p) => !shown.pending.some((q) => q.uuid === p.uuid))], [queued, sends, shown.pending]);
   // The shown rows: once the opening message is drawn, its turn is under way and another sent message steers it.
-  const { init, lastResult, betweenTurns } = useTurnState(shown.events);
+  const { init, lastResult, betweenTurns } = useTurnState(shown.events, thread?.role);
 
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);

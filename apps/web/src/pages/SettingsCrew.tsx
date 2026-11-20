@@ -217,6 +217,7 @@ function AgentPage({ id, roles, onSaved }: { id: string; roles: CrewRole[] | und
 
 /** Where an agent's face comes from, in a line under it. */
 function avatarSource(agent: CrewRole) {
+  if (agent.avatar?.image && agent.server?.avatarOffered) return 'The avatar its server offered. Test connection reads it again until you upload your own.';
   if (agent.avatar?.image) return 'An image you uploaded. It syncs to your other machines with the agent.';
   if (agent.avatar?.icon) return 'Its icon, on its color. An uploaded image takes its place.';
   if (agent.kind !== 'own' && !agent.avatar?.bg && ['conductor', 'researcher', 'builder', 'store-ops', 'inbox'].includes(agent.id)) return 'Its built-in mark. An uploaded image takes its place.';

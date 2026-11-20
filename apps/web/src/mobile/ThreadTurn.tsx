@@ -31,6 +31,7 @@ import { limitLabel } from '../limits.ts';
 import type { useShell, useThread } from './shell.tsx';
 import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
 import { isReply, replyAt } from '@omni/shared/transcript-fold.ts';
+import { seatRun } from '@omni/shared/members.ts';
 
 /** A worktree thread's changes since its base, again whenever a turn starts or ends. */
 export function useBranchChanges(thread: Thread | null, busy: boolean) {
@@ -160,7 +161,7 @@ function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNod
   const remote = !!first && !!c.agents.find((a) => a.id === look.id)?.server;
   return (
     <div className="flex flex-col gap-2">
-      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={{ harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
+      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={seatRun(c.thread.members, look.id) ?? { harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
       <div className={`flex min-w-0 flex-col gap-4 ${REPLY_INDENT} empty:hidden`}>
         {children}
         {remote && <RemoteLockLine channelId={c.thread.channel_id} />}

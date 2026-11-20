@@ -169,7 +169,8 @@ export async function readOfferedAvatar(kind: RemoteKind, url: string, key: stri
 // ---------- find ----------
 
 const RUNS_CAN = ['Steer', 'Stop', 'Tool rows', 'Token counts'];
-const REMOTE_CANNOT = ['Worktree', 'Browser', 'Omni tools'];
+// It talks only (ADR 0020): the thread's files stay with the local agents seated beside it.
+const REMOTE_CANNOT = ['File access', 'Browser', 'Omni tools'];
 /** An eve agent: Omni queues a message sent mid-turn (eve's steer restarts the turn), and cannot answer its approvals. */
 const EVE_CAN = ['Stop', 'Tool rows', 'Token counts'];
 const EVE_CANNOT = ['Steering', 'Approvals', ...REMOTE_CANNOT];
@@ -537,6 +538,8 @@ export interface ConnectRequest {
   /** The protocol a manual connection speaks. A paired draft knows its own. */
   kind?: RemoteKind;
   bills?: string;
+  /** The agent's description: what its server offered, as Find showed it. Omni says where it runs without one. */
+  description?: string;
   /** Before slice 4 the sheet could leave the agent out. Connect always makes it now (ADR 0020), so this is ignored. */
   role?: boolean;
 }
@@ -589,7 +592,8 @@ export async function connectAgent(req: ConnectRequest, ctx: () => CrewSaveConte
     await checkCustomHarness(harness.id);
     // The agent is what connecting is for. It has no charter of Omni's: the server's own instructions lead (Q28).
     const id = freeRoleId(req.slug);
-    const saved = saveCrew(id, { fields: { name, description: `${name}, a remote agent on ${harness.host}.`, harness: harness.id, model: 'default', delegatable: true } }, ctx(), { create: true, server: true });
+    const description = plain(req.description, 300) || `${name}, a remote agent on ${harness.host}.`;
+    const saved = saveCrew(id, { fields: { name, description, harness: harness.id, model: 'default', delegatable: true } }, ctx(), { create: true, server: true });
     made.role = id;
     const avatar = await readOfferedAvatar(harness.kind, harness.url, d ? d.key : m!.key, d?.pair);
     if (avatar) saveOfferedAvatar(id, avatar, ctx());

@@ -114,3 +114,15 @@ export function routingHint(
 
 /** The composer's placeholder: the lead the message goes to with no `@` (Q50). */
 export const replyTo = (leadName: string | null | undefined) => (leadName ? `Reply to ${leadName}` : 'Reply');
+
+/**
+ * The run a member's reply came from, for its author line: its own seat's harness and model. Null for the lead, an
+ * agent with no seat or a thread with none, whose replies carry the thread's run.
+ */
+export function seatRun(
+  members: readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model'>[] | undefined,
+  agent: string | null | undefined,
+): { harness: string; model: string | null } | null {
+  const seat = agent ? members?.find((m) => m.agent === agent && !m.lead) : undefined;
+  return seat ? { harness: seat.harness, model: seat.model } : null;
+}

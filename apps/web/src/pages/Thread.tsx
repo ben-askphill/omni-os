@@ -267,7 +267,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
                     <FindTargetCtx.Provider value={find.target}>
-                      <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                      <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} seats={thread.members} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
                     </FindTargetCtx.Provider>
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>

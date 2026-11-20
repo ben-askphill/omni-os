@@ -22,6 +22,7 @@ import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
+import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
 import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
 import { OmniMark } from './brand.tsx';
@@ -470,6 +471,7 @@ export const Transcript = memo(function Transcript({
   harness,
   model,
   channelId,
+  seats,
 }: {
   threadId: string;
   /** The thread's channel, which a remote agent's lock line names and links (ADR 0020). */
@@ -479,6 +481,8 @@ export const Transcript = memo(function Transcript({
   /** The thread's run now, for the author line's harness and model on replies after its last switch. */
   harness?: string;
   model?: string | null;
+  /** The thread's seated agents (`thread.members`): a member's author line names its own run, not the lead's. */
+  seats?: readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model'>[];
   /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
   code?: boolean;
   /** Every row held, anchors included. */
@@ -533,10 +537,10 @@ export const Transcript = memo(function Transcript({
     let now: ReplyRun | null = first ? { harness: first.p.from.harness, model: first.p.from.modelLabel } : run;
     for (const it of items) {
       if (it.type === 'switch') now = { harness: it.p.to.harness, model: it.p.to.modelLabel };
-      if (heads.has(it.key)) out.set(it.key, now);
+      if (heads.has(it.key)) out.set(it.key, seatRun(seats, heads.get(it.key)) ?? now);
     }
     return out;
-  }, [items, heads, run]);
+  }, [items, heads, run, seats]);
   const leadLook = useAgent(lead);
   const { crew: agents, channel } = useApp();
   // Where each run of a remote agent's replies ends: a lock line, since it could not read the thread's files.

@@ -330,6 +330,15 @@ export const saveCrewAvatar = (id: string, image: string | null, ctx: CrewSaveCo
 /** What `avatar_offered:` records of an image: enough to tell the offered one from one Ben set. */
 const imageMark = (image: string) => createHash('sha256').update(image).digest('hex').slice(0, 12);
 
+/** The agent's image is the one its server offered, not one Ben uploaded since: the Avatar card says so. */
+export function avatarOffered(role: Pick<CrewRole, 'id' | 'avatar'>): boolean {
+  const image = role.avatar?.image;
+  if (!image) return false;
+  const own = crewTexts(role.id).own;
+  const mark = own === null ? null : splitCrewFile(own).meta.avatar_offered;
+  return typeof mark === 'string' && mark === imageMark(image);
+}
+
 /**
  * Put the avatar a remote agent's server offers on it (ADR 0020, Q29), and record in `avatar_offered:` that it was
  * offered. With `unlessOwn`, an avatar Ben set stays: an upload of his, or an icon or color he picked. A later offer

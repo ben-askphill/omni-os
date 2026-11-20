@@ -198,7 +198,7 @@ export interface MemberP {
 /** The quiet line a member row reads as. */
 export const memberLine = (p: Pick<MemberP, 'event' | 'name' | 'commit'>) =>
   p.event === 'committed'
-    ? `${p.name} committed ${p.commit?.files ?? 0} file${p.commit?.files === 1 ? '' : 's'}${p.commit?.message ? `: ${p.commit.message}` : ''}`
+    ? `${p.name.charAt(0).toUpperCase()}${p.name.slice(1)} committed ${p.commit?.files ?? 0} file${p.commit?.files === 1 ? '' : 's'}${p.commit?.message ? `: ${p.commit.message}` : ''}`
     : `${p.name} ${p.event === 'left' ? 'left' : 'joined'}`;
 
 /**

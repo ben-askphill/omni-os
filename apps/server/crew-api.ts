@@ -8,7 +8,7 @@ import { callerOf } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { avatarImageUrl, parseAvatarImage } from './agent-avatar.ts';
 import { getCrew, listCrew, type CrewRole } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, MARKDOWN_MAX, resetCrew, saveCrew, saveCrewAvatar, setCrewHidden, type CrewDetail, type CrewSave, type CrewSaveContext } from './crew-store.ts';
+import { avatarOffered, crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, MARKDOWN_MAX, resetCrew, saveCrew, saveCrewAvatar, setCrewHidden, type CrewDetail, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels, memories } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 import { serverOf } from './remote-agents.ts';
@@ -34,7 +34,8 @@ crewApi.get('/crew', (c) => {
       .filter((r) => all || !r.hidden)
       .map((r) => {
         const server = serverOf(r, cat);
-        return { ...roleView(r), error: r.error ?? (server ? undefined : crewRunProblem(r, cat)), ...(server && { server }), ...(waiting[r.id] && { memoryWaiting: waiting[r.id] }) };
+        const shown = server && (avatarOffered(r) ? { ...server, avatarOffered: true } : server);
+        return { ...roleView(r), error: r.error ?? (server ? undefined : crewRunProblem(r, cat)), ...(shown && { server: shown }), ...(waiting[r.id] && { memoryWaiting: waiting[r.id] }) };
       }),
   );
 });
