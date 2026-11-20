@@ -10,6 +10,7 @@
 // - Steering is off (custom.ts): eve's steer cancels the turn and starts another, so a message sent mid-turn waits.
 // - The bearer key is a header on every call, never in a URL, a log or an error. No redirect is followed.
 import { HermesHttpError, type HermesRun, type HermesRunCreated } from '../hermes/client.ts';
+import { READ_TOOL, type ClientTool } from '../read-tool.ts';
 
 /** The thread session id prefix that carries an eve session id. */
 export const EVE_SESSION_PREFIX = 'omni-eve-';
@@ -52,6 +53,8 @@ interface Translation {
   usage: { input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number };
   /** The turn ended (completed, failed, cancelled): what the run ended with. */
   ended: Raw | null;
+  /** The turn parked to ask Omni for a worktree read: its `session.waiting` is that pause, not the turn's end. */
+  parkedForOmni?: boolean;
 }
 
 const freshTranslation = (): Translation => ({
@@ -61,7 +64,11 @@ const freshTranslation = (): Translation => ({
   model: '',
   usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 },
   ended: null,
+  parkedForOmni: false,
 });
+
+/** The tool an eve request or action names. */
+const toolOf = (r: Raw | null) => str(obj(r?.action)?.toolName) || str(r?.toolName);
 
 const completed = (t: Translation): Raw => ({ event: 'run.completed', output: t.output, usage: { ...t.usage }, ...(t.model && { runtime: { model: t.model } }) });
 
@@ -107,6 +114,11 @@ export function translateEveEvent(t: Translation, raw: unknown): Raw[] {
         const act = obj(a);
         const id = str(act?.callId);
         if (!act || !id) continue;
+        // The read tool's row is Omni's own, drawn when it answers the call's input request below.
+        if (toolOf(act) === READ_TOOL) {
+          t.calls.set(id, { tool: READ_TOOL, subagent: false });
+          continue;
+        }
         if (act.kind === 'subagent-call' || act.kind === 'remote-agent-call') {
           t.calls.set(id, { tool: 'subagent', subagent: true });
           out.push({ event: 'subagent.start', name: str(act.subagentName ?? act.remoteAgentName ?? act.name), task: str(act.description) || str(act.name) });
@@ -121,6 +133,7 @@ export function translateEveEvent(t: Translation, raw: unknown): Raw[] {
     case 'action.result': {
       const r = obj(d.result) ?? {};
       const call = t.calls.get(str(r.callId));
+      if (call?.tool === READ_TOOL) return [];
       const failed = d.status !== 'completed' || r.isError === true;
       const error = str(obj(d.error)?.message);
       if (call?.subagent) return [{ event: 'subagent.complete', summary: preview(r.output), status: failed ? 'failed' : 'completed' }];
@@ -128,10 +141,15 @@ export function translateEveEvent(t: Translation, raw: unknown): Raw[] {
       return [failed ? { event: 'tool.failed', tool, error: error || preview(r.output) || String(d.status) } : { event: 'tool.completed', tool, preview: preview(r.output) }];
     }
     case 'input.requested': {
-      // Omni cannot answer eve's approvals or questions yet: the thread says where to answer.
+      // A request for the worktree read is a client-side tool call Omni answers (docs/internals/remote-harness-protocol.md).
+      // Omni cannot answer eve's other approvals or questions yet: the thread says where to answer.
       const reqs = Array.isArray(d.requests) ? d.requests : [];
       return reqs.map((q) => {
         const r = obj(q) ?? {};
+        if (toolOf(r) === READ_TOOL && str(r.requestId)) {
+          t.parkedForOmni = true;
+          return { event: 'tool.requested', call_id: str(r.requestId), name: READ_TOOL, arguments: obj(r.action)?.input ?? r.input ?? null };
+        }
         return { event: 'approval.request', tool: str(obj(r.action)?.toolName ?? r.toolName), preview: `${str(r.prompt ?? r.title ?? r.question) || 'waiting for an answer'} (answer it in the agent's own chat: Omni cannot answer it yet)` };
       });
     }
@@ -152,6 +170,13 @@ export function translateEveEvent(t: Translation, raw: unknown): Raw[] {
       t.ended = { event: 'run.failed', error: str(d.message) || 'The session failed' };
       return [t.ended];
     case 'session.waiting':
+      // The pause for a read Omni answers: the turn goes on once the answer is in.
+      if (t.parkedForOmni) {
+        t.parkedForOmni = false;
+        return [];
+      }
+      t.ended = completed(t);
+      return [t.ended];
     case 'session.completed':
       // A turn that parked for input ends here without turn.completed: what it said so far is the reply.
       t.ended = completed(t);
@@ -267,7 +292,8 @@ export class EveClient {
    * Send a message: a follow-up on the thread's eve session when it has one that is still active, else a new session
    * (with Omni's prompt as client context). The answer's `session_id` is the thread's session id from now on.
    */
-  async createRun(body: { input: string; session_id: string; instructions?: string }, idempotencyKey: string, signal?: AbortSignal): Promise<HermesRunCreated & { session_id: string }> {
+  // `tools` is the Runs API's: an eve agent serves the read tool as its own, which parks for Omni's answer.
+  async createRun(body: { input: string; session_id: string; instructions?: string; tools?: ClientTool[] }, idempotencyKey: string, signal?: AbortSignal): Promise<HermesRunCreated & { session_id: string }> {
     const existing = body.session_id.startsWith(EVE_SESSION_PREFIX) ? body.session_id.slice(EVE_SESSION_PREFIX.length) : '';
     if (existing) {
       const cursor = await this.nextIndex(existing, signal).catch((e) => {
@@ -342,6 +368,16 @@ export class EveClient {
     if (end.event === 'run.completed') return { status: 'completed', output: str(end.output), usage: obj(end.usage) as HermesRun['usage'], ...(t.model && { runtime: { model: t.model } }) };
     if (end.event === 'run.failed') return { status: 'failed', error: str(end.error) };
     return { status: 'cancelled' };
+  }
+
+  /**
+   * Answer a read the turn parked on: eve's structured input response, keyed by the request id. It never steers, so
+   * the parked turn picks up where it stopped. A refusal reads as one in the text.
+   */
+  async toolResult(runId: string, callId: string, output: string, _isError: boolean, signal?: AbortSignal): Promise<void> {
+    const run = this.runOf(runId);
+    const r = await this.post(`/eve/v1/session/${encodeURIComponent(run.session)}`, { inputResponses: [{ requestId: callId, text: output }] }, signal);
+    if (r.status !== 202 && r.status !== 200) throw new HermesHttpError(r.status, r.text);
   }
 
   /** eve's steer cancels the turn and starts another, so Omni does not steer: custom.ts turns the capability off. */

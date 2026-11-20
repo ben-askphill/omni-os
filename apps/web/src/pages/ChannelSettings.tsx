@@ -415,7 +415,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
           it out or you choose to change it, and a failure opens the fold (#405). */}
-      <Advanced summary="Id, GitHub repo, worktrees, the browser window, usage scans and excerpts for remote agents" open={idFailed || githubFailed || !!(fieldError('id') || fieldError('worktree_include') || fieldError('worktree_shared'))}>
+      <Advanced summary="Id, GitHub repo, worktrees, the browser window, usage scans and remote agents" open={idFailed || githubFailed || !!(fieldError('id') || fieldError('worktree_include') || fieldError('worktree_shared'))}>
         {showId ? (
           <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later." error={fieldError('id')}>
             <input
@@ -525,10 +525,12 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         </div>
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
-            <div className="text-[13px] font-medium text-fg">No thread excerpts to remote agents</div>
-            <div className="text-[12px] text-fg-3">An Ask from this channel to an agent on another server sends only your question: no excerpt of the thread, not even its title or this channel's name. Asks to local agents still carry the excerpt.</div>
+            <div className="text-[13px] font-medium text-fg">Remote agents can see this channel's work</div>
+            <div className="text-[12px] text-fg-3">
+              Agents on another server, such as Hermes, get the other agents' replies in a thread and can read its git-tracked files and diff. Off, they get only the message sent to them. Every read shows in the thread.
+            </div>
           </div>
-          <Toggle checked={f.remoteExcerptsOff} onChange={(v) => set('remoteExcerptsOff', v)} label="No thread excerpts to remote agents" />
+          <Toggle checked={f.remoteWork} onChange={(v) => set('remoteWork', v)} label="Remote agents can see this channel's work" />
         </div>
       </Advanced>
 

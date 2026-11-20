@@ -14,7 +14,7 @@ import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
 import { threadPill } from './thread-state.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
-import { useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
+import { useChannel, useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import type { ThreadPRs } from './panel/PRsTab.tsx';
@@ -30,7 +30,7 @@ import { useTechnical } from '../../display.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 import { runElapsed } from '@omni/shared/ran-on.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
-import { isRemoteAgentHarness, REMOTE_FILES, remoteLedCheckout } from '@omni/shared/remote-agent.ts';
+import { isRemoteAgentHarness, remoteFiles, remoteLedCheckout, remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 
 function QuickRow({
   icon,
@@ -163,6 +163,7 @@ export function ThreadQuickCard({
   const look = useAgent(thread.role);
   // A group thread (ADR 0019): the thread's own agent leads, and the Members row names the others.
   const group = (thread.members ?? []).some((m) => !m.lead);
+  const ch = useChannel(thread.channel_id);
 
   return (
     <section
@@ -212,7 +213,7 @@ export function ThreadQuickCard({
           <QuickRow icon="lock" label="Files">
             <span className="shrink-0 text-fg-3">Files</span>
             <span className="min-w-0 truncate" data-files-row>
-              {REMOTE_FILES}
+              {remoteFiles(remoteReadsOpen(ch))}
             </span>
           </QuickRow>
         </>

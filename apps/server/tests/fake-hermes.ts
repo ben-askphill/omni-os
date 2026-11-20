@@ -20,6 +20,24 @@ interface Run {
   usage?: unknown;
   runtime?: unknown;
   sse: ServerResponse | null;
+  /** The worktree reads this run asks Omni for, one at a time, and the answer each one is waiting for. */
+  reads: FakeRead[];
+  waiting: { call_id: string; resolve: () => void } | null;
+}
+
+/** A read the fake asks Omni for with `tool.requested` (docs/internals/remote-harness-protocol.md, the read call). */
+export interface FakeRead {
+  arguments: unknown;
+  /** Stamp the call with another run's id: a server replaying a call from a turn that has ended. */
+  run_id?: string;
+}
+
+/** What Omni answered a read with: POST /v1/runs/{id}/tool_result. */
+export interface FakeToolResult {
+  run_id: string;
+  call_id: string;
+  output: string;
+  is_error: boolean;
 }
 
 const USAGE = { input_tokens: 11, output_tokens: 7, total_tokens: 18, cache_read_tokens: 2, cache_write_tokens: 1 };
@@ -66,6 +84,14 @@ export interface FakeHermes {
   injectBadData: boolean;
   /** The avatar its signed-in GET /v1/capabilities offers, as image data (ADR 0020), or null for none. */
   avatar: string | null;
+  /** The next runs ask Omni for these worktree reads, each waiting for its answer, then reply and complete. */
+  reads: FakeRead[] | null;
+  /** Omni's answers to reads, in order. */
+  toolResults: FakeToolResult[];
+  /** What a run that read replies, from its answers. Null says how many reads it made. */
+  reply: ((answers: FakeToolResult[]) => string) | null;
+  /** 400 any create that includes `tools`, as a server that takes no client tools may. */
+  rejectTools: boolean;
   complete(output?: string): void;
   reset(): void;
   close(): Promise<void>;
@@ -87,6 +113,10 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
     script: null,
     injectBadData: false,
     avatar: null,
+    reads: null,
+    toolResults: [],
+    reply: null,
+    rejectTools: false,
     complete(output = 'done') {
       for (const run of runs.values()) {
         if (run.status !== 'running') continue;
@@ -106,6 +136,10 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
       fake.steerConflict = false;
       fake.script = null;
       fake.injectBadData = false;
+      fake.reads = null;
+      fake.toolResults = [];
+      fake.reply = null;
+      fake.rejectTools = false;
       fake.calls = [];
       for (const run of runs.values()) {
         if (run.sse && !run.sse.writableEnded) run.sse.end();
@@ -187,6 +221,10 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
       return;
     }
 
+    if (run.reads.length) {
+      void askReads(run, res);
+      return;
+    }
     if (fake.hold && run.status === 'running') {
       writeEvent(res, { event: 'tool.started', run_id: run.id, tool: 'terminal', preview: 'echo hi', seq: 0 }, 1);
       return;
@@ -195,6 +233,30 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
     applyScript(run, events);
     events.forEach((evt, i) => writeEvent(res, evt, i + 1));
     res.write(': stream closed\n');
+    run.sse = null;
+    res.end();
+  };
+
+  // Each read is a `tool.requested` the run waits on until Omni posts its answer; then it replies and completes.
+  const askReads = async (run: Run, res: ServerResponse) => {
+    let n = 0;
+    writeEvent(res, { event: 'run.started', run_id: run.id, seq: n }, ++n);
+    for (const [i, read] of run.reads.entries()) {
+      const call_id = `call_${run.id}_${i + 1}`;
+      const answered = new Promise<void>((resolve) => (run.waiting = { call_id, resolve }));
+      writeEvent(res, { event: 'tool.requested', run_id: read.run_id ?? run.id, call_id, name: 'omni_worktree', arguments: read.arguments, seq: n }, ++n);
+      await answered;
+      if (res.writableEnded) return;
+    }
+    run.reads = [];
+    const answers = fake.toolResults.filter((r) => r.run_id === run.id);
+    const output = fake.reply ? fake.reply(answers) : `Read ${answers.length} times.`;
+    run.status = 'completed';
+    run.output = output;
+    run.usage = USAGE;
+    run.runtime = RUNTIME;
+    writeEvent(res, { event: 'message.delta', run_id: run.id, delta: output, seq: n }, ++n);
+    writeEvent(res, { event: 'run.completed', run_id: run.id, output, usage: USAGE, runtime: RUNTIME, seq: n }, ++n);
     run.sse = null;
     res.end();
   };
@@ -239,19 +301,23 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
         json(res, 429, { error: 'cap' });
         return;
       }
-      const input = body as { instructions?: string; session_id?: string };
+      const input = body as { instructions?: string; session_id?: string; tools?: unknown };
       if (fake.rejectInstructions && input?.instructions) {
         json(res, 400, { error: 'unknown field instructions' });
         return;
       }
+      if (fake.rejectTools && input?.tools) {
+        json(res, 400, { error: 'unknown field tools' });
+        return;
+      }
       const id = `run_${++seq}`;
-      const run: Run = { id, status: 'running', output: '', error: '', session_id: String(input?.session_id ?? ''), usage: undefined, runtime: undefined, sse: null };
+      const run: Run = { id, status: 'running', output: '', error: '', session_id: String(input?.session_id ?? ''), usage: undefined, runtime: undefined, sse: null, reads: fake.reads ?? [], waiting: null };
       runs.set(id, run);
       json(res, 202, { run_id: id, status: 'started' });
       return;
     }
 
-    const m = path.match(/^\/v1\/runs\/([^/]+)(?:\/(events|steer|stop|approval))?$/);
+    const m = path.match(/^\/v1\/runs\/([^/]+)(?:\/(events|steer|stop|approval|tool_result))?$/);
     if (!m) {
       json(res, 404, { error: 'not found' });
       return;
@@ -285,6 +351,19 @@ export async function startFakeHermes(token = 'test-key'): Promise<FakeHermes> {
         endSse(run, { event: 'run.cancelled', run_id: run.id, seq: 8 });
       }
       json(res, 200, { status: 'stopping' });
+      return;
+    }
+    if (req.method === 'POST' && action === 'tool_result') {
+      const b = body as { call_id?: unknown; output?: unknown; is_error?: unknown };
+      if (!run.waiting || b?.call_id !== run.waiting.call_id) {
+        json(res, 409, { error: 'no such call waiting' });
+        return;
+      }
+      fake.toolResults.push({ run_id: run.id, call_id: String(b.call_id), output: String(b.output ?? ''), is_error: b.is_error === true });
+      const { resolve } = run.waiting;
+      run.waiting = null;
+      json(res, 200, { accepted: true });
+      resolve();
       return;
     }
     if (req.method === 'POST' && action === 'approval') {

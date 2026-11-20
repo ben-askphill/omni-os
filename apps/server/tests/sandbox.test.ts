@@ -46,7 +46,7 @@ const channel = (patch: Partial<Channel> = {}): Channel => ({
   prompt_fix_conflicts: null,
   prompt_fix_checks: null,
   scan_opt_out: 0,
-  remote_excerpts_off: 0,
+  remote_work: 0,
   access_level: null,
   connector_access: null,
   design_system: null,

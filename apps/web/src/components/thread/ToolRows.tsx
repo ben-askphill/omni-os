@@ -17,7 +17,7 @@ export const TaskCtx = createContext<Map<string, TaskView>>(new Map());
 
 function toolIcon(name: string) {
   if (name === 'Bash' || name === 'BashOutput') return 'terminal' as const;
-  if (['Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(name)) return 'file' as const;
+  if (['Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep', 'Diff'].includes(name)) return 'file' as const;
   if (name === 'WebFetch' || name === 'WebSearch' || name.includes('browser')) return 'globe' as const;
   if (name === 'Task' || name === 'Agent') return 'layers' as const;
   return 'tool' as const;

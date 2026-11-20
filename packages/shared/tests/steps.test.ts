@@ -289,6 +289,8 @@ describe('plain words', () => {
     expect(plainCall({ name: 'Bash', input: { command: 'rm -rf node_modules && npm ci', description: 'reinstall the packages' } }).now).toBe('Reinstall the packages');
     expect(plainCall({ name: 'Bash', input: { command: 'git status' } }).now).toBe('Running a command');
     expect(plainCall({ name: 'Grep', input: { pattern: 'foo\\(.*\\)' } }).now).toBe('Searching the files');
+    // A remote agent's read of the thread's diff (apps/server/harness/read-tool.ts) is reading, with the files.
+    expect(plainCall({ name: 'Diff', input: { description: "The thread's diff and changed files" } })).toEqual({ phase: 'files', title: 'Looking through the files', now: 'Reading the changes' });
     expect(plainCall({ name: 'Edit', input: { file_path: '/Users/ben/r/snippets/cart.liquid' } }).now).toBe('Editing "cart.liquid"');
     expect(plainCall({ name: 'mcp__claude_ai_Gmail__search_threads', input: {} })).toMatchObject({ phase: 'app:Checking your mail', title: 'Checking your mail', now: 'Using Gmail', connector: { id: 'gmail', name: 'Gmail' } });
     expect(plainCall({ name: 'mcp__claude_ai_Google_Calendar__create_event', input: {} }).now).toBe('Using Google Calendar');

@@ -255,6 +255,12 @@ export function useHereName(): string | undefined {
 /** The user's own name, for owner labels (thread-owner.ts). Undefined until the profile loads, or outside the provider. */
 export const useUserName = (): string | undefined => useContext(Ctx)?.profile?.name;
 
+/** A channel by id, for what it allows. Undefined until the channels load, or outside the provider. */
+export const useChannel = (id: string | undefined): ChannelWithRunning | undefined => {
+  const c = useContext(Ctx);
+  return id ? c?.channel(id) : undefined;
+};
+
 /** The crew roles, for role names. Empty until they load, or outside the provider. */
 export const useCrewRoles = (): readonly CrewRole[] => useContext(Ctx)?.crew ?? NO_CREW;
 const NO_CREW: readonly CrewRole[] = [];

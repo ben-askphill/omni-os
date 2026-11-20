@@ -24,6 +24,7 @@ import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
 import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
 import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
+import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
 import { OmniMark } from './brand.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
@@ -572,8 +573,10 @@ export const Transcript = memo(function Transcript({
   }, [items, heads, run, seats]);
   const leadLook = useAgent(lead);
   const { crew: agents, channel } = useApp();
-  // Where each run of a remote agent's replies ends: a lock line, since it could not read the thread's files.
-  const tails = useMemo(() => (channelId ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId]);
+  // Where each run of a remote agent's replies ends: a lock line, since it could not read the thread's files. A channel
+  // open to remote agents lets them read, so it draws none.
+  const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
+  const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
   // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
   const conductorLook = channel(CONDUCTOR_CHANNEL);
   const faceOf = (look: AgentLook) =>

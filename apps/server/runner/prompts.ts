@@ -8,6 +8,7 @@ import { doesOwnWork, getCrew, type CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { writtenCharter } from '../remote-agents.ts';
+import { READ_TOOL } from '../harness/read-tool.ts';
 import { harnessName } from '../harness/registry.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { userConfig } from '../user-config.ts';
@@ -256,7 +257,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     shopify && channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
     channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
     remoteAgent
-      ? `- You talk only in this thread. Its files are in Omni's checkout on ${name}'s machine, which you cannot read or change from your server: local agents seated in the thread change them, and ${name} commits. What you do with your own tools on your own server is up to you, as before.`
+      ? `- You talk only in this thread. Its files are in Omni's checkout on ${name}'s machine, which you cannot change from your server: local agents seated in the thread change them, and ${name} commits. Where ${name} opens a channel's work to remote agents, Omni offers you its ${READ_TOOL} tool on each turn, to list, read and search the thread's git-tracked files and read its diff; elsewhere you cannot read them. What you do with your own tools on your own server is up to you, as before.`
       : remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
       : thread.branch

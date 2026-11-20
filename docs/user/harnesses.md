@@ -109,7 +109,16 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 
 A [remote agent](crew.md#remote-agents) runs on a server outside Omni, which Omni reaches over HTTP with its key. Its threads run on harness `hermes` (Hermes) or `custom:<slug>` (a server you connected), but no picker lists those: Settings > Models > Harnesses, the model picker, the phone's model sheet and the Conductor's `list_harnesses` show local harnesses only. Settings > Agents lists the agents, with a **Remote** tag, and **Add remote agent** connects a new one ([Remote agents](crew.md#remote-agents)).
 
-A thread a remote agent leads still gets the worktree a local thread would, at the start, so local agents seated in it change files there and you commit them. The remote agent reads none of them. A thread from before keeps only its own data folder, as it always had.
+A thread a remote agent leads still gets the worktree a local thread would, at the start, so local agents seated in it change files there and you commit them. A thread from before keeps only its own data folder, as it always had.
+
+A remote agent never changes the thread's files. In a channel with **Remote agents can see this channel's work** on ([Channel settings](configuration.md#where-things-live)), Omni offers it a read tool on each turn: list, read and search the thread's git-tracked files, and read the thread's diff and changed-file list. Elsewhere it reads none of them.
+
+- **Only git-tracked files.** Untracked and ignored files read as absent, in a list, a search and the diff alike, so `.git/`, an ignored `.env` and the channel's copied and shared files stay hidden. A file a local member made shows once it is staged or committed.
+- **Text only, up to 1 MB.** A binary file is refused. A larger text file, search or diff comes back cut to 1 MB, with a note saying so.
+- **Inside the worktree.** A path outside it (`../`, an absolute path) is refused, and so is a symlink that leads out of it.
+- **One turn.** The read works only during the turn Omni offered it on, through a key held in Omni's memory that the server never sees. It closes when the turn ends and when Omni restarts.
+- **In the thread.** Every read shows as a tool row under the agent's reply (Read, Glob, Grep or Diff), and a refused one says why.
+- **Its server takes part.** A Runs API server gets the tool on each run and asks for reads with the protocol's [read call](../internals/remote-harness-protocol.md#the-read-call). An eve agent serves an `omni_worktree` tool of its own that waits for Omni's answer. A server that does neither keeps working, without reads.
 
 ### Hermes
 
@@ -119,7 +128,7 @@ The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of t
 
 | Piece | What |
 | --- | --- |
-| Where it runs | On the Hermes server, in whatever clone Hermes already has. The thread's worktree is on this machine, for the local agents seated in it |
+| Where it runs | On the Hermes server, in whatever clone Hermes already has. The thread's worktree is on this machine, for the local agents seated in it, and Hermes reads it only through the read tool where the channel allows it |
 | Session | `omni-<thread id>`. The same id continues the conversation, with Hermes' own context |
 | Prompt | Who it is and that it talks only, plus its charter when you wrote one, go in `instructions` on the first run. The transcript shows only what you typed |
 | Steer / interrupt | `POST /v1/runs/{id}/steer` and `/stop`. Omni queues a steer that arrives after the run finished as the next run |
@@ -147,6 +156,7 @@ An eve agent is an AI service built on Vercel's [eve](https://eve.dev) framework
 | Stop | Cancels the turn |
 | In the thread | Reply text, a row per tool call and subagent, token counts and the model, from eve's event stream |
 | Approvals and sign-ins | The thread shows a status line saying what the agent is waiting for. Answer it in the agent's own chat: Omni cannot answer yet |
+| Reading the thread's files | Its own `omni_worktree` tool parks the turn with an input request, and Omni answers it ([protocol](../internals/remote-harness-protocol.md#eve-agents)) |
 | Attachments | Described in the message, not sent |
 
 Nomos's own setup: the Connect Omni page is `/omni`, behind its web login, and a deployment refuses to open its chat until `NOMOS_WEB_PASSWORD` is set.

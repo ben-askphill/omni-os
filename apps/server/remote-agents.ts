@@ -73,11 +73,12 @@ export function writtenCharter(role: CrewRole): string {
 }
 
 /**
- * Remote agents see this channel's work: other agents' replies and a catch-up when seated (Q37), and the Ask's thread
- * excerpt. Today's switch is "No thread excerpts to remote agents"; slice 5 replaces it with one that also covers reads.
+ * Remote agents can see this channel's work (Q36): other agents' replies and a catch-up when seated (Q37), and the
+ * worktree read tool (worktree-read.ts). Off unless Ben turned it on, or the migration found an Ask that already sent a
+ * remote agent an excerpt here (Q69).
  */
 export function remoteSeesWork(channelId: string): boolean {
-  return !channels.get(channelId)?.remote_excerpts_off;
+  return channels.get(channelId)?.remote_work === 1;
 }
 
 // ---------- conversion at boot ----------

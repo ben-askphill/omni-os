@@ -11,6 +11,7 @@ import { OmniMark } from '../components/brand.tsx';
 import { agentLook, type AgentLook } from '../components/AgentAvatar.tsx';
 import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
 import { RemoteLockLine } from '../components/thread/RemoteLockLine.tsx';
+import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { Avatar, Icon, Segmented } from '../components/ui.tsx';
 import { tabPanelProps } from '../components/ui/segmented.tsx';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
@@ -134,8 +135,9 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         <MoConnectors t={t} onOpen={() => steps(t)} />
         {t.prose && <MoProse text={t.prose} event={t.proseKey} />}
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
-        {/* A remote agent could not read the thread's files: its reply ends with the lock line (ADR 0020). */}
-        {t.prose && !!t.author && !!c.agents.find((a) => a.id === t.author)?.server && <RemoteLockLine channelId={thread.channel_id} />}
+        {/* A remote agent could not read the thread's files: its reply ends with the lock line (ADR 0020), unless the
+            channel lets remote agents see its work. */}
+        {t.prose && !!t.author && !!c.agents.find((a) => a.id === t.author)?.server && !remoteReadsOpen(ch) && <RemoteLockLine channelId={thread.channel_id} />}
         {delegated}
         {t.artifacts.filter((a) => !isRenderPath(a.path)).map((a) => (
           <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />

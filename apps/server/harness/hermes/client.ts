@@ -1,6 +1,7 @@
 // HTTP client for the Hermes API server (Runs API). The bearer token is passed in
 // and never written to a log, an error message or a process environment.
 import { SseParser } from './sse.ts';
+import type { ClientTool } from '../read-tool.ts';
 
 const RETRY_MS = [250, 500, 1000, 2000];
 
@@ -17,6 +18,10 @@ export class HermesHttpError extends Error {
   /** 400 that names the instructions field: the server did not accept a system prompt. */
   get instructionsRejected(): boolean {
     return this.status === 400 && /instruction/i.test(this.detail);
+  }
+  /** 400 that names the tools field: the server takes no client-side tools, so the run goes without the read tool. */
+  get toolsRejected(): boolean {
+    return this.status === 400 && /\btools?\b/i.test(this.detail) && !this.instructionsRejected;
   }
 }
 
@@ -135,7 +140,7 @@ export class HermesClient {
   }
 
   async createRun(
-    body: { input: string; session_id: string; instructions?: string },
+    body: { input: string; session_id: string; instructions?: string; tools?: ClientTool[] },
     idempotencyKey: string,
     signal?: AbortSignal,
   ): Promise<HermesRunCreated> {
@@ -173,6 +178,15 @@ export class HermesClient {
     });
     const text = await res.text();
     if (!res.ok && res.status !== 409) throw new HermesHttpError(res.status, text);
+  }
+
+  /**
+   * The answer to a client-side tool call the run is waiting on (`tool.requested`): the worktree read
+   * (worktree-read.ts). `is_error` says it was refused, and `output` says why.
+   */
+  async toolResult(runId: string, callId: string, output: string, isError: boolean, signal?: AbortSignal): Promise<void> {
+    const { status, text } = await this.post(`/v1/runs/${encodeURIComponent(runId)}/tool_result`, { call_id: callId, output, is_error: isError }, {}, signal);
+    if (status < 200 || status >= 300) throw new HermesHttpError(status, text);
   }
 
   /** Resolves an approval.request. Omni only records the request today; this is for a later UI. */
