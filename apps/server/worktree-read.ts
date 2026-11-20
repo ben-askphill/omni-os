@@ -159,22 +159,23 @@ async function readFile(root: string, path: string | undefined): Promise<ReadAns
   const files = await tracked(root, p.rel);
   if (!files.includes(p.rel)) return files.length ? refuse(`${p.rel} is a folder: list it instead.`) : refuse(hidden(p.rel));
   const full = join(root, p.rel);
-  let st;
   try {
-    st = lstatSync(full);
+    lstatSync(full);
   } catch {
     return refuse(`${p.rel} is tracked but not in the worktree: it was deleted there.`);
   }
   // A symlink, in the path or the file itself, is followed only to a tracked file inside the worktree.
   const real = resolvesInside(root, full);
   if (real === null) return refuse(`${p.rel} leads out of the thread's worktree, so it is not read.`);
-  if (st.isSymbolicLink() && !(await tracked(root, real)).includes(real)) return refuse(`${p.rel} leads to a file git does not track.`);
-  if (!statSync(full).isFile()) return refuse(`${p.rel} is not a file.`);
-  const size = statSync(full).size;
-  const buf = head(full, READ_CAP);
+  if (real !== p.rel && !(await tracked(root, real)).includes(real)) return refuse(`${p.rel} leads to a file git does not track.`);
+  const target = join(root, real);
+  if (resolvesInside(root, target) !== real) return refuse(`${p.rel} changed while Omni checked it.`);
+  const st = statSync(target);
+  if (!st.isFile()) return refuse(`${p.rel} is not a file.`);
+  const buf = head(target, READ_CAP);
   if (buf.subarray(0, 8000).includes(0)) return refuse(`${p.rel} is a binary file. The read tool returns text only.`);
   const text = buf.toString('utf8').replace(/�$/, '');
-  return { ok: true, output: size > READ_CAP ? `${text}\n\n[Cut to 1 MB of ${mb(size)}: the rest of ${p.rel} was left out.]` : text };
+  return { ok: true, output: st.size > READ_CAP ? `${text}\n\n[Cut to 1 MB of ${mb(st.size)}: the rest of ${p.rel} was left out.]` : text };
 }
 
 async function listFiles(root: string, path: string | undefined): Promise<ReadAnswer> {

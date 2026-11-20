@@ -3,7 +3,7 @@
 // files and returns its diff, through a per-turn credential that never leaves Omni, carried through the protocol as a
 // client-side tool call. On a booted runner, with the fake Hermes and fake eve servers.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -206,6 +206,20 @@ describe('a remote agent reads the worktree where the channel allows it', () => 
     expect(big.is_error).toBe(false);
     expect(big.output).toMatch(/\n\n\[Cut to 1 MB of 3\.0 MB: the rest of big\.txt was left out\.\]$/);
     expect(Buffer.byteLength(big.output.split('\n\n[Cut')[0])).toBe(1_000_000);
+  });
+
+  it('requires the resolved file to be tracked when a parent directory is a symlink', T, async () => {
+    await setSwitch(true);
+    const t = await hermesThread();
+    mkdirSync(join(t.cwd, 'ignored'));
+    writeFileSync(join(t.cwd, '.gitignore'), 'ignored/\n');
+    writeFileSync(join(t.cwd, 'ignored', 'a.ts'), 'ignored fixture\n');
+    rmSync(join(t.cwd, 'src'), { recursive: true });
+    symlinkSync('ignored', join(t.cwd, 'src'));
+    await askReads(t.id, 2, { action: 'read', path: 'src/a.ts' });
+    expect(hermes.toolResults).toEqual([
+      expect.objectContaining({ is_error: true, output: expect.stringMatching(/leads to a file git does not track/) }),
+    ]);
   });
 
   it('lists, searches and diffs tracked files only: a new file shows once it is staged', T, async () => {
