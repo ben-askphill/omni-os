@@ -72,9 +72,12 @@ export function SettingsPage({ section, focus, agent }: { section?: SettingsSect
   // A pairing link (#/connect-agent?...) lands on Models with it kept, as #/settings/models?connect=<link>.
   const route = useRoute();
   const connect = route.name === 'settings' && current === 'models' ? route.connect : undefined;
+  // An agent's page is its own address. The phone keeps the Agents list mounted under it, so the list reads the
+  // address too and must not take it back.
+  const atAgent = agent ?? (route.name === 'settings' ? route.agent : undefined);
   useEffect(() => {
-    if (section && !agent && hash.split('?')[0] !== settingsHash(current)) navigate(connect ? connectPageHash(connect) : settingsHash(current, current === section ? focus : undefined), { replace: true });
-  }, [hash, section, current, focus, connect, agent]);
+    if (section && !atAgent && hash.split('?')[0] !== settingsHash(current)) navigate(connect ? connectPageHash(connect) : settingsHash(current, current === section ? focus : undefined), { replace: true });
+  }, [hash, section, current, focus, connect, atAgent]);
   useFocus(current, focus);
   const layout = useLayout();
 

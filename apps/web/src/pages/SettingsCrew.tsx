@@ -40,7 +40,7 @@ import { Card, LockNote } from './settings-parts.tsx';
 type CrewDetail = CrewDetailView<CrewRole>;
 
 /** The list of agents, or one agent's page when `agent` names one. */
-export function CrewSection({ agent }: { agent?: string } = {}) {
+export function CrewSection({ agent }: { agent?: string }) {
   const { subscribe } = useApp();
   const roles = useApi<CrewRole[]>('/crew?all=1');
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');

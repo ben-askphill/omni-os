@@ -3,6 +3,7 @@ import { agentDisc, agentInitials } from '@omni/shared/agent-avatar.ts';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import type { CrewRole } from '../api.ts';
+import { onApiBase } from '../api-base.ts';
 import { useCrewRoles } from '../store.tsx';
 import { CrewMark, isCrewRole } from './brand.tsx';
 import { Avatar } from './ui.tsx';
@@ -38,7 +39,8 @@ export function AgentAvatar({ agent, size = 24, className = '' }: { agent: Agent
   const initials = useInitials(agent);
   const look = agent.avatar;
   const box = { width: size, height: size };
-  if (look?.image) return <img src={look.image} alt="" aria-hidden="true" draggable={false} className={`shrink-0 rounded-full object-cover ${className}`} style={box} />;
+  // The server names it under /api; a paired browser reads it on its own keyed path (api-base.ts).
+  if (look?.image) return <img src={onApiBase(look.image)} alt="" aria-hidden="true" draggable={false} className={`shrink-0 rounded-full object-cover ${className}`} style={box} />;
   if (look?.icon) return <Avatar name={agent.name} channelIcon={look.icon} avatarBg={look.bg} size={size} className={className} />;
   if (!look?.bg && isCrewRole(agent.id))
     return (
