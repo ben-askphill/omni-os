@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Group threads (ADR 0019) and remote agents as agents (ADR 0020), before anything is built.
+  Not part of the app: the production build only reads index.html. Lives on the prototype/group-threads branch.
+  Run: npm run prototype -w @omni/web   (then open the printed URL)
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Prototype · Group threads</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23ffe14d'/%3E%3C/svg%3E" />
+    <script>
+      (function () {
+        var q = new URLSearchParams(location.search);
+        var root = document.documentElement;
+        var theme = q.get('theme');
+        if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
+        // The desktop shell's faces, as index.html's head script sets them. The phone layout keeps Apple's.
+        if (matchMedia('(min-width: 768px)').matches) root.dataset.layout = 'rail';
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/prototype/group-threads/main.tsx"></script>
+  </body>
+</html>

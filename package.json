@@ -24,7 +24,8 @@
     "relay:config": "npm run relay-config --workspace @omni/server --",
     "unused": "knip",
     "test:rust": "cargo test --workspace --locked",
-    "check": "npm run typecheck && npm run unused && npm test"
+    "check": "npm run typecheck && npm run unused && npm test",
+    "prototype": "npm run prototype -w @omni/web"
   },
   "engines": {
     "node": ">=24"

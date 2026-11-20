@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prototype": "vite --port 4790 --open /prototype-group-threads.html"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "5.3.0",
