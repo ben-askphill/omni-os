@@ -2,6 +2,9 @@
 // so delegated threads are ordinary threads the user can open, search and continue.
 import { randomUUID } from 'node:crypto';
 import { accessLevelOf, accessSummary, connectorAccessOf } from '@omni/shared/access.ts';
+import { agentColor, agentFace, agentShape, type FaceAgent } from '@omni/shared/agent-avatar.ts';
+import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
+import { CREW_SHAPE_IDS } from '@omni/shared/crew-shapes.ts';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -161,6 +164,31 @@ server.registerTool(
 
 const crewId = z.string().trim().min(1).max(64).describe('Agent id: lowercase letters, digits and dashes. Use list_crew.');
 
+/** What an agent's avatar draws, as agentFace() decides it for every client (ADR 0021, D1). */
+const FACE_SHOWS = { image: 'photo', icon: 'icon', character: 'character' } as const;
+
+/** An agent color by its palette name (Sky), else its hex. */
+const colorName = (hex: string) => AGENT_PALETTE.find((c) => c.hex === hex.toLowerCase())?.name ?? hex;
+/** The hex of the color a save names: an agent color by name (Sky, any case), or a hex as sent. */
+function colorHex(bg: string) {
+  const v = bg.trim();
+  const named = AGENT_PALETTE.find((c) => c.name.toLowerCase() === v.toLowerCase());
+  if (named) return named.hex;
+  if (/^#[0-9a-f]{6}$/i.test(v)) return v;
+  throw new Error(`"${bg}" is not an agent color. Name one of ${AGENT_PALETTE.map((c) => c.name).join(', ')}, or give a hex like #52cdfe.`);
+}
+
+/**
+ * What the agent looks like now: a photo, an icon or emoji, or its crew character, with the shape and color its
+ * character takes, the defaults its id picks included, so the Conductor can say "a droplet in Sky".
+ */
+const avatarView = (r: FaceAgent) => ({
+  // What it draws is the same at every size.
+  shows: FACE_SHOWS[agentFace(r, { size: 32 }).kind],
+  shape: agentShape(r),
+  color: colorName(agentColor(r)),
+});
+
 /** A role as get_crew_role and the writes return it: what a save may change, and the powers and locks it may not. */
 const crewRoleView = (d: any) => {
   const r = d.role;
@@ -168,6 +196,7 @@ const crewRoleView = (d: any) => {
     id: r.id,
     name: r.name,
     description: r.description,
+    avatar: avatarView(r),
     // shipped, edited (a built-in with the user's overlay) or own.
     kind: r.kind,
     ...(r.hidden && { hidden: true }),
@@ -197,6 +226,7 @@ server.registerTool(
   {
     description:
       'One agent, to edit with save_crew_role: its fields, its powers and locks, and its charters as written. ' +
+      'avatar says what its avatar shows (photo, icon or character) and its crew character\'s shape and color, the ones its id picks when none is set, so you can say what it looks like ("a droplet in Sky"). ' +
       `charters.built_in is the shipped charter (null for an agent of ${USER}'s own), charters.own the text of ${USER}'s file (their whole agent, or their addition to or replacement of a built-in) ` +
       'and charters.effective the charter its threads run with. Agents list_crew leaves out (the Conductor, usage-scan, hidden ones) are here by id.',
     inputSchema: { id: crewId },
@@ -228,13 +258,35 @@ server.registerTool(
           model: z.string().max(120).optional().describe('Default model, or "auto". Use list_harnesses.'),
           effort: z.string().max(40).optional(),
           channel: z.string().max(100).optional().describe('Default channel id when a delegation names none. Use list_channels.'),
+          avatar: z
+            .strictObject(
+              {
+                shape: z.string().max(40).optional().describe(`One of ${CREW_SHAPE_IDS.join(', ')}.`),
+                bg: z
+                  .string()
+                  .max(40)
+                  .optional()
+                  .describe(`Its one color: an agent color by name (${AGENT_PALETTE.map((c) => c.name).join(', ')}) or a hex like #52cdfe.`),
+              },
+              {
+                error: (issue) =>
+                  issue.code === 'unrecognized_keys' ? `An agent's icon, emoji and photo are ${USER}'s to set, in Settings > Agents. Send only shape and bg.` : undefined,
+              },
+            )
+            .optional()
+            .describe(
+              `Its crew character: the shape and its color, which get_crew_role's avatar reports. An empty string removes one, so the shape its id picks or its shape's own color comes back. ` +
+                `An icon, emoji or photo shows instead of the character, and only ${USER} sets those, in Settings > Agents.`,
+            ),
         })
         .optional(),
       charter: z.string().max(100_000).optional(),
       charter_mode: z.enum(['append', 'replace']).optional().describe('A built-in only: add to its charter (append) or replace it. Replace only when asked: a release fixes the built-in charter.'),
     },
   },
-  async ({ id, create, fields, charter, charter_mode }) => {
+  async ({ id, create, fields: asked, charter, charter_mode }) => {
+    const bg = asked?.avatar?.bg;
+    const fields = bg ? { ...asked, avatar: { ...asked.avatar, bg: colorHex(bg) } } : asked;
     const save = { ...(fields && { fields }), ...(charter !== undefined && { charter }), ...(charter_mode && { charter_mode }) };
     if (create) return text(crewRoleView(await call('/crew', { method: 'POST', body: JSON.stringify({ id, ...save }) })));
     if (!Object.keys(save).length) throw new Error('Pass the fields, charter or charter_mode to change.');
