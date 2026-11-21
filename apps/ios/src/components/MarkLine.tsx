@@ -7,10 +7,11 @@ import { AgentAvatar } from './AgentAvatar';
 
 /**
  * A group thread's second line while its agents ask or work (ADR 0019, Q35), as phone web's MarkLine draws it: the
- * faces (the one asking first in the Needs you ring, then the working ones, two at most, else one and a count), a red
- * dot when one failed beside them, then "Builder asks you · Designer working".
+ * faces (the one asking first, then the working ones, two at most, else one and a count), each showing its state in
+ * its eyes or, for a photo or an icon, its ring (ADR 0021, D8), a red dot when one failed beside them, then "Builder
+ * asks you · Designer working".
  */
-export function MarkLine({ faces, text, size = 14 }: { faces: AvatarMark | null; text: string; size?: number }) {
+export function MarkLine({ faces, text, size = 16 }: { faces: AvatarMark | null; text: string; size?: number }) {
   const { colors } = useOmniTheme();
   return (
     <View style={styles.line} accessible accessibilityLabel={text}>
@@ -18,7 +19,7 @@ export function MarkLine({ faces, text, size = 14 }: { faces: AvatarMark | null;
         <View style={styles.faces}>
           {faces.faces.map((f, i) => (
             <View key={f.agent} style={i > 0 && styles.overlap}>
-              <AgentAvatar agent={f.agent} size={size} ring={f.ring} />
+              <AgentAvatar agent={f.agent} size={size} shows={{ member: f.ring }} />
             </View>
           ))}
           {faces.more ? <Text style={[styles.more, { color: colors.fg3 }]}>{`+${faces.more}`}</Text> : null}

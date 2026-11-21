@@ -104,6 +104,18 @@ _Avoid_: Team (one delegation), members (one thread's agents)
 A name and avatar with a charter, run defaults and powers, which leads threads and is seated in them as a member: shipped with Omni, the user's own, or a remote agent the user connected.
 _Avoid_: Crew role, role (in anything the user reads; the code still says crew role), persona, bot, harness (what a local agent runs in)
 
+**Avatar**:
+An agent's face wherever it shows: its uploaded photo, else its icon or emoji on its color, else its crew character: its shape, filled with its one color and leaning like the Omni mark, with eyes. The color says who the agent is and never changes with state.
+_Avoid_: Initials disc (retired), crew mark (retired), monogram, profile picture, icon (one source of an avatar)
+
+**Shape**:
+One of the 16 silhouettes a crew character takes, each the Omni ring bent into a form and paired with a color. Nine belong to the built-in agents and seven are spares, one of which any other agent gets from its id until the user picks a shape.
+_Avoid_: Crew mark, mark (a status mark, or the Omni mark), icon, glyph (an eye's or a status mark's), character (the whole drawing)
+
+**Eyes**:
+The pair of glyphs on a crew character that shows what its thread is doing, in the status mark's shapes: circles while the agent has the ball (idle, thinking or working), squares while something outside Omni does (waiting), diamonds when the user does (needs you) and arcs when it is done. Avatars of 31px and smaller draw dots, squares, tall bars and chevrons instead. Thinking is an eye pose, not effort.
+_Avoid_: Ring (the working or Needs you outline that only a photo or icon avatar keeps), badge, status dot (the status mark beside the avatar), expression, mood
+
 **Remote agent**:
 An agent that runs on a server outside Omni, such as Hermes or an eve agent, which talks in threads but never changes their files, and sees a channel's messages and git-tracked files only where the channel lets remote agents see its work.
 _Avoid_: Custom harness (the code's name for its server, which the user never picks), remote harness, provider

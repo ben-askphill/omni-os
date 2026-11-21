@@ -1,27 +1,24 @@
+import type { CharacterFace, FaceShows } from '@omni/shared/agent-avatar.ts';
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
+import Svg, { Circle, G, Path } from 'react-native-svg';
 
 import type { FileSource } from '../live/hub';
 import { useAgents, useLiveHub } from '../live/react';
-import { rounded, useOmniTheme, weight } from '../theme';
-import { CrewMark } from '../ui/Brand';
-import { Text } from '../ui/Text';
+import { useOmniTheme } from '../theme';
 import { agentFace, agentLook } from './agent-face';
 import { ChannelAvatar } from './ChannelAvatar';
 
-/** The ring a header or tab avatar gets while its agent works, or waits on the user (ADR 0019, How it looks). */
-export type AvatarRing = 'working' | 'needs' | null;
-
 /**
- * An agent's avatar (ADR 0019): the image the user uploaded, else its icon or emoji on its color, else a built-in's
- * mark, else two letters unique across agents on a disc, its color only below 18px. The rule is `agentFace`, the
- * Web UI's. The author line, the member sheet, lanes, the To line and the thread's sub line draw it.
+ * An agent's avatar (ADR 0021): the image the user uploaded, else its icon or emoji on its color, else its crew
+ * character. The rule is the shared agent face's (`agentFace`). `shows` is the status mark or member state behind it:
+ * a character shows it in its eyes, a photo or an icon in the Working or Needs you ring (D8). Nothing shows idle eyes
+ * and no ring. The author line, the member sheet, lanes, the To line and the thread's sub line draw it.
  */
-export function AgentAvatar({ agent, size = 24, ring = null }: { agent: string; size?: number; ring?: AvatarRing }) {
+export function AgentAvatar({ agent, size = 24, shows }: { agent: string; size?: number; shows?: FaceShows }) {
   const { colors } = useOmniTheme();
   const agents = useAgents();
-  const face = agentFace(agent, agents, size);
-  const round = { width: size, height: size, borderRadius: size / 2 };
+  const face = agentFace(agent, agents, size, { shows });
   let drawn;
   switch (face.kind) {
     case 'image':
@@ -30,19 +27,8 @@ export function AgentAvatar({ agent, size = 24, ring = null }: { agent: string; 
     case 'icon':
       drawn = <ChannelAvatar name={agentLook(agent, agents).name} icon={face.icon} avatarBg={face.bg} size={size} />;
       break;
-    case 'mark':
-      drawn = (
-        <View style={[styles.center, round, { backgroundColor: colors.surface2 }]}>
-          <CrewMark role={face.role} size={Math.round(size * 0.56)} />
-        </View>
-      );
-      break;
-    case 'disc':
-      drawn = (
-        <View style={[styles.center, round, { backgroundColor: face.bg }]}>
-          {face.letters ? <Text style={[styles.letters, { color: face.ink, fontSize: size * 0.4, lineHeight: size * 0.5 }]}>{face.letters}</Text> : null}
-        </View>
-      );
+    case 'character':
+      drawn = <Character face={face} />;
       break;
   }
   const wrapped = (
@@ -50,16 +36,40 @@ export function AgentAvatar({ agent, size = 24, ring = null }: { agent: string; 
       {drawn}
     </View>
   );
-  if (!ring) return wrapped;
+  if (face.kind === 'character' || !face.ring) return wrapped;
   const gap = 2;
   return (
-    <View style={[styles.center, { width: size + 2 * (gap + 1.5), height: size + 2 * (gap + 1.5), borderRadius: size, borderWidth: 1.5, borderColor: ring === 'needs' ? colors.needs : colors.live }]}>
+    <View style={[styles.center, { width: size + 2 * (gap + 1.5), height: size + 2 * (gap + 1.5), borderRadius: size, borderWidth: 1.5, borderColor: face.ring === 'needs' ? colors.needs : colors.live }]}>
       {wrapped}
     </View>
   );
 }
 
-/** An uploaded avatar, read with the token from the agent's own path. The disc's color stands in while it loads or if it fails. */
+/**
+ * A crew character as the agent face draws it: inside the lean, its outline filled with the agent's color and stroked
+ * in the theme's foreground, the Conductor's satellite in the same color, and the two eyes in the eye ink. No disc.
+ */
+function Character({ face }: { face: CharacterFace }) {
+  const { colors } = useOmniTheme();
+  const ring = colors[face.ring];
+  return (
+    <Svg width={face.size} height={face.size} viewBox={face.viewBox} accessible={false}>
+      <G transform={face.lean}>
+        <Path d={face.outline} fill={face.body} stroke={ring} strokeWidth={face.stroke} strokeLinejoin="round" />
+        {face.satellite ? <Circle cx={face.satellite.cx} cy={face.satellite.cy} r={face.satellite.r} fill={ring} /> : null}
+        {face.pair.map((eye, i) =>
+          eye.line === null ? (
+            <Path key={i} d={eye.path} fill={face.ink} />
+          ) : (
+            <Path key={i} d={eye.path} fill="none" stroke={face.ink} strokeWidth={eye.line} strokeLinecap="round" strokeLinejoin="round" />
+          ),
+        )}
+      </G>
+    </Svg>
+  );
+}
+
+/** An uploaded avatar, read with the token from the agent's own path. A plain circle stands in while it loads or if it fails. */
 function AvatarImage({ agent, v, size }: { agent: string; v: string; size: number }) {
   const { colors } = useOmniTheme();
   const hub = useLiveHub();
@@ -82,9 +92,5 @@ const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  letters: {
-    fontFamily: rounded,
-    fontWeight: weight.medium,
   },
 });

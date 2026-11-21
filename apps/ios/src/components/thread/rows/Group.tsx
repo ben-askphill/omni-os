@@ -3,6 +3,7 @@
 // reply. The rows come from thread/rows.ts; phone web draws the same (apps/web/src/mobile/ThreadTurn.tsx).
 import { clock, toDate } from '@omni/shared/format.ts';
 import { remoteLockLine } from '@omni/shared/remote-agent.ts';
+import { glyphFor, markOf } from '@omni/shared/status.ts';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -70,8 +71,8 @@ export function AuthorRow({ row }: Of<'author'>) {
 const LANE_WORD: Record<string, string> = { running: 'working', queued: 'waiting', done: 'done', failed: 'failed', stopped: 'stopped' };
 
 /**
- * A message several agents answered: a tab per agent, one lane at a time as on phone web. A running agent's tab has the
- * Working ring, and one that edited a collided file a warning mark.
+ * A message several agents answered: a tab per agent, one lane at a time as on phone web. Each tab's avatar shows its
+ * lane's state in its eyes (a photo or icon in a ring), and one that edited a collided file a warning mark.
  */
 export function LanesRow({ row }: Of<'lanes'>) {
   const { colors } = useOmniTheme();
@@ -82,7 +83,6 @@ export function LanesRow({ row }: Of<'lanes'>) {
       {row.tabs.map((tab) => {
         const on = tab.agent === row.picked;
         const name = agentName(tab.agent, agents);
-        const running = tab.status === 'running' || tab.status === 'queued';
         return (
           <Pressable
             key={tab.agent}
@@ -92,7 +92,7 @@ export function LanesRow({ row }: Of<'lanes'>) {
             onPress={() => pickLane(row.turn, tab.agent)}
             style={[styles.tab, { backgroundColor: on ? colors.surface2 : 'transparent', borderColor: on ? colors.line : 'transparent' }]}
           >
-            <AgentAvatar agent={tab.agent} size={18} ring={running ? 'working' : null} />
+            <AgentAvatar agent={tab.agent} size={18} shows={{ mark: markOf(glyphFor(tab.status)) }} />
             <Text numberOfLines={1} style={[styles.tabLabel, { color: on ? colors.fg : colors.fg2 }]}>
               {name}
             </Text>
