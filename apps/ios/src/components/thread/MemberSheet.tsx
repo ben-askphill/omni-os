@@ -55,7 +55,7 @@ export function MemberSheet({ thread, visible, onClose }: { thread: Thread; visi
         <View style={[styles.group, { backgroundColor: colors.surface }]}>
           {rows.map((m, i) => (
             <View key={m.agent} style={[styles.row, i > 0 && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
-              <AgentAvatar agent={m.agent} size={32} ring={m.ring} />
+              <AgentAvatar agent={m.agent} size={32} shows={{ member: m.member }} />
               <View style={styles.grow}>
                 <View style={styles.nameLine}>
                   <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
@@ -80,7 +80,7 @@ export function MemberSheet({ thread, visible, onClose }: { thread: Thread; visi
                   accessibilityLabel={`Remove ${m.name}`}
                   disabled={busy !== null}
                   hitSlop={space.s4}
-                  onPress={() => remove(m.agent, m.name, m.ring === 'working')}
+                  onPress={() => remove(m.agent, m.name, m.member === 'working')}
                   style={styles.action}
                 >
                   {busy === m.agent ? <ActivityIndicator color={colors.fg3} /> : <Text style={[styles.actionText, { color: colors.needs }]}>Remove</Text>}
@@ -126,8 +126,9 @@ export function MemberSheet({ thread, visible, onClose }: { thread: Thread; visi
 }
 
 /**
- * The header's avatars in a group thread, in place of the Working label: up to two faces, a ring on each one that
- * works, and how many agents sit in the thread. Opens the member sheet.
+ * The header's avatars in a group thread, in place of the Working label: up to two faces, the busy ones first, each
+ * showing its state in its eyes (or a photo's or icon's ring), and how many agents sit in the thread. Opens the
+ * member sheet.
  */
 export function MemberButton({ thread, onOpen }: { thread: Thread; onOpen: () => void }) {
   const { colors } = useOmniTheme();
@@ -146,7 +147,7 @@ export function MemberButton({ thread, onOpen }: { thread: Thread; onOpen: () =>
       <View style={styles.faces}>
         {shown.map((m, i) => (
           <View key={m.agent} style={i > 0 && styles.overlap}>
-            <AgentAvatar agent={m.agent} size={22} ring={m.state === 'working' ? 'working' : m.state === 'needs' ? 'needs' : null} />
+            <AgentAvatar agent={m.agent} size={22} shows={{ member: m.state }} />
           </View>
         ))}
       </View>

@@ -16,8 +16,8 @@ import { crewEye, crewEyeLine, crewGrid, crewLean, crewStop, crewStroke } from '
 import { eyesFor, type EyeSource } from './crew-eyes.ts';
 import { monogram } from './monogram.ts';
 
-// The initials disc (ADR 0019, How it looks) left the agent face's chain (ADR 0021, D1). The Web UI's and the iOS
-// app's own chains still draw it until they draw agentFace() below. Pure.
+// The initials disc (ADR 0019, How it looks) left the agent face's chain (ADR 0021, D1). The Web UI's own chain still
+// draws it until it draws agentFace() below. Pure.
 
 const letters = (name: string) => name.replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
 
