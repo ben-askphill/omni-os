@@ -28,7 +28,7 @@ export interface RunnerPorts {
   };
   /** Sending a thread made here to run on another machine (handoff.ts). */
   handoff: {
-    sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac, files: UploadRef[]): void;
+    sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac, carried: { files: UploadRef[]; context?: MessageContext[] }): void;
   };
   /** What the rest of Omni does with a tool result once it is in the transcript (published.ts, then the automations). */
   reporting: {
