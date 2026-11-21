@@ -218,14 +218,14 @@ const TEAM_RULE =
   'An agent with two parts gets one seat. You seat agents in your own #conductor thread with seat_agents, and in a thread you delegate with delegate_team, members on delegate, or agents on message_thread. Never in any other #conductor thread.';
 
 /**
- * A member the Conductor seated in its own #conductor thread (ADR 0019, amended): it talks with the user there and
+ * A member seated in a #conductor thread, by the Conductor in its own or by the user (ADR 0019, amended): it talks with the user there and
  * takes the work on, opening its own thread in the client channel once the work needs one. That thread's report comes
  * back to this member's session, so it relays the outcome in the #conductor thread.
  */
 function conductorSeatLines(name: string, role: CrewRole | undefined, command: boolean) {
   const self = role?.id ?? '<your agent id>';
   return [
-    `This is a #conductor thread: the Conductor seated you to take this work on, and ${name} talks with you here. It has no repo and no worktree.`,
+    `This is a #conductor thread: you were seated to take this work on, and ${name} talks with you here. It has no repo and no worktree, so there are no files here to edit.`,
     `Answer what you can here: questions, a plan, a light lookup. When the work needs files, a repo, a browser, a long run or a report, open your own thread for it in the client's channel and keep it out of this one.`,
     command
       ? `Open it with \`omni new "<brief>" -c <channel> -a ${self}\`: the channel (and folder) the Conductor named, else the one the work belongs in. Write the brief so it stands alone: that thread cannot see this one.`

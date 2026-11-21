@@ -328,7 +328,7 @@ describe('seating in the Conductor\'s own thread', () => {
     const { buildSystemPrompt } = await import('../runner/prompts.ts');
     const { getCrew } = await import('../crew.ts');
     const told = buildSystemPrompt(H.thread(session), H.db.channels.get('conductor')!, getCrew('designer')!);
-    expect(told).toMatch(/This is a #conductor thread: the Conductor seated you/);
+    expect(told).toMatch(/This is a #conductor thread: you were seated to take this work on/);
     expect(told).not.toMatch(/Edit files only/);
     const opened = await call('POST', '/threads', { channel: 'scratch', prompt: 'build the page', role: 'designer' }, mint(session).token);
     expect(opened.status).toBe(200);
