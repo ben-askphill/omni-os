@@ -54,13 +54,13 @@ const CASES: Case[] = [
     trigger: 'relaunch',
     turnMs: 600_000,
     prefer: ['Keep Server Running'],
-    expect: { asked: ['Update When They Finish', 'Stop Them and Update', 'Cancel'], installed: false, oldServerAlive: true, appOpen: true },
+    expect: { asked: ['Update When They Finish', 'Stop 1 Turn and Update', 'Cancel'], installed: false, oldServerAlive: true, appOpen: true },
   },
   {
-    name: 'relaunch, Stop Them and Update',
+    name: 'relaunch, Stop 1 Turn and Update',
     trigger: 'relaunch',
     turnMs: 600_000,
-    prefer: ['Stop Them and Update'],
+    prefer: ['Stop 1 Turn and Update'],
     expect: { installed: true, oldServerAlive: false, appOpen: false, relaunched: true, turn: 'stopped' },
   },
   {
@@ -85,10 +85,10 @@ const CASES: Case[] = [
     expect: { installed: false, oldServerAlive: true, appOpen: false, relaunched: false },
   },
   {
-    name: 'quit, Stop Them and Quit',
+    name: 'quit, Stop 1 Turn and Quit',
     trigger: 'quit',
     turnMs: 600_000,
-    prefer: ['Stop Them and Quit'],
+    prefer: ['Stop 1 Turn and Quit'],
     expect: { installed: true, oldServerAlive: false, appOpen: false, relaunched: false },
   },
   {
