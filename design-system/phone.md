@@ -69,7 +69,7 @@ SF Pro throughout, set by the system on iOS (no `fontFamily`). Weights are 400 a
 | MoArtifactCard | Artifact peek in a thread | `MoArtifactCard.jsx` | `native/MoArtifactCard.tsx` |
 | MoToast | Confirmation pill | `MoToast.jsx` | `native/MoToast.tsx` |
 
-The Expo set also carries what the web gets from the core components: `theme.ts` (every colour in light and dark, shadows, type, phone metrics, motion, `useOmniTheme()`), `Icon` with the full icon set (`icon-paths.ts`, generated from `components/icons/Icon.jsx`), `CrewMark`, `StatusGlyph` with the running ping, and `Press` (the .96 press spring).
+The Expo set also carries what the web gets from the core components: `theme.ts` (every colour in light and dark, shadows, type, phone metrics, motion, `useOmniTheme()`), `Icon` with the full icon set (`icon-paths.ts`, generated from `components/icons/Icon.jsx`), `CrewMark` (retired: the app draws `AgentAvatar`), `StatusGlyph` with the running ping, and `Press` (the .96 press spring).
 
 ## Using it in the iOS app
 

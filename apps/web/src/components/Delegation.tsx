@@ -5,7 +5,8 @@ import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
 import type { Branch } from '../transcript/delegation.ts';
-import { CrewMark, HarnessMark, isCrewRole } from './brand.tsx';
+import { AgentAvatar, useAgent } from './AgentAvatar.tsx';
+import { HarnessMark } from './brand.tsx';
 import { Folded } from './Folded.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Icon, StatusPill } from './ui.tsx';
@@ -38,13 +39,23 @@ export function RailItem({ row, children }: { row: ReactNode; children?: ReactNo
 
 export const ROW_CARD = 'press flex w-full min-w-0 items-start gap-3 rounded-[16px] bg-bg px-3.5 py-3 text-left shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)]';
 
-/** What a row shows: its mark, title, a meta line and its state. */
-export function BranchFace({ role, title, status, children }: { role: string | null | undefined; title: string; status: string; children: ReactNode }) {
+/**
+ * What a row shows: the avatar of the agent its thread runs as (`role`), title, a meta line and its state. A row with
+ * no agent (a thread without one, or a harness's own sub-agent) shows the layers icon on a disc instead.
+ */
+export function BranchFace({ role, title, status, children }: { role?: string | null; title: string; status: string; children: ReactNode }) {
+  const agent = useAgent(role);
   return (
     <>
-      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface text-fg-2">
-        {isCrewRole(role) ? <CrewMark role={role} size={15} /> : <Icon name="layers" size={14} />}
-      </span>
+      {agent ? (
+        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center">
+          <AgentAvatar agent={agent} size={28} />
+        </span>
+      ) : (
+        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface text-fg-2">
+          <Icon name="layers" size={14} />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[14px] font-medium text-fg">{title}</span>
         <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">{children}</span>
@@ -123,6 +134,7 @@ export function DelegationCard({
   /** Reports shown in place, by the thread that sent them: each shows under its row, a lead's under the card. */
   answers?: Record<string, ReportP>;
 }) {
+  const conductor = useAgent('conductor');
   if (!branches.length && !agents.length && !lead) return null;
   const n = branches.length + agents.length;
   // Every member has reported and the lead is still at it: it is writing the combined answer.
@@ -131,7 +143,7 @@ export function DelegationCard({
   return (
     <section aria-label={typeof label === 'string' ? label : what} className="rounded-[20px] px-3.5 pt-3.5 pb-3 shadow-[inset_0_0_0_1px_var(--line)]">
       <header className="mb-2 flex min-w-0 items-center gap-2.5 px-1 text-[13.5px]">
-        {mark ?? <CrewMark role="conductor" size={16} className="text-fg" />}
+        {mark ?? (conductor && <AgentAvatar agent={conductor} size={16} />)}
         <span className="inline-flex shrink-0 items-center gap-2 font-medium text-fg">{label ?? what}</span>
         {lead && (
           <a href={href.thread(lead.id)} className="min-w-0 truncate text-fg-3 hover:text-fg" title="Open the lead thread">

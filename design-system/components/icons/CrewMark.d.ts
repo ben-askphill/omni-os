@@ -1,5 +1,5 @@
 /**
- * Compact mark for a crew role, 12–16px. Conductor = the ring itself (thick);
+ * Retired (ADR 0021, D9): agents show AgentAvatar. Compact mark for a crew role, 12–16px. Conductor = the ring itself (thick);
  * researcher = aperture; builder = block; store-ops = tag; inbox = tray.
  */
 export type CrewRole = 'conductor' | 'researcher' | 'builder' | 'store-ops' | 'inbox';
