@@ -10,8 +10,9 @@ export interface CrewRole {
   /**
    * The role's own look: the path of an image Ben uploaded (`/api/crew/:id/avatar?v=…`, read with the token), else a
    * shared icon (`icon:<name>`) or an emoji, and a hex background. Unset: a built-in's mark, else its initials disc.
+   * `shape`: a crew shape id (ADR 0021), sent only when the file names one. One this build does not know is ignored.
    */
-  avatar?: { image?: string; icon?: string; bg?: string };
+  avatar?: { image?: string; icon?: string; shape?: string; bg?: string };
   /** A harness id from the server's catalog. An open string, not a fixed list: outside runtimes join the catalog by id. */
   harness?: string;
   /** A remote agent's server (ADR 0020): set exactly when the agent runs on Hermes or a server Ben connected. Never a key. */
