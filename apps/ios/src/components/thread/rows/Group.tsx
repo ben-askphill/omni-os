@@ -17,6 +17,7 @@ import { Text } from '../../../ui/Text';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { mentionPieces } from '@omni/shared/message-context-machine.ts';
 import type { Collision } from '@omni/shared/collisions.ts';
+import { eyesFor } from '@omni/shared/crew-eyes.ts';
 import { agentColor, agentName } from '../../agent-face';
 import { AgentAvatar } from '../../AgentAvatar';
 import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
@@ -72,12 +73,14 @@ const LANE_WORD: Record<string, string> = { running: 'working', queued: 'waiting
 
 /**
  * A message several agents answered: a tab per agent, one lane at a time as on phone web. Each tab's avatar shows its
- * lane's state in its eyes (a photo or icon in a ring), and one that edited a collided file a warning mark.
+ * lane's state in its eyes (a photo or icon in a ring), and one that edited a collided file a warning mark. While a
+ * lane still runs the tabs are in focus and their characters move (ADR 0021, D10); once all ended they hold still.
  */
 export function LanesRow({ row }: Of<'lanes'>) {
   const { colors } = useOmniTheme();
   const agents = useAgents();
   const { pickLane } = useRowActions();
+  const live = row.tabs.some((t) => t.status === 'running' || t.status === 'queued');
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist" accessibilityLabel="Agents answering">
       {row.tabs.map((tab) => {
@@ -92,7 +95,8 @@ export function LanesRow({ row }: Of<'lanes'>) {
             onPress={() => pickLane(row.turn, tab.agent)}
             style={[styles.tab, { backgroundColor: on ? colors.surface2 : 'transparent', borderColor: on ? colors.line : 'transparent' }]}
           >
-            <AgentAvatar agent={tab.agent} size={18} shows={{ mark: markOf(glyphFor(tab.status)) }} />
+            {/* A lane's mark is not the open thread's: a running lane works, as in a row (D7), in focus too. */}
+            <AgentAvatar agent={tab.agent} size={18} shows={{ eyes: eyesFor({ mark: markOf(glyphFor(tab.status)) }) }} placement={live ? 'focus' : 'still'} />
             <Text numberOfLines={1} style={[styles.tabLabel, { color: on ? colors.fg : colors.fg2 }]}>
               {name}
             </Text>

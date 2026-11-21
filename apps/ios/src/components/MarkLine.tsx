@@ -19,7 +19,7 @@ export function MarkLine({ faces, text, size = 16 }: { faces: AvatarMark | null;
         <View style={styles.faces}>
           {faces.faces.map((f, i) => (
             <View key={f.agent} style={i > 0 && styles.overlap}>
-              <AgentAvatar agent={f.agent} size={size} shows={{ member: f.ring }} />
+              <AgentAvatar agent={f.agent} size={size} shows={{ member: f.ring }} placement="row" />
             </View>
           ))}
           {faces.more ? <Text style={[styles.more, { color: colors.fg3 }]}>{`+${faces.more}`}</Text> : null}
