@@ -11,6 +11,7 @@ import { showsBubble } from '../../../context/labels';
 import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
 import { STEP_GLYPH } from '@omni/shared/steps.ts';
+import { markOf } from '@omni/shared/status.ts';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { AgentAvatar } from '../../AgentAvatar';
 import { ContextChips } from '../../ContextChips';
@@ -191,7 +192,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
           onPress={() => openThread(k.id)}
           style={({ pressed }) => [styles.kid, { backgroundColor: pressed ? colors.surface3 : colors.bg }]}
         >
-          {k.role ? <AgentAvatar agent={k.role} size={16} /> : null}
+          {k.role ? <AgentAvatar agent={k.role} size={16} shows={{ mark: markOf(glyphFor(k.status)) }} placement="row" /> : null}
           <StatusDot glyph={glyphFor(k.status)} />
           <View style={styles.grow}>
             <Text numberOfLines={1} style={[styles.kidTitle, { color: colors.fg }]}>

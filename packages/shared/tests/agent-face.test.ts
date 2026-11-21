@@ -555,9 +555,23 @@ describe('agentFace moves a character as the Motion board does (D10, D17, D18, D
     }
   });
 
-  it('loops only where one agent is in focus: a list row, a still avatar or one placed nowhere has no loop', () => {
+  it('loops in focus, and in a row only while it works: a still avatar or one placed nowhere has no loop', () => {
     for (const eyes of Object.keys(STATES) as State[])
-      for (const placement of ['row', 'still', undefined] as const) expect(motionOf(eyes, { placement }), `${eyes} ${placement}`).toMatchObject({ body: null, eyes: null });
+      for (const placement of ['row', 'still', undefined] as const) {
+        if (placement === 'row' && eyes === 'working') continue;
+        expect(motionOf(eyes, { placement }), `${eyes} ${placement}`).toMatchObject({ body: null, eyes: null });
+      }
+  });
+
+  it('plays the working loop on a row or card avatar, the same loop as in focus, without the agent-switch pop', () => {
+    const row = motionOf('working', { placement: 'row' });
+    const focus = motionOf('working', { placement: 'focus' });
+    expect(row.body).not.toBeNull();
+    expect(row.eyes).not.toBeNull();
+    expect(row.body).toEqual(focus.body);
+    expect(row.eyes).toEqual(focus.eyes);
+    expect(row.pop).toBeNull();
+    expect(motionOf('working', { placement: 'row', reducedMotion: true })).toEqual(STILL);
   });
 
   it('plays nothing at all under reduced motion, wherever it sits, and rests each state on its own eyes', () => {
