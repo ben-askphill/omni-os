@@ -11,6 +11,7 @@ import { parseConnectorList, parseTokenMap } from './connectors.ts';
 import { isAccessLevel, type AccessLevel } from '@omni/shared/access.ts';
 import { isRoleMemoryMode, type RoleMemoryMode, type RoleMemoryWrites } from '@omni/shared/memory.ts';
 import { readsOnly } from '@omni/shared/quick-ask.ts';
+import { isCommandName } from '@omni/shared/slash.ts';
 
 // Crew roles: one markdown file each, frontmatter and a charter. The shipped ones live in crew/ and each release
 // replaces them. The user's own live in data/crew/: a file there with a new id is a whole role of theirs, and one with
@@ -96,6 +97,11 @@ export interface CrewRole {
   memory: RoleMemoryMode;
   /** `memory_writes:`: a lesson its threads propose waits for the user (review, the default) or applies at once (auto). */
   memoryWrites: RoleMemoryWrites;
+  /**
+   * `skills:`, the skills every thread of this role loads when it starts, by the name its harness lists each by
+   * (skills.ts). Empty when the role names none.
+   */
+  skills: string[];
   charter: string;
   kind: CrewKind;
   /** Hidden on this machine. Built-ins only: no new thread starts as it, and lists leave it out unless asked. */
@@ -215,6 +221,16 @@ function tokensOf(raw: unknown): { tokens?: Record<string, string> } {
   return typeof map === 'object' && Object.keys(map).length ? { tokens: map } : {};
 }
 
+/** The most skills a role names. */
+export const SKILLS_MAX = 50;
+
+/** A role's `skills:`: the names a harness could list, each once. Anything else in the list is left out. */
+export function skillsOf(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const names = raw.filter((s): s is string => typeof s === 'string').map((s) => s.trim()).filter(isCommandName);
+  return [...new Set(names)].slice(0, SKILLS_MAX);
+}
+
 /**
  * A role's tools: delegate-only when either key says so (an overlay's `tools: full` never undoes a built-in's
  * `delegate_only: true`), else what `tools:` names, else full.
@@ -245,6 +261,7 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     review: meta.review === true,
     memory: isRoleMemoryMode(meta.memory) ? meta.memory : 'read-write',
     memoryWrites: meta.memory_writes === 'auto' ? 'auto' : 'review',
+    skills: skillsOf(meta.skills),
     charter: fillPlaceholders(body),
     kind,
     hidden: false,

@@ -51,16 +51,20 @@ interface NoteParams {
   rateLimits?: RateLimits;
 }
 
+/** A skill Codex loads with a turn: its name and its file. */
+type SkillLoad = { name: string; path: string };
+
 /**
  * Ben's message to Codex input items: text (plus a path note for non-image files), a skill item
  * for each skill it names, then local images. Codex's own composer writes a skill as `$name`, so
- * each `/name` becomes `$name` in the text. A skill named twice loads once.
+ * each `/name` becomes `$name` in the text. A skill named twice loads once. `agentSkills`: the
+ * skills the thread's agent loads in every thread (skills.ts), which a session's first turn carries.
  */
-function buildInput(text: string, attachments: Attachment[], commands: CommandUse[]): CodexInput[] {
+function buildInput(text: string, attachments: Attachment[], commands: CommandUse[], agentSkills: SkillLoad[] = []): CodexInput[] {
   const skills = commands.filter((c): c is CommandUse & { path: string } => !!c.path);
   // From the end, so the earlier offsets still hold.
   const said = [...skills].sort((a, b) => b.start - a.start).reduce((t, c) => `${t.slice(0, c.start)}$${c.name}${t.slice(c.end)}`, text);
-  const loads = [...new Map(skills.map((c) => [c.path, c])).values()];
+  const loads = [...new Map<string, SkillLoad>([...skills, ...agentSkills].map((c) => [c.path, c])).values()];
   const images = attachments.filter((a) => a.image);
   const others = attachments.filter((a) => !a.image);
   const full = others.length ? `${said}\n\n${describeAttachments(others)}` : said;
@@ -77,7 +81,7 @@ const BUILTINS = new Set(CODEX_BUILTINS.map((c) => c.name));
 const builtinOf = (m: Outgoing) => m.commands.find((c) => !c.path && BUILTINS.has(c.name));
 
 /** Ask Codex to run the message, as a turn or as the built-in it starts with. Resolves to the turn's id, if the answer has it. */
-async function beginTurn(client: CodexClient, codexThreadId: string | null, thread: AdapterContext['thread'], m: Outgoing, use: CommandUse | undefined): Promise<string | null> {
+async function beginTurn(client: CodexClient, codexThreadId: string | null, thread: AdapterContext['thread'], m: Outgoing, use: CommandUse | undefined, agentSkills: SkillLoad[]): Promise<string | null> {
   if (use?.name === 'compact') {
     // Codex compacts without instructions, so the text after the command goes nowhere. The
     // answer is empty; the compaction's own turn/started has its id.
@@ -91,7 +95,7 @@ async function beginTurn(client: CodexClient, codexThreadId: string | null, thre
   }
   const r = await client.request<{ turn: CodexTurn }>('turn/start', {
     threadId: codexThreadId,
-    input: buildInput(m.text, m.attachments, m.commands),
+    input: buildInput(m.text, m.attachments, m.commands, agentSkills),
     model: thread.model || undefined,
     effort: thread.effort || undefined,
   });
@@ -110,6 +114,8 @@ export const codexAdapter: HarnessAdapter = {
     // A stored Codex thread id (session_id no longer the Omni thread id) means resume.
     const resume = ctx.resume || thread.session_id !== thread.id;
     let codexThreadId: string | null = resume ? thread.session_id : null;
+    // The agent's skills go with the first turn of a new session. A resumed one loaded them when it began.
+    let agentSkills: SkillLoad[] = resume ? [] : (ctx.skills?.native ?? []).filter((s): s is SkillLoad => !!s.path);
     // The model the session runs; thread/start names it when Ben picked the default.
     let model = thread.model || '';
 
@@ -288,7 +294,10 @@ export const codexAdapter: HarnessAdapter = {
       lastFailure = null;
       startingMessage = m;
       const what = builtin === 'review' ? 'start the review' : builtin === 'compact' ? 'compact the conversation' : 'start the turn';
-      const started = beginTurn(client, codexThreadId, thread, m, use).then((turnId) => {
+      // A built-in (`/review`, `/compact`) takes no input items, so the skills wait for the first turn that does.
+      const skills = use ? [] : agentSkills;
+      if (!use) agentSkills = [];
+      const started = beginTurn(client, codexThreadId, thread, m, use, skills).then((turnId) => {
         // A successful JSON-RPC answer confirms delivery; a rejected request must leave
         // both the message and any handover unread for the runner's retry path.
         accepted(m);

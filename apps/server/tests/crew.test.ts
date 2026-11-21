@@ -34,6 +34,7 @@ describe('parseCrewFile', () => {
       review: false,
       memory: 'read-write',
       memoryWrites: 'review',
+      skills: [],
       charter: 'You write and ship code.\n\n- Keep changes scoped.',
       kind: 'own',
       hidden: false,
@@ -55,6 +56,7 @@ describe('parseCrewFile', () => {
       review: false,
       memory: 'read-write',
       memoryWrites: 'review',
+      skills: [],
       charter: 'Just do quick asks.',
       kind: 'own',
       hidden: false,
@@ -81,6 +83,11 @@ describe('parseCrewFile', () => {
     expect(parseCrewFile('u', '---\nname: U\n---\nbody')).not.toHaveProperty('tokens');
     for (const bad of ['tokens: [notion]', 'tokens: OMNI_NOTION_TOKEN', 'tokens:\n  jira: JIRA_TOKEN', 'tokens:\n  notion: notion-token'])
       expect(parseCrewFile('v', `---\n${bad}\n---\nbody`), bad).not.toHaveProperty('tokens');
+  });
+
+  it('reads skills: as the names a harness could list, each once, and leaves anything else out', () => {
+    expect(parseCrewFile('k', '---\nskills:\n  - tdd\n  - superpowers:brainstorming\n  - tdd\n  - not a skill\n  - 7\n---\nbody').skills).toEqual(['tdd', 'superpowers:brainstorming']);
+    expect(parseCrewFile('l', '---\nskills: tdd\n---\nbody').skills).toEqual([]);
   });
 
   it('accepts frontmatter with no body', () => {

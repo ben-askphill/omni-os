@@ -13,7 +13,8 @@ import { z } from 'zod';
 import { publishFeed } from './bus.ts';
 import { parseChannelIcon, SVG_MAX, SVG_PREFIX } from '@omni/shared/channel-icon.ts';
 import { parseAvatarImage } from './agent-avatar.ts';
-import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, SKILLS_MAX, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { isCommandName } from '@omni/shared/slash.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { ROLE_MEMORY_MODES } from '@omni/shared/memory.ts';
 import { record } from './db/sync.ts';
@@ -92,6 +93,13 @@ export const crewFields = z
       .optional(),
     /** review or auto: whether a lesson its threads propose waits for the user. Empty or null removes the key. */
     memory_writes: z.union([z.enum(['review', 'auto']), z.literal('')]).nullable().optional(),
+    /** The skills its threads load when they start (skills.ts), by name. Null removes the key. */
+    skills: z
+      .array(z.string().trim().min(1).max(120).refine(isCommandName, 'A skill is named as its harness lists it, like pr-writer or superpowers:brainstorming.'))
+      .max(SKILLS_MAX, `An agent loads at most ${SKILLS_MAX} skills.`)
+      .transform((names) => [...new Set(names)])
+      .nullable()
+      .optional(),
   })
   .strict();
 export type CrewFields = z.infer<typeof crewFields>;

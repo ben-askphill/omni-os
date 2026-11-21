@@ -1,11 +1,12 @@
 // Start a thread's process, including its browser profile and MCP config.
 import { readsOnly } from '@omni/shared/quick-ask.ts';
-import { config } from '../config.ts';
+import { config, paths } from '../config.ts';
 import { gateFor } from './approvals.ts';
 import { channelAccess, harnessRefusal } from '../access.ts';
 import { channels, events, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
-import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
+import { commandsFolder, worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
+import { skillsLogLine, threadSkills } from '../skills.ts';
 import { inWorkspace } from '../workspace.ts';
 import { followBranch } from '../branch-follow.ts';
 import { pathProblem } from '../sync/path-guard.ts';
@@ -196,12 +197,18 @@ async function spawnLive(live: Live, thread: Thread) {
 
   const run = takeHandover(live, thread);
   thread = run.thread;
+  // The skills its agent loads in every thread, as this harness loads them (skills.ts). A list that is slow to come
+  // leaves them to the harness by name.
+  const skills = await threadSkills(role, thread, commandsFolder(channel) ?? paths.threads).catch(() => null);
+  if (lives.get(thread.id) !== live) return;
+  if (skills) console.log(skillsLogLine(thread.id, skills));
   const permission = gateFor(thread, channel, role, addEvent);
   const ctx: AdapterContext = {
     thread,
     channel,
     role,
-    systemPrompt: buildSystemPrompt(thread, channel, role, threads.team(thread.id).length > 0, Object.keys(secretEnv)),
+    systemPrompt: buildSystemPrompt(thread, channel, role, threads.team(thread.id).length > 0, Object.keys(secretEnv), skills),
+    skills,
     mcpFile,
     secretEnv,
     browserBusy,

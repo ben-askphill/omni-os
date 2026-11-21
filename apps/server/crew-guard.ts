@@ -6,7 +6,7 @@
 //   hide and show stay Ben's, in Settings.
 // - Only a thread running as the Conductor may: the reserved id, whose powers no save can change (crew-store.ts). Never
 //   one an automation started, any thread below one, or a usage scan.
-// - A save from an agent changes charters, descriptions, run defaults and default channels, never powers: no `mcp`,
+// - A save from an agent changes charters, descriptions, run defaults, default channels and skills, never powers: no `mcp`,
 //   `delegate_only`, `tools`, `delegatable`, `review`, `memory` or `memory_writes`, and no whole-file markdown, which
 //   could set them. So no save an agent makes can hand another role the conductor tools, lift a reviewer's no-edits,
 //   let a role keep its own lessons at once, or route around this guard. A reset that would change a role's powers

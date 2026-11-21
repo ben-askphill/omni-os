@@ -26,6 +26,8 @@ export interface CrewListed {
   memoryWrites?: RoleMemoryWrites;
   /** How many lessons its threads proposed wait for the user, when any do. */
   memoryWaiting?: number;
+  /** The skills its threads load when they start (agent-skills.ts). Missing from a server before skills: none. */
+  skills?: string[];
   kind: 'shipped' | 'edited' | 'own';
   hidden: boolean;
   charterMode?: 'append' | 'replace';
@@ -144,6 +146,8 @@ export interface CrewDraft {
   review: boolean;
   memory: RoleMemoryMode;
   memoryWrites: RoleMemoryWrites;
+  /** The skills its threads load when they start, in the order ticked. */
+  skills: string[];
   /** For a built-in: the text added to or put in place of its charter. For a role of the user's own: the whole charter. */
   charter: string;
   charterMode: 'append' | 'replace';
@@ -165,6 +169,7 @@ const fieldsOf = (r: CrewListed) => ({
   review: r.review,
   memory: r.memory ?? 'read-write',
   memoryWrites: r.memoryWrites ?? 'review',
+  skills: r.skills ?? [],
 });
 
 /** The form for a role as it stands. A built-in no one edited adds to its charter until the user picks Replace. */
@@ -174,7 +179,7 @@ export function crewDraftOf(d: CrewDetailView): CrewDraft {
 
 /** A blank role of the user's own. */
 export function blankCrewDraft(): CrewDraft {
-  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, noEdits: false, delegatable: true, conductorTools: false, review: false, memory: 'read-write', memoryWrites: 'review', charter: '', charterMode: 'replace' };
+  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, noEdits: false, delegatable: true, conductorTools: false, review: false, memory: 'read-write', memoryWrites: 'review', skills: [], charter: '', charterMode: 'replace' };
 }
 
 /** Why the form cannot be saved yet, or null. */
@@ -246,6 +251,7 @@ const WIRE: Record<FieldKey, string> = {
   review: 'review',
   memory: 'memory',
   memoryWrites: 'memory_writes',
+  skills: 'skills',
 };
 
 /** The draft read back as a listed role, so a save compares like with like. */
@@ -267,6 +273,7 @@ function fromDraft(d: CrewDraft, base: CrewListed | undefined): CrewListed {
     review: d.review,
     memory: d.memory,
     memoryWrites: d.memoryWrites,
+    skills: d.skills,
     kind: base?.kind ?? 'own',
     hidden: base?.hidden ?? false,
   };
