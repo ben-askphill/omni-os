@@ -12,7 +12,9 @@
 <script type="text/babel">
 omReady(({ ThreadRow }) => {
 
-function App(){return <div className="om-thread"><div className="om-transcript"><ThreadRow title="Pause WEEKEND15 until the patch ships?" taskId="T-4F2C" state="needs" role="store-ops" harness="claude-code" time="3m" preview="It stacks with free shipping."/></div></div>}
+const S={"store_ops_question":"<svg aria-hidden=\"true\" data-shape=\"triangle\" data-grid=\"128\" data-eyes=\"needs\" width=\"32\" height=\"32\" viewBox=\"0 0 128 128\"><g transform=\"translate(64 64) skewX(-10) translate(-64 -64)\"><path d=\"M78.3 36.6L76.4 33.9L75.2 32.8L72.6 30.8L69.6 29.4L68.1 28.9L64.8 28.4L63.2 28.4L59.9 28.9L56.9 30.0L54.1 31.7L52.8 32.8L50.6 35.2L22.7 82.5L21.4 85.5L20.6 88.8L20.5 90.4L20.7 93.7L21.6 96.9L23.1 99.9L24.0 101.2L25.1 102.4L27.7 104.6L29.1 105.4L32.1 106.7L33.7 107.1L37.0 107.5L91.0 107.5L94.3 107.1L95.9 106.7L98.9 105.4L101.7 103.6L104.0 101.2L105.7 98.4L106.9 95.3L107.3 93.7L107.5 90.4L107.4 88.8L106.6 85.5L105.3 82.5Z\" fill=\"#02c650\" stroke=\"var(--fg)\" stroke-width=\"11\" stroke-linejoin=\"round\"></path><path d=\"M53.25 74.235L59.575 80.56L53.25 86.885L46.925 80.56Z\" fill=\"#17181a\"></path><path d=\"M74.75 74.235L81.075 80.56L74.75 86.885L68.425 80.56Z\" fill=\"#17181a\"></path></g></svg>"};
+const F=({s})=><span style={{display:'grid'}} dangerouslySetInnerHTML={{__html:s}}/>;
+function App(){return <div className="om-thread"><div className="om-transcript"><ThreadRow avatar={<F s={S.store_ops_question}/>} title="Pause WEEKEND15 until the patch ships?" taskId="T-4F2C" state="needs" role="store-ops" harness="claude-code" time="3m" preview="It stacks with free shipping."/></div></div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 });
 </script>

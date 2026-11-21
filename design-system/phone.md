@@ -28,7 +28,7 @@ Points on a 390 × 844 phone. The `phone` token family in `tokens.json` holds th
 | Action chip | 36 | Above the composer |
 | Answer button | 48 | Vermilion pill in decision cards |
 | List row | 52 minimum | Grouped lists |
-| Thread avatar | 36 | Status glyph on its corner |
+| Thread avatar | 36 | The agent's avatar; the status glyph ends the title's line (ADR 0021) |
 | Composer | 52, radius 26 | Chips above |
 | Card radius | 20 (inner sheets 14) | Decision, group, artifact |
 | Sheet radius | 28 | Grabber 36 × 5 |

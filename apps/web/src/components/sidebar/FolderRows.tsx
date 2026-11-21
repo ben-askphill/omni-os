@@ -162,14 +162,14 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
         <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
       ))}
       {open && !all && list.length > shown.length && (
-        <button type="button" onClick={() => setAll(true)} className="item ml-[25px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-3 hover:text-fg-2">
+        <button type="button" onClick={() => setAll(true)} className="item ml-[25px] flex h-7 items-center pr-3 pl-[38px] text-[12px] text-fg-3 hover:text-fg-2">
           {list.length - shown.length} more
         </button>
       )}
       {open && f.count > f.threads.length && all && (
-        <span className="ml-[25px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-3">{f.count - f.threads.length} older not shown</span>
+        <span className="ml-[25px] flex h-7 items-center pr-3 pl-[38px] text-[12px] text-fg-3">{f.count - f.threads.length} older not shown</span>
       )}
-      {open && f.count === 0 && <div className="ml-[25px] truncate pr-3 pl-8 text-[12px] leading-7 text-fg-3">No threads yet</div>}
+      {open && f.count === 0 && <div className="ml-[25px] truncate pr-3 pl-[38px] text-[12px] leading-7 text-fg-3">No threads yet</div>}
     </div>
   );
 }
