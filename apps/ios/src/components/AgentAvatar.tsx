@@ -1,4 +1,4 @@
-import type { CharacterFace, FaceShows } from '@omni/shared/agent-avatar.ts';
+import type { CharacterFace, FacePlacement, FaceShows } from '@omni/shared/agent-avatar.ts';
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
@@ -13,12 +13,13 @@ import { ChannelAvatar } from './ChannelAvatar';
  * An agent's avatar (ADR 0021): the image the user uploaded, else its icon or emoji on its color, else its crew
  * character. The rule is the shared agent face's (`agentFace`). `shows` is the status mark or member state behind it:
  * a character shows it in its eyes, a photo or an icon in the Working or Needs you ring (D8). Nothing shows idle eyes
- * and no ring. The author line, the member sheet, lanes, the To line and the thread's sub line draw it.
+ * and no ring. `placement` is where it sits (the shared agent face's). The author line, the member sheet, lanes, the To
+ * line, the thread's sub line and the thread rows draw it.
  */
-export function AgentAvatar({ agent, size = 24, shows }: { agent: string; size?: number; shows?: FaceShows }) {
+export function AgentAvatar({ agent, size = 24, shows, placement }: { agent: string; size?: number; shows?: FaceShows; placement?: FacePlacement }) {
   const { colors } = useOmniTheme();
   const agents = useAgents();
-  const face = agentFace(agent, agents, size, { shows });
+  const face = agentFace(agent, agents, size, { shows, placement });
   let drawn;
   switch (face.kind) {
     case 'image':

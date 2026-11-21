@@ -1,7 +1,8 @@
 import type { ChannelWithRunning, NeedsYou, ThreadStub } from '@omni/client-core';
+import type { FaceShows } from '@omni/shared/agent-avatar.ts';
 import { statusWord } from '@omni/shared/display.ts';
-import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
-import { glyphFor, type Glyph } from '@omni/shared/status.ts';
+import { avatarMark, groupGlyph, markLine, type AvatarMark, type ThreadMember } from '@omni/shared/members.ts';
+import { glyphFor, markOf, type Glyph } from '@omni/shared/status.ts';
 
 type ConductorHandoff = NonNullable<ChannelWithRunning['handoffs']>[number];
 
@@ -59,8 +60,12 @@ export interface ThreadRow {
   owner?: string | null;
   /** The word after the title for a state worth naming. Null for a finished, done thread. */
   statusLabel: string | null;
-  /** The avatar's corner: the thread's status, or the busiest of a group thread's agents (ADR 0019). */
+  /** The status dot at the row's end: the thread's status, or the busiest of a group thread's agents (ADR 0019). */
   glyph: Glyph;
+  /** The agent whose avatar leads the row (ADR 0021, D23); null for a thread with no agent, which leads with its channel's. */
+  agent: string | null;
+  /** What that avatar's eyes show (leadEyes). */
+  eyes: FaceShows;
   /** A group thread at work says who on its second line: "Builder asks you · Designer working". Null otherwise. */
   markLine: string | null;
   /** Its agents' faces beside that line: the one asking first, then the working ones, two at most (ADR 0019). */
@@ -103,15 +108,28 @@ export function shortAgo(iso: string, now: number): string {
   return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+/**
+ * What the avatar leading a thread's row shows in its eyes: the row's status dot, except that a group thread's lead
+ * shows its own state, as each face in the group does, since the dot is the busiest of all its agents (ADR 0019).
+ */
+export function leadEyes(glyph: Glyph, members: readonly Pick<ThreadMember, 'lead' | 'state'>[] | undefined): FaceShows {
+  const lead = members?.find((m) => m.lead);
+  return lead ? { member: lead.state } : { mark: markOf(glyph) };
+}
+
 /** `technical`: Show technical details. Off, the status reads as one of five plain words (Working, Needs you, ...). */
 export function threadRow(t: ThreadStub, now: number, technical = true): ThreadRow {
+  const glyph = groupGlyph(glyphFor(t.status), t.members);
   return {
     id: t.id,
     title: t.title || 'Untitled',
     status: t.status,
     busy: t.status === 'running' || t.status === 'queued',
     statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusWord(t.status, technical),
-    glyph: groupGlyph(glyphFor(t.status), t.members),
+    glyph,
+    agent: t.role ?? null,
+    // A thread marked done shows Stopped on its dot (ThreadRowView), and its avatar's eyes with it.
+    eyes: t.done_at ? { mark: 'stopped' } : leadEyes(glyph, t.members),
     markLine: markLine(t.members),
     faces: avatarMark(t.members),
     ...(t.owner && { owner: t.owner }),

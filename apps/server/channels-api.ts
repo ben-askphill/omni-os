@@ -144,12 +144,15 @@ const RECENT_PER_CHANNEL = 5;
 const THREADS_PER_FOLDER = 50;
 
 /** A thread as the sidebar lists it. `delegating`: a thread it delegated still works (apps/server/delegating.ts). */
-/** A thread as the lists show it. `model` and `branch` are for the thread tree's child rows (tooltip and second line), `setup` for the Starting dot. */
+/**
+ * A thread as the lists show it. `role` is the agent whose avatar leads the row, `model` and `branch` are for the thread
+ * tree's child rows (tooltip and second line), `setup` for the Starting dot.
+ */
 const stub = (t: Thread, delegating: ReadonlySet<string>) => {
-  const { id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup } = t;
+  const { id, channel_id, title, status, role, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup } = t;
   // A group thread's agents (member-view.ts): while any works or waits on the user, the row draws their faces.
   const members = memberViews(t);
-  return { id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id), ...(members && { members }) };
+  return { id, channel_id, title, status, role, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id), ...(members && { members }) };
 };
 
 /** Conductor jobs with their delegated child threads, including children in other channels. */
