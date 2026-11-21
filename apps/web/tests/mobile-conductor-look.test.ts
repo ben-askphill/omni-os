@@ -10,7 +10,8 @@ import type { RowItem } from '../src/mobile/rows.ts';
 
 // The Conductor's saved icon and background on the phone layout: its header on Activity, its row on Channels, its pill
 // in the New sheet and its threads' rows. A saved look wins, as on the desktop Inbox and the iPhone app
-// (packages/shared/channel-icon.ts hasOwnLook). Without one each keeps the Omni mark, or the crew ring on a thread row.
+// (packages/shared/channel-icon.ts hasOwnLook). Without one each keeps the Omni mark, or the Conductor's crew character
+// (ADR 0021) on a thread row.
 const state = vi.hoisted(() => ({ channels: [] as ChannelWithRunning[], waiting: [] as unknown[], threads: [] as unknown[] }));
 
 vi.mock('../src/store.tsx', () => ({
@@ -27,6 +28,7 @@ vi.mock('../src/store.tsx', () => ({
     setPinned: vi.fn(),
     setDone: vi.fn(),
   }),
+  useCrewRoles: () => [],
   useNow: () => Date.parse('2026-01-05T12:00:00.000Z'),
   useHereName: () => undefined,
   useUserName: () => undefined,
@@ -61,7 +63,7 @@ import { MoAvatar, MoRow } from '../src/mobile/parts.tsx';
 
 const html = (node: ReactNode) => renderToStaticMarkup(createElement('div', null, node));
 const OMNI_MARK = 'class="mark ';
-const RING = 'aria-label="Conductor"';
+const RING = 'data-shape="circle"';
 const SAVED = { icon: '🎼', avatar_bg: '#283c62' };
 const BG = 'background-color:#283c62';
 
@@ -93,7 +95,7 @@ beforeEach(() => {
 });
 
 describe("a Conductor thread's row on the phone", () => {
-  it('draws the crew ring while the Conductor has no look of its own', () => {
+  it("draws the Conductor's crew character while the Conductor has no look of its own", () => {
     const activity = html(createElement(MoInboxRow, { t: thread({ channel_id: 'conductor', role: 'conductor' }), status: null, last: true }));
     expect(activity).toContain(RING);
     expect(activity).not.toContain('background-color');
@@ -135,11 +137,14 @@ describe("a Conductor thread's row on the phone", () => {
     expect(saved).toContain('🎼');
   });
 
-  it("leaves other roles on their crew mark, whatever their channel's look", () => {
+  it("draws other agents' characters, built-in or not, whatever their channel's look", () => {
     const builder = html(createElement(MoAvatar, { role: 'builder', channel: 'acme', channelIcon: SAVED.icon, avatarBg: SAVED.avatar_bg }));
-    expect(builder).toContain('aria-label="Builder"');
+    expect(builder).toMatch(/data-shape="squircle"[^>]*data-eyes="idle"/);
     expect(builder).not.toContain(BG);
     expect(builder).not.toContain('🎼');
+    const own = html(createElement(MoAvatar, { role: 'notes', channel: 'acme', channelIcon: SAVED.icon, avatarBg: SAVED.avatar_bg }));
+    expect(own).toMatch(/<svg[^>]*data-shape="[a-z-]+"[^>]*data-eyes="idle"/);
+    expect(own).not.toContain('🎼');
     const roleless = html(createElement(MoAvatar, { role: null, channel: 'acme', channelIcon: SAVED.icon, avatarBg: SAVED.avatar_bg }));
     expect(roleless).toContain(BG);
     expect(roleless).toContain('🎼');

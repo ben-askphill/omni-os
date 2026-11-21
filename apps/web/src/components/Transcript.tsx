@@ -26,7 +26,6 @@ import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
 import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
-import { OmniMark } from './brand.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
@@ -580,11 +579,12 @@ export const Transcript = memo(function Transcript({
   // open to remote agents lets them read, so it draws none.
   const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
   const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
-  // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
+  // The Conductor answers in its channel's saved look, else its crew character, until Ben gives the Conductor agent an
+  // image or icon (the phone's too).
   const conductorLook = channel(CONDUCTOR_CHANNEL);
   const faceOf = (look: AgentLook) =>
-    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon ? (
-      conductorLook && hasOwnLook(conductorLook) ? <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} /> : <OmniMark size={24} />
+    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon && conductorLook && hasOwnLook(conductorLook) ? (
+      <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} />
     ) : undefined;
 
   // Mod log lines and merge-risk cards are asides: the row before them is still the live one.

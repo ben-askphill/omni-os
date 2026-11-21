@@ -1,0 +1,29 @@
+AgentAvatar is an agent's face wherever the Web UI shows one, on desktop web, phone web and the desktop app (`AgentAvatar` in `apps/web/src/components/AgentAvatar.tsx`, the crew character in `CrewCharacter.tsx`). It draws exactly what `agentFace()` in `packages/shared/agent-avatar.ts` returns, as the iOS app does ([ADR 0021](../../../docs/adr/0021-crew-avatars.md)).
+
+```jsx
+<AgentAvatar agent={{ id: 'researcher', name: 'Researcher' }} size={24} />
+<AgentAvatar agent={role} size={22} shows={{ member: 'working' }} placement="focus" />  // eyes from a member's state
+```
+
+## What it draws
+
+- **The chain.** The photo the user uploaded, round; else its icon, emoji or SVG on the agent's color (the 06 Iconography glyphs, as a channel avatar draws them); else its **crew character**. There is no initials disc.
+- **The character.** One of 16 shapes bent from the Omni ring: an inline SVG on the shape's grid, the body filled with the agent's color and outlined in `--fg` (#17181a light, #eceae5 dark), two eyes in the eye ink (`--ink` or white, whichever reads on the color), and the Conductor's satellite in `--fg`. The whole drawing, eyes included, leans 10° like the logo. **No disc** behind it: the silhouette is the face.
+- **Shape and color.** The crew file's `avatar.shape` and `avatar.bg`; without them the built-in agents take their own pair (circle Conductor in Ink, droplet Researcher in Sky, squircle Builder in Amber, pill-wide Reviewer in Violet, arch Writer in Rose, tray Admin in Mint, triangle Store ops in Green, pill-tall Usage scan in Sun, pebble Hermes in Lilac) and any other agent one of the seven spare pairs, picked from its id.
+
+## Sizes
+
+- 16px is the smallest. In use: 88 (Identity preview), 36 (phone rows), 32, 30 (Settings › Agents), 28 (Agent picker), 24 (author lines), 22 (member avatars, lanes), 20, 18 and 16 (thread header chip, mention pills, the phone thread's sub line, the avatar mark).
+- Each size draws its own drawing: the 128 grid from 32px, the 24 grid from 19 to 31px, the 18 grid at 18px and below. Stroke and eyes are set per size (1.4px stroke and 2.44px eyes at 16, up to 15/128 and 13/128 of the size from 64px), and the eyes always clear the outline by at least 0.75px or 35% of the stroke.
+- From 32px the eyes are circles, rounded squares, diamonds and arcs; at 31px and below, dots, plain squares, tall bars and chevrons.
+
+## States
+
+- Idle, thinking and working are the same eyes in different places; waiting takes squares, needs you diamonds (bars when small), done arcs (chevrons when small). The card's States row draws all six.
+- Everywhere shows idle eyes until thread state reaches the eyes. Avatars with no thread behind them (Settings, pickers, mentions) and past replies stay idle.
+
+## Rules
+
+- `data-shape`, `data-grid` and `data-eyes` on the character's `<svg>` name the drawing for screenshots and checks.
+- Photo and icon avatars keep the round disc they always had. A character never sits on a disc.
+- An agent mention pill takes the agent's color at 55% behind its name, with the 16px avatar at its start; a selected pill takes the full color and the ink that reads on it.

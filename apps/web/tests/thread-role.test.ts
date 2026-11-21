@@ -49,8 +49,8 @@ describe('the crew role of a thread', () => {
     expect(html).toContain('data-role="store-ops"');
     expect(html).toContain('>Store ops<');
     expect(html).toContain('title="Runs as Store ops"');
-    // A built-in's mark, as its avatar: the chip's text names it.
-    expect(html).toMatch(/title="Runs as Store ops"[^>]*><span aria-hidden="true"[^>]*><svg/);
+    // Its crew character at 16px, as its avatar: the chip's text names it.
+    expect(html).toMatch(/title="Runs as Store ops"[^>]*><svg aria-hidden="true" data-shape="triangle"[^>]*width="16"/);
   });
 
   it('has an Agent row in Details, right under Channel', () => {

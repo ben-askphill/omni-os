@@ -226,7 +226,7 @@ function InboxCard({
           <span className="flex shrink-0 items-center gap-1.5 md:group-focus-within/row:invisible md:group-hover/row:invisible">
             {drawsFaces(t.members) ? (
               // A group thread's agents at work or waiting on the user: their faces are the mark (Q35).
-              <AvatarMark members={t.members} size={14} />
+              <AvatarMark members={t.members} size={16} />
             ) : status ? (
               <>
                 <StatusDot mark={mark} size={phase ? 7 : 6} />

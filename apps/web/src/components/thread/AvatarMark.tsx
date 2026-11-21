@@ -50,7 +50,7 @@ export function AvatarMark({ members, size = 16, className = '' }: { members: Me
 }
 
 /** The phone row's second line (Q35 pick C): the faces, then who asks and who works in words. Null when none does. */
-export function MarkLine({ members, size = 14, className = '' }: { members: Members; size?: number; className?: string }) {
+export function MarkLine({ members, size = 16, className = '' }: { members: Members; size?: number; className?: string }) {
   const said = markLine(members);
   if (!said) return null;
   return (

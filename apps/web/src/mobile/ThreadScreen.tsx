@@ -191,7 +191,7 @@ export function ThreadScreen() {
       {lead && agentName && (
         <>
           {' · '}
-          <AgentAvatar agent={{ ...lead, name: agentName }} size={14} className="inline-grid align-[-2px]" /> {agentName}
+          <AgentAvatar agent={{ ...lead, name: agentName }} size={16} className="inline-block align-[-3px]" /> {agentName}
         </>
       )}
       {' · '}

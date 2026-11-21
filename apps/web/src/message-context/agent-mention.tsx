@@ -3,17 +3,19 @@
 // (components/composer/MessageEditor.tsx), the text keeps `@<name>`, and the message goes to that agent (ADR 0019).
 // A sent message draws the mention as the same pill in its text (MentionText.tsx). One its text does not name (an API
 // or Conductor send, or an Ask) shows on the line over the bubble instead (SentTo), as the reply's author line does.
-import { agentDisc } from '@omni/shared/agent-avatar.ts';
+import type { CSSProperties } from 'react';
+import { agentColor } from '@omni/shared/agent-avatar.ts';
+import { avatarInk } from '@omni/shared/avatar-color.ts';
 import type { AgentMention } from '@omni/shared/message-context-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from '../components/AgentAvatar.tsx';
 import { useCrewRoles } from '../store.tsx';
 import type { ContextView } from './views.ts';
 
-/**
- * An agent's own color, for its pill: its avatar's background, else its initials disc's color. An uploaded image's
- * main color is not read yet, so an agent with an image takes its disc's color.
- */
-export const agentColor = (a: Pick<AgentLook, 'id' | 'avatar'>) => a.avatar?.bg ?? agentDisc(a.id, '', 24).bg;
+/** An agent pill's colors (index.css .mention-pill-agent): the agent's one color (D4), and the ink that reads on it. */
+export function agentPillStyle(a: Pick<AgentLook, 'id' | 'avatar'>): CSSProperties {
+  const color = agentColor(a);
+  return { '--agent': color, '--agent-on': avatarInk(color) } as CSSProperties;
+}
 
 function AgentMentionDetail({ body: b }: { body: AgentMention }) {
   const agent = useAgent(b.agent) ?? { id: b.agent, name: b.name };

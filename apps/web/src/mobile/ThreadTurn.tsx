@@ -8,7 +8,6 @@ import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { MergeRiskCard } from '../components/thread/MergeRiskCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
-import { OmniMark } from '../components/brand.tsx';
 import { agentLook, type AgentLook } from '../components/AgentAvatar.tsx';
 import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
 import { RemoteLockLine } from '../components/thread/RemoteLockLine.tsx';
@@ -151,13 +150,13 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
 }
 
 /**
- * The Conductor's face on its answers: the icon and background saved for its channel, else the Omni mark, unless Ben
- * gave the Conductor agent an image or icon of its own.
+ * The Conductor's face on its answers: the icon and background saved for its channel, else its crew character, unless
+ * Ben gave the Conductor agent an image or icon of its own.
  */
 function conductorFace(c: TurnCtx, look: AgentLook) {
   if (look.avatar?.image || look.avatar?.icon) return undefined;
   const ch = c.conductorChannel;
-  return ch && hasOwnLook(ch) ? <Avatar name={ch.name} omni channelIcon={ch.icon} avatarBg={ch.avatar_bg} size={24} /> : <OmniMark size={24} />;
+  return ch && hasOwnLook(ch) ? <Avatar name={ch.name} omni channelIcon={ch.icon} avatarBg={ch.avatar_bg} size={24} /> : undefined;
 }
 
 /**

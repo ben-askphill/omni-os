@@ -1346,12 +1346,14 @@
   /* An agent @mention: its avatar, in the agent's own color (--agent, set inline) instead of the machine pill's blue. */
   .mention-pill-agent {
     padding-left: 0.15em;
-    /* Agent colors are light pastels: the color sits in the fill, and the name keeps the text color. */
+    /* The color sits in the fill, and the name keeps the text color; a selected pill takes the agent's full color and
+       the ink that reads on it (--agent-on, set inline with --agent). */
     color: var(--fg);
     background: color-mix(in srgb, var(--agent) 55%, transparent);
     border-radius: 999px;
   }
   .mention-pill-agent[data-selected] {
+    color: var(--agent-on, var(--fg));
     background: var(--agent);
   }
   .mention-pill-agent.mention-pill-sent:focus-visible {
