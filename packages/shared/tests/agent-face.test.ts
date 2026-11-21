@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { agentFace, type CharacterFace } from '../agent-avatar.ts';
 import { AGENT_PALETTE, contrast } from '../avatar-color.ts';
 import { crewShapesSource, OUT as CREW_SHAPES_FILE, SPEC_FILE } from '../scripts/build-crew-shapes.ts';
-import { CREW_CLEARED_SIZES, CREW_FITTED, PILL_DIAGONAL_LEVEL_STOPS } from '../crew-shapes.ts';
+import { CREW_CLEARED_SIZES, CREW_FITTED, EYE_STATES, PILL_DIAGONAL_LEVEL_STOPS } from '../crew-shapes.ts';
 import { crewClearance } from '../crew-size.ts';
+import type { MemberState } from '../members.ts';
+import { MARK, threadMark, turnPhase, type Mark } from '../status.ts';
 
 // Seam A (ADR 0021, D27): the agent face, checked against the committed spec JSON.
 
@@ -348,5 +350,85 @@ describe('the agent palette', () => {
       expect(agentFace({ id: 'someone', avatar: { bg: hex, shape: 'cloud' } }, { size: 24 }), name).toMatchObject({ body: hex, ink: inkOf[name] });
       expect(agentFace({ id: 'someone', avatar: { bg: hex, icon: '🎨' } }, { size: 24 }), name).toMatchObject({ bg: hex, ink: inkOf[name] });
     }
+  });
+});
+
+describe('agentFace shows a thread\'s state in the eyes (D6, D7, D11)', () => {
+  const eyesOf = (shows: Parameters<typeof agentFace>[1]['shows'], placement?: 'focus' | 'row' | 'still') => {
+    const f = agentFace({ id: 'someone', avatar: { shape: 'circle' } }, { size: 24, shows, placement });
+    return f.kind === 'character' ? f.eyes : null;
+  };
+
+  /** The decided eyes for each status mark in a list row (ADR 0021, Eyes for each state). */
+  const IN_A_LIST: Record<Mark, string> = {
+    idle: 'idle',
+    stopped: 'idle',
+    starting: 'working',
+    working: 'working',
+    tool: 'working',
+    delegating: 'waiting',
+    queued: 'waiting',
+    limited: 'waiting',
+    resuming: 'waiting',
+    checking: 'waiting',
+    question: 'needs',
+    crew_question: 'needs',
+    held: 'needs',
+    signin: 'needs',
+    review: 'needs',
+    failed: 'needs',
+    crew_failed: 'needs',
+    setup_failed: 'needs',
+    done: 'done',
+  };
+
+  it('gives every status mark in a list its eyes: circles while the agent has it, squares while it waits, diamonds for Ben, arcs once done', () => {
+    for (const mark of Object.keys(MARK) as Mark[]) expect(eyesOf({ mark }, 'row'), mark).toBe(IN_A_LIST[mark]);
+  });
+
+  it('splits thinking from working in the open thread: starting or working thinks, a tool call works; every other mark as in a list', () => {
+    const open: Partial<Record<Mark, string>> = { starting: 'thinking', working: 'thinking', tool: 'working' };
+    for (const mark of Object.keys(MARK) as Mark[]) expect(eyesOf({ mark }, 'focus'), mark).toBe(open[mark] ?? IN_A_LIST[mark]);
+  });
+
+  it('gives every member state its eyes, a working member working even in focus', () => {
+    const want: Record<MemberState, string> = { needs: 'needs', failed: 'needs', working: 'working', done: 'done', stopped: 'idle', idle: 'idle' };
+    for (const placement of ['focus', 'row'] as const)
+      for (const member of Object.keys(want) as MemberState[]) expect(eyesOf({ member }, placement), `${member} ${placement}`).toBe(want[member]);
+  });
+
+  it('shows a running thread working anywhere but in focus', () => {
+    for (const placement of ['row', 'still', undefined] as const)
+      for (const mark of ['starting', 'working', 'tool'] as const) expect(eyesOf({ mark }, placement), `${mark} ${placement}`).toBe('working');
+  });
+
+  it('splits the open thread by its rows, and shows the same thread working in a list', () => {
+    const row = (kind: string, payload?: object) => ({ kind, payload: payload ? JSON.stringify(payload) : null });
+    const running = { status: 'running' };
+    const turns = {
+      thinking: [row('user')],
+      working: [row('user'), row('tool_use', { id: 'call-1' })],
+      done: [row('user'), row('tool_use', { id: 'call-1' }), row('tool_result', { tool_use_id: 'call-1' })],
+    };
+    expect(eyesOf({ mark: threadMark(running, { turn: turnPhase([]) }) }, 'focus'), 'not picked up yet').toBe('thinking');
+    expect(eyesOf({ mark: threadMark(running, { turn: turnPhase(turns.thinking) }) }, 'focus'), 'no call open').toBe('thinking');
+    expect(eyesOf({ mark: threadMark(running, { turn: turnPhase(turns.working) }) }, 'focus'), 'a call open').toBe('working');
+    expect(eyesOf({ mark: threadMark(running, { turn: turnPhase(turns.done) }) }, 'focus'), 'the call returned').toBe('thinking');
+    expect(eyesOf({ mark: threadMark(running) }, 'row'), 'in a list').toBe('working');
+    expect(eyesOf({ mark: threadMark({ status: 'running', setup: 'preparing' }) }, 'row'), 'its folder prepared, in a list').toBe('working');
+  });
+
+  it('never gives the needs you eyes for a mark that moves', () => {
+    for (const placement of ['focus', 'row'] as const)
+      for (const mark of Object.keys(MARK) as Mark[]) if (eyesOf({ mark }, placement) === 'needs') expect(MARK[mark].motion, mark).toBe('still');
+  });
+
+  it('shows idle eyes with nothing behind the avatar, wherever it sits (D11)', () => {
+    for (const placement of ['focus', 'row', 'still', undefined] as const) expect(eyesOf(undefined, placement), String(placement)).toBe('idle');
+  });
+
+  it('shows eyes picked outright as they are, wherever it sits', () => {
+    for (const placement of ['focus', 'row', 'still'] as const)
+      for (const eyes of EYE_STATES) expect(eyesOf({ eyes }, placement), `${eyes} ${placement}`).toBe(eyes);
   });
 });

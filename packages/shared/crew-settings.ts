@@ -8,8 +8,11 @@ export interface CrewListed {
   id: string;
   name: string;
   description: string;
-  /** `image`: the URL of the image Ben uploaded (GET /api/crew/:id/avatar). Without one, the icon on its color. */
-  avatar?: { image?: string; icon?: string; bg?: string };
+  /**
+   * `image`: the URL of the image Ben uploaded (GET /api/crew/:id/avatar). Without one, the icon on its color.
+   * `shape`: a crew shape id (crew-shapes.ts), sent only when the file names one.
+   */
+  avatar?: { image?: string; icon?: string; shape?: string; bg?: string };
   harness?: string;
   model?: string;
   effort?: string;

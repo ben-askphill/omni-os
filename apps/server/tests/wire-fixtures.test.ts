@@ -308,6 +308,10 @@ async function boot(): Promise<number> {
     // A custom harness (harness/custom.ts) with no key on this machine, so GET /harnesses records its row.
     mkdirSync(join(data, 'harnesses'), { recursive: true });
     writeFileSync(join(data, 'harnesses', 'fixture-agent.yaml'), 'name: Fixture agent\nkind: runs-api\nurl: http://127.0.0.1:9\nauth:\n  scheme: bearer\n  secret: FIXTURE_AGENT_KEY\nbills: Bills the fixture server\n');
+    // The shipped agents have no avatar: an overlay gives one a crew shape and its color (ADR 0021), so GET /crew
+    // records an edited agent with both. Written before the start, so no crew frame lands in feed.sse.
+    mkdirSync(join(data, 'crew'), { recursive: true });
+    writeFileSync(join(data, 'crew', 'writer.md'), '---\ncharter_mode: append\navatar:\n  shape: droplet\n  bg: "#52cdfe"\n---\n');
     setUp = { bin: fakeSecurity(), automationsDir: automations() };
     fakeGh(setUp.bin);
   }

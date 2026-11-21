@@ -146,6 +146,37 @@ describe('Settings > Crew (S3)', () => {
     await send('POST', '/crew/builder/reset');
   });
 
+  it('saves a crew shape with its color, and refuses a shape it does not know with the ones it does', async () => {
+    const res = await send('PUT', '/crew/builder', { fields: { avatar: { shape: 'droplet', bg: '#52CDFE' } } });
+    expect(res.status).toBe(200);
+    expect((await json(res)).role.avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+    expect(own('builder')).toContain('avatar:\n  shape: droplet\n  bg: "#52CDFE"');
+    expect((await json(await send('GET', '/crew'))).find((r: { id: string }) => r.id === 'builder').avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+
+    const refused = await send('PUT', '/crew/builder', { fields: { avatar: { shape: 'hexagon' } } });
+    expect(refused.status).toBe(400);
+    const { error } = await json(refused);
+    expect(error).toMatch(/^An avatar shape is one of circle, droplet, squircle, .*, bucket\.$/);
+    expect(getCrew('builder')?.avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+    // Clearing the avatar clears the shape with the icon and color.
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: null } })).status).toBe(200);
+    expect(getCrew('builder')?.avatar).toBeUndefined();
+    expect(own('builder')).not.toContain('shape');
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('reads past a shape this build does not draw, as a file from a later build names one', async () => {
+    writeOwn('builder', '---\ncharter_mode: append\navatar:\n  shape: hexagon\n  bg: "#52cdfe"\n---\n');
+    expect(getCrew('builder')?.avatar).toEqual({ bg: '#52cdfe' });
+    writeOwn('builder', '---\ncharter_mode: append\navatar:\n  shape: hexagon\n---\n');
+    expect(getCrew('builder')?.avatar).toBeUndefined();
+    // An edit from this build keeps the key for the build that draws it.
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: '#ff4983' } } })).status).toBe(200);
+    expect(own('builder')).toContain('shape: hexagon');
+    expect(getCrew('builder')?.avatar).toEqual({ bg: '#ff4983' });
+    await send('POST', '/crew/builder/reset');
+  });
+
   it('keeps an uploaded SVG icon on its background through the file, as a channel keeps one', async () => {
     // Several lines, quotes and a colon: the file must give back exactly the markup that went in.
     const svg = 'svg:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\n  <path d="M2 2h20v20H2z" fill="#283c62"/>\n  <text x="4" y="16">a: b</text>\n</svg>';

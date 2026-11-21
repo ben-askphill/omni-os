@@ -257,6 +257,20 @@ describe('crew files across machines', () => {
     expect(getCrew('from-b')).toBeUndefined();
   });
 
+  it('lands a file with a crew shape, and an edit that names no shape keeps it', async () => {
+    const markdown = '---\nname: Shaped\navatar:\n  shape: droplet\n  bg: "#52cdfe"\n---\nCite every source.\n';
+    await relay.push([signAs(file('shaped', { markdown }))]);
+    expect((await worker.syncNow()).error).toBeUndefined();
+    expect(getCrew('shaped')?.avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+    // The Identity block of a build before shapes sends only the keys it knows.
+    expect((await call('PUT', '/crew/shaped', { fields: { avatar: { icon: '🛒', bg: '#ffa839' } } })).status).toBe(200);
+    expect(getCrew('shaped')?.avatar).toEqual({ icon: '🛒', shape: 'droplet', bg: '#ffa839' });
+    expect((await worker.syncNow()).error).toBeUndefined();
+    expect((sent('shaped').at(-1)!.data as any).markdown).toContain('shape: droplet');
+    await call('DELETE', '/crew/shaped');
+    expect((await worker.syncNow()).error).toBeUndefined();
+  });
+
   it('a handoff carries who sent each queued message, so an agent\'s message never lands as Ben\'s', async () => {
     const { carriedEvent, senderOfMsg } = await import('../handoff.ts');
     const queued = [

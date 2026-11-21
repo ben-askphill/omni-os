@@ -13,6 +13,7 @@ import {
   type SizeStop,
 } from './crew-shapes.ts';
 import { crewEye, crewEyeLine, crewGrid, crewLean, crewStop, crewStroke } from './crew-size.ts';
+import { eyesFor, type EyeSource } from './crew-eyes.ts';
 import { monogram } from './monogram.ts';
 
 // The initials disc (ADR 0019, How it looks) left the agent face's chain (ADR 0021, D1). The Web UI's and the iOS
@@ -79,10 +80,8 @@ export interface FaceAgent {
   avatar?: { image?: string | null; icon?: string | null; bg?: string | null; shape?: string | null } | null;
 }
 
-/** What the avatar shows. Nothing shows idle eyes. */
-export interface FaceShows {
-  eyes: EyeState;
-}
+/** What the avatar shows (crew-eyes.ts). Nothing shows idle eyes. */
+export type FaceShows = EyeSource;
 
 /** Where the avatar sits: where one agent is in focus, in a list row, or still (a past reply, a picker). */
 export type FacePlacement = 'focus' | 'row' | 'still';
@@ -91,7 +90,10 @@ export interface FaceOptions {
   /** The avatar's size in px. */
   size: number;
   shows?: FaceShows;
-  /** The drawing is the same wherever the avatar sits; only its motion depends on this and on reduced motion. */
+  /**
+   * In focus a status mark is the open thread's, whose rows tell thinking from a tool call; in a row or still a running
+   * thread works (D7). Otherwise the drawing is the same wherever the avatar sits.
+   */
   placement?: FacePlacement;
   reducedMotion?: boolean;
 }
@@ -196,7 +198,7 @@ export function agentFace(agent: FaceAgent, opts: FaceOptions): AgentFace {
     return { kind: 'icon', size: opts.size, icon, bg, ink: avatarInk(bg) };
   }
   const shape = agentShape(agent);
-  return crewCharacter(shape, agent.avatar?.bg || CREW_SHAPES[shape].color, opts.size, opts.shows?.eyes ?? 'idle');
+  return crewCharacter(shape, agentColor(agent), opts.size, eyesFor(opts.shows, opts.placement === 'focus'));
 }
 
 function crewCharacter(shape: CrewShapeId, body: string, px: number, eyes: EyeState): CharacterFace {
