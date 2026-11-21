@@ -54,6 +54,16 @@ export const progressFinished = (v: Pick<StepsView, 'steps'>) => v.steps.length 
  */
 export const progressMark = (state: StepState, { last, finished }: { last: boolean; finished: boolean }) => (finished && last ? 'done' : PROGRESS_MARK[state]);
 
+/**
+ * How far down the rail its dark part runs: the index of the first step that is not done, so it runs from the first
+ * step into the step it is on, or the step count once every step is done. Grouped phases keep the order they first
+ * came up in, so a turn that goes back to an earlier phase is on a step above done ones: the dark part still stops there.
+ */
+export const progressReach = (steps: readonly Pick<Step, 'state'>[]) => {
+  const at = steps.findIndex((s) => s.state !== 'done');
+  return at < 0 ? steps.length : at;
+};
+
 /** The line under the step it is on: what it does now while the turn runs. */
 export const progressNow = (s: Step): string | null => (s.state === 'active' || s.state === 'needs' ? s.now : null);
 

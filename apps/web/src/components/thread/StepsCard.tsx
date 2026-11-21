@@ -9,7 +9,7 @@ import { actionsLabel, stepsHeader, type Step, type StepsView } from '@omni/shar
 import { Icon, StatusDot, StatusPill, Ticks } from '../ui.tsx';
 import { ToolRow } from './ToolRows.tsx';
 import { StepRail } from './StepRail.tsx';
-import { progressFinished } from '@omni/shared/progress-panel.ts';
+import { progressFinished, progressReach } from '@omni/shared/progress-panel.ts';
 import { NowWithConnector } from '../ConnectorMark.tsx';
 import { callsHold, useFindOpens } from '../../transcript/find-target.ts';
 
@@ -34,6 +34,7 @@ function StepRow({
   s,
   index,
   count,
+  reach,
   finished,
   cwd,
   running,
@@ -42,6 +43,7 @@ function StepRow({
   s: Step;
   index: number;
   count: number;
+  reach: number;
   finished: boolean;
   cwd?: string | null;
   running: boolean;
@@ -53,7 +55,7 @@ function StepRow({
   const on = s.state === 'active' || s.state === 'needs';
   return (
     <li data-state={s.state} className="flex min-w-0 gap-2.5">
-      <StepRail state={s.state} index={index} count={count} mid={MID} finished={finished} className="w-3" />
+      <StepRail state={s.state} index={index} count={count} reach={reach} mid={MID} finished={finished} className="w-3" />
       <div className="min-w-0 flex-1 py-[5px]">
         <div className="flex min-w-0 items-start gap-2.5">
           <span className="min-w-0 flex-1">
@@ -101,6 +103,8 @@ export function StepsCard({ v, cwd, byId }: { v: StepsView; cwd?: string | null;
   const open = v.live || shown || found;
   const n = v.steps.length;
   const failed = v.steps.some((s) => s.state === 'failed');
+  const reach = progressReach(v.steps);
+  const finished = progressFinished(v);
   return (
     <section aria-label="Steps" data-live={v.live || undefined} className="rounded-[20px] px-4 pt-3 pb-2.5 shadow-[inset_0_0_0_1px_var(--line)]">
       {v.live ? (
@@ -123,7 +127,7 @@ export function StepsCard({ v, cwd, byId }: { v: StepsView; cwd?: string | null;
       {open && (
         <ol className={v.live ? '' : 'fade-in mt-1'}>
           {v.steps.map((s, i) => (
-            <StepRow key={s.key} s={s} index={i} count={n} finished={progressFinished(v)} cwd={cwd} running={v.live} byId={byId} />
+            <StepRow key={s.key} s={s} index={i} count={n} reach={reach} finished={finished} cwd={cwd} running={v.live} byId={byId} />
           ))}
         </ol>
       )}
