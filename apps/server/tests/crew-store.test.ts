@@ -16,6 +16,7 @@ const { avatarOf, charterHash, crewForNewThread, getCrew, listCrew, splitCrewFil
 const { crewRunProblem } = await import('../crew-store.ts');
 const { channels } = await import('../db.ts');
 const { updateUserConfig } = await import('../user-config.ts');
+const { crewDraftOf, crewSaveBody } = await import('@omni/shared/crew-settings.ts');
 
 const shipped = mkdtempSync(join(tmpdir(), 'omni-crew-shipped-'));
 paths.crew = shipped;
@@ -172,6 +173,16 @@ describe('Settings > Crew (S3)', () => {
     expect(getCrew('builder')?.avatar).toBeUndefined();
     // An edit from this build keeps the key for the build that draws it.
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: '#ff4983' } } })).status).toBe(200);
+    expect(own('builder')).toContain('shape: hexagon');
+    expect(getCrew('builder')?.avatar).toEqual({ bg: '#ff4983' });
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('keeps a later build’s shape when Settings saves only a new color', async () => {
+    writeOwn('builder', '---\ncharter_mode: append\navatar:\n  shape: hexagon\n  bg: "#52cdfe"\n---\n');
+    const view = await json(await send('GET', '/crew/builder'));
+    const draft = { ...crewDraftOf(view), bg: '#ff4983' };
+    expect((await send('PUT', '/crew/builder', crewSaveBody(draft, view))).status).toBe(200);
     expect(own('builder')).toContain('shape: hexagon');
     expect(getCrew('builder')?.avatar).toEqual({ bg: '#ff4983' });
     await send('POST', '/crew/builder/reset');
