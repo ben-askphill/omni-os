@@ -6,6 +6,7 @@ import type { SlashCommand } from '@omni/shared/slash.ts';
 import type { PermissionGate } from '../runner/approvals.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
+import type { ThreadSkills } from '../skills.ts';
 import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
 import type { Attachment } from '../uploads.ts';
@@ -18,6 +19,11 @@ export interface AdapterContext {
   role?: CrewRole;
   /** Omni's context (channel facts, role charter, artifacts, secrets note). */
   systemPrompt: string;
+  /**
+   * What this harness loads of the role's skills (skills.ts): the system prompt already says it, and Codex also sends
+   * each skill it lists with the session's first turn. Unset when the role loads none here.
+   */
+  skills?: ThreadSkills | null;
   /** Per-thread MCP config file, when one was written. */
   mcpFile: string | null;
   /** Channel and global secret values. Empty for a Runs API harness, which gets none of them (ADR 0017). */

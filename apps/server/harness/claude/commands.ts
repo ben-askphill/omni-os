@@ -111,7 +111,8 @@ export function normalizeClaudeCommands(raw: unknown): SlashCommand[] {
     const scope = SCOPE.exec(description)?.[1];
     if (r.builtin === true) {
       cmd.mentionable = false;
-    } else if (plugin && description.startsWith(`(${plugin})`)) {
+    } else if (plugin && description.toLowerCase().startsWith(`(${plugin.toLowerCase()})`)) {
+      // Claude Code tags a plugin's command with the plugin's display name, which can be capitalised: "(Superpowers)".
       cmd.source = 'plugin';
       cmd.plugin = plugin;
       description = description.slice(plugin.length + 2).trim();
