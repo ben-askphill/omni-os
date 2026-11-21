@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { requestPhase, type HandoffOffer, type HandoffRequest, type HandoffView, type Takeover } from '@omni/shared/handoff.ts';
+import type { MessageContext } from '@omni/shared/message-context.ts';
 import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { assignments, channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
@@ -165,12 +166,20 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
  * Send a thread that has not run anywhere to another machine, to run there from its first message (run-on.ts): the
  * offer goes out ready, since there is no turn to stop, session to upload or worktree to pack. That machine cuts the
  * worktree itself, or lays out `bundle` when the offer carries one (a fork's, continue.ts) and runs its setup in it.
- * `to` must be a synced machine; the caller checks it. `files` and the bundle are in Storage already.
+ * `to` must be a synced machine; the caller checks it. `files` and the bundle are in Storage already. `context` is the
+ * first message's records, stamped here (thread-routes-api.ts): they go with the prompt, so the agent there reads them.
  */
-export function sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac, files: UploadRef[] = [], bundle: WorktreeBundle | null = null, id: string = randomUUID()) {
+export function sendNewThread(
+  threadId: string,
+  prompt: string,
+  from: Mac,
+  to: Mac,
+  { files = [], context = [], bundle = null, id = randomUUID() }: { files?: UploadRef[]; context?: MessageContext[]; bundle?: WorktreeBundle | null; id?: string } = {},
+) {
   writeOffer({
     id, thread: threadId, from, to, at: iso(), idle: true, fresh: true, state: 'offered', queued: [prompt], bundle, leftBehind: null,
     ...(files.length && { files }),
+    ...(context.length && { context }),
   });
   void activeWorker()?.syncNow();
 }
@@ -330,7 +339,8 @@ function restoreFresh(offer: Offered) {
   const why = reply?.offer === offer.id && reply.state === 'failed' ? reply.error : null;
   const reason = why ? `${offer.to.name} could not start it: ${why}.` : `It was not sent to ${offer.to.name}.`;
   offer.queued.forEach((text, n) => {
-    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: carriedEvent(offer, text, n), source: 'handoff', mode: 'queue' });
+    const context = n === 0 && offer.context?.length ? offer.context : undefined;
+    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { ...carriedEvent(offer, text, n), ...(context && { context }) }, source: 'handoff', mode: 'queue', context });
     if (row) messageRequests.park(row.id);
   });
   const channel = channels.get(t.channel_id);
@@ -489,6 +499,7 @@ async function take(offer: Offered, worker: SyncWorker) {
             source: offer.fresh ? 'ben' : 'handoff',
             mode: 'queue',
             ...(offer.fresh && n === 0 && attachments.length && { attachments }),
+            ...(offer.fresh && n === 0 && offer.context?.length && { context: offer.context }),
           }),
         ),
       ].filter((r) => !!r);

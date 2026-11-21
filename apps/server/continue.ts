@@ -441,7 +441,7 @@ async function sendElsewhere(t: Thread, route: { from: Mac; to: Mac }, text: str
     const bundle = repo ? await packTree(repo.dir, { head: repo.head, tree: repo.tree }, t.id, offer, worker.transport) : null;
     tx(() => {
       assignRouted(t.id, route.to.id);
-      sendNewThread(t.id, text, route.from, route.to, refs, bundle, offer);
+      sendNewThread(t.id, text, route.from, route.to, { files: refs, bundle, id: offer });
     });
   } catch (err) {
     console.error(`[continue] ${t.id}: could not send it to ${route.to.name}:`, (err as Error).message);

@@ -112,8 +112,9 @@ const createSchema = z.object({
   base: basePick.nullish(),
   device: z.string().max(100).nullish(),
   /**
-   * Thread references on the first message (the new-thread composer's chips), checked by parseContexts and stamped by
-   * stampNewThreadReferences. No other kind: the rest point into the thread they are written in.
+   * Thread references and machine mentions on the first message (the new-thread composer's chips and pills), checked
+   * by parseContexts and stamped by stampNewThreadReferences and stampMachineMentions. No other kind: the rest point
+   * into the thread they are written in. A machine mention never picks where the thread starts: `device` does.
    */
   context: z.unknown().optional(),
   /** A quick ask (packages/shared/quick-ask.ts): answered in place, out of the lists but Recent asks. */
@@ -277,8 +278,7 @@ function openingOf(id: string, pending: PendingMsg[]): Opening | null {
   if (events.firstUserText(id) !== null) return null;
   const lead = leadOf(pending);
   if (lead) return { text: lead.text, uuid: lead.uuid, ...(lead.attachments?.length && { attachments: lead.attachments }), ...(lead.context && { context: lead.context }) };
-  const prompt = freshPrompt(id);
-  return prompt ? { text: prompt } : null;
+  return freshPrompt(id);
 }
 
 /** The detail with `page`'s events: every event, the head and its `history`, or none (the stream's sync). */
