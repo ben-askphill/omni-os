@@ -105,13 +105,14 @@ export function OutcomeRow({ row }: Of<'outcome'>) {
   );
 }
 
-/** The Conductor's name over its answer, with the icon and background saved for it, else the Omni mark (web: ThreadTurn). */
+/** The Conductor's name over a reply on a thread from before agents. */
 export function ConductorRow({ row }: Of<'conductor'>) {
   const { colors } = useOmniTheme();
-  const { look } = row;
+  const { look, agent } = row;
+  const channelAvatar = look ? <ChannelAvatar name={look.name} icon={look.icon} avatarBg={look.avatar_bg} conductor size={18} /> : <OmniMark size={14} color={colors.fg3} />;
   return (
     <View style={styles.line}>
-      {look ? <ChannelAvatar name={look.name} icon={look.icon} avatarBg={look.avatar_bg} conductor size={18} /> : <OmniMark size={14} color={colors.fg3} />}
+      {agent ? <AgentAvatar agent={agent} size={18} /> : channelAvatar}
       <Text style={[styles.meta, { color: colors.fg3 }]}>Conductor</Text>
     </View>
   );

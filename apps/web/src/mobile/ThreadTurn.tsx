@@ -1,5 +1,6 @@
 import { PHASE, glyphFor, markOf, type Mark, type TurnPhase } from '@omni/shared/status.ts';
 import { conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { eyesForMark } from '@omni/shared/crew-eyes.ts';
 import { agentShows } from '@omni/shared/crew-eyes.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -159,11 +160,8 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
     );
 }
 
-/**
- * The Conductor's face on its answers, as on every surface (conductorChannelLook): its agent's photo or icon, else the
- * icon and background saved for its channel, else its crew character.
- */
 function conductorFace(c: TurnCtx, look: AgentLook) {
+  if (c.thread.channel_id === CONDUCTOR_CHANNEL) return undefined;
   const ch = conductorChannelLook(look, c.conductorChannel);
   return ch ? <Avatar name={ch.name} omni channelIcon={ch.icon} avatarBg={ch.avatar_bg} size={24} /> : undefined;
 }

@@ -620,9 +620,8 @@ export const Transcript = memo(function Transcript({
   // open to remote agents lets them read, so it draws none.
   const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
   const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
-  // The Conductor answers in its face on every surface (conductorChannelLook): its agent's photo or icon, else its
-  // channel's saved look, else its crew character.
-  const conductorChannel = channel(CONDUCTOR_CHANNEL);
+  // Replies in #conductor use the author's agent avatar. The saved channel look can still stand in elsewhere.
+  const conductorChannel = channelId === CONDUCTOR_CHANNEL ? undefined : channel(CONDUCTOR_CHANNEL);
   const faceOf = (look: AgentLook) => {
     const c = conductorChannelLook(look, conductorChannel);
     return c ? <Avatar name={c.name} omni channelIcon={c.icon} avatarBg={c.avatar_bg} size={24} /> : undefined;
