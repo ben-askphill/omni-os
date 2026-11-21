@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { agentFace, type FacePlacement, type FaceShows } from '@omni/shared/agent-avatar.ts';
+import type { FacePlacement, FaceShows } from '@omni/shared/agent-avatar.ts';
 import { eyesFor } from '@omni/shared/crew-eyes.ts';
 import type { EyeState } from '@omni/shared/crew-shapes.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
@@ -8,6 +8,7 @@ import { onApiBase } from '../api-base.ts';
 import { useCrewRoles } from '../store.tsx';
 import { CrewCharacter } from './CrewCharacter.tsx';
 import { Avatar } from './ui.tsx';
+import { useCrewMotion } from './use-crew-motion.ts';
 
 /** What an avatar reads of an agent. */
 export type AgentLook = Pick<CrewRole, 'id' | 'name' | 'avatar'>;
@@ -28,11 +29,13 @@ const RING: Partial<Record<EyeState, string>> = { thinking: 'avatar-ring-working
  * An agent's avatar, drawn from the agent face (ADR 0021, D1): the image Ben uploaded, else its icon or emoji on its
  * color, else its crew character. `shows` is the status mark or member state behind it (nothing for idle eyes) and
  * `placement` where the avatar sits, as agentFace() takes them. A character shows it in its eyes; a photo or an icon,
- * which has none, in the Working or Needs you ring (D8). Nothing sits on the avatar. Every surface of the Web UI draws it.
+ * which has none, in the Working or Needs you ring (D8). Nothing sits on the avatar. A character moves as the face
+ * says for its placement (useCrewMotion): loops in focus, a change's squeeze in a row, nothing still or under reduced
+ * motion. Every surface of the Web UI draws it.
  */
 export function AgentAvatar({ agent, size = 24, shows, placement, className = '' }: { agent: AgentLook; size?: number; shows?: FaceShows; placement?: FacePlacement; className?: string }) {
-  const face = agentFace(agent, { size, shows, placement });
-  if (face.kind === 'character') return <CrewCharacter face={face} className={className} />;
+  const { face, body, eyes } = useCrewMotion(agent, { size, shows, placement });
+  if (face.kind === 'character') return <CrewCharacter face={face} className={className} body={body} eyes={eyes} />;
   const ring = RING[eyesFor(shows, placement === 'focus')] ?? '';
   // The server names it under /api; a paired browser reads it on its own keyed path (api-base.ts).
   if (face.kind === 'image') return <img src={onApiBase(face.image)} alt="" aria-hidden="true" draggable={false} className={`shrink-0 rounded-full object-cover ${ring} ${className}`} style={{ width: size, height: size }} />;

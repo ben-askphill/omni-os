@@ -9,11 +9,28 @@ import {
   type CrewGrid,
   type CrewShapeId,
   type EyeGlyphKind,
+  type EyePair,
+  type EyePose,
   type EyeState,
   type SizeStop,
 } from './crew-shapes.ts';
 import { crewEye, crewEyeLine, crewGrid, crewLean, crewStop, crewStroke } from './crew-size.ts';
 import { eyesFor, type EyeSource } from './crew-eyes.ts';
+import {
+  BODY_LOOPS,
+  CREW_HOP,
+  CREW_POP,
+  CREW_STILL,
+  crewOpen,
+  crewSqueeze,
+  crewWideOpen,
+  EYE_LOOPS,
+  type CrewChange,
+  type CrewMotion,
+  type EyeFrame,
+  type EyeMotion,
+  type EyeTimeline,
+} from './crew-motion.ts';
 
 /** FNV-1a over the id: an agent gets the same spare shape and color on every client, and a rename keeps them. */
 function hash(s: string) {
@@ -51,10 +68,14 @@ export interface FaceOptions {
   shows?: FaceShows;
   /**
    * In focus a status mark is the open thread's, whose rows tell thinking from a tool call; in a row or still a running
-   * thread works (D7). Otherwise the drawing is the same wherever the avatar sits.
+   * thread works (D7). Otherwise the drawing is the same wherever the avatar sits. It decides the motion (D10): loops
+   * in focus, a live change in focus and in a row, nothing still. An avatar placed nowhere is still.
    */
   placement?: FacePlacement;
+  /** The system's reduced motion: nothing moves (D18, D28). */
   reducedMotion?: boolean;
+  /** The eyes it showed until now, on a live change: the motion then holds the change into these eyes. */
+  from?: EyeState;
 }
 
 /** One eye, upright, in grid units. */
@@ -92,6 +113,8 @@ export interface CharacterFace {
   glyphs: 'large' | 'small';
   eyes: EyeState;
   pair: readonly [CrewEye, CrewEye];
+  /** What plays on it (crew-motion.ts). */
+  motion: CrewMotion;
 }
 
 /** An uploaded photo, drawn round. `image` is the path the crew file names. */
@@ -157,17 +180,18 @@ export function agentFace(agent: FaceAgent, opts: FaceOptions): AgentFace {
     return { kind: 'icon', size: opts.size, icon, bg, ink: avatarInk(bg) };
   }
   const shape = agentShape(agent);
-  return crewCharacter(shape, agentColor(agent), opts.size, eyesFor(opts.shows, opts.placement === 'focus'));
+  return crewCharacter(shape, agentColor(agent), opts.size, eyesFor(opts.shows, opts.placement === 'focus'), opts);
 }
 
-function crewCharacter(shape: CrewShapeId, body: string, px: number, eyes: EyeState): CharacterFace {
+function crewCharacter(shape: CrewShapeId, body: string, px: number, eyes: EyeState, opts: FaceOptions): CharacterFace {
   const grid = crewGrid(px);
   const stop = crewStop(px);
   const drawing = CREW_SHAPES[shape].sizes[stop];
   const glyphs = px >= 32 ? 'large' : 'small';
   const unit = grid / px;
   const pose = EYE_STATE_POSE[eyes];
-  const [a, b] = CREW_LAYOUTS[CREW_SHAPES[shape].layout][stop][pose];
+  const centres = CREW_LAYOUTS[CREW_SHAPES[shape].layout][stop];
+  const [a, b] = centres[pose];
   const eye = (cx: number, cy: number) => crewEyeGlyph(EYE_GLYPHS[glyphs][pose], cx, cy, crewEye(px) * EYE_POSE_SCALE[pose] * unit, crewEyeLine(px) * unit);
   return {
     kind: 'character',
@@ -186,7 +210,58 @@ function crewCharacter(shape: CrewShapeId, body: string, px: number, eyes: EyeSt
     glyphs,
     eyes,
     pair: [eye(a[0], a[1]), eye(b[0], b[1])],
+    motion: crewMotion({ centres, pose, lid: crewEyeLine(px) / crewEye(px) }, eyes, opts),
   };
+}
+
+/** What the eye motion reads of a drawing: every pose's centres at its stop, the pose it rests on, and a shut eye's height as a share of an open one. */
+interface EyeRig {
+  centres: Record<EyePose, EyePair>;
+  pose: EyePose;
+  lid: number;
+}
+
+const hasLoop = (eyes: EyeState): eyes is keyof typeof BODY_LOOPS => Object.hasOwn(BODY_LOOPS, eyes);
+
+/**
+ * What plays on a character (ADR 0021, Motion). Under reduced motion, or still, nothing (D18). The body and eye loops
+ * run only where one agent is in focus (D10); a live change plays wherever it moves at all, a list row included.
+ */
+function crewMotion(rig: EyeRig, eyes: EyeState, { placement = 'still', reducedMotion = false, from }: FaceOptions): CrewMotion {
+  if (reducedMotion || placement === 'still') return CREW_STILL;
+  const loops = placement === 'focus' && hasLoop(eyes);
+  return {
+    body: loops ? BODY_LOOPS[eyes] : null,
+    eyes: loops ? eyeMotion(rig, rig.pose, EYE_LOOPS[eyes], true) : null,
+    change: from !== undefined && from !== eyes ? crewChange(rig, from, eyes) : null,
+    pop: placement === 'focus' ? CREW_POP : null,
+  };
+}
+
+/** The squeeze on the eyes of `from`, the swap behind it and the open into `eyes`: through the wide beat from idle to thinking, with the hop into done. */
+function crewChange(rig: EyeRig, from: EyeState, eyes: EyeState): CrewChange {
+  const was = EYE_STATE_POSE[from];
+  const open = from === 'idle' && eyes === 'thinking' ? crewWideOpen(rig.pose) : crewOpen(rig.pose);
+  return { squeeze: eyeMotion(rig, was, crewSqueeze(was), false), open: eyeMotion(rig, rig.pose, open, false), body: eyes === 'done' ? CREW_HOP : null };
+}
+
+/**
+ * A timeline for this drawing, on eyes that rest on `rest`: each beat moves an eye from its rest centre to its pose's,
+ * and a blink shuts it to the lid's height where it looks, dropped as far as the spec's blink sits from its idle eyes.
+ */
+function eyeMotion(rig: EyeRig, rest: EyePose, line: EyeTimeline, loop: boolean): EyeMotion {
+  const { centres, lid } = rig;
+  const side = (k: 0 | 1): EyeFrame[] => {
+    let looking = rest;
+    return line.beats.map(({ at, pose, sx, sy, ease }) => {
+      const shut = pose === 'blink';
+      if (!shut) looking = pose;
+      const [x, y] = centres[looking][k];
+      const [bx, by] = shut ? [centres.blink[k][0] - centres.idle[k][0], centres.blink[k][1] - centres.idle[k][1]] : [0, 0];
+      return { at, pose, dx: x + bx - centres[rest][k][0], dy: y + by - centres[rest][k][1], sx, sy: shut ? lid : sy, ease };
+    });
+  };
+  return { ms: line.ms, loop, frames: [side(0), side(1)] };
 }
 
 /** Paths are written to a thousandth of a grid unit. */

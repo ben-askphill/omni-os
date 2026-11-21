@@ -23,6 +23,14 @@ AgentAvatar is an agent's face wherever the Web UI shows one, on desktop web, ph
 - `shows` is what the eyes read: a thread's status mark (`{ mark }`) or a group member's state (`{ member }`). The thread header, the quick-actions card, the member list, lanes, phone thread rows, the avatar mark and the head of the reply being written pass it. In focus (`placement="focus"`: the open thread's header, the member list, lanes, the live reply head) the eyes tell thinking from working; in a row a running thread works.
 - Avatars with no thread behind them (Settings, pickers, mentions) and the heads of past replies stay idle (`placement="still"`).
 
+## Motion
+
+- Each state moves as the Motion board draws it, played from code (the Web Animations API on the web, Reanimated on iOS) from the one set of numbers in `packages/shared/crew-motion.ts`. No CSS keyframes: the eye groups keep only `transform-box: fill-box` and a centred origin.
+- Loops, only in focus (thread header, member list, lanes, the live reply head, the Settings preview): idle breathes (`--dur-breathe`, 1.025 × .975) and blinks twice, then glances (`--dur-crew-glance`); thinking sways ±2.5° about 50% 70% (`--dur-tick`) and looks centre, left, centre, blinks, right (`--dur-crew-look`); working bounces (`--dur-crew-bounce`) and scans left and right (`--dur-crew-scan` each); waiting breathes slowly, eyes too (`--dur-crew-wait`, 1.04 × .955). Needs you and done hold still.
+- A live change of state, in focus and in rows: the eyes squeeze to 1.15 × .06 (`--dur-crew-squeeze`, stretch), the glyphs swap, and the new eyes spring open (`--dur-crew-open`). Idle to thinking opens into wide eyes (1.22, `--dur-crew-wide`, held `--dur-crew-wide-hold`); into done the body hops once (`--dur-crew-hop`, settle). Never on first render: a list that loads draws still faces.
+- A new agent in the Settings preview pops the body from .7 (`--dur-crew-pop`, spring).
+- Reduced motion is the only off switch: nothing moves, each state rests on its own eyes, and a change swaps them at once. Curves are `--ease-fluid` (loops), `--ease-spring`, `--ease-settle` and `--ease-stretch`.
+
 ## Rules
 
 - `data-shape`, `data-grid` and `data-eyes` on the character's `<svg>` name the drawing for screenshots and checks.
