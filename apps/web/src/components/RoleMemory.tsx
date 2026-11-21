@@ -14,7 +14,8 @@ import { isImeEnter } from '../ime.ts';
 
 type RoleMemoryList = { memories: Memory[]; waiting: number };
 
-export function RoleMemory({ role }: { role: Pick<CrewRole, 'id' | 'name' | 'memory' | 'memoryWrites'> }) {
+/** `note`: false under the Memory group's own choices, which already say how the role's memory works. */
+export function RoleMemory({ role, note: showNote = true }: { role: Pick<CrewRole, 'id' | 'name' | 'memory' | 'memoryWrites'>; note?: boolean }) {
   const { channels } = useApp();
   const res = useApi<RoleMemoryList>(`/crew/${encodeURIComponent(role.id)}/memory`);
   const { data, error, reload } = res;
@@ -64,7 +65,7 @@ export function RoleMemory({ role }: { role: Pick<CrewRole, 'id' | 'name' | 'mem
   if (!data) return <Loading />;
   return (
     <div className="space-y-3">
-      <p className="text-[12.5px] leading-[18px] text-fg-3">{note}</p>
+      {showNote && <p className="text-[12.5px] leading-[18px] text-fg-3">{note}</p>}
       {data.memories.length === 0 && <p className="text-[12.5px] text-fg-3">No lessons yet. Add one, or let its threads propose them.</p>}
       <ul className="space-y-2" aria-label={`${role.name}'s memory`}>
         {data.memories.map((m) => (

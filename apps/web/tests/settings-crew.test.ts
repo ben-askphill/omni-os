@@ -4,9 +4,11 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Channel, CrewRole } from '../src/api.ts';
 
-// Settings > Agents' agent page (`#/settings/crew/builder`): the editor's Form and Markdown tabs are one draft, so an
-// edit in either survives a switch to the other and a save from it, and a key only the file has stays. Hide shows the
-// role hidden at once. The Memory tab counts the lessons that wait for you and adds one of yours.
+// Settings > Agents' agent page (`#/settings/crew/builder`): the form and Advanced > Edit as Markdown are one draft, so
+// an edit in either survives a switch to the other and a save from it, and a key only the file has stays. Hide shows
+// the role hidden at once. The Memory group counts the lessons that wait for you and adds one of yours. The Identity
+// block is the one place the avatar is set: an SVG on a color saves with Save, and any source but a photo upload takes
+// an uploaded image away.
 
 const state = vi.hoisted(() => ({ channels: [] as Channel[], crew: [] as CrewRole[] }));
 vi.mock('../src/store.tsx', async (importOriginal) => ({
@@ -112,9 +114,15 @@ const type = async (el: HTMLTextAreaElement | HTMLInputElement, value: string) =
 };
 const saves = () => calls.filter((c) => c.method === 'PUT' && c.url === '/api/crew/builder');
 
+const toMarkdown = async () => {
+  // The fold's button also carries its summary.
+  await click([...host.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find((b) => b.textContent?.startsWith('Advanced'))!);
+  await click(button('Edit as Markdown'));
+};
+
 it('keeps a Form edit when you switch to Markdown and save from there', async () => {
   await type(q<HTMLTextAreaElement>('#crew-desc'), 'Builds and tests.');
-  await click(button('Markdown'));
+  await toMarkdown();
   const md = q<HTMLTextAreaElement>('#crew-md').value;
   expect(md).toContain('description: Builds and tests.');
   // The key the form does not show is still in the file.
@@ -125,9 +133,9 @@ it('keeps a Form edit when you switch to Markdown and save from there', async ()
 });
 
 it('reads a Markdown edit into the form, and a Form save keeps it and the keys the form does not show', async () => {
-  await click(button('Markdown'));
+  await toMarkdown();
   await type(q<HTMLTextAreaElement>('#crew-md'), '---\nruntime: vps-agent\ndescription: From the file.\ncharter_mode: append\n---\nUse pnpm.\n');
-  await click(button('Form'));
+  await click(button('Back to form'));
   expect(q<HTMLTextAreaElement>('#crew-desc').value).toBe('From the file.');
 
   await type(q<HTMLTextAreaElement>('#crew-charter'), 'Use pnpm. Run the tests.');
@@ -149,11 +157,9 @@ it('shows the role hidden once Hide is done, offering Show', async () => {
   expect(host.querySelector('h1')?.textContent).toBe('Builder');
 });
 
-it("counts the lessons that wait on the Memory tab, and adds one of yours for every channel", async () => {
-  const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((b) => b.textContent?.startsWith('Memory'))!;
-  expect(tab.textContent).toBe('Memory2');
-  expect(tab.title).toBe('2 lessons wait for you');
-  await click(tab);
+it('counts the lessons that wait on the Memory group, lists them there, and adds one of yours for every channel', async () => {
+  const waiting = [...host.querySelectorAll('section')].find((el) => el.querySelector('h2')?.textContent === 'Memory')!;
+  expect(waiting.textContent).toContain('2 waiting');
   expect(host.textContent).toContain('Run the check script before you report.');
   expect(host.textContent).toContain('#acme only');
 
@@ -184,4 +190,58 @@ it("leaves an agent page's address alone when the Agents list sits under it, as 
   await act(async () => root.render(createElement(SettingsPage, { section: 'crew' })));
   await flush();
   expect(location.hash).toBe('#/settings/crew');
+});
+
+/** A choice in the radio group labelled `group`, by its text or its label. */
+const radio = (group: string, label: string) => [...host.querySelectorAll<HTMLButtonElement>(`[aria-label="${group}"] [role="radio"]`)].find((b) => b.textContent?.trim() === label || b.getAttribute('aria-label') === label)!;
+const pick = async (input: HTMLInputElement, file: File) => {
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  await flush();
+};
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#283c62"/></svg>';
+
+it('holds every avatar control in the one Identity block, and nowhere else on the page', async () => {
+  expect(host.querySelectorAll('[data-agent-identity]')).toHaveLength(1);
+  const identity = q('[data-agent-identity]');
+  expect([...host.querySelectorAll('[aria-label="Avatar"] [role="radio"]')].map((b) => b.textContent)).toEqual(['Built-in', 'Emoji', 'Icon', 'Upload']);
+  // No other upload, icon or color control outside the block.
+  const outside = [...host.querySelectorAll('input[type="file"], input[type="color"], [aria-label="Background swatches"]')].filter((el) => !identity.contains(el));
+  expect(outside).toHaveLength(0);
+  expect(button('Upload image')).toBeUndefined();
+});
+
+it('saves an uploaded SVG on the background color picked, with Save', async () => {
+  await click(radio('Avatar', 'Upload'));
+  // A photo fills the circle, so no color shows until the file is an SVG.
+  expect(host.querySelector('[aria-label="Background swatches"]')).toBeNull();
+  await pick(q<HTMLInputElement>('input[aria-label="Upload an image or SVG for Builder"]'), new File([SVG], 'mark.svg', { type: 'image/svg+xml' }));
+  await click(host.querySelector<HTMLButtonElement>('[aria-label="Background swatches"] button[aria-label="Navy"]')!);
+  // The preview draws the SVG as an image before anything is saved.
+  expect(q('[aria-label="Avatar preview"] img')?.getAttribute('src')).toContain('data:image/svg+xml');
+  expect(saves()).toHaveLength(0);
+  expect(host.textContent).toContain('Unsaved changes');
+
+  await click(button('Save'));
+  expect(saves().map((c) => c.body.fields.avatar)).toEqual([{ icon: `svg:${SVG}`, bg: '#283c62' }]);
+  // Builder had no uploaded image, so nothing goes to the avatar endpoint.
+  expect(calls.filter((c) => c.url === '/api/crew/builder/avatar')).toHaveLength(0);
+});
+
+it('takes an uploaded photo away when another source is saved, so the preview is what shows', async () => {
+  detail = { ...detail, role: { ...detail.role, avatar: { image: '/api/crew/builder/avatar?v=abcdef', icon: 'icon:zap' } } };
+  state.crew = [detail.role as unknown as CrewRole];
+  act(() => root.unmount());
+  root = createRoot(host);
+  await act(async () => root.render(createElement(CrewSection, { agent: 'builder' })));
+  await flush();
+  expect(radio('Avatar', 'Upload').getAttribute('aria-checked')).toBe('true');
+  expect(button('Replace')).toBeDefined();
+  expect(host.querySelector('[aria-label="Background swatches"]')).toBeNull();
+
+  await click(radio('Avatar', 'Icon'));
+  // The icon it had under the photo comes back as the pick.
+  expect(host.querySelector('[role="radiogroup"][aria-label="Icon"] [aria-checked="true"]')?.getAttribute('aria-label')).toBe('zap');
+  await click(button('Save'));
+  expect(calls.filter((c) => c.method === 'PUT' && c.url === '/api/crew/builder/avatar').map((c) => c.body)).toEqual([{ image: null }]);
 });

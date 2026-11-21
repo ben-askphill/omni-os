@@ -403,7 +403,13 @@
         "new role",
         "duplicate",
         "hide",
-        "reset"
+        "reset",
+        "avatar",
+        "photo",
+        "emoji",
+        "icon",
+        "svg",
+        "agent color"
       ]
     },
     {

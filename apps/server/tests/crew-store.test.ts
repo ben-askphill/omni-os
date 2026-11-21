@@ -12,7 +12,7 @@ const home = mkdtempSync(join(tmpdir(), 'omni-crew-home-'));
 await startRunner({ HOME: home });
 const { app } = await import('../app.ts');
 const { paths } = await import('../config.ts');
-const { charterHash, crewForNewThread, getCrew, listCrew } = await import('../crew.ts');
+const { avatarOf, charterHash, crewForNewThread, getCrew, listCrew, splitCrewFile } = await import('../crew.ts');
 const { crewRunProblem } = await import('../crew-store.ts');
 const { channels } = await import('../db.ts');
 const { updateUserConfig } = await import('../user-config.ts');
@@ -137,11 +137,24 @@ describe('Settings > Crew (S3)', () => {
     expect(getCrew('builder')?.avatar).toEqual({ icon: '🛒', bg: '#f5e6ba' });
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: null } } })).status).toBe(200);
     expect(getCrew('builder')?.avatar).toEqual({ icon: '🛒' });
-    // An uploaded SVG would not read in a file, and a color must be hex.
+    // Something that is not one plain SVG is refused, and a color must be hex.
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { icon: 'svg:<svg/>' } } })).status).toBe(400);
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { icon: 'svg:<svg><script>alert(1)</script></svg>' } } })).status).toBe(400);
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: 'amber' } } })).status).toBe(400);
     await send('PUT', '/crew/builder', { fields: { avatar: null } });
     expect(getCrew('builder')?.avatar).toBeUndefined();
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('keeps an uploaded SVG icon on its background through the file, as a channel keeps one', async () => {
+    // Several lines, quotes and a colon: the file must give back exactly the markup that went in.
+    const svg = 'svg:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\n  <path d="M2 2h20v20H2z" fill="#283c62"/>\n  <text x="4" y="16">a: b</text>\n</svg>';
+    const res = await send('PUT', '/crew/builder', { fields: { avatar: { icon: svg, bg: '#f5e6ba' } } });
+    expect(res.status).toBe(200);
+    expect((await json(res)).role.avatar).toEqual({ icon: svg, bg: '#f5e6ba' });
+    // Read again from disk, as the next start or another machine's sync reads it.
+    expect(avatarOf(splitCrewFile(own('builder')).meta.avatar)).toEqual({ icon: svg, bg: '#f5e6ba' });
+    expect((await json(await send('GET', '/crew?all=1'))).find((r: { id: string }) => r.id === 'builder').avatar).toEqual({ icon: svg, bg: '#f5e6ba' });
     await send('POST', '/crew/builder/reset');
   });
 
