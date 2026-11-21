@@ -783,4 +783,18 @@ export function migrate() {
     db.exec(`UPDATE sync_refused SET count = 1 WHERE applied = 1 AND count > 1;
       INSERT INTO kv (key, value) VALUES ('sync.migrated.refused_retry_counts', json_quote(strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));`);
   }
+  // The shadow agent router's log (agent-router/shadow.ts): per new #conductor thread, what Jev and Haiku would have
+  // picked for its first message, and what the Conductor did in that turn. Picks are JSON arrays of agent ids, most
+  // likely first, 'conductor-self' for the Conductor answering itself; conductor_picks is [] when it delegated
+  // nothing. Machine-local, never synced, and no message text or key: the thread holds the message.
+  db.exec(`CREATE TABLE IF NOT EXISTS agent_router_shadow (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    message_at TEXT NOT NULL,
+    agents TEXT NOT NULL,
+    jev_model TEXT, jev_picks TEXT, jev_confidence REAL, jev_scores TEXT, jev_ms INTEGER, jev_tokens INTEGER, jev_error TEXT,
+    haiku_model TEXT, haiku_via TEXT, haiku_picks TEXT, haiku_confidence REAL, haiku_ms INTEGER, haiku_cost_usd REAL, haiku_error TEXT,
+    conductor_picks TEXT, conductor_status TEXT, conductor_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );`);
 }

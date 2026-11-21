@@ -82,6 +82,13 @@ export const config = {
   browserLive: (env.OMNI_BROWSER_LIVE ?? '1') !== '0',
   /** After a finished turn, ask Haiku for the user's likely next reply: the reply box's placeholder, Tab fills it in. */
   suggestions: (env.OMNI_SUGGESTIONS ?? '1') !== '0',
+  /**
+   * Ask two routers which agents should take the first message of every new #conductor thread, and log their picks
+   * beside the Conductor's own (agent-router/shadow.ts). Changes nothing the user sees. Off until '1'.
+   */
+  shadowRouter: env.OMNI_SHADOW_ROUTER === '1',
+  /** TypeSafe's API, for the shadow router's Jev call. Set only to point Omni at a fake for tests or QA. The key is the secret JEV_API_KEY. */
+  jevApiUrl: env.OMNI_JEV_API_URL ?? 'https://api.typesafe.ai',
   /** Save a worktree thread's checkout before and after every turn, for its This turn diff (apps/server/turns.ts). */
   turnSnapshots: (env.OMNI_TURN_SNAPSHOTS ?? '1') !== '0',
   /** How long a turn's first message waits for the checkout to be saved before it goes without that snapshot. */

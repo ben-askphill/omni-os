@@ -40,6 +40,11 @@ export interface RunnerPorts {
     quietRun(threadId: string, reply: string | null): boolean;
     /** A quick ask's turn ended done with this reply (quick-ask.ts afterQuickTurn): a TASK line or a file promotes it. */
     quickTurn(threadId: string, reply: string): Promise<void>;
+    /**
+     * A new thread started here with this first message (agent-router/shadow.ts shadowRoute logs what two routers
+     * would pick for a #conductor one). Returns at once: nothing on the user's path waits on it.
+     */
+    threadStarted(thread: Thread, prompt: string): void;
   };
 }
 
@@ -69,7 +74,12 @@ const unbound = (what: string) => () => {
 const ports: RunnerPorts = {
   routing: { targetFor: unbound('routing.targetFor'), forwardMessage: unbound('routing.forwardMessage'), forwardReport: unbound('routing.forwardReport') },
   handoff: { sendNewThread: unbound('handoff.sendNewThread') },
-  reporting: { toolResult: unbound('reporting.toolResult'), quietRun: unbound('reporting.quietRun'), quickTurn: unbound('reporting.quickTurn') },
+  reporting: {
+    toolResult: unbound('reporting.toolResult'),
+    quietRun: unbound('reporting.quietRun'),
+    quickTurn: unbound('reporting.quickTurn'),
+    threadStarted: unbound('reporting.threadStarted'),
+  },
 };
 
 let deps: ControllerDeps | null = null;

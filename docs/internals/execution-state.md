@@ -127,6 +127,7 @@ binds each to its module and builds the controller deps:
 | `handoff.sendNewThread` | `handoff.ts` | `runner/api.ts` createThread for another machine |
 | `reporting.toolResult` | `published.ts`, then `automation-triggers.ts` | `runner/records.ts` on every tool result |
 | `reporting.quietRun` | `automation-quiet.ts` | `runner/session.ts` as a turn ends, before its alert |
+| `reporting.threadStarted` | `agent-router/shadow.ts` | `runner/api.ts` createThread, once a thread here has started |
 
 `app.ts` and the test boot (`tests/runner-boot.ts`) import `compose.ts` first; a port used before that throws an error that names it.
 `tests/import-boundaries.test.ts` scans the runtime imports and fails on any cycle that crosses an owner, so a new import

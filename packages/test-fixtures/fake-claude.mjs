@@ -28,6 +28,9 @@
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   NEXT_THREAD       text mode (Omni's proposed follow-up thread): propose one; without it, answer NONE
 //   NEXT:<ms>         text mode (Omni's proposed follow-up thread): take that long to answer
+//   ROUTE:<ids>       json mode (Omni's shadow agent router): pick these agents (comma-separated); without it, conductor-self
+//   ROUTE_FAIL        json mode (Omni's shadow agent router): fail the call
+//   ROUTE_SLOW:<ms>   json mode (Omni's shadow agent router): take that long to answer
 //   OPEN_ITEMS        text mode (Omni's open items): list a question, a decision and a blocker; without it, answer NONE
 //   OPEN:<ms>         text mode (Omni's open items): take that long to answer
 //   RICH              before the answer, the calls a real turn is made of: a plan updated as it goes, a sub-agent
@@ -1267,6 +1270,22 @@ async function main() {
       const wait = Number(/TITLE:(\d+)/.exec(prompt)?.[1] ?? 0);
       if (wait) await new Promise((r) => setTimeout(r, wait));
       return process.stdout.write('Fake title\n');
+    }
+    if (outFmt === 'json' && opts['--json-schema'] && (opts['--system-prompt'] ?? '').startsWith('You route messages')) {
+      // Omni's shadow agent router (apps/server/agent-router/routers.ts). ROUTE:<ids> in the message picks those
+      // agents, ROUTE_FAIL fails the call, ROUTE_SLOW:<ms> waits first; otherwise the Conductor answers itself.
+      if (prompt.includes('ROUTE_FAIL')) return fail('fake-claude: the router call failed');
+      const wait = Number(/ROUTE_SLOW:(\d+)/.exec(prompt)?.[1] ?? 0);
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      const agents = /ROUTE:([\w,-]+)/.exec(prompt)?.[1].split(',') ?? ['conductor-self'];
+      const answer = { agents, confidence: 0.8 };
+      return process.stdout.write(
+        JSON.stringify({
+          type: 'result', subtype: 'success', is_error: false, duration_ms: 5, duration_api_ms: 5, num_turns: 1,
+          result: JSON.stringify(answer), structured_output: answer, stop_reason: 'end_turn', session_id: sessionId,
+          total_cost_usd: 0.0002, usage: { input_tokens: 400, output_tokens: 20 }, permission_denials: [], uuid: randomUUID(),
+        }) + '\n',
+      );
     }
     if (outFmt === 'json') {
       return process.stdout.write(
