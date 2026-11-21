@@ -16,8 +16,8 @@ import { crewEye, crewEyeLine, crewGrid, crewLean, crewStop, crewStroke } from '
 import { eyesFor, type EyeSource } from './crew-eyes.ts';
 import { monogram } from './monogram.ts';
 
-// An agent's face where it has no image or icon of its own: a colored disc with two letters (ADR 0019, How it looks).
-// The web, the phone layout and the iOS app draw it. Pure.
+// The initials disc (ADR 0019, How it looks) left the agent face's chain (ADR 0021, D1). The Web UI's and the iOS
+// app's own chains still draw it until they draw agentFace() below. Pure.
 
 const letters = (name: string) => name.replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
 
@@ -135,15 +135,70 @@ export interface CharacterFace {
   pair: readonly [CrewEye, CrewEye];
 }
 
-export type AgentFace = CharacterFace;
+/** An uploaded photo, drawn round. `image` is the path the crew file names. */
+export interface ImageFace {
+  kind: 'image';
+  size: number;
+  image: string;
+}
+
+/** A shared icon, an emoji or an SVG icon (`avatar.icon`, as channel-icon.ts reads it) on the agent's color. */
+export interface IconFace {
+  kind: 'icon';
+  size: number;
+  icon: string;
+  bg: string;
+  ink: string;
+}
+
+export type AgentFace = ImageFace | IconFace | CharacterFace;
 
 const isCrewShape = (shape: unknown): shape is CrewShapeId => (CREW_SHAPE_IDS as readonly unknown[]).includes(shape);
 
-/** What an agent's avatar draws: the crew character its avatar names, null when it names none. */
-export function agentFace(agent: FaceAgent, opts: FaceOptions): AgentFace | null {
+/**
+ * The shape each built-in agent takes when its crew file names none (D2), Store ops and Hermes included although
+ * neither ships as a crew file. Kept in code: an overlay replaces a crew file's whole avatar map.
+ */
+export const BUILT_IN_SHAPES: Readonly<Record<string, CrewShapeId>> = {
+  conductor: 'circle',
+  researcher: 'droplet',
+  builder: 'squircle',
+  reviewer: 'pill-wide',
+  writer: 'arch',
+  inbox: 'tray',
+  'store-ops': 'triangle',
+  'usage-scan': 'pill-tall',
+  hermes: 'pebble',
+};
+
+/** The shapes no built-in agent takes, in the spec's order: any other agent gets one of them (D2). */
+export const SPARE_SHAPES: readonly CrewShapeId[] = ['diamond', 'bubble', 'cloud', 'pill-diagonal', 'fan', 'shield', 'bucket'];
+
+/**
+ * The shape an agent's character takes: the one its avatar names, else its built-in one, else a spare from the hash of
+ * its id, so it looks the same on every machine and client and keeps its face when it is renamed.
+ */
+export function agentShape(agent: FaceAgent): CrewShapeId {
   const shape = agent.avatar?.shape;
-  if (!isCrewShape(shape)) return null;
-  return crewCharacter(shape, agent.avatar?.bg || CREW_SHAPES[shape].color, opts.size, eyesFor(opts.shows, opts.placement === 'focus'));
+  if (isCrewShape(shape)) return shape;
+  return Object.hasOwn(BUILT_IN_SHAPES, agent.id) ? BUILT_IN_SHAPES[agent.id] : SPARE_SHAPES[hash(agent.id) % SPARE_SHAPES.length];
+}
+
+/** An agent's one color (D4): its avatar's, else the one its shape is paired with (D13). */
+export function agentColor(agent: FaceAgent): string {
+  return agent.avatar?.bg || CREW_SHAPES[agentShape(agent)].color;
+}
+
+/** What an agent's avatar draws (D1): its uploaded photo, else its icon or emoji on its color, else its crew character. */
+export function agentFace(agent: FaceAgent, opts: FaceOptions): AgentFace {
+  const { image, icon } = agent.avatar ?? {};
+  if (image) return { kind: 'image', size: opts.size, image };
+  if (icon) {
+    const bg = agentColor(agent);
+    return { kind: 'icon', size: opts.size, icon, bg, ink: avatarInk(bg) };
+  }
+  const shape = agentShape(agent);
+  return crewCharacter(shape, agentColor(agent), opts.size, eyesFor(opts.shows, opts.placement === 'focus'));
 }
 
 function crewCharacter(shape: CrewShapeId, body: string, px: number, eyes: EyeState): CharacterFace {

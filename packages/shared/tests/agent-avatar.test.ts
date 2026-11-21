@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { agentDisc, agentInitials } from '../agent-avatar.ts';
 import { AVATAR_SWATCHES } from '../avatar-color.ts';
 
+// The initials disc left agentFace's chain (ADR 0021, D1); the clients' own chains draw it until they draw the face.
 describe('agentDisc', () => {
   it('takes its color from the agent id, so a rename keeps it, and shows its letters only from 18px', () => {
     const big = agentDisc('researcher', 'RS', 24);
@@ -16,7 +17,7 @@ describe('agentDisc', () => {
   it('spreads agents over the swatches, ink that reads on each', () => {
     const ids = ['builder', 'reviewer', 'researcher', 'writer', 'inbox', 'store-ops', 'designer', 'hermes'];
     expect(new Set(ids.map((id) => agentDisc(id, 'AB', 24).bg)).size).toBeGreaterThan(3);
-    for (const id of ids) expect(['#202020', '#ffffff']).toContain(agentDisc(id, 'AB', 24).ink);
+    for (const id of ids) expect(['#17181a', '#ffffff']).toContain(agentDisc(id, 'AB', 24).ink);
   });
 });
 
