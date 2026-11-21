@@ -1,4 +1,4 @@
-// Omni's merge-risk gate. Each open PR a builder thread opened in Omni's own repo is rated once per head it is pushed
+// Omni's merge-risk gate. Each open PR an Omni thread opened in Omni's own repo, whichever agent ran it, is rated once per head it is pushed
 // to: a fresh Claude run with no tools reads only the PR's title, body and diff against main's rubric (rubric.ts), code
 // works out the level and the label (level.ts), and the PR gets one comment and one label, edited in place on the next
 // push. It rates only: it never merges, never turns auto-merge on and blocks nothing.
@@ -84,8 +84,6 @@ function checkoutOf(repo: string): string | null {
   return ch?.repo_path ?? null;
 }
 
-/** The builder threads a PR's head branch belongs to. A PR no builder opened is not rated. */
-const builders = (owners: Thread[]) => owners.filter((t) => t.role === 'builder');
 /** A thread on the branch is still at work: its latest push is not its last one yet. */
 const busy = (owners: Thread[]) => owners.some((t) => t.status === 'running' || t.status === 'queued' || t.setup === 'preparing');
 
@@ -135,7 +133,7 @@ async function rate(repo: string, n: number, sha: string, rubric: Rubric, deps: 
 
 /**
  * The PR's mark for its current head. A new push starts a fresh one, and takes off a merge-ready label from the head
- * before at once, even while the builder is still at work: that label no longer holds until this head is rated.
+ * before at once, even while the thread is still at work: that label no longer holds until this head is rated.
  */
 async function markFor(repo: string, pr: OpenPR, deps: GateDeps): Promise<RiskMark> {
   const key = markKey(repo, pr.number);
@@ -177,8 +175,8 @@ async function gateOne(repo: string, pr: OpenPR, mark: RiskMark, rubric: Rubric,
 }
 
 /**
- * One pass over the open PRs of Omni's repo that a builder thread opened and that are not drafts or a fork's. A new
- * push loses merge-ready at once; a head with no rating yet is rated once its builder is not mid-turn, one PR at a
+ * One pass over the open PRs of Omni's repo that an Omni thread opened and that are not drafts or a fork's. A new
+ * push loses merge-ready at once; a head with no rating yet is rated once its thread is not mid-turn, one PR at a
  * time. Main's rubric is fetched only when something needs rating. Marks of PRs no longer open are dropped. Returns how
  * many it wrote.
  */
@@ -194,7 +192,8 @@ export async function pollOnce(deps: GateDeps = ghDeps): Promise<number> {
   for (const pr of open) {
     if (pr.isDraft || pr.isCrossRepository) continue;
     const owners = threads.byRepoBranch(repo, pr.headRefName);
-    if (!builders(owners).length) continue;
+    // A PR no Omni thread opened (Ben's own, a bot's) is not rated. Any agent's thread counts, or none.
+    if (!owners.length) continue;
     try {
       const mark = await markFor(repo, pr, deps);
       if (!mark.posted && !busy(owners)) due.push({ pr, mark });

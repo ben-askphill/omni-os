@@ -111,9 +111,10 @@ describe('which PRs the gate rates', () => {
     expect(w.published[0]).toMatchObject({ label: 'needs-ben', body: expect.stringContaining('**Merge risk: high**') });
   });
 
-  it("skips drafts, forks, PRs no builder opened and a builder that is still working, and rates the last once it stops", async () => {
+  it("skips drafts, forks, PRs no Omni thread opened and a thread that is still working, and rates the last once it stops", async () => {
     const working = thread('omni/dddd4444', { status: 'running' });
     thread('omni/eeee5555', { role: 'researcher' });
+    thread('omni/kkkk5656', { role: null });
     thread('omni/ffff6666');
     thread('omni/gggg7777');
     w.open = [
@@ -122,12 +123,14 @@ describe('which PRs the gate rates', () => {
       pr(6, 'omni/ffff6666', 'f1', { isDraft: true }),
       pr(7, 'omni/gggg7777', 'g1', { isCrossRepository: true }),
       pr(8, 'someone-else', 'h1'),
+      pr(56, 'omni/kkkk5656', 'k1'),
     ];
-    expect(await poll()).toBe(0);
-    expect(w.prompts).toHaveLength(0);
+    // Any agent's thread counts: a researcher's PR and one from a thread with no agent are rated too.
+    expect(await poll()).toBe(2);
+    expect(w.published.map((p) => p.n)).toEqual([5, 56]);
     db.threads.update(working.id, { status: 'done' });
     expect(await poll()).toBe(1);
-    expect(w.published.map((p) => p.n)).toEqual([4]);
+    expect(w.published.map((p) => p.n)).toEqual([5, 56, 4]);
   });
 
   it('rates nothing when main has no rubric, or when another machine runs the automations', async () => {
