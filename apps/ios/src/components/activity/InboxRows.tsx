@@ -3,14 +3,16 @@
 // opens the thread. A job's tree hangs under its row (ThreadTree.tsx).
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useChannelLook } from '../../live/react';
+import { useAgents } from '../../live/react';
 import type { DoneRow, InboxRow } from '../../live/activity-model';
 import { tallyLabel } from '../../live/thread-tree';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Text } from '../../ui/Text';
-import { ChannelAvatar } from '../ChannelAvatar';
+import { agentName } from '../agent-face';
 import { MarkLine } from '../MarkLine';
+import { StatusDot } from '../StatusDot';
+import { ROW_AVATAR, ThreadAvatar } from '../ThreadAvatar';
 import { AgentsRow, TreeRows, TreeToggle, TreeToggleSpace } from './ThreadTree';
 
 export interface RowAction {
@@ -19,7 +21,6 @@ export interface RowAction {
   run: () => void;
 }
 
-const AVATAR = 36;
 /** The row's own inset, its second line (where the tree toggle sits) and the padding under that line. */
 const ROW_PAD = space.s2;
 const META_LINE = Math.round(fontSize.small * 1.35);
@@ -61,13 +62,14 @@ export interface RowTree {
 }
 
 /**
- * A thread as phone web's MoInboxRow draws it: the channel's avatar with the status on its corner, the title with the
- * status (or the time) on its right, then the channel and branch. A job has its tally at the end of that line, a
- * button laid over the row, and its tree under it. A row on the Working shelf lists its running sub-agents there too.
+ * A thread as phone web's MoInboxRow draws it: its agent's avatar (else its channel's), the title with the status (or
+ * the time) and the status dot at its far end, then the channel and branch. A job has its tally at the end of that
+ * line, a button laid over the row, and its tree under it. A row on the Working shelf lists its running sub-agents
+ * there too.
  */
 export function InboxRowView({ row, last, actions, onPress, tree }: { row: InboxRow; last: boolean; actions: RowAction[]; onPress: () => void; tree: RowTree }) {
   const { colors } = useOmniTheme();
-  const home = useChannelLook(row.channelId);
+  const agents = useAgents();
   const where = [`#${row.channel}`, row.owner && `for ${row.owner}`, row.branch].filter(Boolean).join(' · ');
   const right = row.status ? row.status.label : row.time;
   const reserve = actionsWidth(actions.length);
@@ -79,17 +81,18 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
       <View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, row.markLine, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
+          accessibilityLabel={[row.title, row.agent && agentName(row.agent, agents), row.pinned ? 'pinned' : null, row.markLine, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
           onPress={onPress}
           style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
         >
-          <ChannelAvatar name={home.name ?? row.channel} icon={home.icon} avatarBg={home.avatarBg} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
+          <ThreadAvatar agent={row.agent} eyes={row.eyes} channelId={row.channelId} channel={row.channel} />
           <View style={[styles.body, { paddingRight: reserve }, !last && !under && rule]}>
             <View style={styles.line}>
               <Text numberOfLines={1} style={[styles.title, { color: row.receded ? colors.fg3 : colors.fg }]}>
                 {row.title}
               </Text>
               <Text style={[styles.right, { color: colors.fg3 }]}>{right}</Text>
+              <StatusDot glyph={row.glyph} size={8} />
             </View>
             {/* A group thread at work says who: "Builder asks you · Designer working" (ADR 0019). */}
             {row.markLine ? <MarkLine faces={row.faces} text={row.markLine} /> : null}
@@ -235,7 +238,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   tree: {
-    marginLeft: ROW_PAD + AVATAR / 2,
+    marginLeft: ROW_PAD + ROW_AVATAR / 2,
     paddingBottom: space.s3,
   },
   actions: {
@@ -258,7 +261,7 @@ const styles = StyleSheet.create({
     minHeight: minTarget,
   },
   gutter: {
-    width: AVATAR,
+    width: ROW_AVATAR,
     alignItems: 'center',
   },
   doneBody: {

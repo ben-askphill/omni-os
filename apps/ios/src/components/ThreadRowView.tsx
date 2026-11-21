@@ -2,19 +2,22 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import type { ThreadRow } from '../live/channel-model';
-import { useChannelLook } from '../live/react';
+import { useAgents } from '../live/react';
 import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 import { Icon } from '../ui/Icon';
-import { ChannelAvatar } from './ChannelAvatar';
+import { agentName } from './agent-face';
 import { MarkLine } from './MarkLine';
+import { StatusDot } from './StatusDot';
+import { ThreadAvatar } from './ThreadAvatar';
 
 /**
- * A thread in a list, as phone web's MoRow draws it: the channel's avatar with the thread's status on its corner, the
- * title and age, then the state on a second line. A row from several channels names its channel there first.
+ * A thread in a list, as phone web's MoRow draws it: its agent's avatar (else its channel's), the title, its age and
+ * the status dot at the far end, then the state on a second line. A row from several channels names its channel there
+ * first.
  */
 export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & { channel?: string }; onPress: () => void; onLongPress?: () => void }) {
   const { colors } = useOmniTheme();
-  const home = useChannelLook(row.target.channelId);
+  const agents = useAgents();
   const channel = row.channel ? `#${row.channel}` : null;
   const marked = row.target.done ? 'Marked done' : null;
   const glyph = row.target.done ? 'settled' : row.glyph;
@@ -25,13 +28,13 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[row.title, channel, row.pinned ? 'pinned' : null, marked ? 'marked done' : null, row.markLine ?? row.statusLabel, row.ago].filter(Boolean).join(', ')}
+      accessibilityLabel={[row.title, row.agent && agentName(row.agent, agents), channel, row.pinned ? 'pinned' : null, marked ? 'marked done' : null, row.markLine ?? row.statusLabel, row.ago].filter(Boolean).join(', ')}
       accessibilityHint={onLongPress ? 'Swipe left for pin, done and archive. Hold for more.' : undefined}
       onPress={onPress}
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
     >
-      <ChannelAvatar name={home.name ?? row.channel ?? row.target.channelId} icon={home.icon} avatarBg={home.avatarBg} conductor={row.target.channelId === 'conductor'} glyph={glyph} />
+      <ThreadAvatar agent={row.agent} eyes={row.eyes} channelId={row.target.channelId} channel={row.channel} />
       <View style={[styles.body, { borderBottomColor: colors.line }]}>
         <View style={styles.top}>
           <Text numberOfLines={2} style={[styles.title, { color: settled ? colors.fg2 : colors.fg }]}>
@@ -43,6 +46,9 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
             </View>
           ) : null}
           <Text style={[styles.ago, { color: colors.fg3 }]}>{row.ago}</Text>
+          <View style={styles.dot}>
+            <StatusDot glyph={glyph} size={8} />
+          </View>
         </View>
         {/* A group thread at work says who on its second line, as phone web's row does (ADR 0019). */}
         {row.markLine ? (
@@ -58,6 +64,8 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
     </Pressable>
   );
 }
+
+const TITLE_LINE = Math.round(fontSize.subhead * 1.3);
 
 const styles = StyleSheet.create({
   row: {
@@ -87,8 +95,13 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: fontSize.subhead,
-    lineHeight: Math.round(fontSize.subhead * 1.3),
+    lineHeight: TITLE_LINE,
     fontWeight: weight.medium,
+  },
+  /** On the title's first line, centred on it. */
+  dot: {
+    height: TITLE_LINE,
+    justifyContent: 'center',
   },
   ago: {
     paddingTop: space.s1,
