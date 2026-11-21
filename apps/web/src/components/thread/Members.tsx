@@ -47,7 +47,7 @@ export function Facepile({ members, size = 22, max = 3, count = true, placement 
   return (
     <span className="flex items-center">
       {shown.map((m, i) => (
-        <span key={m.agent} className="rounded-full bg-bg p-[1.5px]" style={{ marginLeft: i ? -size * 0.3 : 0, zIndex: shown.length - i }}>
+        <span key={m.agent} className="relative rounded-full" style={{ marginLeft: i ? -size * 0.3 : 0, zIndex: shown.length - i }}>
           <MemberFace member={m} size={size} placement={placement} />
         </span>
       ))}
