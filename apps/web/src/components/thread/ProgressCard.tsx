@@ -1,4 +1,4 @@
-import { progressCount, progressFinished, progressNow, progressPanel, progressTone, type ProgressPanel } from '@omni/shared/progress-panel.ts';
+import { progressCount, progressFinished, progressNow, progressPanel, progressReach, progressTone, type ProgressPanel } from '@omni/shared/progress-panel.ts';
 import { buildItems, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { useMemo, useState } from 'react';
 import { readPref, writePref } from '../../store.tsx';
@@ -56,6 +56,8 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
   const first = folds && !open ? count - 1 : 0;
   const earlier = count - 1;
   const shown = view.steps.map((s, i) => ({ s, i })).slice(first);
+  // A folded list's rail counts the toggle's row as its first, so its reach moves with the rows.
+  const reach = progressReach(view.steps) + (folds ? 1 - first : 0);
 
   return (
     <section
@@ -78,7 +80,7 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
       <ol className={`${ROW_X} pb-[var(--sp-4)]`}>
         {folds && (
           <li className="flex min-w-0 gap-[var(--sp-5)]">
-            <StepRail state="done" index={0} count={2} mid={MID} />
+            <StepRail state="done" index={0} count={2} reach={reach} mid={MID} />
             <button
               type="button"
               aria-expanded={open}
@@ -96,7 +98,7 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
           const last = i === count - 1;
           return (
             <li key={s.key} data-state={s.state} className="flex min-w-0 gap-[var(--sp-5)]" aria-current={tone === 'current' ? 'step' : undefined}>
-              <StepRail state={s.state} index={folds ? i - first + 1 : i} count={folds ? shown.length + 1 : count} mid={MID} finished={finished} />
+              <StepRail state={s.state} index={folds ? i - first + 1 : i} count={folds ? shown.length + 1 : count} reach={reach} mid={MID} finished={finished} />
               <span className="min-w-0 flex-1 py-[var(--sp-3)] text-[12.5px] leading-[1.45]">
                 <span className={`block ${finished && last ? 'text-fg-2' : TEXT[tone]}`}>{s.title}</span>
                 {now && (

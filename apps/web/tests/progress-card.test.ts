@@ -58,6 +58,22 @@ describe('ProgressCard', () => {
     expect(lines(pending)).toEqual(['light']);
   });
 
+  it('keeps the rail light past the step it is on, even with a done step below it', () => {
+    const todo = ev('tool_use', {
+      id: 'td',
+      name: 'TodoWrite',
+      input: { todos: ['in_progress', 'completed', 'pending'].map((status, i) => ({ content: LIST[i], activeForm: LIST[i], status })) },
+      parent: null,
+    });
+    render('t1', [ev('user', { text: 'Make a demo' }), todo]);
+    const lines = (li: Element) => [...li.querySelectorAll('span[aria-hidden]')].map((l) => (l.className.includes('bg-fg-4') ? 'dark' : 'light'));
+    expect([...host.querySelectorAll('li')].map((li) => [li.dataset.state, lines(li)])).toEqual([
+      ['active', ['light']],
+      ['done', ['light', 'light']],
+      ['pending', ['light']],
+    ]);
+  });
+
   it('ends a finished list on a done check, folded to its last step until Show earlier steps', () => {
     const finished = [...start, ...setSteps('s2', LIST, 3)];
     render('t1', finished);

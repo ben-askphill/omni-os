@@ -28,6 +28,7 @@ import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { Folded } from '../components/Folded.tsx';
 import { ConnectorMark, NowWithConnector } from '../components/ConnectorMark.tsx';
 import { StepRail } from '../components/thread/StepRail.tsx';
+import { progressReach } from '@omni/shared/progress-panel.ts';
 import { connectorsUsed } from '@omni/shared/connectors.ts';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
@@ -77,6 +78,7 @@ export function MoSteps({ v, failed, onActions }: { v: StepsView; failed: number
   const [shown, setShown] = useState(false);
   const open = v.live || shown;
   const ended = v.steps.some((s) => s.state === 'failed') ? 'failed' : v.steps.every((s) => s.state === 'done') ? 'done' : 'settled';
+  const reach = progressReach(v.steps);
   return (
     <div className="flex flex-col rounded-[20px] bg-surface">
       {v.live ? (
@@ -104,7 +106,7 @@ export function MoSteps({ v, failed, onActions }: { v: StepsView; failed: number
             return (
               <li key={s.key} data-state={s.state} className="flex items-start gap-2.5">
                 {/* The rail as on the Progress card; the row's top padding (4.5px) plus half of a 14px line at 1.35. */}
-                <StepRail state={s.state} index={i} count={v.steps.length} mid={14} finished={ended === 'done'} className="w-3" />
+                <StepRail state={s.state} index={i} count={v.steps.length} reach={reach} mid={14} finished={ended === 'done'} className="w-3" />
                 <span className="min-w-0 flex-1 py-[4.5px]">
                   <span className={`block text-[14px] leading-[1.35] ${on ? 'text-fg' : 'text-fg-3'}`}>{s.title}</span>
                   {s.now && (

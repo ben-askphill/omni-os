@@ -71,3 +71,43 @@ describe('MoSteps on the phone', () => {
     expect(t).not.toContain('Read the reviews');
   });
 });
+
+describe('the rail on both', () => {
+  // Each row's pieces of the rail (above its mark, below it), dark where the list has got to.
+  const rails = (html: string) =>
+    html
+      .split('<li')
+      .slice(1)
+      .map((li) => [...li.matchAll(/class="(absolute left-1\/2 w-\[2px\][^"]*)"/g)].map((m) => (m[1].includes('bg-fg-4') ? 'dark' : 'light')));
+  const both = (v: ReturnType<typeof view>) => [
+    rails(renderToStaticMarkup(createElement(StepsCard, { v, cwd: '/w', byId: new Map() }))),
+    rails(renderToStaticMarkup(createElement(MoSteps, { v, failed: 0, onActions: () => {} }))),
+  ];
+  const at = (current: number) => [ev('user', { text: 'Which review app?' }), ...call(`c${current}`, 'mcp__omni-steps__set_steps', { steps: list, current })];
+
+  it('stays light below the first step while it is on it', () => {
+    for (const r of both(view(at(0), true))) expect(r).toEqual([['light'], ['light', 'light'], ['light']]);
+  });
+
+  it('runs dark into a middle step it is on, and light past it', () => {
+    for (const r of both(view(at(1), true))) expect(r).toEqual([['dark'], ['dark', 'light'], ['light']]);
+  });
+
+  it('runs dark the whole way once every step is done', () => {
+    for (const r of both(view(at(3), true))) expect(r).toEqual([['dark'], ['dark', 'dark'], ['dark']]);
+  });
+
+  it('stays light past the step it is on when the turn went back to a phase above done ones', () => {
+    const back = [
+      ev('user', { text: 'How is it going?' }),
+      ...call('a', 'ToolSearch', { query: 'select:list_threads' }),
+      ...call('b', 'mcp__omni__list_threads', {}),
+      ...call('r', 'Read', { file_path: '/r/notes.md' }),
+      ev('tool_use', { id: 'g', name: 'ToolSearch', input: { query: 'select:get_thread' } }),
+    ];
+    const v = view(back, true);
+    expect(v.steps.map((s) => s.state)).toEqual(['active', 'done', 'done', 'pending']);
+    for (const r of both(v)) expect(r).toEqual([['light'], ['light', 'light'], ['light', 'light'], ['light']]);
+  });
+});
+

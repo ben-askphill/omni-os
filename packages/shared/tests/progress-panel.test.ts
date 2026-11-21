@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PROGRESS_MARK, progressCount, progressFinished, progressMark, progressNow, progressPanel, progressTone } from '../progress-panel.ts';
+import { PROGRESS_MARK, progressCount, progressFinished, progressMark, progressNow, progressPanel, progressReach, progressTone } from '../progress-panel.ts';
+import { turnSteps } from '../steps.ts';
 import { buildItems, type TranscriptEvent } from '../transcript-fold.ts';
 
 // The Progress card under the quick card: the newest turn's list the agent or its harness made, never Omni's phases.
@@ -89,5 +90,43 @@ describe('a step row', () => {
     expect(progressMark('done', { last: false, finished: true })).toBeNull();
     expect(progressMark('done', { last: true, finished: false })).toBeNull();
     expect(progressFinished({ steps: [] })).toBe(false);
+  });
+});
+
+describe('the rail', () => {
+  const states = (...list: string[]) => list.map((state) => ({ state: state as never }));
+
+  it('runs its dark part from the first step into the step it is on', () => {
+    expect(progressReach(states('active', 'pending', 'pending'))).toBe(0);
+    expect(progressReach(states('done', 'active', 'pending'))).toBe(1);
+    expect(progressReach(states('done', 'done', 'needs'))).toBe(2);
+    expect(progressReach(states('done', 'failed', 'pending'))).toBe(1);
+  });
+
+  it('runs it the whole way once every step is done, and stops at the first step not done', () => {
+    expect(progressReach(states('done', 'done', 'done'))).toBe(3);
+    expect(progressReach(states('done', 'done', 'pending'))).toBe(2);
+    expect(progressReach([])).toBe(0);
+  });
+
+  it('stops at the step it is on when a turn goes back to a phase above done ones', () => {
+    // Phases keep the order they first came up in: ToolSearch, then the Conductor's tools, then a file, then ToolSearch again.
+    const v = turnSteps(
+      buildItems([
+        user('How is it going?'),
+        ...call('a', 'ToolSearch', { query: 'select:list_threads' }),
+        ...call('b', 'mcp__omni__list_threads', {}),
+        ...call('c', 'Read', { file_path: '/r/notes.md' }),
+        ev('tool_use', { id: 'd', name: 'ToolSearch', input: { query: 'select:get_thread' }, parent: null }),
+      ]).items,
+      { live: true },
+    )!;
+    expect(v.steps.map((s) => [s.title, s.state])).toEqual([
+      ['Getting ready', 'active'],
+      ['Checking on the work', 'done'],
+      ['Looking through the files', 'done'],
+      ['Writing the answer', 'pending'],
+    ]);
+    expect(progressReach(v.steps)).toBe(0);
   });
 });
