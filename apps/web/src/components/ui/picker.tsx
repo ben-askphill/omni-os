@@ -19,7 +19,7 @@ export interface PickerOption<T extends string> {
   channelIcon?: string | null;
   /** The Conductor's channel: its avatar draws the Omni mark until it has an icon of its own. */
   omni?: boolean;
-  /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
+  /** A mark to lead with instead of the avatar (a HarnessLogo, or the Omni mark). */
   lead?: ReactNode;
   /** A face of its own in place of the letter avatar, drawn at the size the row asks for (an agent's AgentAvatar). */
   face?: (size: number) => ReactNode;
