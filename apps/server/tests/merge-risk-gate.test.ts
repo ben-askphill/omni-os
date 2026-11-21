@@ -6,8 +6,9 @@ import type { GateDeps, OpenPR, PRText } from '../merge-risk/gate.ts';
 
 // The merge-risk gate's poll against a real db, with GitHub, main's rubric and the model faked: which PRs it rates,
 // that it rates a head once, rates a new push again, writes "not rated" after failed runs, and never writes a rating
-// for a head that moved. The last block runs the real gh writes against a fake gh, to show a rerun edits the one
-// comment and swaps the label instead of adding more.
+// for a head that moved, and writes each rating it posts into the threads on the PR's branch, once per head. The last
+// block runs the real gh writes against a fake gh, to show a rerun edits the one comment and swaps the label instead of
+// adding more.
 
 const tmp = mkdtempSync(join(tmpdir(), 'omni-merge-risk-gate-'));
 const REPO = 'o/omni';
@@ -257,6 +258,74 @@ describe('reruns', () => {
     w.open = [];
     await poll();
     expect(db.kv.get(gate.markKey(REPO, 14))).toBeUndefined();
+  });
+});
+
+describe("the rating in the branch's threads", () => {
+  const rows = (id: string) => db.events.since(id).filter((e) => e.kind === 'merge_risk').map((e) => JSON.parse(e.payload));
+
+  it('writes one row into each thread on the branch when it posts, none on a poll of the same head, and a new one for a new head', async () => {
+    const first = thread('omni/rrrr1818');
+    const second = thread('omni/rrrr1818', { role: 'designer', source: 'manual', status: 'done' });
+    const other = thread('omni/ssss1919');
+    w.open = [pr(18, 'omni/rrrr1818', 'r1aaaaaaaa')];
+    await poll();
+    expect(rows(first.id)).toEqual([
+      { repo: REPO, pr: 18, url: 'https://github.com/o/omni/pull/18', head: 'r1aaaaaaaa', level: 'low', label: 'merge-ready', bullets: [] },
+    ]);
+    expect(rows(second.id)).toEqual(rows(first.id));
+    expect(rows(other.id)).toEqual([]);
+    await poll();
+    await poll();
+    expect(rows(first.id)).toHaveLength(1);
+    expect(rows(second.id)).toHaveLength(1);
+    w.open = [pr(18, 'omni/rrrr1818', 'r2bbbbbbbb')];
+    w.replies = [ONE_DECENT];
+    await poll();
+    for (const t of [first, second]) {
+      expect(rows(t.id).map((r) => [r.head, r.level, r.label])).toEqual([
+        ['r1aaaaaaaa', 'low', 'merge-ready'],
+        ['r2bbbbbbbb', 'low', 'needs-ben'],
+      ]);
+      expect(rows(t.id)[1].bullets).toEqual(['- **Impact:** 👀 touches apps/server/sync/']);
+    }
+    // Omni wrote it, not an agent, and nothing else landed in the thread: no message, so no turn.
+    expect(db.events.since(first.id).map((e) => [e.kind, e.agent])).toEqual([
+      ['merge_risk', null],
+      ['merge_risk', null],
+    ]);
+    expect(db.threads.get(first.id)!.status).toBe('done');
+  });
+
+  it('writes the "not rated" row with its reason, and no row for a head it did not write to the PR', async () => {
+    const owner = thread('omni/tttt2020');
+    w.open = [pr(22, 'omni/tttt2020', 't1')];
+    w.headNow[22] = 't2';
+    await poll();
+    expect(rows(owner.id)).toEqual([]);
+    w.open = [pr(22, 'omni/tttt2020', 't2')];
+    w.replies = [null, null];
+    await poll();
+    await poll();
+    expect(rows(owner.id)).toEqual([expect.objectContaining({ head: 't2', level: 'not rated', label: 'needs-ben', reason: 'the rating call failed or ran out of time.' })]);
+  });
+
+  it('writes the row once the PR write goes through after a failed one, not before', async () => {
+    const owner = thread('omni/uuuu2121');
+    w.open = [pr(23, 'omni/uuuu2121', 'u1')];
+    w.replies = [ONE_DECENT];
+    const publish = deps.publish;
+    deps.publish = async () => {
+      throw new Error('HTTP 502');
+    };
+    try {
+      await poll();
+    } finally {
+      deps.publish = publish;
+    }
+    expect(rows(owner.id)).toEqual([]);
+    await poll();
+    expect(rows(owner.id)).toEqual([expect.objectContaining({ head: 'u1', label: 'needs-ben', bullets: ['- **Impact:** 👀 touches apps/server/sync/'] })]);
   });
 });
 

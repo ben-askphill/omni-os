@@ -7,6 +7,7 @@ import { spanIndex, type Clipped, type Span } from './history.ts';
 import { shortPath } from './short-path.ts';
 import type { OutputMeta } from './tool-output.ts';
 import { collisionsIn, type Collision } from './collisions.ts';
+import { MERGE_RISK_EVENT, readMergeRisk, type MergeRiskP } from './merge-risk.ts';
 
 // The transcript fold. Pure: events in, rows out. The Web UI's Transcript.tsx and the phone's thread-view.ts render
 // the rows, and the iOS app folds with it too, so it imports no DOM, no React and no Node API.
@@ -187,7 +188,9 @@ export type Item =
   /** An agent was seated in the thread or removed from it (ADR 0019): a quiet "Designer joined" or "Designer left" line. */
   | { type: 'member'; key: number; at: string; p: MemberP }
   /** A file two agents both edited (ADR 0019, packages/shared/collisions.ts), with whether it was cleared since. */
-  | { type: 'collision'; key: number; at: string; c: Collision };
+  | { type: 'collision'; key: number; at: string; c: Collision }
+  /** The merge-risk gate's rating of one head of the thread's PR (merge-risk.ts), for Ben. No agent wrote it or reads it. */
+  | { type: 'merge_risk'; key: number; at: string; p: MergeRiskP };
 
 /** A `member` row (apps/server/runner/members.ts). */
 export interface MemberP {
@@ -446,6 +449,13 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         const c = p.event === 'committed' && p.commit && typeof p.commit === 'object' ? p.commit : null;
         const commit = c && { sha: str(c.sha), message: str(c.message), files: typeof c.files === 'number' ? c.files : 0 };
         items.push({ type: 'member', key: e.id, at: e.created_at, p: { event: p.event, agent: p.agent, name: str(p.name) || p.agent, ...(commit && { commit }) } });
+        break;
+      }
+      case MERGE_RISK_EVENT: {
+        const p = readMergeRisk(payload<unknown>(e));
+        if (!p) break;
+        group = null;
+        items.push({ type: 'merge_risk', key: e.id, at: e.created_at, p });
         break;
       }
       case 'mod': {

@@ -6,6 +6,7 @@ import { sentContext } from '@omni/shared/message-context-machine.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { threadView, type NowDoing, type Prompt, type ThreadView, type TurnStatus, type TurnView } from '@omni/shared/thread-view.ts';
 import { collisionLabel, type Collision } from '@omni/shared/collisions.ts';
+import type { MergeRiskP } from '@omni/shared/merge-risk.ts';
 import { showsSteps, stepsHeader, type StepState, type StepsView } from '@omni/shared/steps.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
@@ -77,6 +78,8 @@ type RowOf =
   | { kind: 'lock'; key: string; channel: string }
   /** An agent joined or left the thread, or the user committed a remote-led thread's edits: one quiet line. */
   | { kind: 'member'; key: string; text: string; event: 'joined' | 'left' | 'committed' }
+  /** The merge-risk gate's rating of one head of the thread's PR (@omni/shared/merge-risk.ts), under its turn. */
+  | { kind: 'merge_risk'; key: string; p: MergeRiskP }
   | { kind: 'now'; key: string; now: NowDoing; meta: string | null }
   /** The running turn's thinking line (web: ThinkingLine): the mark, the label shimmering and the time since `since`. */
   | { kind: 'thinking'; key: string; label: string; since: string }
@@ -122,6 +125,7 @@ export const ITEM_ROWS: Record<Item['type'], readonly RowKind[]> = {
   question: ['question'],
   member: ['member'],
   collision: ['collision'],
+  merge_risk: ['merge_risk'],
   // No row of its own: an Ask's thread is one of the turn's children (thread-view.ts), on the turn's delegation card.
   ask: [],
 };
@@ -207,6 +211,7 @@ function* turnRows(t: IosTurn, i: number, input: RowsInput): Generator<ThreadRow
   for (const f of t.flags ?? []) yield { kind: 'collision', key: `x${f.key}`, c: f };
   for (const it of t.switches) yield { kind: 'switch', key: `w${it.key}`, it, running: thread.status === 'running' };
   for (const it of t.members) yield { kind: 'member', key: `j${it.key}`, text: memberLine(it.p), event: it.p.event };
+  for (const it of t.risks ?? []) yield { kind: 'merge_risk', key: `mr${it.key}`, p: it.p };
 }
 
 /** A turn's reply under its author line, set beside the avatar. A turn no agent wrote shows as it always did. */

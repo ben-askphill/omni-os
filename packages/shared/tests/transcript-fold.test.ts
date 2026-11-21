@@ -166,6 +166,44 @@ describe('transcript fold', () => {
   });
 });
 
+describe('merge-risk rows', () => {
+  const at = '2026-11-21T09:00:00.000Z';
+  const rated = { repo: 'o/omni', pr: 914, url: 'https://github.com/o/omni/pull/914', head: '56597d6e0123', level: 'medium', label: 'needs-ben', bullets: ['- **Impact:** 👀 touches apps/server/sync/'] };
+  const fold = (rows: [string, unknown][]) => buildItems(rows.map(([kind, p], i) => ({ id: i + 1, kind, payload: JSON.stringify(p), created_at: at }))).items;
+  const call = (id: string): [string, unknown] => ['tool_use', { id, name: 'Bash', input: { command: 'ls' }, parent: null }];
+
+  it("folds the gate's rating into one item with its PR, head, level, label and gaps", () => {
+    expect(fold([['merge_risk', rated]])).toEqual([{ type: 'merge_risk', key: 1, at, p: rated }]);
+  });
+
+  it('keeps the reason on a "not rated" row, and ends a group of calls', () => {
+    const unrated = { ...rated, level: 'not rated', bullets: [], reason: 'the rating call failed or ran out of time.' };
+    const items = fold([call('a'), ['merge_risk', unrated], call('b')]);
+    expect(items.map((it) => it.type)).toEqual(['tools', 'merge_risk', 'tools']);
+    expect(items[1]).toMatchObject({ p: { level: 'not rated', reason: 'the rating call failed or ran out of time.' } });
+  });
+
+  it('drops a row that is not a whole rating, and reads a row with no bullets as no gaps', () => {
+    const { bullets: _, ...bare } = rated;
+    const items = fold([
+      ['merge_risk', { ...rated, level: 'fine' }],
+      ['merge_risk', { ...rated, pr: '914' }],
+      ['merge_risk', 'not json'],
+      ['merge_risk', bare],
+    ]);
+    expect(items).toEqual([{ type: 'merge_risk', key: 4, at, p: { ...bare, bullets: [] } }]);
+  });
+
+  it('is not a reply: the reply after it opens a new run under its author line', () => {
+    const items = fold([
+      ['assistant_text', { text: 'Opened the PR.' }],
+      ['merge_risk', rated],
+      ['assistant_text', { text: 'Fixed the gap.' }],
+    ]);
+    expect([...replyHeads(items, 'builder').keys()]).toEqual([1, 3]);
+  });
+});
+
 describe('reply heads', () => {
   const at = '2026-11-20T09:00:00.000Z';
   const row = (id: number, kind: string, p: unknown, agent?: string): TranscriptEvent => ({ id, kind, payload: JSON.stringify(p), created_at: at, ...(agent && { agent }) });
