@@ -7,11 +7,13 @@ import { CREW_SHAPE_IDS, CREW_SHAPES, EYE_STATES } from '@omni/shared/crew-shape
 import { errorText } from '../api.ts';
 import { squareAvatar } from '../agent-avatar-upload.ts';
 import { lastGrapheme } from '../format.ts';
+import { useReducedMotion } from '../motion.ts';
 import { useCrewRoles } from '../store.tsx';
 import { AgentAvatar, type AgentLook } from './AgentAvatar.tsx';
 import { AvatarColorPicker } from './AvatarColorPicker.tsx';
 import { Button, ErrorNote, Icon, Segmented } from './ui.tsx';
 import { ROVING_ITEM, useRovingFocus } from './ui/use-roving-focus.ts';
+import { useCrewPop } from './use-crew-motion.ts';
 
 // The identity block at the top of an agent's page in Settings > Agents, and of New agent: the live preview with a
 // reply-sized and a rail-sized sample and the eye states under it, its name and description, and one Avatar control
@@ -80,18 +82,20 @@ export function AgentIdentity({
 }) {
   const look = identityLook(id, name, value, saved);
   const set = (patch: Partial<IdentityValue>) => onChange({ ...value, ...patch });
-  const face = agentFace(look, { size: 88 });
+  const reducedMotion = useReducedMotion();
+  const face = agentFace(look, { size: 88, placement: 'focus', reducedMotion });
   // The color Automatic draws: the one its shape is paired with (ADR 0021, D13), the shape picked or its id's.
   const paired = CREW_SHAPES[agentShape({ id, avatar: { shape: value.shape } })].color;
   // The wrapper the agent-switch pop plays on (ADR 0021, Motion), apart from the avatar's own loops: the key changes
-  // with what it shows, its shape and its color.
+  // with what it shows, its shape and its color. A character pops; a photo or an icon has no body to pop.
   const pop = face.kind === 'character' ? `${face.shape} ${face.body}` : face.kind === 'icon' ? `${face.icon} ${face.bg}` : face.image;
+  const popRef = useCrewPop<HTMLSpanElement>(pop, face.kind === 'character' ? face.motion.pop : null);
   return (
     <div className="space-y-5" data-agent-identity>
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         <figure className="flex shrink-0 flex-col items-center gap-2.5 sm:w-[132px]" aria-label="Avatar preview">
           <span className="relative">
-            <span className="block" data-crew-pop={pop}>
+            <span className="block" data-crew-pop={pop} ref={popRef}>
               <AgentAvatar agent={look} size={88} placement="focus" />
             </span>
             {value.picked && <span className="absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full bg-[var(--live)] shadow-[0_0_0_2.5px_var(--surface)]" title="Not saved yet" />}

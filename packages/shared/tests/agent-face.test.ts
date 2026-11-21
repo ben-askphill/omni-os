@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { agentFace, type CharacterFace } from '../agent-avatar.ts';
+import { agentFace, type CharacterFace, type FaceOptions } from '../agent-avatar.ts';
+import type { BodyMotion, EyeMotion } from '../crew-motion.ts';
 import { AGENT_PALETTE, contrast } from '../avatar-color.ts';
 import { crewShapesSource, OUT as CREW_SHAPES_FILE, SPEC_FILE } from '../scripts/build-crew-shapes.ts';
 import { CREW_CLEARED_SIZES, CREW_FITTED, EYE_STATES, PILL_DIAGONAL_LEVEL_STOPS } from '../crew-shapes.ts';
@@ -430,5 +431,199 @@ describe('agentFace shows a thread\'s state in the eyes (D6, D7, D11)', () => {
   it('shows eyes picked outright as they are, wherever it sits', () => {
     for (const placement of ['focus', 'row', 'still'] as const)
       for (const eyes of EYE_STATES) expect(eyesOf({ eyes }, placement), `${eyes} ${placement}`).toBe(eyes);
+  });
+});
+
+describe('agentFace moves a character as the Motion board does (D10, D17, D18, D25)', () => {
+  /** A circle at 32px showing `eyes`, in focus unless `opts` says otherwise, and its motion. */
+  const face32 = (eyes: State, opts: Partial<FaceOptions> = {}) => {
+    const f = agentFace({ id: 'someone', avatar: { shape: 'circle' } }, { size: 32, shows: { eyes }, placement: 'focus', ...opts });
+    if (f.kind !== 'character') throw new Error('no character');
+    return f;
+  };
+  const motionOf = (eyes: State, opts: Partial<FaceOptions> = {}) => face32(eyes, opts).motion;
+  /** Nothing plays. */
+  const STILL = { body: null, eyes: null, change: null, pop: null };
+  /** A body animation's frames as [at, lift, turn, width, height]. */
+  const bodyFrames = (m: BodyMotion | null) => m?.frames.map((f) => [f.at, f.y, f.rotate, f.sx, f.sy]);
+
+  it('breathes an idle agent in focus: 4.8s on the fluid curve, scale 1.025 × .975 and back, looping', () => {
+    const body = motionOf('idle').body;
+    expect(body).toMatchObject({ ms: 4800, loop: true });
+    expect(bodyFrames(body)).toEqual([[0, 0, 0, 1, 1], [0.5, 0, 0, 1.025, 0.975], [1, 0, 0, 1, 1]]);
+    expect(body!.frames.every((f) => f.ease === 'fluid')).toBe(true);
+  });
+
+  it('sways a thinking agent ±2.5° about 50% 70% every 2.4s, and starts the swing from upright', () => {
+    const body = motionOf('thinking').body!;
+    expect(body).toMatchObject({ ms: 2400, loop: true, origin: [0.5, 0.7] });
+    expect(bodyFrames(body)).toEqual([[0, 0, -2.5, 1, 1], [0.5, 0, 2.5, 1, 1], [1, 0, -2.5, 1, 1]]);
+    // A quarter in, the fluid curve is halfway from -2.5° to 2.5°: upright.
+    expect(body.phase).toBe(0.25);
+    expect(body.frames.every((f) => f.ease === 'fluid')).toBe(true);
+  });
+
+  it('bounces a working agent every .84s with the spec keyframes, lifting by shares of its size', () => {
+    const body = motionOf('working').body!;
+    expect(body).toMatchObject({ ms: 840, loop: true, origin: [0.5, 1] });
+    // 50% names only the lift; its squash runs straight between 28% and 74%.
+    expect(bodyFrames(body)).toEqual([[0, 0, 0, 1.06, 0.94], [0.28, -0.07, 0, 0.96, 1.05], [0.5, -0.1, 0, 0.97, 1.036], [0.74, -0.03, 0, 0.98, 1.02], [1, 0, 0, 1.06, 0.94]]);
+    expect(body.frames.every((f) => f.ease === 'fluid')).toBe(true);
+  });
+
+  it('breathes a waiting agent slowly: 3.2s, scale 1.04 × .955', () => {
+    const body = motionOf('waiting').body!;
+    expect(body).toMatchObject({ ms: 3200, loop: true, origin: [0.5, 1] });
+    expect(bodyFrames(body)).toEqual([[0, 0, 0, 1, 1], [0.5, 0, 0, 1.04, 0.955], [1, 0, 0, 1, 1]]);
+  });
+
+  /** The poses an eye loop passes through, holds folded. */
+  const poses = (m: EyeMotion | null) => m?.frames[0].map((f) => f.pose).filter((p, i, all) => i === 0 || p !== all[i - 1]);
+  /** Where an eye frame puts each eye, in grid units. */
+  const centres = (f: CharacterFace, m: EyeMotion, i: number) => f.pair.map((e, k) => [e.cx + m.frames[k][i].dx, e.cy + m.frames[k][i].dy]);
+  /** The spec's centres for a pose of the circle at 32px. */
+  const at32 = (pose: string) => SPEC.shapes.circle.sizes['32'].lay[pose].p;
+  const closeTo = (got: number[][], want: number[][]) => got.forEach((p, k) => p.forEach((v, j) => expect(v).toBeCloseTo(want[k][j], 6)));
+
+  it('blinks an idle agent\'s eyes twice, then glances, every 7.0s, through the spec\'s poses', () => {
+    const f = face32('idle');
+    const eyes = f.motion.eyes!;
+    expect(eyes).toMatchObject({ ms: 7000, loop: true });
+    expect(poses(eyes)).toEqual(['idle', 'blink', 'idle', 'blink', 'idle', 'think_r', 'idle']);
+    eyes.frames[0].forEach((frame, i) => {
+      // Each frame puts the eyes on its pose's centres; a blink closes them to the lid's height on the blink's own.
+      closeTo(centres(f, eyes, i), at32(frame.pose));
+      const lid = SPEC.shapes.circle.sizes['32'].line / SPEC.shapes.circle.sizes['32'].lay.blink.d;
+      expect([frame.sx, frame.sy], frame.pose).toEqual(frame.pose === 'blink' ? [1, expect.closeTo(lid, 2)] : [1, 1]);
+    });
+    // Both blinks are quick: shut and open again within a fifth of a second.
+    const at = (i: number) => eyes.frames[0][i].at * eyes.ms;
+    const blinks = eyes.frames[0].flatMap((frame, i) => (frame.pose === 'blink' ? [at(i + 1) - at(i - 1)] : []));
+    expect(blinks).toHaveLength(2);
+    for (const ms of blinks) expect(ms).toBeLessThanOrEqual(220);
+  });
+
+  it('looks a thinking agent\'s eyes centre, left, centre, blink, right every 4.3s, blinking where they look', () => {
+    const f = face32('thinking');
+    const eyes = f.motion.eyes!;
+    expect(eyes).toMatchObject({ ms: 4300, loop: true });
+    expect(poses(eyes)).toEqual(['think_c', 'think_l', 'think_c', 'blink', 'think_c', 'think_r', 'think_c']);
+    const drop = at32('blink').map((p, k) => [p[0] - at32('idle')[k][0], p[1] - at32('idle')[k][1]]);
+    eyes.frames[0].forEach((frame, i) => {
+      const want = frame.pose === 'blink' ? at32('think_c').map((p, k) => [p[0] + drop[k][0], p[1] + drop[k][1]]) : at32(frame.pose);
+      closeTo(centres(f, eyes, i), want);
+    });
+  });
+
+  it('scans a working agent\'s eyes left and right, 0.4s each', () => {
+    const f = face32('working');
+    const eyes = f.motion.eyes!;
+    expect(eyes).toMatchObject({ ms: 800, loop: true });
+    expect(poses(eyes)).toEqual(['work_c', 'work_l', 'work_r', 'work_c']);
+    const at = (pose: string) => eyes.frames[0].find((frame) => frame.pose === pose)!.at * eyes.ms;
+    expect(at('work_r') - at('work_l')).toBe(400);
+    expect(eyes.ms - (at('work_r') - at('work_l'))).toBe(400);
+    eyes.frames[0].forEach((frame, i) => closeTo(centres(f, eyes, i), at32(frame.pose)));
+  });
+
+  it('breathes a waiting agent\'s squares with its body, over the same 3.2s, in place', () => {
+    const eyes = motionOf('waiting').eyes!;
+    expect(eyes).toMatchObject({ ms: 3200, loop: true });
+    for (const side of eyes.frames) {
+      expect(side.every((frame) => frame.pose === 'waiting' && frame.dx === 0 && frame.dy === 0 && frame.sx === frame.sy)).toBe(true);
+      expect(Math.min(...side.map((frame) => frame.sx))).toBeLessThan(1);
+    }
+  });
+
+  it('loops only where one agent is in focus: a list row, a still avatar or one placed nowhere has no loop', () => {
+    for (const eyes of Object.keys(STATES) as State[])
+      for (const placement of ['row', 'still', undefined] as const) expect(motionOf(eyes, { placement }), `${eyes} ${placement}`).toMatchObject({ body: null, eyes: null });
+  });
+
+  it('plays nothing at all under reduced motion, wherever it sits, and rests each state on its own eyes', () => {
+    for (const eyes of Object.keys(STATES) as State[])
+      for (const placement of ['focus', 'row', 'still'] as const) {
+        const f = face32(eyes, { placement, reducedMotion: true, from: eyes === 'idle' ? 'done' : 'idle' });
+        expect(f.motion, `${eyes} ${placement}`).toEqual(STILL);
+        expect(face32(eyes, { placement: 'still', from: eyes === 'idle' ? 'done' : 'idle' }).motion, `${eyes} still`).toEqual(STILL);
+        expect(f.pair.map((e) => e.glyph), `${eyes} ${placement}`).toEqual([SPEC.shapes.circle.sizes['32'].lay[STATES[eyes]].k, SPEC.shapes.circle.sizes['32'].lay[STATES[eyes]].k]);
+      }
+  });
+
+  /** An eye animation's frames of one eye as [at, dx, dy, width, height]. */
+  const eyeFrames = (m: EyeMotion, k = 0) => m.frames[k].map((f) => [f.at, f.dx, f.dy, f.sx, f.sy]);
+
+  it('plays no change on first render, nor when the eyes stay what they were', () => {
+    for (const eyes of Object.keys(STATES) as State[])
+      for (const placement of ['focus', 'row'] as const) {
+        expect(motionOf(eyes, { placement }).change, `${eyes} ${placement}`).toBeNull();
+        expect(motionOf(eyes, { placement, from: eyes }).change, `${eyes} ${placement} from itself`).toBeNull();
+      }
+  });
+
+  it('squeezes the eyes shut into needs you and springs them open on the diamonds, then nothing moves', () => {
+    const m = motionOf('needs', { from: 'working' });
+    const { squeeze, open, body } = m.change!;
+    // The squeeze plays on the eyes drawn until now, where they are: 1.15 × .06 in 110ms on the stretch curve.
+    expect(squeeze).toMatchObject({ ms: 110, loop: false });
+    for (const k of [0, 1] as const) expect(eyeFrames(squeeze, k)).toEqual([[0, 0, 0, 1, 1], [1, 0, 0, 1.15, 0.06]]);
+    expect(squeeze.frames[0][0].ease).toBe('stretch');
+    // The new eyes spring open from there, on their own centres.
+    expect(open).toMatchObject({ loop: false });
+    for (const k of [0, 1] as const) expect(eyeFrames(open, k)).toEqual([[0, 0, 0, 1.15, 0.06], [1, 0, 0, 1, 1]]);
+    expect(open.frames[0][0]).toMatchObject({ pose: 'needs', ease: 'spring' });
+    expect(body).toBeNull();
+    expect(m).toMatchObject({ body: null, eyes: null });
+  });
+
+  it('plays a change in a list row too, with no loop after it', () => {
+    const m = motionOf('waiting', { placement: 'row', from: 'working' });
+    expect(m.change?.squeeze.ms).toBe(110);
+    expect(m).toMatchObject({ body: null, eyes: null });
+    // In focus the new state's loops follow the change.
+    expect(motionOf('waiting', { from: 'working' })).toMatchObject({ body: { ms: 3200 }, eyes: { ms: 3200 }, change: { squeeze: { ms: 110 } } });
+  });
+
+  it('adds a beat of wide eyes from idle to thinking: 1.22 on the wide pose in 260ms on the spring, held .3s, then to rest', () => {
+    const f = face32('thinking', { from: 'idle' });
+    const { open } = f.motion.change!;
+    expect(open.ms).toBe(260 + 300 + 260);
+    expect(open.frames[0].map((frame) => [frame.at * open.ms, frame.pose, frame.sx, frame.sy, frame.ease])).toEqual([
+      [0, 'wide', 1.15, 0.06, 'spring'],
+      [260, 'wide', 1.22, 1.22, 'fluid'],
+      [560, 'wide', 1.22, 1.22, 'settle'],
+      [820, 'think_c', 1, 1, 'settle'],
+    ]);
+    // The beat sits on the spec's wide centres; the rest is thinking's own.
+    for (const i of [0, 1, 2]) closeTo(centres(f, open, i), at32('wide'));
+    closeTo(centres(f, open, 3), at32('think_c'));
+    // Any other change into thinking just opens.
+    expect(face32('thinking', { from: 'working' }).motion.change!.open.ms).toBe(260);
+  });
+
+  it('hops once on a live change to done: .95s on the settle curve with the spec keyframes, in focus and in a row', () => {
+    for (const placement of ['focus', 'row'] as const) {
+      const { change, body } = motionOf('done', { placement, from: 'working' });
+      expect(body, placement).toBeNull();
+      expect(change!.body, placement).toMatchObject({ ms: 950, loop: false, origin: [0.5, 1] });
+      expect(bodyFrames(change!.body)).toEqual([[0, 0, 0, 1, 1], [0.16, 0, 0, 1.1, 0.88], [0.42, -0.16, 0, 0.93, 1.09], [0.66, 0, 0, 1.08, 0.92], [0.82, 0, 0, 0.98, 1.03], [1, 0, 0, 1, 1]]);
+      expect(change!.body!.frames.every((frame) => frame.ease === 'settle')).toBe(true);
+    }
+    // No other change hops.
+    for (const eyes of ['idle', 'thinking', 'working', 'waiting', 'needs'] as const) expect(motionOf(eyes, { from: 'done' }).change!.body, eyes).toBeNull();
+  });
+
+  it('pops the body when the agent in focus changes: .6s on the spring from .7, about its centre, once', () => {
+    for (const eyes of Object.keys(STATES) as State[]) {
+      const pop = motionOf(eyes).pop;
+      expect(pop, eyes).toMatchObject({ ms: 600, loop: false, origin: [0.5, 0.5] });
+      expect(bodyFrames(pop)).toEqual([[0, 0, 0, 0.7, 0.7], [1, 0, 0, 1, 1]]);
+      expect(pop!.frames[0].ease).toBe('spring');
+      expect(motionOf(eyes, { placement: 'row' }).pop, `${eyes} in a row`).toBeNull();
+    }
+  });
+
+  it('holds needs you and done still: no loop of the body or the eyes', () => {
+    for (const eyes of ['needs', 'done'] as const) expect(motionOf(eyes), eyes).toMatchObject({ body: null, eyes: null });
   });
 });

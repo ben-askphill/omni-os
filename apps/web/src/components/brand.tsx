@@ -1,8 +1,9 @@
 import { MARK_TRANSFORM, HARNESS_LOGOS as LOGO, HARNESS } from '@omni/shared/brand.ts';
 import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
 import { angDiff, c01, easeWeights, MARK_DROPLETS, MARK_R, MARK_START, MARK_TARGETS, MARK_W, markFrame, type MarkDrop, type MarkState } from '@omni/shared/mark.ts';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { HarnessId } from '../api.ts';
+import { useReducedMotion } from '../motion.ts';
 
 // ---------- the Omni mark ----------
 
@@ -13,17 +14,6 @@ const W = MARK_W;
 const DROPLETS = MARK_DROPLETS;
 export { MARK_TRANSFORM } from '@omni/shared/brand.ts';
 export type { MarkState } from '@omni/shared/mark.ts';
-
-export function useReducedMotion() {
-  const [rm, setRm] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const on = () => setRm(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return rm;
-}
 
 /** The mark without motion: ring plus satellite. Used for reduced motion and favicons. */
 export function StaticMark({ size = 32, title = 'Omni', className = '' }: { size?: number; title?: string; className?: string }) {
