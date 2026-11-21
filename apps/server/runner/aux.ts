@@ -42,6 +42,10 @@ function removeRunDir(cwd: string) {
 interface OneShotRun {
   model: string;
   effort?: string;
+  /** Replaces Claude Code's own system prompt, which a no-tools call has no use for. */
+  system?: string;
+  /** Constrains the answer to this JSON schema. The output is then the CLI's JSON result, with `structured_output`. */
+  jsonSchema?: object;
 }
 
 /**
@@ -71,7 +75,18 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
   try {
     child = spawn(
       config.claudeBin,
-      ['-p', '--model', run.model, ...(run.effort ? ['--effort', run.effort] : []), '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
+      [
+        '-p',
+        '--model',
+        run.model,
+        ...(run.effort ? ['--effort', run.effort] : []),
+        ...(run.system ? ['--system-prompt', run.system] : []),
+        ...(run.jsonSchema ? ['--output-format', 'json', '--json-schema', JSON.stringify(run.jsonSchema)] : ['--output-format', 'text']),
+        '--strict-mcp-config',
+        '--no-session-persistence',
+        '--tools',
+        '',
+      ],
       { cwd, env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: entrypoint }), stdio: ['pipe', 'pipe', 'ignore'] },
     );
   } catch (err) {
@@ -98,7 +113,8 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
 
 /**
  * One no-tools call as a promise: its trimmed output, or null when it failed or ran past `timeoutMs`. For the
- * merge-risk gate (merge-risk/gate.ts), which names its own model and effort.
+ * merge-risk gate (merge-risk/gate.ts), which names its own model and effort, and the shadow agent router
+ * (agent-router/routers.ts), which names a system prompt and a JSON schema.
  */
 export function askClaude(entrypoint: string, prompt: string, timeoutMs: number, run: OneShotRun): Promise<string | null> {
   return new Promise((resolve, reject) => {

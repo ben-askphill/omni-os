@@ -30,6 +30,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Architecture overview](internals/overview.md): how a thread runs, how the clients are kept apart, repo layout
 - [Execution and ownership state](internals/execution-state.md): a thread's process, its messages and its owner machine as state diagrams, who owns each, and how the runner reaches the rest of Omni. Read before touching `apps/server/runner/`
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
+- [Shadow agent router](internals/agent-router-shadow.md): Jev and Haiku pick agents for each new #conductor thread beside the Conductor, logged for scoring, with no change to the thread
 - [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
 - [Remote harness protocol](internals/remote-harness-protocol.md): the Runs API Omni speaks to Hermes and every custom harness, what a server must serve and what it never gets
 - [Message context](internals/message-context.md): diff lines, terminal excerpts, browser annotations, thread references and how to add a kind

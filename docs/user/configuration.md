@@ -53,7 +53,7 @@ A precheck is a shell command, and any signed-in device can change your name and
 
 ## Server options
 
-Optional. Copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the port and host, the default model, permission mode, concurrency per harness, keepalive, browser flags, data and automations dirs, upload cap and reply suggestions (`OMNI_SUGGESTIONS=0` turns them off). Each line in `.env.example` says what it does.
+Optional. Copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the port and host, the default model, permission mode, concurrency per harness, keepalive, browser flags, data and automations dirs, upload cap, reply suggestions (`OMNI_SUGGESTIONS=0` turns them off) and the shadow agent router (`OMNI_SHADOW_ROUTER=1`, see [internals](../internals/agent-router-shadow.md)). Each line in `.env.example` says what it does.
 
 Where `.env` goes depends on what runs the server:
 

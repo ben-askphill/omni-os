@@ -364,7 +364,10 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   for (const a of seats) {
     if (a !== thread.role) seat(thread.id, a, input.prompt);
   }
-  return startThread(thread, harness, folder, input);
+  const started = await startThread(thread, harness, folder, input);
+  // The shadow agent router logs what two routers would pick for a new #conductor thread. Nothing waits on it.
+  runnerPorts().reporting.threadStarted(started, input.prompt);
+  return started;
 }
 
 /** Send a new thread's first message: saved until its worktree is ready, else delivered now. */
