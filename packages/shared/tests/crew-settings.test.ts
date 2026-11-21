@@ -73,16 +73,25 @@ describe('the editor', () => {
     const builtIn = role();
     const edited = role({ kind: 'edited', delegatable: false, mcp: ['omni'], delegateOnly: true, avatar: { icon: 'icon:zap' } });
     const d = { ...crewDraftOf(detail(edited, builtIn)), delegatable: true, conductorTools: false, delegateOnly: false, bg: '#f5e6ba' };
-    expect(crewSaveBody(d, detail(edited, builtIn)).fields).toEqual({ delegatable: null, mcp: null, delegate_only: null, avatar: { icon: 'icon:zap', bg: '#f5e6ba' } });
+    expect(crewSaveBody(d, detail(edited, builtIn)).fields).toEqual({ delegatable: null, mcp: null, delegate_only: null, avatar: { icon: 'icon:zap', shape: null, bg: '#f5e6ba' } });
     expect(crewSaveBody({ ...d, icon: '', bg: '' }, detail(edited, builtIn)).fields.avatar).toBeNull();
   });
 
-  it('names a cleared icon or color as null, so the server drops it and keeps an uploaded image', () => {
+  it('names a cleared icon, shape or color as null, so the server drops it and keeps an uploaded image', () => {
     const builtIn = role();
-    const edited = role({ kind: 'edited', avatar: { image: '/api/crew/builder/avatar?v=1', icon: 'icon:zap', bg: '#f5e6ba' } });
+    const edited = role({ kind: 'edited', avatar: { image: '/api/crew/builder/avatar?v=1', icon: 'icon:zap', shape: 'fan', bg: '#f5e6ba' } });
     const d = crewDraftOf(detail(edited, builtIn));
-    expect(crewSaveBody({ ...d, bg: '' }, detail(edited, builtIn)).fields.avatar).toEqual({ icon: 'icon:zap', bg: null });
+    expect(d.shape).toBe('fan');
+    expect(crewSaveBody({ ...d, bg: '' }, detail(edited, builtIn)).fields.avatar).toEqual({ icon: 'icon:zap', shape: 'fan', bg: null });
+    expect(crewSaveBody({ ...d, shape: '' }, detail(edited, builtIn)).fields.avatar).toEqual({ icon: 'icon:zap', shape: null, bg: '#f5e6ba' });
     expect(crewSaveBody({ ...d, name: 'Builder 2' }, detail(edited, builtIn)).fields.avatar).toBeUndefined();
+  });
+
+  it('saves a crew shape picked with its color, and a shape alone, from the character the id picks', () => {
+    const builtIn = role();
+    const shipped = detail(builtIn, builtIn);
+    expect(crewSaveBody({ ...crewDraftOf(shipped), shape: 'bucket', bg: '#0093e4' }, shipped).fields).toEqual({ avatar: { icon: null, shape: 'bucket', bg: '#0093e4' } });
+    expect(crewSaveBody({ ...crewDraftOf(shipped), shape: 'droplet' }, shipped).fields).toEqual({ avatar: { icon: null, shape: 'droplet', bg: null } });
   });
 
   it('sends No file edits as tools: full when turned off on a built-in that ships it, and drops the key when back to the default', () => {
