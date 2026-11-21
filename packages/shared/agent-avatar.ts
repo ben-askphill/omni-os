@@ -236,11 +236,13 @@ const hasLoop = (eyes: EyeState): eyes is keyof typeof BODY_LOOPS => Object.hasO
 
 /**
  * What plays on a character (ADR 0021, Motion). Under reduced motion, or still, nothing (D18). The body and eye loops
- * run only where one agent is in focus (D10); a live change plays wherever it moves at all, a list row included.
+ * run where one agent is in focus, and in a row or card while its thread is working (D10, D29): the loop is the live
+ * signal, so it shows wherever the running thread's avatar is, not only inside the thread. A row at any other state is
+ * calm. A live change plays wherever it moves at all, a list row included.
  */
 function crewMotion(rig: EyeRig, eyes: EyeState, { placement = 'still', reducedMotion = false, from }: FaceOptions): CrewMotion {
   if (reducedMotion || placement === 'still') return CREW_STILL;
-  const loops = placement === 'focus' && hasLoop(eyes);
+  const loops = (placement === 'focus' || (placement === 'row' && eyes === 'working')) && hasLoop(eyes);
   return {
     body: loops ? BODY_LOOPS[eyes] : null,
     eyes: loops ? eyeMotion(rig, rig.pose, EYE_LOOPS[eyes], true) : null,
