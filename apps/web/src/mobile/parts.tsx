@@ -3,7 +3,7 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
-import { CrewMark, isCrewRole } from '../components/brand.tsx';
+import { AgentAvatar, useAgent } from '../components/AgentAvatar.tsx';
 import { Folded } from '../components/Folded.tsx';
 import { FindTargetCtx } from '../transcript/find-target.ts';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
@@ -118,21 +118,15 @@ export function MoEmpty({ children }: { children: ReactNode }) {
 }
 
 /**
- * Who works the thread: its crew mark, or the channel's avatar when it runs without a role, with its status on the
- * corner. A Conductor thread wears the Conductor's saved icon and background once it has them, as on the desktop Inbox
- * and the iPhone; its crew ring is only the default.
+ * Who works the thread: its agent's avatar (AgentAvatar), or the channel's avatar when it runs without one, with its
+ * status on the corner. A Conductor thread wears the Conductor's saved icon and background once it has them, as on the
+ * desktop Inbox and the iPhone; its crew character is only the default.
  */
 export function MoAvatar({ role, channel, channelIcon, avatarBg, state, phase, mark, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null; size?: number }) {
-  const ring = isCrewRole(role) && !(role === 'conductor' && hasOwnLook({ icon: channelIcon, avatar_bg: avatarBg }));
+  const agent = useAgent(role === 'conductor' && hasOwnLook({ icon: channelIcon, avatar_bg: avatarBg }) ? null : role);
   return (
     <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      {ring ? (
-        <span className="grid h-full w-full place-items-center rounded-full bg-surface-2 text-fg-2">
-          <CrewMark role={role} size={Math.round(size * 0.46)} />
-        </span>
-      ) : (
-        <Avatar name={channel ?? '?'} channelIcon={channelIcon} avatarBg={avatarBg} omni={channel === CONDUCTOR_CHANNEL} size={size} />
-      )}
+      {agent ? <AgentAvatar agent={agent} size={size} /> : <Avatar name={channel ?? '?'} channelIcon={channelIcon} avatarBg={avatarBg} omni={channel === CONDUCTOR_CHANNEL} size={size} />}
       {state && (
         <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
           <StatusDot status={state} phase={phase} mark={mark} size={8} />

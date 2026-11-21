@@ -206,7 +206,7 @@ export interface CrewRole {
   description: string;
   /**
    * The role's own look: the URL of an image Ben uploaded (GET /api/crew/:id/avatar), else a shared icon (`icon:<name>`)
-   * or an emoji, and a hex background. Unset: a built-in's mark, else its initials disc (AgentAvatar).
+   * or an emoji, and a hex background. Unset: its crew character, its shape and color picked from its id (AgentAvatar).
    * `shape`: a crew shape id (ADR 0021), sent only when the file names one. One this build does not know is ignored.
    */
   avatar?: { image?: string; icon?: string; shape?: string; bg?: string };

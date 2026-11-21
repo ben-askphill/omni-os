@@ -32,7 +32,7 @@ function RoleChip({ role, name }: { role: string; name: string }) {
   const look = useAgent(role);
   return (
     <Chip className="ml-1 gap-1 font-normal" title={`Runs as ${name}`}>
-      {look && <AgentAvatar agent={{ ...look, name }} size={14} />}
+      {look && <AgentAvatar agent={{ ...look, name }} size={16} />}
       <span data-role={role}>{name}</span>
     </Chip>
   );

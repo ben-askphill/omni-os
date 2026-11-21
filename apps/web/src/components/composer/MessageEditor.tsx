@@ -26,7 +26,7 @@ import { addDraftContext, draftContext, removeDraftContext } from '../../message
 import { reachLine } from '../../message-context/machine-mention.tsx';
 import { AGENT_TOKEN, agentToken, editorText, editorValue, MACHINE_TOKEN, machineToken, reconcileMentions, tokenCodec } from '../../message-context/machine-tokens.ts';
 import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
-import { agentColor } from '../../message-context/agent-mention.tsx';
+import { agentPillStyle } from '../../message-context/agent-mention.tsx';
 import { Icon, Loader, StatusDot } from '../ui.tsx';
 import { KbdFooter, MENU_SURFACE, overlayRow } from '../ui/overlay.tsx';
 
@@ -311,8 +311,8 @@ function MachineChip({ token }: { token: Token }) {
 function AgentChip({ token }: { token: Token }) {
   const agent = useAgent(token.value) ?? { id: token.value, name: token.label };
   return (
-    <TokenInputToken className="mention-pill mention-pill-agent" title={`${token.label}: the message goes to this agent`} style={{ '--agent': agentColor(agent) } as React.CSSProperties}>
-      <AgentAvatar agent={agent} size={14} />
+    <TokenInputToken className="mention-pill mention-pill-agent" title={`${token.label}: the message goes to this agent`} style={agentPillStyle(agent)}>
+      <AgentAvatar agent={agent} size={16} />
       {token.label}
     </TokenInputToken>
   );
