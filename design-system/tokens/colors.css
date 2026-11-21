@@ -8,7 +8,11 @@ color-scheme:light;
 --diff-add:color-mix(in srgb,var(--done) 22%,transparent);
 --diff-del:color-mix(in srgb,var(--needs) 12%,transparent);
 /* agent colors: identity only, the same in both themes. A crew character's body, an agent icon's disc and the agent's
-   mention pill; never a state. Code copy: AGENT_PALETTE in packages/shared/avatar-color.ts. Channels keep their own swatches. */
+   mention pill; never a state. Code: AGENT_PALETTE in packages/shared/avatar-color.ts, which apps/ios/src/theme.ts derives
+   its agentInk to agentPeach from; apps/web/src/index.css carries the same --agent-* (its token-contrast test holds both
+   copies to the palette). Channels keep their own swatches.
+   A mention pill tints the agent color over the surface (45% light, 30% dark, AGENT_PILL_TINT) under a name in --fg, which
+   then reads at 4.5:1 or more on all 14; selected, it takes an inset 1.5px --fg ring. */
 --agent-ink:#17181a;
 --agent-sky:#52cdfe;
 --agent-amber:#ffa839;

@@ -5,16 +5,14 @@
 // or Conductor send, or an Ask) shows on the line over the bubble instead (SentTo), as the reply's author line does.
 import type { CSSProperties } from 'react';
 import { agentColor } from '@omni/shared/agent-avatar.ts';
-import { avatarInk } from '@omni/shared/avatar-color.ts';
 import type { AgentMention } from '@omni/shared/message-context-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from '../components/AgentAvatar.tsx';
 import { useCrewRoles } from '../store.tsx';
 import type { ContextView } from './views.ts';
 
-/** An agent pill's colors (index.css .mention-pill-agent): the agent's one color (D4), and the ink that reads on it. */
+/** An agent pill's color (index.css .mention-pill-agent tints it): the agent's one color (D4). */
 export function agentPillStyle(a: Pick<AgentLook, 'id' | 'avatar'>): CSSProperties {
-  const color = agentColor(a);
-  return { '--agent': color, '--agent-on': avatarInk(color) } as CSSProperties;
+  return { '--agent': agentColor(a) } as CSSProperties;
 }
 
 function AgentMentionDetail({ body: b }: { body: AgentMention }) {

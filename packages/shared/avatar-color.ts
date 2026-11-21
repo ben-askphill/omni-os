@@ -57,6 +57,14 @@ export const AGENT_PALETTE = [
 ] as const;
 export type AgentColorName = (typeof AGENT_PALETTE)[number]['name'];
 
+/**
+ * How much of the agent's color a mention pill's fill takes over the surface under it, per theme: light enough in the
+ * light theme, and dark enough in the dark one, that the name, in the text color, reads at 4.5:1 or more on every agent
+ * color and surface. The Web UI's .mention-pill-agent (index.css) and the iOS pill draw it; the web's
+ * token-contrast.test.ts checks the CSS against it.
+ */
+export const AGENT_PILL_TINT = { light: 0.45, dark: 0.3 } as const;
+
 /** The dark ink on an avatar, the light theme's --fg: a crew character's eyes, and a channel avatar's mark (D19). */
 export const AVATAR_INK = '#17181a';
 /** The ink that reads on `bg`: the dark ink or white, whichever has more contrast. */

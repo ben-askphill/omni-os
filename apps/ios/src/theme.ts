@@ -1,4 +1,11 @@
+import { AGENT_PALETTE, type AgentColorName } from '@omni/shared/avatar-color.ts';
 import { Platform, useColorScheme } from 'react-native';
+
+/**
+ * The agent colors (ADR 0021, D20; web: --agent-ink to --agent-peach): identity only, the same in both themes, as
+ * agentInk to agentPeach. The numbers are AGENT_PALETTE's in packages/shared, so the app holds no copy of its own.
+ */
+const agent = Object.fromEntries(AGENT_PALETTE.map((c) => [`agent${c.name}`, c.hex])) as Record<`agent${AgentColorName}`, string>;
 
 const light = {
   bg: '#ffffff',
@@ -45,6 +52,7 @@ const light = {
   diffAddFg: '#1a6b34',
   diffDelBg: 'rgba(196, 45, 15, 0.08)',
   diffDelFg: '#a3290f',
+  ...agent,
 } as const;
 
 export type ColorTokens = { [K in keyof typeof light]: string };
@@ -83,6 +91,7 @@ const dark: ColorTokens = {
   diffAddFg: '#7ee2a0',
   diffDelBg: 'rgba(255, 122, 92, 0.12)',
   diffDelFg: '#ff9a80',
+  ...agent,
 };
 
 export const space = {

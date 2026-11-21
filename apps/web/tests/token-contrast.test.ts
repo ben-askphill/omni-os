@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { AGENT_PALETTE, AGENT_PILL_TINT } from '@omni/shared/avatar-color.ts';
 
 // The contrast the tokens in apps/web/src/index.css promise, and the rules that lean on them.
 // fg-4 is 2.75:1 on white: placeholders, disabled labels and decoration, never text that must be read. Readable text
@@ -149,5 +150,38 @@ describe('non-text contrast reaches 3:1 (WCAG 1.4.11)', () => {
   it('reads the token table the way the browser does', () => {
     expect(contrast('var(--fg-4)', 'var(--bg)', 'light')).toBeCloseTo(2.75, 2);
     expect(contrast('var(--line-strong)', 'var(--bg)', 'light')).toBeCloseTo(1.4, 1);
+  });
+});
+
+describe('the agent colors (ADR 0021, D20)', () => {
+  const DESIGN = readFileSync(join(import.meta.dirname, '../../../design-system/tokens/colors.css'), 'utf8');
+  const agentTokens = (css: string) => Object.fromEntries([...css.matchAll(/--agent-([a-z]+):\s*(#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]]));
+  const PALETTE = Object.fromEntries(AGENT_PALETTE.map((c) => [c.name.toLowerCase(), c.hex]));
+
+  it('holds the palette as packages/shared does, here and in the design system', () => {
+    expect(agentTokens(CSS)).toEqual(PALETTE);
+    expect(agentTokens(DESIGN)).toEqual(PALETTE);
+  });
+
+  it("tints an agent mention pill so its name reads at 4.5:1 on every agent color and surface, in both themes", () => {
+    const pill = rule('.mention-pill-agent');
+    const tint = /background:\s*light-dark\(color-mix\(in srgb, var\(--agent\) (\d+)%, transparent\), color-mix\(in srgb, var\(--agent\) (\d+)%, transparent\)\)/.exec(pill);
+    expect(tint?.slice(1).map(Number)).toEqual([AGENT_PILL_TINT.light * 100, AGENT_PILL_TINT.dark * 100]);
+    expect(pill).toMatch(/color:\s*var\(--fg\)/);
+    for (const scheme of SCHEMES)
+      for (const bg of SURFACES)
+        for (const { name, hex } of AGENT_PALETTE) {
+          const under = rgb(resolve(bg, scheme));
+          const a = AGENT_PILL_TINT[scheme];
+          const fill = rgb(hex).map((v, k) => v * a + under[k] * (1 - a)) as Rgb;
+          const text = luminance(rgb(resolve('var(--fg)', scheme)));
+          const ratio = (Math.max(text, luminance(fill)) + 0.05) / (Math.min(text, luminance(fill)) + 0.05);
+          expect(ratio, `${name} on ${bg}, ${scheme}`).toBeGreaterThanOrEqual(4.5);
+        }
+  });
+
+  it('keeps the selected pill and its focus ring off the agent color, which can vanish into either theme', () => {
+    expect(rule('.mention-pill-agent[data-selected]')).not.toMatch(/var\(--agent/);
+    expect(rule('.mention-pill-agent.mention-pill-sent:focus-visible')).toMatch(/outline-color:\s*var\(--fg\)/);
   });
 });
