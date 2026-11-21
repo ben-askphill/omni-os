@@ -10,12 +10,13 @@ import type { RowItem } from '../src/mobile/rows.ts';
 
 // The Conductor's saved icon and background on the phone layout: its header on Activity, its row on Channels, its pill
 // in the New sheet and its threads' rows. A saved look wins, as on the desktop Inbox and the iPhone app
-// (packages/shared/channel-icon.ts hasOwnLook). Without one each keeps the Omni mark, or the Conductor's crew character
-// (ADR 0021) on a thread row.
+// (packages/shared/channel-icon.ts hasOwnLook; on a thread row, agent-avatar.ts conductorChannelLook). Without one each
+// keeps the Omni mark, or the Conductor's crew character (ADR 0021) on a thread row.
 const state = vi.hoisted(() => ({ channels: [] as ChannelWithRunning[], waiting: [] as unknown[], threads: [] as unknown[] }));
 
 vi.mock('../src/store.tsx', () => ({
   useNeedOf: () => undefined,
+  useChannel: (id: string) => state.channels.find((c) => c.id === id),
   useApp: () => ({
     channels: state.channels,
     channel: (id: string) => state.channels.find((c) => c.id === id),
@@ -117,9 +118,11 @@ describe("a Conductor thread's row on the phone", () => {
   });
 
   it('takes either half of the look: a saved icon alone, or a background alone on the Omni mark', () => {
+    state.channels = [channel('conductor', 'Conductor', { icon: 'icon:target' })];
     const icon = html(createElement(MoAvatar, { role: 'conductor', channel: 'conductor', channelIcon: 'icon:target' }));
     expect(icon).not.toContain(RING);
     expect(icon).not.toContain(OMNI_MARK);
+    state.channels = [channel('conductor', 'Conductor', { avatar_bg: '#283c62' })];
     const bg = html(createElement(MoAvatar, { role: 'conductor', channel: 'conductor', avatarBg: '#283c62' }));
     expect(bg).not.toContain(RING);
     expect(bg).toContain(OMNI_MARK);

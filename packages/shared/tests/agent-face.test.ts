@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { agentFace, type CharacterFace, type FaceOptions } from '../agent-avatar.ts';
+import { agentFace, conductorChannelLook, type CharacterFace, type FaceOptions } from '../agent-avatar.ts';
 import type { BodyMotion, EyeMotion } from '../crew-motion.ts';
 import { AGENT_PALETTE, contrast } from '../avatar-color.ts';
 import { crewShapesSource, OUT as CREW_SHAPES_FILE, SPEC_FILE } from '../scripts/build-crew-shapes.ts';
@@ -295,6 +295,26 @@ describe('agentFace runs the chain: photo, then icon, then character', () => {
     expect(agentFace({ id: 'builder', avatar: { icon: 'icon:tool', shape: 'diamond' } }, { size: 24 })).toMatchObject({ kind: 'icon', bg: SPEC.palette.Magenta });
     expect(agentFace({ id: 'builder', avatar: { image: '', icon: '', bg: '' } }, { size: 24 })).toMatchObject({ kind: 'character', shape: 'squircle', body: SPEC.palette.Amber });
     expect(agentFace({ id: 'builder', avatar: { image: null, icon: null, bg: null, shape: null } }, { size: 24 })).toMatchObject({ kind: 'character', shape: 'squircle' });
+  });
+});
+
+describe("the Conductor answers in its channel's look until its agent has a photo or icon (D9)", () => {
+  const channel = { name: 'Conductor', icon: '🎼', avatar_bg: '#ffc943' };
+  it('draws the Conductor agent’s own photo or icon over its channel’s saved look', () => {
+    expect(conductorChannelLook({ id: 'conductor', avatar: { image: '/api/crew/conductor/avatar?v=1' } }, channel)).toBeNull();
+    expect(conductorChannelLook({ id: 'conductor', avatar: { icon: 'icon:zap' } }, channel)).toBeNull();
+  });
+
+  it('draws the channel’s saved icon or background over the crew character, a new color or shape of the agent’s included', () => {
+    expect(conductorChannelLook({ id: 'conductor' }, channel)).toBe(channel);
+    expect(conductorChannelLook({ id: 'conductor', avatar: { bg: '#52cdfe', shape: 'cloud' } }, { name: 'Conductor', avatar_bg: '#ffc943' })).toEqual({ name: 'Conductor', avatar_bg: '#ffc943' });
+  });
+
+  it('draws the crew character when the channel has no look of its own, and every other agent its own avatar', () => {
+    expect(conductorChannelLook({ id: 'conductor' }, { name: 'Conductor', icon: null, avatar_bg: null })).toBeNull();
+    expect(conductorChannelLook({ id: 'conductor' }, null)).toBeNull();
+    expect(conductorChannelLook({ id: 'builder' }, channel)).toBeNull();
+    expect(conductorChannelLook(null, channel)).toBeNull();
   });
 });
 

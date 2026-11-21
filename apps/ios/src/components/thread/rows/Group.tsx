@@ -20,7 +20,7 @@ import type { Collision } from '@omni/shared/collisions.ts';
 import { eyesFor } from '@omni/shared/crew-eyes.ts';
 import { agentColor, agentName } from '../../agent-face';
 import { AgentAvatar } from '../../AgentAvatar';
-import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
+import { ChannelAvatar } from '../../ChannelAvatar';
 import { useRowActions } from './actions';
 
 type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
@@ -37,21 +37,13 @@ export function AuthorRow({ row }: Of<'author'>) {
   const agents = useAgents();
   const technical = useTechnical();
   const name = agentName(row.agent, agents);
-  const own = agents.find((a) => a.id === row.agent)?.avatar;
-  // The Conductor's face is its channel's saved look, else the Omni mark, unless its agent has an image or icon.
-  const conductor = row.agent === 'conductor' && !own?.image && !own?.icon;
   return (
     <View style={styles.author} accessibilityRole="header" accessibilityLabel={[name, row.at ? clock(toDate(row.at)) : null].filter(Boolean).join(', ')}>
-      {conductor ? (
-        row.look ? (
-          <ChannelAvatar name={row.look.name} icon={row.look.icon} avatarBg={row.look.avatar_bg} conductor size={AVATAR} />
-        ) : (
-          <View style={[styles.gutter, { width: AVATAR, height: AVATAR }]}>
-            <OmniMark size={AVATAR} color={colors.fg2} />
-          </View>
-        )
+      {/* The Conductor's channel look when it wears one (rows.ts), else the agent's avatar; the reply being written shows live eyes. */}
+      {row.look ? (
+        <ChannelAvatar name={row.look.name} icon={row.look.icon} avatarBg={row.look.avatar_bg} conductor size={AVATAR} />
       ) : (
-        <AgentAvatar agent={row.agent} size={AVATAR} />
+        <AgentAvatar agent={row.agent} size={AVATAR} shows={row.shows ?? undefined} placement={row.shows ? 'focus' : 'still'} />
       )}
       <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
         {name}
@@ -250,7 +242,6 @@ const styles = StyleSheet.create({
   sentAgent: { flexDirection: 'row', alignItems: 'center', gap: space.s2, maxWidth: 160 },
   pill: { fontWeight: weight.semibold, borderRadius: radius.xs },
   author: { flexDirection: 'row', alignItems: 'center', gap: space.s6, minHeight: AVATAR },
-  gutter: { alignItems: 'center', justifyContent: 'center' },
   name: { flexShrink: 0, fontSize: 13.5, fontWeight: weight.semibold },
   run: { flexDirection: 'row', alignItems: 'center', gap: space.s2, flexShrink: 1 },
   meta: { fontSize: fontSize.meta },

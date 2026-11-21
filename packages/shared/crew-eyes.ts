@@ -3,7 +3,7 @@
 // while the agent has it, squares while something else holds it, diamonds when Ben does, arcs once done. The agent
 // face reads it (agent-avatar.ts). Pure.
 import type { EyeState } from './crew-shapes.ts';
-import type { MemberState } from './members.ts';
+import type { MemberState, ThreadMember } from './members.ts';
 import { MARK, type Mark, type MarkFamily } from './status.ts';
 
 /** Each family's eyes. A mark that broke waits on Ben to look into it, so it takes his diamonds (D6). */
@@ -36,4 +36,16 @@ export function eyesFor(shows: EyeSource | undefined, open = false): EyeState {
   if (!shows) return 'idle';
   if ('mark' in shows) return eyesForMark(shows.mark, open);
   return 'member' in shows ? eyesForMember(shows.member) : shows.eyes;
+}
+
+/**
+ * What an agent's avatar shows on the open thread (ADR 0021): the thread's status mark, whose open-thread eyes tell
+ * thinking from a tool call (D7), or in a group thread the agent's own member state, so each agent shows what it does.
+ * Nothing (idle eyes) for an agent not seated in the group. The header's lead and the head of the reply being written
+ * show it on every client.
+ */
+export function agentShows(members: readonly Pick<ThreadMember, 'agent' | 'state'>[] | undefined, agent: string | null | undefined, mark: Mark): EyeSource | undefined {
+  if (!members?.length) return { mark };
+  const seat = members.find((m) => m.agent === agent);
+  return seat && { member: seat.state };
 }

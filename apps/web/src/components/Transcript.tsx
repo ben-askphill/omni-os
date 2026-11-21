@@ -20,15 +20,15 @@ import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { PHASE, turnPhase, type Mark } from '@omni/shared/status.ts';
-import { agentShows } from './thread/thread-state.ts';
-import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
 import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
 import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
-import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
@@ -620,13 +620,13 @@ export const Transcript = memo(function Transcript({
   // open to remote agents lets them read, so it draws none.
   const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
   const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
-  // The Conductor answers in its channel's saved look, else its crew character, until Ben gives the Conductor agent an
-  // image or icon (the phone's too).
-  const conductorLook = channel(CONDUCTOR_CHANNEL);
-  const faceOf = (look: AgentLook) =>
-    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon && conductorLook && hasOwnLook(conductorLook) ? (
-      <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} />
-    ) : undefined;
+  // The Conductor answers in its face on every surface (conductorChannelLook): its agent's photo or icon, else its
+  // channel's saved look, else its crew character.
+  const conductorChannel = channel(CONDUCTOR_CHANNEL);
+  const faceOf = (look: AgentLook) => {
+    const c = conductorChannelLook(look, conductorChannel);
+    return c ? <Avatar name={c.name} omni channelIcon={c.icon} avatarBg={c.avatar_bg} size={24} /> : undefined;
+  };
 
   // Mod log lines and merge-risk cards are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'merge_risk');

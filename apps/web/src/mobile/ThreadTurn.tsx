@@ -1,7 +1,7 @@
 import { PHASE, glyphFor, markOf, type Mark, type TurnPhase } from '@omni/shared/status.ts';
-import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import { conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { eyesForMark } from '@omni/shared/crew-eyes.ts';
-import { agentShows } from '../components/thread/thread-state.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, MemberLine, SwitchLine } from '../components/Transcript.tsx';
@@ -20,7 +20,6 @@ import { tabPanelProps } from '../components/ui/segmented.tsx';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { CollisionFlag, CollisionMark } from '../components/thread/Collision.tsx';
 import { collisionLabel } from '@omni/shared/collisions.ts';
-import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
@@ -161,13 +160,12 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
 }
 
 /**
- * The Conductor's face on its answers: the icon and background saved for its channel, else its crew character, unless
- * Ben gave the Conductor agent an image or icon of its own.
+ * The Conductor's face on its answers, as on every surface (conductorChannelLook): its agent's photo or icon, else the
+ * icon and background saved for its channel, else its crew character.
  */
 function conductorFace(c: TurnCtx, look: AgentLook) {
-  if (look.avatar?.image || look.avatar?.icon) return undefined;
-  const ch = c.conductorChannel;
-  return ch && hasOwnLook(ch) ? <Avatar name={ch.name} omni channelIcon={ch.icon} avatarBg={ch.avatar_bg} size={24} /> : undefined;
+  const ch = conductorChannelLook(look, c.conductorChannel);
+  return ch ? <Avatar name={ch.name} omni channelIcon={ch.icon} avatarBg={ch.avatar_bg} size={24} /> : undefined;
 }
 
 /**

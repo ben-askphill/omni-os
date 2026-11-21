@@ -15,6 +15,7 @@ vi.mock('../src/store.tsx', () => ({
   useApp: () => ({ channels: [], channel: () => undefined, needsYou: null, profile: null, tasks: [] }),
   useNow: () => Date.parse('2026-01-05T12:00:00.000Z'),
   useNeedOf: () => null,
+  useChannel: () => undefined,
   useCrewRoles: () => [],
   readPref: (_key: string, fallback: unknown) => fallback,
   writePref: () => {},

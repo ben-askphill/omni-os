@@ -12,7 +12,8 @@ import { Chip, CopyStatus, Icon, IconButton, IconLink, Loader, statusLabel, Stat
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
-import { agentShows, threadPill } from './thread-state.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { threadPill } from './thread-state.ts';
 import { eyesFor } from '@omni/shared/crew-eyes.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
 import { useChannel, useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
