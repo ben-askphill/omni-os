@@ -14,6 +14,7 @@ import type { DesktopUpdateCommand, DesktopUpdateReport } from '@omni/shared/upd
 import type { AppContext } from './context.ts';
 import { handle, on } from './handle.ts';
 import { quitPlan, quitToUpdate, updateWhenIdle } from './quit.ts';
+import { installAppImage } from './appimage-install.ts';
 import { createUpdateReporter } from './update-report.ts';
 import {
   commandStep,
@@ -60,6 +61,7 @@ function host(): UpdateHost {
     hasFeed: app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
     appImage,
     installDirWritable,
+    selfUpdateOff: process.env.OMNI_SELF_UPDATE === 'off',
   };
 }
 
@@ -70,6 +72,11 @@ function feedYml(): string | null {
   } catch {
     return null;
   }
+}
+
+/** The update electron-updater downloaded, in its cache. BaseUpdater keeps it behind a getter its types mark protected. */
+function downloadedFile(updater: AppUpdater): string | null {
+  return (updater as unknown as { installerPath?: string | null }).installerPath ?? null;
 }
 
 /** Starts `file` with `args` once this process has exited, from a shell that does not depend on it. */
@@ -178,17 +185,17 @@ export function installUpdates(ctx: AppContext): void {
       }
       return;
     }
-    // The new AppImage replaces this one now. Started by electron-updater it would get no arguments, so after
-    // Relaunch it starts here with this launch's own (--port, --data-dir), once this process has gone and let go of
-    // the instance lock. A plain sh outside the AppImage waits for that: app.relaunch's helper runs from this
-    // AppImage's mount, which goes away as the app quits. A versioned file name moves to the new version's.
-    let next = appImage;
-    updater.once('appimage-filename-updated', (path: string) => {
-      next = path;
-    });
-    updater.quitAndInstall(true, false);
+    // The new AppImage takes this one's place now (appimage-install.ts), never through electron-updater's own install,
+    // which deletes this AppImage before it looks for the download: with the download gone, as when another copy of
+    // the app installed it first, the machine was left with no Omni to start. A failed install keeps this version,
+    // which downloads the update again at its next launch. Started by electron-updater the new AppImage would get no
+    // arguments, so after Relaunch it starts here with this launch's own (--port, --data-dir), once this process has
+    // gone and let go of the instance lock. A plain sh outside the AppImage waits for that: app.relaunch's helper runs
+    // from this AppImage's mount, which goes away as the app quits.
+    const installed = installAppImage(appImage, downloadedFile(updater));
+    if (!installed.ok) console.error('[omni] update: not installed, keeping this version:', installed.reason);
+    const next = installed.ok ? installed.path : appImage;
     if (install.relaunch && existsSync(next)) startAfterExit(next, process.argv.slice(1));
-    // An install that failed leaves the app open with its windows closed and its server stopped: quit anyway.
     setImmediate(() => app.quit());
   });
 

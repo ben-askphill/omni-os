@@ -157,8 +157,14 @@ describe('parseArgs', () => {
       script: 'run.json',
       out: 'shots',
       app: 'Omni.app',
+      updates: false,
       overrides: { port: 4766, dataDir: '/qa/data', appearance: 'dark', zoom: 1.2, size: { width: 1100, height: 800 } },
     });
+  });
+
+  it('leaves the packaged app\'s updater off unless --updates asks for it', () => {
+    expect(parseArgs(['--script', 'x', '--out', 'y'])).toMatchObject({ updates: false });
+    expect(parseArgs(['--script', 'x', '--out', 'y', '--updates'])).toMatchObject({ updates: true });
   });
 
   it('needs a script and an out folder, and refuses what it does not know', () => {

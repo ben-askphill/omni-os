@@ -17,8 +17,8 @@ import {
   type UpdaterEvent,
 } from '../src/update-state.ts';
 
-const mac: UpdateHost = { packaged: true, platform: 'darwin', hasFeed: true, appImage: undefined, installDirWritable: true };
-const appImage: UpdateHost = { packaged: true, platform: 'linux', hasFeed: true, appImage: '/home/me/Apps/Omni.AppImage', installDirWritable: true };
+const mac: UpdateHost = { packaged: true, platform: 'darwin', hasFeed: true, appImage: undefined, installDirWritable: true, selfUpdateOff: false };
+const appImage: UpdateHost = { packaged: true, platform: 'linux', hasFeed: true, appImage: '/home/me/Apps/Omni.AppImage', installDirWritable: true, selfUpdateOff: false };
 
 const run = (events: UpdaterEvent[], from: DesktopUpdateView = { state: 'idle', checkedAt: null }) => events.reduce(reduceUpdate, from);
 /** Found with Check automatically on, so electron-updater downloads it by itself. */
@@ -38,6 +38,11 @@ describe('when the app updates itself', () => {
     expect(unsupportedReason({ ...appImage, installDirWritable: false })).toMatch(/not writable/);
     expect(unsupportedReason({ ...mac, installDirWritable: false })).toMatch(/Move it to Applications/);
     expect(unsupportedReason({ ...mac, platform: 'win32' })).toMatch(/macOS and Linux/);
+  });
+
+  it('does not in a copy started with OMNI_SELF_UPDATE=off, as the QA harness starts it', () => {
+    expect(unsupportedReason({ ...appImage, selfUpdateOff: true })).toMatch(/leaves updates to the installed app/);
+    expect(unsupportedReason({ ...mac, selfUpdateOff: true })).toMatch(/leaves updates to the installed app/);
     expect(initialView({ ...mac, packaged: false }).state).toBe('unsupported');
   });
 });
