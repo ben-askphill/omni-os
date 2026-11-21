@@ -288,6 +288,10 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const names = machineNames();
   const shown = <T extends { id: string; status?: string }>(list: T[]) => list.map((x) => withDelegating(x, ids, names));
   const children = threads.children(t.id);
+  const delegatedBySeats = t.channel_id === 'conductor' ? threads.seatedDelegations(t.id).map((child) => ({
+    ...child,
+    seated_delegation: threads.seatedDelegationOf(child),
+  })) : [];
   const parent = t.parent_id ? threads.get(t.parent_id) : null;
   const detail = {
     thread: withDelegating(t, ids, names),
@@ -298,7 +302,7 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     // The newest files and screenshots of the threads it delegated to, at any depth, each with its thread's title.
     // New ones come on the stream as crew_artifact (artifacts.ts announceArtifact).
     crew_artifacts: artifacts.crew(t.id, CREW_ARTIFACTS_MAX),
-    children: shown(children),
+    children: shown([...children, ...delegatedBySeats].sort((a, b) => a.created_at.localeCompare(b.created_at))),
     // Members of the teams this thread started, so its delegation cards can show their state.
     team: shown(children.flatMap((ch) => threads.team(ch.id))),
     parent: parent ? withDelegating(parent, ids, names) : null,

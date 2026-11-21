@@ -23,10 +23,17 @@ export const feedApi = new Hono();
 feedApi.get('/feed', (c) =>
   sessionSSE(c, async (stream) => {
     // A thread carries its handoff and `delegating` on every update, as its own stream and GET do.
-    const onFeed = (e: FeedEvent) =>
+    const onFeed = (e: FeedEvent) => {
+      if (e.type !== 'thread') {
+        void stream.writeSSE({ data: JSON.stringify(e) });
+        return;
+      }
+      const t = e.thread as Thread;
+      const seated_delegation = threads.seatedDelegationOf(t);
       void stream.writeSSE({
-        data: JSON.stringify(e.type === 'thread' ? { ...e, thread: withDelegating(e.thread as Thread), handoff: handoffView(e.thread as Thread) } : e),
+        data: JSON.stringify({ ...e, thread: { ...withDelegating(t), ...(seated_delegation && { seated_delegation }) }, handoff: handoffView(t) }),
       });
+    };
     bus.on('feed', onFeed);
     stream.onAbort(() => {
       bus.off('feed', onFeed);

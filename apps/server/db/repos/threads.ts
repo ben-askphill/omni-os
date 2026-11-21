@@ -1,5 +1,6 @@
 import type { RunName } from '@omni/shared/run-switch.ts';
 import type { Goal, GoalStatus } from '@omni/shared/goal.ts';
+import type { SeatedDelegation } from '@omni/shared/members.ts';
 import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
 import { assignments } from './assignments.ts';
@@ -235,6 +236,18 @@ export const threads = {
   /** The threads delegated from this one. A group thread's member threads are its agents' sessions, not delegations (runner/members.ts). */
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? AND source != 'member' ORDER BY created_at`).all(parentId) as unknown as Thread[],
+  /** Work opened by a #conductor thread's seated agents, including seats that have since been removed. */
+  seatedDelegations: (threadId: string) =>
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE source != 'member' AND parent_id IN (
+      SELECT id FROM threads WHERE parent_id = ? AND source = 'member' AND channel_id = 'conductor'
+    ) ORDER BY created_at`).all(threadId) as unknown as Thread[],
+  /** The transcript a seated agent opened the work from. The hidden session remains its parent for crew reports. */
+  seatedDelegationOf: (child: Pick<Thread, 'parent_id' | 'source'>) =>
+    child.parent_id && child.source !== 'member'
+      ? db.prepare(`SELECT parent_id AS thread_id, role AS agent FROM threads
+          WHERE id = ? AND source = 'member' AND channel_id = 'conductor' AND parent_id IS NOT NULL AND role IS NOT NULL`)
+          .get(child.parent_id) as unknown as SeatedDelegation | undefined
+      : undefined,
   /** The threads working on a branch, newest first. Omni names branches per thread, so it is one in practice. */
   withBranch: (branch: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE branch = ? ORDER BY created_at DESC, rowid DESC`).all(branch) as unknown as Thread[],

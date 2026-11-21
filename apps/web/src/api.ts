@@ -33,7 +33,7 @@ export type HarnessWithRunning = HarnessInfo & { running: number; /** How to ins
 export type CommandList = HarnessCommands & { recent?: string[] };
 
 // ---------- response shapes ----------
-import type { ThreadMember } from '@omni/shared/members.ts';
+import type { SeatedDelegation, ThreadMember } from '@omni/shared/members.ts';
 import type { RemoteServer } from '@omni/shared/remote-agent.ts';
 
 /** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
@@ -48,6 +48,7 @@ export type Thread = ThreadRow & {
   delegating?: boolean;
   /** A group thread's agents, the lead first, while an agent besides the lead is seated (packages/shared/members.ts). */
   members?: ThreadMember[];
+  seated_delegation?: SeatedDelegation;
   /** Why it takes no new messages: its lead agent was deleted or is hidden (apps/server/member-view.ts). */
   read_only?: string;
 } & RanOnFields & StepField;
