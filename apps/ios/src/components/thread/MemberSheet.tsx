@@ -55,7 +55,7 @@ export function MemberSheet({ thread, visible, onClose }: { thread: Thread; visi
         <View style={[styles.group, { backgroundColor: colors.surface }]}>
           {rows.map((m, i) => (
             <View key={m.agent} style={[styles.row, i > 0 && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
-              <AgentAvatar agent={m.agent} size={32} shows={{ member: m.member }} />
+              <AgentAvatar agent={m.agent} size={32} shows={{ member: m.member }} placement="focus" />
               <View style={styles.grow}>
                 <View style={styles.nameLine}>
                   <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
@@ -147,7 +147,7 @@ export function MemberButton({ thread, onOpen }: { thread: Thread; onOpen: () =>
       <View style={styles.faces}>
         {shown.map((m, i) => (
           <View key={m.agent} style={i > 0 && styles.overlap}>
-            <AgentAvatar agent={m.agent} size={22} shows={{ member: m.state }} />
+            <AgentAvatar agent={m.agent} size={22} shows={{ member: m.state }} placement="focus" />
           </View>
         ))}
       </View>

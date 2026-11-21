@@ -19,6 +19,8 @@ import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
 import { MemberButton, MemberSheet } from '../components/thread/MemberSheet';
+import { glyphFor } from '../components/glyph';
+import { leadEyes } from '../live/channel-model';
 import { useAgents, useChannels, useTechnical, useThreadLive, useThreadView } from '../live/react';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { useRemote } from '../live/use-remote';
@@ -99,6 +101,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
           channel={channelName}
           role={roleName}
           lead={lead}
+          leadShows={thread ? leadEyes(glyphFor(status), thread.members) : undefined}
           talksOnly={talksOnly}
           wide={group}
           device={device}

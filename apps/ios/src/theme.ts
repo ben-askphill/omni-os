@@ -164,6 +164,18 @@ export const motion = {
   ping: 1600,
 } as const;
 
+/**
+ * The four named curves as cubic-bezier control points, for Reanimated's Easing.bezier (web: --ease-fluid, --ease-spring,
+ * --ease-settle and --ease-stretch in apps/web/src/index.css). Fluid drives loops; spring overshoots, settle lands and
+ * stretch pulls.
+ */
+export const ease = {
+  fluid: [0.37, 0, 0.63, 1],
+  spring: [0.24, 1.34, 0.38, 1],
+  settle: [0.28, 1.28, 0.36, 1],
+  stretch: [0.32, 0.72, 0.24, 1],
+} as const;
+
 /** Apple's minimum touch target. */
 export const minTarget = 44;
 
