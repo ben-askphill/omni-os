@@ -37,4 +37,4 @@ AgentAvatar is an agent's face wherever the Web UI shows one, on desktop web, ph
 - Photo and icon avatars keep the round disc they always had. A character never sits on a disc.
 - A character wears no ring: its eyes carry the state. A photo or icon has no eyes, so it wears the Working ring (`--live`, breathing) while its agent works and the still Needs you ring (`--needs`) while it waits on you.
 - Nothing sits on a character's face. The avatar mark's Needs you diamond and failed dot sit after the faces, and a phone row's status mark beside its avatar.
-- An agent mention pill takes the agent's color at 55% behind its name, with the 16px avatar at its start; a selected pill takes the full color and the ink that reads on it.
+- An agent mention pill tints the agent's color behind its name (45% in light, 30% in dark, `AGENT_PILL_TINT`), with the 16px avatar at its start, so the name in the text color reads at 4.5:1 or more on every agent color. A selected pill keeps the tint and takes an inset 1.5px ring in the text color; its focus ring is the text color too.

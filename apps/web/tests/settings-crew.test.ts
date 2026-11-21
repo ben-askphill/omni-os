@@ -228,7 +228,7 @@ it('saves an uploaded SVG on the background color picked, with Save', async () =
   expect(host.textContent).toContain('Unsaved changes');
 
   await click(button('Save'));
-  expect(saves().map((c) => c.body.fields.avatar)).toEqual([{ icon: `svg:${SVG}`, shape: null, bg: '#0093e4' }]);
+  expect(saves().map((c) => c.body.fields.avatar)).toEqual([{ icon: `svg:${SVG}`, bg: '#0093e4' }]);
   // Builder had no uploaded image, so nothing goes to the avatar endpoint.
   expect(calls.filter((c) => c.url === '/api/crew/builder/avatar')).toHaveLength(0);
 });

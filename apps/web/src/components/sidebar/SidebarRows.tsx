@@ -6,7 +6,8 @@ import { duration, plural } from '../../format.ts';
 import { href } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo } from '../brand.tsx';
-import { Icon, StatusDot, ThreadDot, rowShows, threadStatusText, useRowMark, type IconName } from '../ui.tsx';
+import { Icon, RowDot, StatusDot, rowShows, threadStatusText, useRowMark, type IconName } from '../ui.tsx';
+import type { RowMark } from '../ui/status.tsx';
 import { ThreadAvatar } from '../ThreadAvatar.tsx';
 import { AvatarMark, drawsFaces } from '../thread/AvatarMark.tsx';
 import { showsRunning } from '@omni/shared/delegate-count.ts';
@@ -86,6 +87,8 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
   const agents = own.length;
   // A thread whose turn ended still works while its sub-agents or the threads it delegated run.
   const busy = showsRunning(t) || agents > 0;
+  // One mark for the row: the avatar's eyes at its start and the dot at its end draw the same.
+  const row = useRowMark(t, { busy });
   const at = TREE_AT[String(indent) as keyof typeof TREE_AT];
   return (
     <>
@@ -106,14 +109,14 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
           active ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
-        <RowLead t={t} busy={busy} />
+        <RowLead t={t} row={row} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {t.harness && (
           <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-3 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
             <HarnessLogo harness={t.harness} size={11} />
           </span>
         )}
-        <RowEnd t={t} busy={busy} />
+        <RowEnd row={row} />
       </a>
       {tree && <TreeUnder t={t} tree={tree} at={at} onNavigate={onNavigate} />}
       {own.map((k, i) => (
@@ -124,12 +127,12 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
 }
 
 /**
- * A sidebar row's start: the thread's agent, its eyes on the row's mark, else its channel's avatar; a group thread whose
- * agents run or wait on Ben draws their faces there instead (AvatarMark), with the row's mark at its far end (RowEnd).
+ * A sidebar row's start: the thread's agent, its eyes on the row's mark (useRowMark, worked out once per row), else its
+ * channel's avatar; a group thread whose agents run or wait on Ben draws their faces there instead (AvatarMark), with
+ * the row's mark at its far end (RowEnd).
  */
-function RowLead({ t, busy }: { t: ThreadStub; busy: boolean }) {
+function RowLead({ t, row }: { t: ThreadStub; row: RowMark }) {
   const { channels } = useApp();
-  const row = useRowMark(t, { busy });
   const ch = channels.find((c) => c.id === t.channel_id);
   return (
     <span className="grid shrink-0 place-items-center" style={{ minWidth: ROW_AVATAR, height: ROW_AVATAR }} data-row-lead>
@@ -143,10 +146,10 @@ function RowLead({ t, busy }: { t: ThreadStub; busy: boolean }) {
 }
 
 /** A sidebar row's status mark, at its far end. A group thread's too: its faces are in the avatar's slot. */
-function RowEnd({ t, busy }: { t: ThreadStub; busy: boolean }) {
+function RowEnd({ row }: { row: RowMark }) {
   return (
     <span className="grid min-w-3 shrink-0 place-items-center" data-row-mark>
-      <ThreadDot t={t} busy={busy} faces={false} />
+      <RowDot row={row} />
     </span>
   );
 }
@@ -206,6 +209,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
   const own = !showsAgents(t, tree?.phase) ? [] : tree ? tasks.filter((k) => k.thread_id === t.id) : tasks;
   const agents = own.length;
   const busy = showsRunning(t) || agents > 0;
+  const row = useRowMark(t, { busy });
   // One block with its tree and sub-agents, so a job stands apart from the next row (index.css, .tree-group).
   return (
     <div className="tree-group space-y-px">
@@ -218,7 +222,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
         data-active={(active && home) || undefined}
         className={`item flex h-9 min-w-0 flex-1 items-center gap-2 px-3 text-[13.5px] md:h-[var(--h-nav)] md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
       >
-        <RowLead t={t} busy={busy} />
+        <RowLead t={t} row={row} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         <span
           className={`flex max-w-[45%] shrink-0 items-center gap-2 ${
@@ -226,7 +230,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
           }`}
         >
           <span className="min-w-0 truncate text-[11px] font-normal text-fg-3">{channel}</span>
-          <RowEnd t={t} busy={busy} />
+          <RowEnd row={row} />
         </span>
       </a>
       {unpin && (

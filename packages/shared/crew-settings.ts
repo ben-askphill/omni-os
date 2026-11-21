@@ -222,11 +222,12 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
     const unset = builtIn ? same(now[k], builtIn[k]) : k in SWITCH_DEFAULTS && now[k] === SWITCH_DEFAULTS[k as keyof typeof SWITCH_DEFAULTS];
     fields[key] = unset ? (typeof value === 'string' ? '' : null) : value;
   }
-  // The avatar's icon, shape and color go together, a cleared one as null: a save changes only the avatar keys it
-  // names, so an uploaded image (PUT /api/crew/:id/avatar) stays. Null for all three drops them.
-  if (!before || before.icon !== now.icon || before.shape !== now.shape || before.bg !== now.bg) {
-    fields.avatar = now.icon || now.shape || now.bg ? { icon: now.icon || null, shape: now.shape || null, bg: now.bg || null } : null;
-  }
+  // Only the avatar keys the form changed go, a cleared one as null: a save changes only the avatar keys it names, so an
+  // uploaded image (PUT /api/crew/:id/avatar) stays, and so does a key this build reads as empty, such as a shape a later
+  // build draws.
+  const avatar: Record<string, string | null> = {};
+  for (const k of ['icon', 'shape', 'bg'] as const) if (before ? before[k] !== now[k] : now[k]) avatar[k] = now[k] || null;
+  if (Object.keys(avatar).length) fields.avatar = avatar;
   const body: CrewSaveBody = { fields };
   if (!detail || d.charter.trim() !== (detail.charters.own ?? '').trim()) body.charter = d.charter;
   if (detail?.builtIn && d.charterMode !== (detail.role.charterMode ?? 'append')) body.charter_mode = d.charterMode;

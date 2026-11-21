@@ -28,6 +28,7 @@ vi.mock('../src/store.tsx', () => ({
     channelsLoaded: true,
     needsYou: state.needsYou,
   }),
+  useChannel: () => undefined,
   useCrewRoles: () => [],
   useNow: () => Date.parse('2026-10-23T12:00:00Z'),
 }));

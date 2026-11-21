@@ -19,9 +19,9 @@ import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
 import { MemberButton, MemberSheet } from '../components/thread/MemberSheet';
-import { glyphFor } from '../components/glyph';
-import { leadEyes } from '../live/channel-model';
-import { useAgents, useChannels, useTechnical, useThreadLive, useThreadView } from '../live/react';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { threadMark, turnPhase } from '@omni/shared/status.ts';
+import { useAgents, useChannels, useNeedsYou, useTechnical, useThreadLive, useThreadView } from '../live/react';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
@@ -83,6 +83,12 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const group = !!thread?.members?.length;
   const groupWorking = group && thread!.members!.some((m) => m.state === 'working');
   const device = view ? threadDeviceName({ takeover: takeoverShown(view.takeover, view.handoff), machine: machine.machine, hereName: server.data?.device?.name }) : null;
+  // The mark the Web UI's header pill draws: what holds it up first, then the running turn's phase, so the lead's eyes
+  // think through the turn and work during a tool call (ADR 0021, D7). The head of the reply being written shows it too.
+  const rows = view?.rows;
+  const turn = useMemo(() => (status === 'running' && rows ? turnPhase(rows) : null), [status, rows]);
+  const need = useNeedsYou()?.items.find((i) => i.thread.id === id) ?? null;
+  const mark = thread ? threadMark(thread, { turn, need }) : null;
   const ran = useRemote(useCallback((api: OmniApi) => api.threadAccount(id), [id]));
   const account = ran.data?.account ? threadAccountLabel(ran.data.account) : null;
   const canPick = machine.machine !== null;
@@ -101,7 +107,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
           channel={channelName}
           role={roleName}
           lead={lead}
-          leadShows={thread ? leadEyes(glyphFor(status), thread.members) : undefined}
+          leadShows={thread && mark ? agentShows(thread.members, thread.role, mark) : undefined}
           talksOnly={talksOnly}
           wide={group}
           device={device}
@@ -118,7 +124,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
           )
         : undefined,
     });
-  }, [navigation, title, status, technical, channelName, roleName, lead, talksOnly, group, groupWorking, device, account, canPick, hasThread, openMenu, thread]);
+  }, [navigation, title, status, technical, channelName, roleName, lead, talksOnly, group, groupWorking, device, account, canPick, hasThread, openMenu, thread, mark]);
 
   // A machine can fall asleep while the thread stays open: read the list again each time the menu opens.
   const { reload: reloadMachines } = machine;
@@ -178,7 +184,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
     <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={headerHeight} style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ThreadHeader view={view} flash={flash} />
       <HandoffBanner view={view} machine={machine} />
-      <ThreadBody view={view} live={live} />
+      <ThreadBody view={view} live={live} mark={mark} />
       {live && view.thread ? (
         <ThreadFooter>
           <ThreadComposer live={live} thread={view.thread} harnesses={catalog.harnesses} onOpenRun={() => setRunOpen(true)} step={<StepChip chip={chip} onAsk={askStep} />} />

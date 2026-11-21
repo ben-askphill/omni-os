@@ -14,13 +14,13 @@ import { fontSize, minTarget, mono, radius, space, useOmniTheme, weight } from '
 import { HarnessLogo } from '../../../ui/Brand';
 import { Icon } from '../../../ui/Icon';
 import { Text } from '../../../ui/Text';
-import { avatarInk } from '@omni/shared/avatar-color.ts';
+import { AGENT_PILL_TINT } from '@omni/shared/avatar-color.ts';
 import { mentionPieces } from '@omni/shared/message-context-machine.ts';
 import type { Collision } from '@omni/shared/collisions.ts';
 import { eyesFor } from '@omni/shared/crew-eyes.ts';
 import { agentColor, agentName } from '../../agent-face';
 import { AgentAvatar } from '../../AgentAvatar';
-import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
+import { ChannelAvatar } from '../../ChannelAvatar';
 import { useRowActions } from './actions';
 
 type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
@@ -28,6 +28,9 @@ type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
 /** The avatar's gutter and its gap: how far a reply's rows sit in from the author line (web: REPLY_INDENT). */
 export const AVATAR = 24;
 export const REPLY_INSET = AVATAR + space.s6;
+
+/** A #rrggbb color at `alpha` over whatever sits under it, as the web's color-mix with transparent draws it. */
+const tint = (hex: string, alpha: number) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')}, ${alpha})`;
 
 const list = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
@@ -37,21 +40,13 @@ export function AuthorRow({ row }: Of<'author'>) {
   const agents = useAgents();
   const technical = useTechnical();
   const name = agentName(row.agent, agents);
-  const own = agents.find((a) => a.id === row.agent)?.avatar;
-  // The Conductor's face is its channel's saved look, else the Omni mark, unless its agent has an image or icon.
-  const conductor = row.agent === 'conductor' && !own?.image && !own?.icon;
   return (
     <View style={styles.author} accessibilityRole="header" accessibilityLabel={[name, row.at ? clock(toDate(row.at)) : null].filter(Boolean).join(', ')}>
-      {conductor ? (
-        row.look ? (
-          <ChannelAvatar name={row.look.name} icon={row.look.icon} avatarBg={row.look.avatar_bg} conductor size={AVATAR} />
-        ) : (
-          <View style={[styles.gutter, { width: AVATAR, height: AVATAR }]}>
-            <OmniMark size={AVATAR} color={colors.fg2} />
-          </View>
-        )
+      {/* The Conductor's channel look when it wears one (rows.ts), else the agent's avatar; the reply being written shows live eyes. */}
+      {row.look ? (
+        <ChannelAvatar name={row.look.name} icon={row.look.icon} avatarBg={row.look.avatar_bg} conductor size={AVATAR} />
       ) : (
-        <AgentAvatar agent={row.agent} size={AVATAR} />
+        <AgentAvatar agent={row.agent} size={AVATAR} shows={row.shows ?? undefined} placement={row.shows ? 'focus' : 'still'} />
       )}
       <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
         {name}
@@ -226,7 +221,7 @@ export function SentTo({ agents: to }: { agents: readonly { agent: string; name:
 
 /** A message's text with each agent or machine it mentions as a pill: an agent's in its own color, a machine's in the live blue. */
 export function MentionText({ text, records, style }: { text: string; records: unknown; style: object }) {
-  const { colors } = useOmniTheme();
+  const { colors, scheme } = useOmniTheme();
   const agents = useAgents();
   const pieces = mentionPieces(text, records);
   return (
@@ -234,9 +229,12 @@ export function MentionText({ text, records, style }: { text: string; records: u
       {pieces.map((piece, i) => {
         const span = piece.span;
         if (!span) return piece.text;
-        const bg = span.kind === 'agent' ? agentColor(span.agent.agent, agents) : colors.live;
+        // An agent's pill tints its color as the Web UI's does (AGENT_PILL_TINT), so the name in the text color reads at
+        // 4.5:1 on every agent color in both themes; a machine's takes the live blue.
+        const agent = span.kind === 'agent';
+        const bg = agent ? tint(agentColor(span.agent.agent, agents), AGENT_PILL_TINT[scheme]) : colors.live;
         return (
-          <Text key={i} style={[styles.pill, { backgroundColor: bg, color: span.kind === 'agent' ? avatarInk(bg) : colors.onInk }]}>
+          <Text key={i} style={[styles.pill, { backgroundColor: bg, color: agent ? colors.fg : colors.onInk }]}>
             {piece.text}
           </Text>
         );
@@ -250,7 +248,6 @@ const styles = StyleSheet.create({
   sentAgent: { flexDirection: 'row', alignItems: 'center', gap: space.s2, maxWidth: 160 },
   pill: { fontWeight: weight.semibold, borderRadius: radius.xs },
   author: { flexDirection: 'row', alignItems: 'center', gap: space.s6, minHeight: AVATAR },
-  gutter: { alignItems: 'center', justifyContent: 'center' },
   name: { flexShrink: 0, fontSize: 13.5, fontWeight: weight.semibold },
   run: { flexDirection: 'row', alignItems: 'center', gap: space.s2, flexShrink: 1 },
   meta: { fontSize: fontSize.meta },

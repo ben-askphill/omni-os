@@ -128,8 +128,8 @@ export function threadRow(t: ThreadStub, now: number, technical = true): ThreadR
     statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusWord(t.status, technical),
     glyph,
     agent: t.role ?? null,
-    // A thread marked done shows Stopped on its dot (ThreadRowView), and its avatar's eyes with it.
-    eyes: t.done_at ? { mark: 'stopped' } : leadEyes(glyph, t.members),
+    // A thread marked done shows the done arcs in its avatar's eyes, as on the Web UI (rowShows); its dot reads Stopped.
+    eyes: t.done_at ? { mark: 'done' } : leadEyes(glyph, t.members),
     markLine: markLine(t.members),
     faces: avatarMark(t.members),
     ...(t.owner && { owner: t.owner }),

@@ -47,7 +47,8 @@ import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCar
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
-import { agentShows, threadPill } from '../components/thread/thread-state.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { threadPill } from '../components/thread/thread-state.ts';
 import { defers, LIVE_TURNS } from '../transcript/defer.ts';
 import { FindBar } from '../components/thread/FindBar.tsx';
 import { useThreadFind } from '../pages/useThreadFind.ts';
@@ -205,7 +206,8 @@ export function ThreadScreen() {
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
-  const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
+  // The Conductor answers in its channel's look in any thread it is seated in, as on the desktop.
+  const conductorChannel = channel(CONDUCTOR_CHANNEL);
   const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, agents: roles, ch, changes, pr, now, shell, status, turn, mark: own.mark };
 
   const openFromCard = (tab: PanelTab) => {

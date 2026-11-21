@@ -59,6 +59,7 @@ The crew avatars design (the `omni-crew-avatars-spec` export, checked against th
 ### The built-in marks retire (D9)
 
 - The crew marks (`CREW` in `packages/shared/brand.ts` and both `CrewMark` components) are retired everywhere, pickers included. Delegation cards, ask cards, the automations list, thread details and the iOS crew report cards show the agent's avatar instead, and built-in agent names move out of the marks' data. Only five of the nine built-in agents had a mark, and an agent should look the same wherever it shows.
+- The Conductor keeps one exception, decided once beside the face in `conductorChannelLook()` (`packages/shared/agent-avatar.ts`) for every surface: its agent's own photo or icon, else the icon and background saved for the Conductor channel, else its crew character. Thread rows and reply author lines use it on desktop web, phone web and the iOS app.
 
 ### The switch of shared-glyph agents
 

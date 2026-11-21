@@ -11,7 +11,7 @@ import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
 import { HeaderActions } from './HeaderActions.tsx';
 import { MemberAvatars } from './Members.tsx';
-import { agentShows } from './thread-state.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
 import type { FaceShows } from '@omni/shared/agent-avatar.ts';
 import type { Mark } from '@omni/shared/status.ts';
 

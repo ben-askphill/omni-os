@@ -1,8 +1,6 @@
 // What a thread's status reads as on the thread screen: the header pill (desktop and phone), the quick card's run row
 // and the last run divider all take it from here, so they never disagree.
 import type { Thread } from '../../api.ts';
-import type { FaceShows } from '@omni/shared/agent-avatar.ts';
-import type { ThreadMember } from '@omni/shared/members.ts';
 import { MARK, PHASE, STATUS, markOf, threadGlyph, threadMark, threadPhase, type Glyph, type Mark, type MarkContext, type Phase, type TurnPhase } from '@omni/shared/status.ts';
 import { limitLabel } from '../../limits.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
@@ -60,15 +58,4 @@ function ownPill(thread: PillThread, seen: ThreadSeen): ThreadPill {
     return { glyph: MARK[mark].glyph, label: (MARK[mark].glyph === 'limited' && limitLabel(thread, seen.now)) || MARK[mark].label, ...(MARK[mark].glyph === 'running' && phase && { phase }), mark };
   if (glyph === 'running' && thread.status === 'running') return { glyph, label: runningLabel(thread, phase ? PHASE[phase].label : STATUS.running.label), ...(phase && { phase }), mark: markOf(glyph, phase) };
   return { glyph, label: (glyph === 'limited' && limitLabel(thread, seen.now)) || (phase ? PHASE[phase].label : STATUS[glyph].label), ...(phase && { phase }), mark: markOf(glyph, phase) };
-}
-
-/**
- * What an agent's avatar shows on the open thread (ADR 0021): the thread's status mark, whose open-thread eyes tell
- * thinking from a tool call (D7), or in a group thread the agent's own member state, so each agent shows what it does.
- * Nothing (idle eyes) for an agent not seated in the group.
- */
-export function agentShows(members: readonly Pick<ThreadMember, 'agent' | 'state'>[] | undefined, agent: string | null | undefined, mark: Mark): FaceShows | undefined {
-  if (!members?.length) return { mark };
-  const seat = members.find((m) => m.agent === agent);
-  return seat && { member: seat.state };
 }

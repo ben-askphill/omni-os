@@ -42,6 +42,23 @@
   --done: #c6f52b;
   --on-done: var(--ink);
   --done-edge: light-dark(var(--ink), transparent);
+  /* The agent colors (ADR 0021, D20): identity only, the same in both themes. A crew character's body, an agent icon's
+     disc and the agent's mention pill; never a state. The numbers are AGENT_PALETTE's (packages/shared/avatar-color.ts),
+     which the code reads; tests/token-contrast.test.ts holds these and the design system's to it. */
+  --agent-ink: #17181a;
+  --agent-sky: #52cdfe;
+  --agent-amber: #ffa839;
+  --agent-violet: #9834fd;
+  --agent-rose: #ff4983;
+  --agent-mint: #4aefa7;
+  --agent-green: #02c650;
+  --agent-sun: #ffdc4f;
+  --agent-lilac: #bda7fe;
+  --agent-magenta: #df00c5;
+  --agent-azure: #0093e4;
+  --agent-aqua: #0ee6e9;
+  --agent-teal: #00a8a2;
+  --agent-peach: #feb98b;
   /* Amber for "getting full" (the context meter from 70%) and the Limited status. Darker in light mode so it reads on white. */
   --warn: light-dark(#b45309, #f5b544);
   /* Destructive labels (Button variant="danger"): a red that reads as text, unlike vermilion. */
@@ -1348,18 +1365,19 @@
   /* An agent @mention: its avatar, in the agent's own color (--agent, set inline) instead of the machine pill's blue. */
   .mention-pill-agent {
     padding-left: 0.15em;
-    /* The color sits in the fill, and the name keeps the text color; a selected pill takes the agent's full color and
-       the ink that reads on it (--agent-on, set inline with --agent). */
+    /* The color sits in the fill as a tint (AGENT_PILL_TINT), and the name keeps the text color: 4.5:1 or more on every
+       agent color and surface in both themes, where Ink at 55% fell below it in light and Sun in dark. */
     color: var(--fg);
-    background: color-mix(in srgb, var(--agent) 55%, transparent);
+    background: light-dark(color-mix(in srgb, var(--agent) 45%, transparent), color-mix(in srgb, var(--agent) 30%, transparent));
     border-radius: 999px;
   }
+  /* Selected, and the focus ring, in the text color: an agent color can vanish into either theme (Ink in dark, Sun in
+     light), and no ink reads at 4.5:1 on full Magenta. */
   .mention-pill-agent[data-selected] {
-    color: var(--agent-on, var(--fg));
-    background: var(--agent);
+    box-shadow: inset 0 0 0 1.5px var(--fg);
   }
   .mention-pill-agent.mention-pill-sent:focus-visible {
-    outline-color: var(--agent);
+    outline-color: var(--fg);
   }
 
   /* A photo or icon agent avatar's state (components/AgentAvatar.tsx, ADR 0021 D8): a ring while the agent works, a

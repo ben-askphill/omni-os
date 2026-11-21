@@ -1,4 +1,5 @@
 import { avatarInk } from './avatar-color.ts';
+import { hasOwnLook } from './channel-icon.ts';
 import {
   CREW_LAYOUTS,
   CREW_SHAPE_IDS,
@@ -181,6 +182,16 @@ export function agentFace(agent: FaceAgent, opts: FaceOptions): AgentFace {
   }
   const shape = agentShape(agent);
   return crewCharacter(shape, agentColor(agent), opts.size, eyesFor(opts.shows, opts.placement === 'focus'), opts);
+}
+
+/**
+ * The Conductor's face, one rule for every surface (D9): its agent's own photo or icon, else the icon and background
+ * saved for the Conductor channel, else its crew character. Returns that channel's look when it wins, null when the
+ * agent's own avatar (agentFace) draws. Every other agent always draws its own.
+ */
+export function conductorChannelLook<C extends { icon?: string | null; avatar_bg?: string | null }>(agent: FaceAgent | null | undefined, channel: C | null | undefined): C | null {
+  if (agent?.id !== 'conductor' || agent.avatar?.image || agent.avatar?.icon) return null;
+  return channel && hasOwnLook(channel) ? channel : null;
 }
 
 function crewCharacter(shape: CrewShapeId, body: string, px: number, eyes: EyeState, opts: FaceOptions): CharacterFace {
