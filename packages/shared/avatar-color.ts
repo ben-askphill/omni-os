@@ -19,8 +19,21 @@ export function contrast(a: string, b: string): number {
   const x = luminance(a), y = luminance(b);
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
-/** The channels' swatches. Agents take AGENT_PALETTE (ADR 0021, D5). */
-export const AVATAR_SWATCHES = ['#e8d9f5', '#d4e9fa', '#d3eee4', '#f5e6ba', '#f6d9cd', '#f0d8e3', '#283c62', '#354f42', '#573c65', '#733e35'];
+/** The channels' swatches by name, as the color picker lists them. Agents take AGENT_PALETTE (ADR 0021, D5). */
+export const CHANNEL_SWATCHES = [
+  { name: 'Lavender', hex: '#e8d9f5' },
+  { name: 'Sky', hex: '#d4e9fa' },
+  { name: 'Mint', hex: '#d3eee4' },
+  { name: 'Sand', hex: '#f5e6ba' },
+  { name: 'Peach', hex: '#f6d9cd' },
+  { name: 'Rose', hex: '#f0d8e3' },
+  { name: 'Navy', hex: '#283c62' },
+  { name: 'Forest', hex: '#354f42' },
+  { name: 'Plum', hex: '#573c65' },
+  { name: 'Rust', hex: '#733e35' },
+] as const;
+/** The channels' swatches. */
+export const AVATAR_SWATCHES: string[] = CHANNEL_SWATCHES.map((s) => s.hex);
 
 /**
  * The agent palette (ADR 0021, D20): a crew character's body, an icon's disc and the agent's mention pill, in the order

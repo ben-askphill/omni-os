@@ -19,7 +19,6 @@ import { avatarStyleOf, iconFor, imageChangeOf, stashOf } from '@omni/shared/age
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { AgentIdentity, type IdentityValue } from '../components/AgentIdentity.tsx';
-import { isCrewRole } from '../components/brand.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
@@ -299,7 +298,7 @@ function Footer({ page, dirty, children }: { page?: boolean; dirty?: boolean; ch
 }
 
 /** The identity block's value for a role as it stands, or a new one. */
-const identityOf = (avatar: CrewRole['avatar'] | undefined): IdentityValue => ({ style: avatarStyleOf(avatar), stash: stashOf(avatar?.icon), bg: avatar?.bg ?? '', picked: null });
+const identityOf = (avatar: CrewRole['avatar'] | undefined): IdentityValue => ({ style: avatarStyleOf(avatar), stash: stashOf(avatar?.icon), shape: avatar?.shape ?? '', bg: avatar?.bg ?? '', picked: null });
 
 function EditorBody({
   id,
@@ -333,8 +332,8 @@ function EditorBody({
   const [draft, setDraft] = useState<CrewDraft | null>(id ? null : blankCrewDraft());
   const [newId, setNewId] = useState<string | null>(null);
   const [mode, setMode] = useState<'form' | 'markdown'>('form');
-  // The Identity block: which avatar style shows, what each style holds, the color and a photo waiting for Save. The
-  // draft's icon and bg follow it.
+  // The Identity block: which avatar style shows, what each style holds, the shape, the color and a photo waiting for
+  // Save. The draft's icon, shape and bg follow it.
   const [identity, setIdentity] = useState<IdentityValue>(() => identityOf(undefined));
   const [markdown, setMarkdown] = useState(id ? '' : crewMarkdownOf(null));
   // The Markdown tab's text as it last matched the form. An edit there is read into the form on the way back.
@@ -366,7 +365,7 @@ function EditorBody({
   const set = <K extends keyof CrewDraft>(k: K, v: CrewDraft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
   const changeIdentity = (v: IdentityValue) => {
     setIdentity(v);
-    setDraft((d) => (d ? { ...d, icon: iconFor(v.style, v.stash), bg: v.bg } : d));
+    setDraft((d) => (d ? { ...d, icon: iconFor(v.style, v.stash), shape: v.shape, bg: v.bg } : d));
   };
   const d = detail.data ?? null;
   const builtIn = !!d?.builtIn;
@@ -536,7 +535,6 @@ function EditorBody({
                 onChange={changeIdentity}
                 saved={role?.avatar?.image}
                 offered={offered}
-                builtInMark={isCrewRole(theId)}
                 fields={
                   <>
                     <Field id="crew-name" label="Name">
