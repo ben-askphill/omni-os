@@ -91,6 +91,24 @@ describe('claude catalog from what Claude Code reports', () => {
     expect(models.find((m) => m.default)?.id).toBe('claude-sonnet-5-5');
   });
 
+  it('keeps bundled and reported display names and derives missing names from Claude IDs', () => {
+    const models = claudeModels('sonnet', [
+      { value: 'claude-opus-5-5', displayName: 'Alternate Opus name' },
+      { value: 'claude-haiku-5-5-20261120[1m]', displayName: 'claude-haiku-5-5-20261120[1m]' },
+      { value: 'claude-fable-5-3' },
+      { value: 'claude-opus-5', displayName: ' Opus 5 Preview ' },
+    ]);
+    expect(Object.fromEntries(models.map((m) => [m.id, m.label]))).toMatchObject({
+      'claude-opus-5-5': 'Opus 5.5',
+      'claude-sonnet-5-5': 'Sonnet 5.5',
+      'claude-haiku-5-5': 'Haiku 5.5',
+      'claude-fable-5-1': 'Fable 5.1',
+      'claude-fable-5-2': 'Fable 5.2',
+      'claude-fable-5-3': 'Fable 5.3',
+      'claude-opus-5': 'Opus 5 Preview',
+    });
+  });
+
   it('validates a run on a reported model', () => {
     const c: Catalog = { harnesses: [claudeHarness(4, 'sonnet', reported)] };
     expect(validateRun(c, 'claude-code', 'claude-haiku-5-5', 'max')).toEqual({ ok: true, harness: 'claude-code', model: 'claude-haiku-5-5', effort: 'max' });

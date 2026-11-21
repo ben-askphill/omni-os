@@ -1,4 +1,5 @@
 import type { Run } from './run-switch.ts';
+import { claudeModelLabel } from './claude-model-label.ts';
 
 /** The model that asks for Auto, which picks the harness, model and effort from the prompt (apps/server/harness/auto.ts). */
 export const AUTO = 'auto';
@@ -30,7 +31,7 @@ export interface RunCatalogHarness {
 }
 
 export interface ThreadRunLabels {
-  /** The model's display name, the stored id, or "default". Prefixed "Auto · " when Auto picked it. */
+  /** The model's display name or ID, or "default". Prefixed "Auto · " when Auto picked it. */
   model: string;
   /** The harness's display name. Empty until the catalog names it. */
   harnessName: string;
@@ -47,7 +48,8 @@ export function threadRunLabels(
   harnesses: RunCatalogHarness[] | null | undefined,
 ): ThreadRunLabels {
   const { harness, model } = runModel(thread, harnesses);
-  const label = model?.label || thread.model || 'default';
+  const id = thread.model || 'default';
+  const label = model?.label || (thread.harness === 'claude-code' ? claudeModelLabel(id) : id);
   return {
     model: thread.auto_reason ? `Auto · ${label}` : label,
     harnessName: harness?.name ?? '',
