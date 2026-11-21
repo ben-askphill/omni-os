@@ -43,6 +43,7 @@ The crew avatars design (the `omni-crew-avatars-spec` export, checked against th
 ### Rings and corner pops (D8)
 
 - Characters draw no ring. The Needs you diamond leaves the face on the avatar mark, and the phone row's status dot leaves the avatar's corner. Both sit beside the avatar, in the status mark's place at the row's far end. The eyes carry the state, so a ring would repeat it, and nothing covers the face. Photo and icon avatars have no eyes, so they keep the working and Needs you rings.
+- Faces in a pile (the member avatars, the avatar mark, the iOS member sheet and mark line) sit side by side with a small gap instead of overlapping. With no disc behind a character, an overlap hid part of the next face, often an eye. Added after the code review of the build.
 
 ### Motion
 

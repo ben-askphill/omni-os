@@ -29,11 +29,9 @@ export function AvatarMark({ members, size = 16, facesOnly = false, className = 
   if (!mark) return null;
   const said = markLine(members) ?? '';
   return (
-    <span role="img" aria-label={said} title={said} data-avatar-mark className={`inline-flex shrink-0 items-center ${className}`}>
-      {mark.faces.map((f, i) => (
-        <span key={f.agent} className="relative rounded-full" style={{ marginLeft: i ? -size * 0.3 : 0, zIndex: mark.faces.length - i }}>
-          <Face face={f} size={size} />
-        </span>
+    <span role="img" aria-label={said} title={said} data-avatar-mark className={`inline-flex shrink-0 items-center gap-0.5 ${className}`}>
+      {mark.faces.map((f) => (
+        <Face key={f.agent} face={f} size={size} />
       ))}
       {mark.more > 0 && (
         <span className="ml-1 shrink-0 font-num font-semibold text-fg-2 tabular-nums" style={{ fontSize: Math.max(10.5, size * 0.62) }}>

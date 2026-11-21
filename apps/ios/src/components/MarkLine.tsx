@@ -17,10 +17,8 @@ export function MarkLine({ faces, text, size = 16 }: { faces: AvatarMark | null;
     <View style={styles.line} accessible accessibilityLabel={text}>
       {faces ? (
         <View style={styles.faces}>
-          {faces.faces.map((f, i) => (
-            <View key={f.agent} style={i > 0 && styles.overlap}>
-              <AgentAvatar agent={f.agent} size={size} shows={{ member: f.ring }} placement="row" />
-            </View>
+          {faces.faces.map((f) => (
+            <AgentAvatar key={f.agent} agent={f.agent} size={size} shows={{ member: f.ring }} placement="row" />
           ))}
           {faces.more ? <Text style={[styles.more, { color: colors.fg3 }]}>{`+${faces.more}`}</Text> : null}
           {faces.failed ? <View style={[styles.dot, { backgroundColor: colors.needs }]} /> : null}
@@ -36,7 +34,6 @@ export function MarkLine({ faces, text, size = 16 }: { faces: AvatarMark | null;
 const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: space.s3, minWidth: 0 },
   faces: { flexDirection: 'row', alignItems: 'center', gap: space.s1 },
-  overlap: { marginLeft: -4 },
   more: { fontSize: fontSize.meta, fontWeight: weight.medium },
   dot: { width: 6, height: 6, borderRadius: 3 },
   text: { flexShrink: 1, fontSize: fontSize.small, lineHeight: Math.round(fontSize.small * lineHeight.body) },
