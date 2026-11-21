@@ -12,7 +12,8 @@ import { Chip, CopyStatus, Icon, IconButton, IconLink, Loader, statusLabel, Stat
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
-import { threadPill } from './thread-state.ts';
+import { agentShows, threadPill } from './thread-state.ts';
+import { eyesFor } from '@omni/shared/crew-eyes.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
 import { useChannel, useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
@@ -163,6 +164,8 @@ export function ThreadQuickCard({
   const look = useAgent(thread.role);
   // A group thread (ADR 0019): the thread's own agent leads, and the Members row names the others.
   const group = (thread.members ?? []).some((m) => !m.lead);
+  // The lead's eyes say what the header's say, thinking included, though the card is no place for its loops (ADR 0021).
+  const leadEyes = { eyes: eyesFor(agentShows(thread.members, thread.role, pill.mark), true) };
   const ch = useChannel(thread.channel_id);
 
   return (
@@ -196,7 +199,7 @@ export function ThreadQuickCard({
       </QuickRow>
       <QuickRow icon="delegate">
         <span className="shrink-0 text-fg-3">{group ? 'Lead' : 'Agent'}</span>
-        {look && agent && <AgentAvatar agent={{ ...look, name: agent }} size={18} />}
+        {look && agent && <AgentAvatar agent={{ ...look, name: agent }} size={18} shows={leadEyes} placement="row" />}
         <span className={`min-w-0 truncate ${agent ? '' : 'text-fg-3'}`}>{agent ?? NO_CREW_ROLE}</span>
       </QuickRow>
       {group && (

@@ -1360,21 +1360,22 @@
     outline-color: var(--agent);
   }
 
-  /* A group thread's member avatars (components/thread/Members.tsx): a ring while the agent works, a still one while it
-     waits on you. The ring breathes unless motion is reduced. */
-  .member-ring-working,
-  .member-ring-needs {
+  /* A photo or icon agent avatar's state (components/AgentAvatar.tsx, ADR 0021 D8): a ring while the agent works, a
+     still one while it waits on you. A crew character shows it in its eyes and never wears one. The ring breathes
+     unless motion is reduced. */
+  .avatar-ring-working,
+  .avatar-ring-needs {
     box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--ring);
   }
-  .member-ring-working {
+  .avatar-ring-working {
     --ring: var(--live);
   }
-  .member-ring-needs {
+  .avatar-ring-needs {
     --ring: var(--needs);
   }
   @media (prefers-reduced-motion: no-preference) {
-    .member-ring-working {
-      animation: member-ring 1.6s ease-in-out infinite;
+    .avatar-ring-working {
+      animation: avatar-ring 1.6s ease-in-out infinite;
     }
   }
   /* Parallel turns (thread/Lanes.tsx): a lane per agent, and the collision flag over them (thread/Collision.tsx). */
@@ -2283,7 +2284,7 @@ html:active-view-transition-type(push, pop)::view-transition-new(root) {
   }
 }
 
-@keyframes member-ring {
+@keyframes avatar-ring {
   50% {
     box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px color-mix(in srgb, var(--live) 35%, transparent);
   }

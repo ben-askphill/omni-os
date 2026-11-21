@@ -12,7 +12,7 @@ import type { Thread } from '../src/api.ts';
 
 const ROLES = [
   { id: 'lead', name: 'Builder', harness: 'claude-code', delegatable: true, delegateOnly: false, hidden: false },
-  { id: 'designer', name: 'Designer', harness: 'claude-code', delegatable: true, delegateOnly: false, hidden: false },
+  { id: 'designer', name: 'Designer', harness: 'claude-code', delegatable: true, delegateOnly: false, hidden: false, avatar: { icon: 'icon:image', bg: '#d4e9fa' } },
   { id: 'critic', name: 'Critic', harness: 'codex', delegatable: true, delegateOnly: false, hidden: false },
   { id: 'conductor', name: 'Conductor', harness: 'claude-code', delegatable: false, delegateOnly: true, hidden: false },
 ];
@@ -124,6 +124,12 @@ describe('the member list', () => {
       ['lead', true, false],
       ['designer', false, true],
     ]);
+    // Each face shows its member's state (ADR 0021, D8): a character in its eyes, with no ring; an icon in its ring.
+    const face = (agent: string) => host.querySelector(`[data-member="${agent}"] [data-state]`)!;
+    expect(face('lead').querySelector('svg[data-eyes]')?.getAttribute('data-eyes')).toBe('done');
+    expect(face('lead').querySelector('[class*="avatar-ring"]')).toBeNull();
+    expect(face('designer').querySelector('svg[data-eyes]')).toBeNull();
+    expect(face('designer').querySelector('.avatar-ring-working')).not.toBeNull();
     expect(host.querySelector('[aria-label="Remove Builder"]')).toBeNull();
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Remove Designer"]')!.click());
     expect(host.textContent).toContain('Its session closes once its turn finishes.');

@@ -102,8 +102,8 @@ const SHAPE: Record<Mark | 'loading', ReactNode> = {
 // A shape that is not a plain dot loses itself below 8px, and one with a satellite below 9.
 const MIN_SHAPED = 8;
 const PLAIN: ReadonlySet<Mark> = new Set(['working', 'idle', 'starting']);
-const CREW: ReadonlySet<Mark> = new Set(['delegating', 'crew_question', 'crew_failed']);
-const boxOf = (mark: Mark, size: number) => (CREW.has(mark) ? Math.max(size, MIN_SHAPED + 1) : PLAIN.has(mark) ? size : Math.max(size, MIN_SHAPED));
+const CREW_MARKS: ReadonlySet<Mark> = new Set(['delegating', 'crew_question', 'crew_failed']);
+const boxOf = (mark: Mark, size: number) => (CREW_MARKS.has(mark) ? Math.max(size, MIN_SHAPED + 1) : PLAIN.has(mark) ? size : Math.max(size, MIN_SHAPED));
 
 /**
  * The one status mark, for every state a thread can be in (`Mark` in @omni/shared/status.ts). Its shape says who has
