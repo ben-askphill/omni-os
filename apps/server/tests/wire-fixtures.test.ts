@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { homedir, hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
@@ -188,6 +189,8 @@ const NAMES = [
   // A group thread (ADR 0019) after Add an agent: its `members`, as the header's avatars and the member list read them.
   // After the steps thread, so the ids recorded before it stay put.
   'thread-members.json',
+  // A work thread, as the Conductor's detail lists it, with its seat's session still holding the report.
+  'seated-delegations.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -409,10 +412,10 @@ type Detail = { thread: Thread; events: { kind: string }[]; pending?: { kind?: s
 
 async function scenario() {
   let base = `http://127.0.0.1:${await boot()}`;
-  const call = async (method: string, path: string, body?: unknown, ok = true) => {
+  const call = async (method: string, path: string, body?: unknown, ok = true, token = process.env.OMNI_TOKEN) => {
     const res = await fetch(`${base}/api${path}`, {
       method,
-      headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();
@@ -1019,6 +1022,24 @@ async function scenario() {
   await eventually(async () => (await detail(grouped.id)).thread.status === 'done', 'the group thread to finish its first turn');
   const seated = keep('thread-members.json', await call('POST', `/threads/${grouped.id}/members`, { agent: 'reviewer' })) as { members: { agent: string }[] };
   expect(seated.members.map((m) => m.agent)).toEqual(['builder', 'reviewer']);
+
+  const job = (await call('POST', '/threads', { channel: 'conductor', prompt: 'Plan the label fix', title: 'Plan the label fix', role: 'conductor' })) as Thread;
+  await eventually(async () => (await detail(job.id)).thread.status === 'done', 'the Conductor to finish its first turn');
+  await call('POST', `/threads/${job.id}/messages`, {
+    prompt: '@Builder fix the labels in #acme',
+    context: [{ id: 'builder-mention', kind: 'agent_mention', v: 1, label: '@Builder', body: { agent: 'builder', name: 'Builder' } }],
+  });
+  const db = new DatabaseSync(join(data, 'omni.db'), { readOnly: true });
+  const seat = db.prepare('SELECT session_thread FROM thread_members WHERE thread_id = ? AND agent = ?').get(job.id, 'builder') as { session_thread: string };
+  db.close();
+  const tokenFile = join(data, 'threads', seat.session_thread, 'token');
+  await eventually(async () => existsSync(tokenFile) && (await detail(job.id)).events.some((e) => e.kind === 'result'), 'the seated Builder to start');
+  const work = (await call('POST', '/threads', { channel: 'acme', role: 'builder', prompt: 'Fix labels', title: 'Fix labels', task_id: 'T-SEAT', source: 'conductor' }, true, readFileSync(tokenFile, 'utf8').trim())) as Thread;
+  await eventually(async () => (await detail(work.id)).thread.status === 'done', 'the work thread to finish');
+  const { children } = await get(`/threads/${job.id}`);
+  expect(children).toHaveLength(1);
+  expect(children[0]).toMatchObject({ id: work.id, parent_id: seat.session_thread, seated_delegation: { thread_id: job.id, agent: 'builder' } });
+  keep('seated-delegations.json', children);
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

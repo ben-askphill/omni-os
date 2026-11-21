@@ -38,9 +38,9 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
 import { sentContext } from '@omni/shared/message-context-machine.ts';
 import { SentTo } from '../message-context/agent-mention.tsx';
-import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, seatedDelegationsAt, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
-import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { answersFor, branchOf, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
@@ -354,6 +354,8 @@ interface ItemRowProps {
   running: boolean;
   /** The team card's members, on the first item when it is the thread's first message. */
   team?: Branch[];
+  /** Work threads a seated agent opened from this row. */
+  seated?: Thread[];
   /** The first item is the brief the delegating thread sent: it folds. */
   brief?: boolean;
   reports: Map<string, string>;
@@ -383,7 +385,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer, indent }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, seated, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer, indent }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -458,15 +460,16 @@ const ItemRow = memo(
     })();
     const shown = Array.isArray(body) ? body.length > 0 : !!body;
     // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
-    return shown ? (
+    return shown || seated?.length ? (
       <div data-key={it.key} className={`${defer ? 'tx-row ' : ''}space-y-4${indent ? ` ${REPLY_INDENT}` : ''}`}>
         {body}
+        {seated?.length ? <DelegationCard branches={seated.map(branchOf)} reports={reports} /> : null}
       </div>
     ) : null;
   },
   (a, b) => {
     for (const k of Object.keys(b) as (keyof ItemRowProps)[]) {
-      if (k === 'pages' || k === 'steps' || k === 'answers' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
+      if (k === 'pages' || k === 'steps' || k === 'answers' || k === 'seated' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
     }
     return Object.keys(a).length === Object.keys(b).length;
   },
@@ -573,6 +576,13 @@ export const Transcript = memo(function Transcript({
     held.current = keepSame(held.current, buildItems(events, spans).items);
     return held.current;
   }, [events, spans]);
+  const seated = useMemo(() => {
+    if (!known.some((t) => t.seated_delegation?.thread_id === threadId)) return new Map<number, Thread[]>();
+    const onCards = new Set(all.flatMap((it) => it.type === 'tools'
+      ? delegations(it.calls).flatMap((d) => [d.lead?.id, ...d.branches.map((b) => b.id)])
+      : it.type === 'ask' ? [it.p.thread_id] : []));
+    return seatedDelegationsAt(known.filter((t) => t.seated_delegation?.thread_id === threadId && !onCards.has(t.id)), all, events, spans);
+  }, [known, threadId, all, events, spans]);
   // A message several agents answered gathers their replies into lanes (ADR 0019, @omni/shared/lanes.ts). `items` is
   // the flow outside the lanes, which the author lines and the turns' steps read; each lane folds its own.
   const flow = useMemo<LaneFolded[]>(() => laneFold(all, { lead, cwd }), [all, lead, cwd]);
@@ -688,6 +698,7 @@ export const Transcript = memo(function Transcript({
         byId={byId}
         artifacts={artifacts}
         pages={pages.get(it.key)}
+        seated={seated.get(it.key)}
         steps={steps && it.key === first ? steps : undefined}
         code={it.type === 'result' ? code : undefined}
         answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
@@ -715,6 +726,7 @@ export const Transcript = memo(function Transcript({
               cwd={cwd}
               running={running}
               team={idx === 0 && fromStart && team?.length ? team : undefined}
+              seated={seated.get(it.key)}
               brief={idx === 0 && fromStart && delegated}
               reports={reports}
               byId={byId}

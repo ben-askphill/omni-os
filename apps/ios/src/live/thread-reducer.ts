@@ -1,6 +1,7 @@
 import type { Artifact, Channel, HistoryEvent, PendingMsg, SSEState, Thread, ThreadOpen } from '@omni/client-core';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { Span } from '@omni/shared/history.ts';
+import { isDelegatedTo } from '@omni/shared/members.ts';
 import { withOpening, type Opening } from '@omni/shared/opening.ts';
 
 export interface ThreadView {
@@ -120,7 +121,7 @@ export function reduceThread(view: ThreadView, message: unknown): ThreadView {
 
   if (t.id === view.threadId) return fromStream ? withOwnThread(view, t, message) : view;
   let next = view;
-  if (t.parent_id === view.threadId) next = { ...next, children: upsert(next.children, t) };
+  if (isDelegatedTo(t, view.threadId)) next = { ...next, children: upsert(next.children, t) };
   if (next.parent && next.parent.id === t.id) next = { ...next, parent: t };
   return next;
 }

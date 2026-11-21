@@ -1,10 +1,10 @@
-import type { ThreadMember } from '@omni/shared/members.ts';
+import type { SeatedDelegation, ThreadMember } from '@omni/shared/members.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { apiPath, sendWithFiles, type HttpClient, type WithFiles } from '../http.ts';
 
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
-export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
+export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team' | 'member';
 
 /** A thread row, as every thread endpoint sends it. */
 export interface Thread {
@@ -62,6 +62,7 @@ export interface Thread {
   step?: string;
   /** A group thread's agents, the lead first, while an agent besides the lead is seated (@omni/shared/members.ts). */
   members?: ThreadMember[];
+  seated_delegation?: SeatedDelegation;
   /** Why it takes no new messages: its lead agent was deleted or is hidden. */
   read_only?: string;
 }
