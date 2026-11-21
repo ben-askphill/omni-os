@@ -19,7 +19,7 @@ import { avatarStyleOf, iconFor, imageChangeOf, stashOf } from '@omni/shared/age
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { AgentIdentity, type IdentityValue } from '../components/AgentIdentity.tsx';
-import { isCrewRole } from '../components/brand.tsx';
+import { builtInName } from '@omni/shared/crew-role.ts';
 import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
@@ -536,7 +536,7 @@ function EditorBody({
                 onChange={changeIdentity}
                 saved={role?.avatar?.image}
                 offered={offered}
-                builtInMark={isCrewRole(theId)}
+                builtInMark={!!builtInName(theId)}
                 fields={
                   <>
                     <Field id="crew-name" label="Name">

@@ -1,4 +1,4 @@
-import { CrewMark, HarnessLogo, isCrewRole } from '../../../ui/Brand';
+import { HarnessLogo } from '../../../ui/Brand';
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
 import { STEP_GLYPH } from '@omni/shared/steps.ts';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
+import { AgentAvatar } from '../../AgentAvatar';
 import { ContextChips } from '../../ContextChips';
 import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
 import { glyphFor, StatusDot } from '../../StatusDot';
@@ -73,7 +74,7 @@ export function ReportRow({ row }: Of<'report'>) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, r.dropped && styles.dim]}>
       <Pressable accessibilityRole="button" onPress={() => openThread(r.thread_id)} style={styles.line}>
-        {isCrewRole(r.role) ? <CrewMark role={r.role} /> : null}
+        {r.role ? <AgentAvatar agent={r.role} size={16} /> : null}
         <Text style={[styles.cardTitle, { color: colors.fg }]}>{`Report from ${r.role || 'the crew'}`}</Text>
         {r.dropped ? <Text style={[styles.caption, { color: colors.fg3 }]}>{r.undelivered ? `Not delivered · ${r.undelivered}` : 'Not delivered'}</Text> : null}
         <View style={styles.grow} />
@@ -189,7 +190,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
           onPress={() => openThread(k.id)}
           style={({ pressed }) => [styles.kid, { backgroundColor: pressed ? colors.surface3 : colors.bg }]}
         >
-          {isCrewRole(k.role) ? <CrewMark role={k.role} /> : null}
+          {k.role ? <AgentAvatar agent={k.role} size={16} /> : null}
           <StatusDot glyph={glyphFor(k.status)} />
           <View style={styles.grow}>
             <Text numberOfLines={1} style={[styles.kidTitle, { color: colors.fg }]}>

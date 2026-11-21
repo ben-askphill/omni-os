@@ -4,13 +4,13 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Icon } from '../src/ui/Icon';
-import { HarnessLogo, CrewMark, LinkBrand } from '../src/ui/Brand';
-import { HARNESS, CREW } from '@omni/shared/brand.ts';
+import { HarnessLogo, LinkBrand } from '../src/ui/Brand';
+import { HARNESS } from '@omni/shared/brand.ts';
 import { LINK_ICONS } from '@omni/shared/link-icons.ts';
 
 vi.mock('../src/theme', () => ({ useOmniTheme: () => ({ colors: { fg: '#123456' } }) }));
 vi.mock('../src/ui/Text', () => ({ Text: 'Text' }));
-vi.mock('react-native-svg', () => ({ default: 'Svg', Path: 'Path', Circle: 'Circle', Rect: 'Rect' }));
+vi.mock('react-native-svg', () => ({ default: 'Svg', Path: 'Path' }));
 import { ICON_PATHS, type IconName as SharedIconName } from '@omni/shared/icons.ts';
 import { ICON_ALIASES, drawingName, isIconName, type IconName } from '../src/ui/symbols';
 
@@ -49,15 +49,12 @@ describe('native render paths', () => {
     }
   });
 
-  it('renders all registered vendor, crew and link-brand marks', () => {
+  it('renders all registered vendor and link-brand marks', () => {
     for (const [harness, info] of Object.entries(HARNESS)) {
       if (!info.logo) continue; // Web uses initials for vendors without a drawing too.
       const svg = HarnessLogo({ harness });
       expect(svg.type).toBe('Svg');
       expect(svg.props.children.props.d, harness).toBeTruthy();
-    }
-    for (const role of Object.keys(CREW) as (keyof typeof CREW)[]) {
-      expect(CrewMark({ role }).props.children.length, role).toBeGreaterThan(0);
     }
     for (const brand of Object.keys(LINK_ICONS)) {
       expect(LinkBrand({ brand }).props.children.every((p: { props: { d: string } }) => !!p.props.d), brand).toBe(true);

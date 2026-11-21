@@ -2,7 +2,8 @@ import { useState, type ReactNode } from 'react';
 import { type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { useApi, type BackgroundTask, type Channel, type HarnessWithRunning, type Thread } from '../../../api.ts';
 import { threadRunLabels } from '@omni/shared/thread-run.ts';
-import { CrewMark, HarnessMark, isCrewRole } from '../../brand.tsx';
+import { AgentAvatar, useAgent } from '../../AgentAvatar.tsx';
+import { HarnessMark } from '../../brand.tsx';
 import { Chip, CopyButton, Icon, StatusDot } from '../../ui.tsx';
 import { duration, fullDate, plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
@@ -139,6 +140,7 @@ export function DetailsTab({
   // Off outside a repo channel: no branch card, working directory, session, task id, MCP list, tokens or resume command.
   const code = useShowsCode(channel);
   const technical = useTechnical();
+  const agent = useAgent(thread.role);
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
   // Its run is on another machine: Cursor Cloud, or a remote agent's server. Nothing resumes it in a terminal here.
@@ -166,10 +168,10 @@ export function DetailsTab({
             #{channel?.name ?? thread.channel_id}
           </a>
         </Row>
-        {roleName && thread.role && (
+        {roleName && agent && (
           <Row k="Agent">
-            <span className="inline-flex items-center gap-[var(--sp-2)]" data-role={thread.role}>
-              {isCrewRole(thread.role) && <CrewMark role={thread.role} size={14} className="text-fg-2" />}
+            <span className="inline-flex items-center gap-[var(--sp-2)]" data-role={agent.id}>
+              <AgentAvatar agent={{ ...agent, name: roleName }} size={16} />
               {roleName}
             </span>
           </Row>
