@@ -20,10 +20,13 @@ AgentAvatar is an agent's face wherever the Web UI shows one, on desktop web, ph
 ## States
 
 - Idle, thinking and working are the same eyes in different places; waiting takes squares, needs you diamonds (bars when small), done arcs (chevrons when small). The card's States row draws all six.
-- Everywhere shows idle eyes until thread state reaches the eyes. Avatars with no thread behind them (Settings, pickers, mentions) and past replies stay idle.
+- `shows` is what the eyes read: a thread's status mark (`{ mark }`) or a group member's state (`{ member }`). The thread header, the quick-actions card, the member list, lanes, phone thread rows, the avatar mark and the head of the reply being written pass it. In focus (`placement="focus"`: the open thread's header, the member list, lanes, the live reply head) the eyes tell thinking from working; in a row a running thread works.
+- Avatars with no thread behind them (Settings, pickers, mentions) and the heads of past replies stay idle (`placement="still"`).
 
 ## Rules
 
 - `data-shape`, `data-grid` and `data-eyes` on the character's `<svg>` name the drawing for screenshots and checks.
 - Photo and icon avatars keep the round disc they always had. A character never sits on a disc.
+- A character wears no ring: its eyes carry the state. A photo or icon has no eyes, so it wears the Working ring (`--live`, breathing) while its agent works and the still Needs you ring (`--needs`) while it waits on you.
+- Nothing sits on a character's face. The avatar mark's Needs you diamond and failed dot sit after the faces, and a phone row's status mark beside its avatar.
 - An agent mention pill takes the agent's color at 55% behind its name, with the 16px avatar at its start; a selected pill takes the full color and the ink that reads on it.

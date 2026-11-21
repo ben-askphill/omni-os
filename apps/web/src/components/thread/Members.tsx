@@ -1,8 +1,9 @@
 // A group thread's agents on the desktop web (ADR 0019): the members' avatars at the right of the thread header, which
-// open the member list in a popover, with each member's run and Remove, and Add an agent. Running agents' avatars get
-// a ring; the header has no Working label. The quick-actions card's Lead and Members rows, and the Add an agent dialog
+// open the member list in a popover, with each member's run and Remove, and Add an agent. Each avatar shows its
+// member's state in its eyes, or a photo's or icon's ring (ADR 0021, D8); the header has no Working label. The quick-actions card's Lead and Members rows, and the Add an agent dialog
 // the thread menu opens, live here too. The phone draws the same list as a sheet (mobile/MemberSheet.tsx).
 import { useEffect, useRef, useState } from 'react';
+import type { FacePlacement } from '@omni/shared/agent-avatar.ts';
 import type { ThreadMember } from '@omni/shared/members.ts';
 import { pickedRun, threadChoice, threadRunLabels, type RunPick } from '@omni/shared/thread-run.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type Thread } from '../../api.ts';
@@ -24,28 +25,30 @@ const STATE_LABEL: Record<ThreadMember['state'], string> = {
 };
 const STATE_MARK = { needs: 'question', failed: 'failed', working: 'working', done: 'done', stopped: 'stopped', idle: 'idle' } as const;
 
-/** One agent's avatar, with the Working ring while it runs. */
-export function MemberFace({ member, size = 22 }: { member: Pick<ThreadMember, 'agent' | 'name' | 'state'>; size?: number }) {
+/**
+ * One agent's avatar, showing its member state. `placement`: in focus in the thread header and the member list, in a
+ * row in the quick card's Members row.
+ */
+export function MemberFace({ member, size = 22, placement = 'focus' }: { member: Pick<ThreadMember, 'agent' | 'name' | 'state'>; size?: number; placement?: FacePlacement }) {
   const agent = useAgent(member.agent) ?? { id: member.agent, name: member.name };
-  const ring = member.state === 'working' ? 'member-ring-working' : member.state === 'needs' ? 'member-ring-needs' : '';
   return (
-    <span className={`inline-grid shrink-0 place-items-center rounded-full ${ring}`} data-state={member.state}>
-      <AgentAvatar agent={{ ...agent, name: member.name }} size={size} />
+    <span className="inline-grid shrink-0 place-items-center rounded-full" data-state={member.state}>
+      <AgentAvatar agent={{ ...agent, name: member.name }} size={size} shows={{ member: member.state }} placement={placement} />
     </span>
   );
 }
 
 const LOUD: Partial<Record<ThreadMember['state'], number>> = { needs: 2, working: 1 };
 
-/** Overlapping avatars, `max` at most: the agents that wait on Ben or work come first, so their ring always shows. */
-export function Facepile({ members, size = 22, max = 3, count = true }: { members: readonly ThreadMember[]; size?: number; max?: number; count?: boolean }) {
+/** Overlapping avatars, `max` at most: the agents that wait on Ben or work come first, so their state always shows. */
+export function Facepile({ members, size = 22, max = 3, count = true, placement }: { members: readonly ThreadMember[]; size?: number; max?: number; count?: boolean; placement?: FacePlacement }) {
   const shown = [...members].sort((a, b) => (LOUD[b.state] ?? 0) - (LOUD[a.state] ?? 0)).slice(0, max);
   const more = count ? members.length - shown.length : 0;
   return (
     <span className="flex items-center">
       {shown.map((m, i) => (
         <span key={m.agent} className="rounded-full bg-bg p-[1.5px]" style={{ marginLeft: i ? -size * 0.3 : 0, zIndex: shown.length - i }}>
-          <MemberFace member={m} size={size} />
+          <MemberFace member={m} size={size} placement={placement} />
         </span>
       ))}
       {more > 0 && <span className="ml-1 text-[11.5px] font-medium text-fg-3">+{more}</span>}
@@ -296,7 +299,7 @@ export function MembersLine({ thread }: { thread: Thread }) {
   if (!others.length) return null;
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <Facepile members={others} size={18} />
+      <Facepile members={others} size={18} placement="row" />
       <span className="min-w-0 truncate">{others.map((m) => m.name).join(', ')}</span>
     </span>
   );

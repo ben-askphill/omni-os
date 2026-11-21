@@ -86,7 +86,7 @@ export function groupMark(own: Mark, members: readonly Pick<ThreadMember, 'lead'
   return out;
 }
 
-/** One face in the avatar mark: an agent that waits on Ben (the Needs you ring and diamond) or works (the Working ring). */
+/** One face in the avatar mark: an agent that waits on Ben or works, which its eyes show (a photo or icon in its ring). */
 export interface MarkFace {
   agent: string;
   name: string;

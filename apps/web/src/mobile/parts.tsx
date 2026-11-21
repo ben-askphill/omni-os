@@ -7,7 +7,9 @@ import { AgentAvatar, useAgent } from '../components/AgentAvatar.tsx';
 import { Folded } from '../components/Folded.tsx';
 import { FindTargetCtx } from '../transcript/find-target.ts';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
-import type { Mark, Phase } from '@omni/shared/status.ts';
+import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import type { ThreadMember } from '@omni/shared/members.ts';
+import { glyphFor, markOf, type Mark, type Phase } from '@omni/shared/status.ts';
 import type { RowItem } from './rows.ts';
 import { LayerShownCtx, SheetHostCtx } from './sheet-stack.ts';
 import { drawsFaces, MarkLine } from '../components/thread/AvatarMark.tsx';
@@ -118,20 +120,30 @@ export function MoEmpty({ children }: { children: ReactNode }) {
 }
 
 /**
- * Who works the thread: its agent's avatar (AgentAvatar), or the channel's avatar when it runs without one, with its
- * status on the corner. A Conductor thread wears the Conductor's saved icon and background once it has them, as on the
- * desktop Inbox and the iPhone; its crew character is only the default.
+ * Who works the thread: its agent's avatar (AgentAvatar), its eyes showing `shows` as a list row's do, or the channel's
+ * avatar when it runs without one. Nothing sits on it (ADR 0021, D8): a row puts its status mark beside it (MoRowLead).
+ * A Conductor thread wears the Conductor's saved icon and background once it has them, as on the desktop Inbox and the
+ * iPhone; its crew character is only the default.
  */
-export function MoAvatar({ role, channel, channelIcon, avatarBg, state, phase, mark, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null; size?: number }) {
+export function MoAvatar({ role, channel, channelIcon, avatarBg, shows, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; shows?: FaceShows; size?: number }) {
   const agent = useAgent(role === 'conductor' && hasOwnLook({ icon: channelIcon, avatar_bg: avatarBg }) ? null : role);
   return (
-    <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      {agent ? <AgentAvatar agent={agent} size={size} /> : <Avatar name={channel ?? '?'} channelIcon={channelIcon} avatarBg={avatarBg} omni={channel === CONDUCTOR_CHANNEL} size={size} />}
-      {state && (
-        <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-          <StatusDot status={state} phase={phase} mark={mark} size={8} />
-        </span>
-      )}
+    <span className="grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+      {agent ? <AgentAvatar agent={agent} size={size} shows={shows} placement="row" /> : <Avatar name={channel ?? '?'} channelIcon={channelIcon} avatarBg={avatarBg} omni={channel === CONDUCTOR_CHANNEL} size={size} />}
+    </span>
+  );
+}
+
+/**
+ * A thread row's start: who works it, its eyes on the row's state, and its status mark beside the avatar, not on its
+ * corner. A group thread's lead shows its own state, as the busy faces on the row's second line show theirs.
+ */
+export function MoRowLead({ state, phase, mark, members, ...who }: Omit<Parameters<typeof MoAvatar>[0], 'shows' | 'size'> & { state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null; members?: readonly Pick<ThreadMember, 'lead' | 'state'>[] }) {
+  const lead = members?.find((m) => m.lead);
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      <MoAvatar {...who} shows={lead ? { member: lead.state } : state ? { mark: mark ?? markOf(glyphFor(state), phase) } : undefined} />
+      {state && <StatusDot status={state} phase={phase} mark={mark} size={8} />}
     </span>
   );
 }
@@ -149,7 +161,7 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () => void; last?: boolean; trailing?: ReactNode }) {
   return (
     <button type="button" onClick={onOpen} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-      <MoAvatar role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} phase={it.phase} />
+      <MoRowLead role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} phase={it.phase} members={it.members} />
       <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`}>
         <span className="flex items-baseline gap-2">
           <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${it.settled ? 'text-fg-2' : 'text-fg'}`}>{it.title}</span>

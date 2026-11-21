@@ -1,4 +1,7 @@
-import { PHASE, type TurnPhase } from '@omni/shared/status.ts';
+import { PHASE, glyphFor, markOf, type Mark, type TurnPhase } from '@omni/shared/status.ts';
+import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import { eyesForMark } from '@omni/shared/crew-eyes.ts';
+import { agentShows } from '../components/thread/thread-state.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, MemberLine, SwitchLine } from '../components/Transcript.tsx';
@@ -78,7 +81,15 @@ export type TurnCtx = {
   status: string | null;
   /** What the running turn is doing (`turnPhase`), for the thinking line's dot. */
   turn: TurnPhase | null;
+  /** The thread's status mark, as the header's pill draws it: the head of the reply being written shows it (ADR 0021). */
+  mark: Mark;
 };
+
+/** A turn still being written: running, or queued for a slot. */
+const running = (t: Pick<TurnView, 'status'>) => t.status === 'running' || t.status === 'queued';
+
+/** A lane's eyes from its own turn: working while it runs, waiting while it is queued, as a lane in a list (D7). */
+const laneShows = (t: Pick<TurnView, 'status'>): FaceShows => ({ eyes: eyesForMark(markOf(glyphFor(t.status))) });
 
 /** Who a turn's Asks went to, when each thread it started came from one: one role by name, several by count. */
 function askedOf(t: TurnView): { name: string; remote: string | null } | undefined {
@@ -164,13 +175,13 @@ function conductorFace(c: TurnCtx, look: AgentLook) {
  * the reply indented beside the avatar. Turns are parted by Ben's messages, so each one opens a run of its own. A turn
  * no agent wrote (a thread with no agent) shows as it always did.
  */
-function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNode }) {
+function Reply({ t, c, shows, children }: { t: TurnView; c: TurnCtx; shows: FaceShows | undefined; children: ReactNode }) {
   const look = t.author ? agentLook(t.author, c.agents) : null;
   if (!look) return <>{children}</>;
   const first = t.items.find(isReply);
   return (
     <div className="flex flex-col gap-2">
-      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={seatRun(c.thread.members, look.id) ?? { harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} phone />
+      <AuthorLine agent={look} at={first ? replyAt(first) : null} run={seatRun(c.thread.members, look.id) ?? { harness: t.harness, model: t.result?.model }} face={look.id === 'conductor' ? conductorFace(c, look) : undefined} shows={shows} phone />
       <div className={`flex min-w-0 flex-col gap-4 ${REPLY_INDENT} empty:hidden`}>
         {children}
       </div>
@@ -180,11 +191,13 @@ function Reply({ t, c, children }: { t: TurnView; c: TurnCtx; children: ReactNod
 
 /**
  * A message several agents answered (ADR 0019): one lane per tab, the collision flags above the tabs (Q55). Each tab
- * names its agent, with the Working ring while it runs and a flag when it edited a collided file; the lane under it is
- * that agent's reply, steps and changed files.
+ * names its agent, whose eyes show its lane's state (a photo's or icon's ring) while the lanes run, and a flag when it
+ * edited a collided file; the lane under it is that agent's reply, steps and changed files.
  */
 function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
   const lanes = t.lanes!;
+  // While any lane works, each tab's face shows its own lane's state; once they all ended they are history (D11).
+  const live = lanes.turns.some(running);
   const [picked, setPicked] = useState(lanes.turns[0]?.author ?? '');
   const panel = useId();
   const lane = lanes.turns.find((l) => l.author === picked) ?? lanes.turns[0];
@@ -206,14 +219,11 @@ function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
         onChange={setPicked}
         options={lanes.turns.map((l) => {
           const look = agentLook(l.author ?? '', c.agents);
-          const run = l.status === 'running' || l.status === 'queued';
           return {
             id: l.author ?? '',
             label: (
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <span className={`inline-grid shrink-0 rounded-full ${run ? 'member-ring-working' : ''}`}>
-                  <AgentAvatar agent={look} size={18} />
-                </span>
+                <AgentAvatar agent={look} size={18} shows={live ? laneShows(l) : undefined} placement={live ? 'focus' : 'still'} />
                 <span className="truncate">{look.name}</span>
                 {hit(l.author ?? '') && <Icon name="alert" size={13} className="shrink-0 text-warn" />}
               </span>
@@ -223,7 +233,7 @@ function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
         })}
       />
       <div {...tabPanelProps(panel, lane.author ?? '')} className="flex flex-col gap-3">
-        <Reply t={lane} c={c}>
+        <Reply t={lane} c={c} shows={live ? laneShows(lane) : undefined}>
           {lane.questions.map((q) => (
             <QuestionCard key={q.id} threadId={c.thread.id} q={q} touch />
           ))}
@@ -311,7 +321,8 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     {t.lanes ? (
       <MoLanes t={t} c={c} />
     ) : (
-      <Reply t={t} c={c}>
+      // The reply being written shows live eyes; a past one's head stays idle (ADR 0021, D11).
+      <Reply t={t} c={c} shows={running(t) ? agentShows(thread.members, t.author, c.mark) : undefined}>
         {t.questions.map((q) => (
           <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
         ))}

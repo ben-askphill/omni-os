@@ -36,7 +36,8 @@ import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
 import { runningSubagents } from '../subagents.ts';
 import { isAsking } from '@omni/shared/transcript-fold.ts';
-import { useApp, useHereName, useNow } from '../store.tsx';
+import { useApp, useHereName, useNeedOf, useNow } from '../store.tsx';
+import { threadPill } from '../components/thread/thread-state.ts';
 import { limitLabel } from '../limits.ts';
 import { useThreadActions } from './useThreadActions.ts';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
@@ -136,6 +137,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const panel = useThreadPanel({ artifactParam, loaded: thread !== null, select: selectArtifact });
   const hereName = useHereName();
   const now = useNow(60_000);
+  const need = useNeedOf(id);
   const workCwd = init?.cwd || thread?.cwd || '';
   const openFromCard = (tab: PanelTab) => {
     setPanelTab(tab);
@@ -214,6 +216,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   }
 
   const reconnecting = !live && ready;
+  // The mark the header's pill draws: the lead's eyes in the header and on the reply being written show it (ADR 0021).
+  const mark = threadPill(thread, { asking, reconnecting, now, turn, need, pr: prs?.pr }).mark;
   const roleName = crewRoleName(thread.role, roles);
   const artifactCount = files.length + shots.length + crew.files.length + crew.shots.length;
 
@@ -229,6 +233,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           delegated={known}
           roleName={roleName}
           account={account}
+          mark={mark}
           actions={{
             thread,
             context,
@@ -263,7 +268,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
                     <FindTargetCtx.Provider value={find.target}>
-                      <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} seats={thread.members} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                      <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} seats={thread.members} running={turnInProgress} mark={mark} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
                     </FindTargetCtx.Provider>
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>
