@@ -52,29 +52,36 @@ export const routesFirstMessage = (t: Thread) =>
 const json = (v: unknown) => (v === undefined ? null : JSON.stringify(v));
 
 /**
- * Log what the routers would pick for a new thread's first message. Returns at once: the row is saved now, so the
- * Conductor's pick finds it however fast its turn ends, and the routers run on a later tick. Never throws.
+ * Log what the routers would pick for a new thread's first message. Returns at once: only the row is saved now, so
+ * the Conductor's pick finds it however fast its turn ends. The agents on offer are read, and the routers asked, on a
+ * later tick. Never throws.
  */
 export function shadowRoute(thread: Thread, prompt: string, deps: ShadowDeps = liveDeps): Promise<void> | null {
   try {
     if (!deps.enabled() || !routesFirstMessage(thread) || !prompt.trim()) return null;
-    const agents = deps.agents();
     const at = now();
-    db.prepare(`INSERT INTO agent_router_shadow (thread_id, message_at, agents, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(thread_id) DO NOTHING`).run(
+    db.prepare(`INSERT INTO agent_router_shadow (thread_id, message_at, agents, created_at, updated_at) VALUES (?, ?, '[]', ?, ?) ON CONFLICT(thread_id) DO NOTHING`).run(
       thread.id,
       thread.created_at,
-      JSON.stringify(agents.map((a) => a.id)),
       at,
       at,
     );
-    return new Promise<void>((done) => setImmediate(done)).then(() => route(thread.id, prompt, agents, deps));
+    return new Promise<void>((done) => setImmediate(done)).then(() => route(thread.id, prompt, deps));
   } catch (err) {
     console.error('[agent-router] could not start the shadow run:', (err as Error).message);
     return null;
   }
 }
 
-async function route(threadId: string, prompt: string, agents: RouterAgent[], deps: ShadowDeps) {
+async function route(threadId: string, prompt: string, deps: ShadowDeps) {
+  let agents: RouterAgent[];
+  try {
+    agents = deps.agents();
+  } catch (err) {
+    const error = scrubbed(`could not list the agents: ${errorText(err)}`);
+    return save(threadId, { jev_model: JEV_MODEL, jev_error: error, haiku_model: HAIKU_MODEL, haiku_via: 'cli', haiku_error: error });
+  }
+  save(threadId, { agents: JSON.stringify(agents.map((a) => a.id)) });
   await Promise.all([runJev(threadId, prompt, agents, deps), runHaiku(threadId, prompt, agents, deps)]);
 }
 
