@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { agentFace } from '../agent-avatar.ts';
+import { agentFace, type CharacterFace } from '../agent-avatar.ts';
+import { AGENT_PALETTE, contrast } from '../avatar-color.ts';
 import { crewShapesSource, OUT as CREW_SHAPES_FILE, SPEC_FILE } from '../scripts/build-crew-shapes.ts';
 import { CREW_CLEARED_SIZES, CREW_FITTED, PILL_DIAGONAL_LEVEL_STOPS } from '../crew-shapes.ts';
 import { crewClearance } from '../crew-size.ts';
@@ -9,8 +10,8 @@ import { crewClearance } from '../crew-size.ts';
 // Seam A (ADR 0021, D27): the agent face, checked against the committed spec JSON.
 
 interface SpecEye { k: string; p: [number, number][]; d: number }
-interface SpecStop { G: number; dpath: string; fill: string; sw: number; sat: [number, number, number] | null; lay: Record<string, SpecEye>; base: number; line: number }
-interface Spec { palette: Record<string, string>; strokeStops_px: [number, number][]; shapes: Record<string, { colour: string; sizes: Record<string, SpecStop> }> }
+interface SpecStop { G: number; dpath: string; fill: string; eye: string; sw: number; sat: [number, number, number] | null; lay: Record<string, SpecEye>; base: number; line: number }
+interface Spec { palette: Record<string, string>; strokeStops_px: [number, number][]; shapes: Record<string, { colour: string; charter: string | null; sizes: Record<string, SpecStop> }> }
 
 const SPEC: Spec = JSON.parse(readFileSync(SPEC_FILE, 'utf8'));
 const SHAPES = Object.keys(SPEC.shapes);
@@ -23,7 +24,7 @@ const specStop = (shape: string, stop: number) => SPEC.shapes[shape].sizes[stop 
 
 const face = (shape: string, size: number, eyes: State = 'idle') => {
   const f = agentFace({ id: 'someone', avatar: { shape } }, { size, shows: { eyes } });
-  if (!f) throw new Error(`no face for ${shape}`);
+  if (f.kind !== 'character') throw new Error(`no character for ${shape}`);
   return f;
 };
 
@@ -217,7 +218,7 @@ function glyphPoints(path: string): Point[] {
 }
 
 /** How far an eye's glyph stays inside the outline's stroke, in px; negative when it reaches the stroke or outside. */
-function room(f: NonNullable<ReturnType<typeof agentFace>>, eye: (typeof f.pair)[number]) {
+function room(f: CharacterFace, eye: CharacterFace['pair'][number]) {
   const line = corners(f.outline);
   const pad = (eye.line ?? 0) / 2 + f.stroke / 2;
   const points = glyphPoints(eye.path);
@@ -226,7 +227,7 @@ function room(f: NonNullable<ReturnType<typeof agentFace>>, eye: (typeof f.pair)
 }
 
 /** The same for a plain circle of the eye's diameter at another centre: what the spec's pair would draw. */
-function roomAt(f: NonNullable<ReturnType<typeof agentFace>>, centre: Point, d: number) {
+function roomAt(f: CharacterFace, centre: Point, d: number) {
   const line = corners(f.outline);
   return inside(centre, line) ? px(f, distance(centre, line) - d / 2 - f.stroke / 2) : -Infinity;
 }
@@ -271,6 +272,81 @@ describe('agentFace keeps the eyes off the outline', () => {
     for (const stop of PILL_DIAGONAL_LEVEL_STOPS) {
       const f = face('pill-diagonal', stop);
       expect(Object.keys(STATES).some((state) => tilted(specStop('pill-diagonal', stop).lay[STATES[state as State]].p).some((p) => roomAt(f, p as Point, f.pair[0].d) < crewClearance(stop)))).toBe(true);
+    }
+  });
+});
+
+/** The agent the spec draws each shape for, by the id its charter file carries; the spares have none. */
+const SPEC_AGENTS = Object.fromEntries(SHAPES.flatMap((shape) => (SPEC.shapes[shape].charter ? [[SPEC.shapes[shape].charter!.replace(/^.*\//, '').replace(/\.md$/, ''), shape]] : [])));
+
+describe('agentFace runs the chain: photo, then icon, then character', () => {
+  it('draws an uploaded photo over an icon, and an icon or emoji on its color over the character', () => {
+    const image = '/api/crew/designer/avatar?v=0123456789ab';
+    expect(agentFace({ id: 'designer', avatar: { image, icon: '🎨', bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toEqual({ kind: 'image', size: 24, image });
+    expect(agentFace({ id: 'designer', avatar: { icon: '🎨', bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toMatchObject({ kind: 'icon', size: 24, icon: '🎨', bg: '#52cdfe' });
+    expect(agentFace({ id: 'designer', avatar: { bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toMatchObject({ kind: 'character', shape: 'cloud', body: '#52cdfe' });
+  });
+
+  it("sits an icon with no color of its own on the agent's color, and treats empty fields as none", () => {
+    expect(agentFace({ id: 'builder', avatar: { icon: 'icon:tool' } }, { size: 24 })).toMatchObject({ kind: 'icon', icon: 'icon:tool', bg: SPEC.palette.Amber });
+    expect(agentFace({ id: 'builder', avatar: { icon: 'icon:tool', shape: 'diamond' } }, { size: 24 })).toMatchObject({ kind: 'icon', bg: SPEC.palette.Magenta });
+    expect(agentFace({ id: 'builder', avatar: { image: '', icon: '', bg: '' } }, { size: 24 })).toMatchObject({ kind: 'character', shape: 'squircle', body: SPEC.palette.Amber });
+    expect(agentFace({ id: 'builder', avatar: { image: null, icon: null, bg: null, shape: null } }, { size: 24 })).toMatchObject({ kind: 'character', shape: 'squircle' });
+  });
+});
+
+describe('agentFace picks a face for an agent with no avatar of its own', () => {
+  it('gives the nine built-in agents the shape the spec draws for them, in its paired color', () => {
+    expect(Object.keys(SPEC_AGENTS).sort()).toEqual(['builder', 'conductor', 'hermes', 'inbox', 'researcher', 'reviewer', 'store-ops', 'usage-scan', 'writer']);
+    for (const [id, shape] of Object.entries(SPEC_AGENTS))
+      expect(agentFace({ id }, { size: 32 }), id).toMatchObject({ kind: 'character', shape, body: SPEC.palette[SPEC.shapes[shape].colour] });
+  });
+
+  it('gives any other agent one of the seven spare shapes and its paired color, from its id', () => {
+    const spares = SHAPES.filter((shape) => !SPEC.shapes[shape].charter);
+    expect(spares).toEqual(['diamond', 'bubble', 'cloud', 'pill-diagonal', 'fan', 'shield', 'bucket']);
+    const ids = Array.from({ length: 60 }, (_, i) => `agent-${i}`).concat(['designer', 'release-scout', 'fixture-agent', 'constructor', '']);
+    const picked = new Set<string>();
+    for (const id of ids) {
+      const f = agentFace({ id }, { size: 24 });
+      if (f.kind !== 'character') throw new Error(`no character for ${id}`);
+      expect(spares, id).toContain(f.shape);
+      expect(f.body, id).toBe(SPEC.palette[SPEC.shapes[f.shape].colour]);
+      // The same agent gets the same pair on every call, at every size and in every state.
+      expect(agentFace({ id }, { size: 88, shows: { eyes: 'done' } }), id).toMatchObject({ shape: f.shape, body: f.body });
+      picked.add(f.shape);
+    }
+    expect([...picked].sort()).toEqual([...spares].sort());
+    expect(agentFace({ id: 'designer' }, { size: 24 })).toMatchObject({ shape: 'bucket', body: SPEC.palette.Amber });
+  });
+});
+
+describe('the agent palette', () => {
+  it("holds the spec's 14 colors, in the order the shapes pair them", () => {
+    const paired = [...new Set(SHAPES.map((shape) => SPEC.shapes[shape].colour))];
+    expect(AGENT_PALETTE.map((c) => c.name)).toEqual(paired);
+    expect(paired).toEqual(['Ink', 'Sky', 'Amber', 'Violet', 'Rose', 'Mint', 'Green', 'Sun', 'Lilac', 'Magenta', 'Azure', 'Aqua', 'Teal', 'Peach']);
+    expect(Object.fromEntries(AGENT_PALETTE.map((c) => [c.name, c.hex]))).toEqual(SPEC.palette);
+  });
+
+  it('never gives an agent a status color', () => {
+    // Ultramarine, Vermilion and Volt: running, needs you and done (--live, --needs, --done).
+    const reserved = ['#2b3bff', '#ff4420', '#c6f52b'];
+    for (const { hex } of AGENT_PALETTE) expect(reserved).not.toContain(hex);
+    for (const shape of SHAPES) expect(reserved).not.toContain(face(shape, 24).body);
+  });
+
+  it('inks the eyes as the spec does, the dark ink or white, whichever reads, at 3:1 or more', () => {
+    for (const shape of SHAPES)
+      for (const stop of STOPS) {
+        const f = face(shape, stop);
+        expect(f.ink, `${shape} at ${stop}px`).toBe(specStop(shape, stop).eye);
+        expect(contrast(f.ink, f.body), `${shape} at ${stop}px`).toBeGreaterThanOrEqual(3);
+      }
+    const inkOf = Object.fromEntries(SHAPES.map((shape) => [SPEC.shapes[shape].colour, specStop(shape, 24).eye]));
+    for (const { name, hex } of AGENT_PALETTE) {
+      expect(agentFace({ id: 'someone', avatar: { bg: hex, shape: 'cloud' } }, { size: 24 }), name).toMatchObject({ body: hex, ink: inkOf[name] });
+      expect(agentFace({ id: 'someone', avatar: { bg: hex, icon: '🎨' } }, { size: 24 }), name).toMatchObject({ bg: hex, ink: inkOf[name] });
     }
   });
 });

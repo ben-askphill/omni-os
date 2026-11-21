@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { autoAvatarColor, avatarInk, contrast, contrastingColor, hexColor, resolveAvatarColor, svgColors } from '../avatar-color.ts';
+import { autoAvatarColor, AVATAR_SWATCHES, avatarInk, contrast, contrastingColor, hexColor, resolveAvatarColor, svgColors } from '../avatar-color.ts';
 
 describe('avatar colors', () => {
   it('normalizes literal colors and rejects non-opaque paint', () => {
@@ -28,6 +28,11 @@ describe('avatar colors', () => {
     for (const foreground of ['#202020', '#ffffff', '#ff0000', '#777777']) for (const r of [0, 0.5, 0.999]) expect(contrast(contrastingColor(foreground, () => r), foreground)).toBeGreaterThanOrEqual(4.5);
     expect(contrastingColor('#202020', () => 0)).not.toBe(contrastingColor('#202020', () => 0.9));
     expect(contrast(avatarInk('#283c62'), '#283c62')).toBeGreaterThanOrEqual(4.5);
+  });
+  it("inks a channel avatar in the light theme's foreground or white, each swatch on the side it took before", () => {
+    // The dark ink was #202020 (ADR 0021, D19): the six pale swatches took it, the four dark ones white.
+    expect(AVATAR_SWATCHES.map(avatarInk)).toEqual([...Array(6).fill('#17181a'), ...Array(4).fill('#ffffff')]);
+    expect(avatarInk('#e6a491')).toBe('#17181a');
   });
   it('keeps manual choices across avatar changes and does not reroll unrelated writes', () => {
     const current = { icon: '🌻', avatar_bg: '#123456', avatar_bg_manual: 1 };
