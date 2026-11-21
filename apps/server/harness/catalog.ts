@@ -5,6 +5,7 @@ import type { AnyHarnessId, HarnessId, HarnessInfo, ModelEntry, RemoteTarget } f
 import type { CustomHarness } from './custom.ts';
 import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
 import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
+import { claudeModelLabel, stripClaudeModelSuffixes } from '@omni/shared/claude-model-label.ts';
 import { parseClaudeStatus } from './accounts-parse.ts';
 
 // ---------- Claude Code ----------
@@ -60,10 +61,7 @@ export function parseClaudeReported(raw: unknown): ClaudeReportedModel[] {
 
 /** The id a reported model runs: its resolved model, without a context suffix (`[1m]`) or a release date. */
 export const claudeReportedId = (r: ClaudeReportedModel) =>
-  (r.resolvedModel || r.value)
-    .trim()
-    .replace(/\[[^\]]*\]$/, '')
-    .replace(/-\d{8}$/, '');
+  stripClaudeModelSuffixes(r.resolvedModel || r.value);
 
 /**
  * The Claude Code models: the bundled list, then each model Claude Code reports that the list lacks, with its own
@@ -87,7 +85,7 @@ export function claudeModels(defaultModelId = 'claude-sonnet-5-5', reported: rea
     const efforts = r.supportsEffort ? (r.supportedEffortLevels ?? []) : [];
     models.push({
       id,
-      label: r.displayName?.trim() || id,
+      label: claudeModelLabel(id, r.displayName),
       efforts,
       defaultEffort: efforts.includes(CLAUDE_DEFAULT_EFFORT) ? CLAUDE_DEFAULT_EFFORT : (efforts[0] ?? ''),
     });
