@@ -60,6 +60,7 @@ describe('threadRows covers every item the shared fold produces', () => {
         if (t.cloud) expect(of(rows, 'cloud').some((x) => x.kind === 'cloud' && x.p === t.cloud)).toBe(true);
         if (t.prose) expect(of(rows, 'prose').some((x) => x.kind === 'prose' && x.text === t.prose)).toBe(true);
         for (const s of t.switches) expect(of(rows, 'switch').some((x) => x.kind === 'switch' && x.it === s)).toBe(true);
+        for (const r of t.risks ?? []) expect(of(rows, 'merge_risk').some((x) => x.kind === 'merge_risk' && x.p === r.p)).toBe(true);
         for (const a of t.artifacts) expect(of(rows, 'artifact').some((x) => x.kind === 'artifact' && x.a === a)).toBe(true);
         const live = i === view.turns.length - 1 && (t.status === 'running' || t.status === 'queued');
         if (!live && (t.result || t.error || t.status !== 'done')) expect(of(rows, 'outcome').some((x) => x.kind === 'outcome' && x.status === t.status), `turn ${i} outcome`).toBe(true);
@@ -259,6 +260,18 @@ describe('threadRows in a group thread', () => {
       ['Designer joined', false],
       ['Designer left', false],
     ]);
+  });
+
+  it("puts the merge-risk gate's rating under the turn it followed, as its own row outside the reply", () => {
+    const rated = { repo: 'o/omni', pr: 914, url: 'https://github.com/o/omni/pull/914', head: '56597d6e01', level: 'medium', label: 'needs-ben', bullets: ['- **Impact:** 👀 touches `apps/server/sync/`'] };
+    const rows = groupRows([
+      { kind: 'user', payload: { text: 'Open the PR', source: 'ben' } },
+      { kind: 'assistant_text', payload: { text: 'Opened #914.' }, agent: 'builder' },
+      { kind: 'result', payload: ok, agent: 'builder' },
+      { kind: 'merge_risk', payload: rated },
+    ]);
+    expect(rows.at(-1)).toEqual({ kind: 'merge_risk', key: 'mr4', p: rated });
+    expect(rows.filter((r) => r.kind === 'merge_risk')).toHaveLength(1);
   });
 
   it('splits a message two agents answer into a tab per agent, the flag above, and shows the first lane with its files', () => {

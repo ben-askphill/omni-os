@@ -1,6 +1,7 @@
 // Merge risk's level and label, worked out in code from the model's bullets, so the model cannot talk its own level
 // down. A port of askphill/apa-zuiver's .github/scripts/merge-risk-level.mjs (weights and thresholds as there) and of
 // the all-clear half of askphill/agent-workflow's decide.ts. Pure: tested in tests/merge-risk-level.test.ts.
+import { MERGE_READY } from '@omni/shared/merge-risk.ts';
 
 export const RISK_WEIGHTS = { Alignment: 1, Impact: 2, Verification: 2, 'Rollback cost': 1.5, 'Error detection': 1 } as const;
 export type RiskCategory = keyof typeof RISK_WEIGHTS;
@@ -12,8 +13,8 @@ const EMOJI_VERDICT: Record<string, Verdict> = { '⚠': 'poor', '👀': 'decent'
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-/** Every area good on an Omni thread's branch. */
-export const MERGE_READY = 'merge-ready';
+/** Every area good on an Omni thread's branch. The thread's merge-risk card reads the same label. */
+export { MERGE_READY };
 
 /**
  * The label for anything else: `needs-<first name>` from the name in Settings > General, so a PR says whose read it

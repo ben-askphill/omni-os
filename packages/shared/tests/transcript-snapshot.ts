@@ -71,6 +71,8 @@ function projectItem(it: Item) {
       return { type: 'member' as const, key: it.key, event: it.p.event, agent: it.p.agent };
     case 'collision':
       return { type: 'collision' as const, key: it.key, path: it.c.path, agents: it.c.agents, cleared: it.c.cleared };
+    case 'merge_risk':
+      return { type: 'merge_risk' as const, key: it.key, pr: it.p.pr, head: it.p.head, level: it.p.level, label: it.p.label };
     default: {
       const unreachable: never = it;
       return unreachable;

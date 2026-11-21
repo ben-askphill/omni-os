@@ -50,6 +50,7 @@ import { connectorGroups } from '@omni/shared/connectors.ts';
 import { StepsCard } from './thread/StepsCard.tsx';
 import { LanesBlock, type LaneItems } from './thread/Lanes.tsx';
 import { CollisionFlag } from './thread/Collision.tsx';
+import { MergeRiskCard } from './thread/MergeRiskCard.tsx';
 import { laneFold, lanesEnded, type LaneFolded } from '@omni/shared/lanes.ts';
 import { Attachments } from './thread/Attachments.tsx';
 import { QueuedMessages, SendingMessages } from './thread/PendingMessages.tsx';
@@ -446,6 +447,8 @@ const ItemRow = memo(
           return <MemberLine key={it.key} p={it.p} />;
         case 'collision':
           return <CollisionFlag key={it.key} c={it.c} threadId={threadId} />;
+        case 'merge_risk':
+          return <MergeRiskCard key={it.key} p={it.p} />;
         case 'ask':
           return <AskItem key={it.key} p={it.p} byId={byId} reports={reports} answer={answers?.[it.p.thread_id]} />;
         default:
@@ -541,7 +544,7 @@ export const Transcript = memo(function Transcript({
   );
   // The lanes are still running: they show their own steps and latest line, not the transcript's live ones.
   const lanesLive = useMemo(() => {
-    const at = flow.findLast((x) => x.type !== 'mod' && x.type !== 'collision');
+    const at = flow.findLast((x) => x.type !== 'mod' && x.type !== 'collision' && x.type !== 'merge_risk');
     return at?.type === 'lanes' && !lanesEnded(at);
   }, [flow]);
   const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
@@ -584,8 +587,8 @@ export const Transcript = memo(function Transcript({
       conductorLook && hasOwnLook(conductorLook) ? <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} /> : <OmniMark size={24} />
     ) : undefined;
 
-  // Mod log lines are asides: the row before them is still the live one.
-  const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
+  // Mod log lines and merge-risk cards are asides: the row before them is still the live one.
+  const lastIdx = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'merge_risk');
   const last = items[lastIdx];
   // The turn is waiting on Ben's answer, not working: the card under it says so.
   const asking = last?.type === 'question' && last.q.state === 'pending';
@@ -609,7 +612,7 @@ export const Transcript = memo(function Transcript({
 
   // A turn that runs with no reply of the lead's open yet (Ben just wrote): its live steps and thinking line get a head.
   const liveHead = running && !!leadLook && (() => {
-    const at = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'result');
+    const at = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'result' && it.type !== 'merge_risk');
     const it = items[at];
     return !it || !isReply(it) || (it.agent ?? lead) !== lead;
   })();

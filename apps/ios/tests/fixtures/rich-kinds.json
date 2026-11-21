@@ -197,6 +197,11 @@
    "created_at": "2026-11-02T09:00:39.000Z"
   },
   {
+   "kind": "merge_risk",
+   "payload": "{\"repo\":\"ben-askphill/omni-os\",\"pr\":914,\"url\":\"https://github.com/ben-askphill/omni-os/pull/914\",\"head\":\"56597d6e8e1f\",\"level\":\"medium\",\"label\":\"needs-ben\",\"bullets\":[\"- **Impact:** 👀 touches `apps/server/sync/`\",\"- **Verification:** ⚠️ no phone screenshot\"]}",
+   "created_at": "2026-11-02T09:00:39.500Z"
+  },
+  {
    "kind": "user",
    "payload": "{\"text\":\"A message that never reached the agent.\",\"dropped\":true,\"undelivered\":\"The machine was offline\"}",
    "created_at": "2026-11-02T09:00:40.000Z"

@@ -5,6 +5,7 @@ import { Attachments, MemberLine, SwitchLine } from '../components/Transcript.ts
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { QuestionCard } from '../components/thread/QuestionCard.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
+import { MergeRiskCard } from '../components/thread/MergeRiskCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
@@ -326,6 +327,9 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     ))}
     {t.members.map((it) => (
       <MemberLine key={it.key} p={it.p} />
+    ))}
+    {t.risks?.map((it) => (
+      <MergeRiskCard key={it.key} p={it.p} />
     ))}
     </>
   );

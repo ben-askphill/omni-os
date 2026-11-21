@@ -16,6 +16,17 @@ const art = (name: string, m: number) => ({ id: m, path: name, name, updated_at:
 const child = (cid: string, m: number, source = 'conductor') => ({ id: cid, created_at: at(m), source, status: 'running' });
 
 describe('threadView', () => {
+  it("puts the merge-risk gate's ratings under the turn they came after, not into its reply", () => {
+    const rated = { repo: 'o/omni', pr: 914, url: 'https://github.com/o/omni/pull/914', head: 'a1', level: 'low', label: 'merge-ready', bullets: [] };
+    const events = [user('Open the PR', 0), text('Opened #914.', 1), result(2), ev('merge_risk', rated, 3), user('Fix the label', 4), text('Done.', 5), result(6), ev('merge_risk', { ...rated, head: 'a2' }, 7)];
+    const v = threadView({ events, thread: thread('done'), artifacts: [], children: [] });
+    expect(v.turns.map((t) => [t.prose, t.risks?.map((r) => r.p.head)])).toEqual([
+      ['Opened #914.', ['a1']],
+      ['Done.', ['a2']],
+    ]);
+    expect(v.turns[0].items.map((it) => it.type)).toEqual(['user', 'text', 'result']);
+  });
+
   it('folds each turn into its prompt, steps, failures, answer and outcome', () => {
     const events = [
       user('Find the drop-off', 0),

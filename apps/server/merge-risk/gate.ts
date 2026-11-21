@@ -1,7 +1,9 @@
 // Omni's merge-risk gate. Each open PR an Omni thread opened in Omni's own repo, whichever agent ran it, is rated once per head it is pushed
 // to: a fresh Claude run with no tools reads only the PR's title, body and diff against main's rubric (rubric.ts), code
 // works out the level and the label (level.ts), and the PR gets one comment and one label, edited in place on the next
-// push. It rates only: it never merges, never turns auto-merge on and blocks nothing.
+// push. It rates only: it never merges, never turns auto-merge on and blocks nothing. Each rating it writes also goes
+// into every thread on the PR's branch as a merge_risk row (@omni/shared/merge-risk.ts), so Ben reads it in Omni: the
+// row starts no turn, and no harness reads it (transcript-select.ts takes only messages, replies and calls).
 // Polling, not webhooks, as automation-watch.ts: GitHub cannot reach the server. With sync on, only the machine that
 // runs automations rates (sync/owner.ts), so one push is never rated twice.
 import { execFile } from 'node:child_process';
@@ -11,12 +13,15 @@ import { fenced } from '../automation-events.ts';
 import { ghLogin } from '../automation-watch.ts';
 import { config } from '../config.ts';
 import { channels, kv, threads, type Thread } from '../db.ts';
+import { transcriptOf } from '../db/repos/events.ts';
 import { TIERS } from '../harness/auto.ts';
 import { askClaude } from '../runner/aux.ts';
+import { addEvent } from '../runner/state.ts';
 import { runsAutomationsHere } from '../sync/owner.ts';
 import { omniRepo, resolved } from '../user-config.ts';
 import { COMMENT_MARKER, MERGE_READY, needsLabel, parseRating, ratedComment, riskLabel, scoreRating, unratedComment, type RiskLevel } from './level.ts';
 import { mainRubric, type Rubric } from './rubric.ts';
+import { MERGE_RISK_EVENT, type MergeRiskP } from '@omni/shared/merge-risk.ts';
 
 const run = promisify(execFile);
 
@@ -70,8 +75,11 @@ export interface RiskMark {
   tries: number;
   /** The label written for the head before, taken off with the next write even when the needs label was renamed since. */
   was?: string;
-  /** A finished rating not written yet, so a failed write does not cost another run. */
-  pending?: { body: string; label: string; level: RiskLevel | 'not rated' };
+  /**
+   * A finished rating not written yet, so a failed write does not cost another run: the comment, and the gaps or the
+   * reason there is none for the threads' row.
+   */
+  pending?: { body: string; label: string; level: RiskLevel | 'not rated'; bullets?: string[]; reason?: string };
   posted?: { label: string; level: RiskLevel | 'not rated'; at: string };
 }
 
@@ -112,7 +120,7 @@ export function ratingPrompt(rubric: string, repo: string, n: number, pr: PRText
   ].join('\n');
 }
 
-type Rated = { body: string; label: string; level: RiskLevel } | { failed: string } | { moved: true };
+type Rated = { body: string; label: string; level: RiskLevel; bullets: string[] } | { failed: string } | { moved: true };
 
 /** One rating run on the PR's current head, scored in code. */
 async function rate(repo: string, n: number, sha: string, rubric: Rubric, deps: GateDeps): Promise<Rated> {
@@ -128,7 +136,7 @@ async function rate(repo: string, n: number, sha: string, rubric: Rubric, deps: 
   }
   const { level } = scoreRating(rating.verdicts);
   const label = riskLabel(rating.verdicts, pr.headRefName, deps.needs());
-  return { body: ratedComment({ level, bullets: rating.bullets, label, head: sha, rubric: rubric.sha }), label, level };
+  return { body: ratedComment({ level, bullets: rating.bullets, label, head: sha, rubric: rubric.sha }), label, level, bullets: rating.bullets };
 }
 
 /**
@@ -146,8 +154,36 @@ async function markFor(repo: string, pr: OpenPR, deps: GateDeps): Promise<RiskMa
   return mark;
 }
 
-/** Rate one PR's head, unless a rating is already waiting to be written, and write it. True when it wrote. */
-async function gateOne(repo: string, pr: OpenPR, mark: RiskMark, rubric: Rubric, deps: GateDeps): Promise<boolean> {
+/**
+ * The rating written to the PR, as one row in each thread on its branch. A member's session writes into its group
+ * thread (db/repos/events.ts), so a group thread gets one row however many of its sessions own the branch. One thread
+ * that fails does not keep the row from the others.
+ */
+function shareRating(repo: string, n: number, sha: string, owners: Thread[], pending: NonNullable<RiskMark['pending']>) {
+  const p: MergeRiskP = {
+    repo,
+    pr: n,
+    url: `https://github.com/${repo}/pull/${n}`,
+    head: sha,
+    level: pending.level,
+    label: pending.label,
+    bullets: pending.bullets ?? [],
+    ...(pending.reason && { reason: pending.reason }),
+  };
+  for (const id of new Set(owners.map((t) => transcriptOf(t.id)))) {
+    try {
+      addEvent(id, MERGE_RISK_EVENT, p);
+    } catch (err) {
+      console.error(`[merge-risk] ${repo}#${n}: could not write the rating into thread ${id}:`, err);
+    }
+  }
+}
+
+/**
+ * Rate one PR's head, unless a rating is already waiting to be written, and write it: to the PR, then into each thread
+ * on its branch (`owners`). True when it wrote.
+ */
+async function gateOne(repo: string, pr: OpenPR, mark: RiskMark, rubric: Rubric, owners: Thread[], deps: GateDeps): Promise<boolean> {
   const key = markKey(repo, pr.number);
   if (!mark.pending) {
     const got = await rate(repo, pr.number, mark.sha, rubric, deps);
@@ -160,7 +196,7 @@ async function gateOne(repo: string, pr: OpenPR, mark: RiskMark, rubric: Rubric,
         return false;
       }
       const needs = deps.needs();
-      mark.pending = { body: unratedComment({ head: mark.sha, reason: got.failed, label: needs }), label: needs, level: 'not rated' };
+      mark.pending = { body: unratedComment({ head: mark.sha, reason: got.failed, label: needs }), label: needs, level: 'not rated', reason: got.failed };
     } else mark = { ...mark, pending: got };
     kv.set(key, mark);
   }
@@ -171,6 +207,8 @@ async function gateOne(repo: string, pr: OpenPR, mark: RiskMark, rubric: Rubric,
   const drop = [...new Set([MERGE_READY, deps.needs(), ...(mark.was ? [mark.was] : [])])].filter((l) => l !== pending.label);
   await deps.publish(repo, pr.number, pending.body, pending.label, drop);
   kv.set(key, { sha: mark.sha, tries: mark.tries, posted: { label: pending.label, level: pending.level, at: new Date().toISOString() } } satisfies RiskMark);
+  // After the mark: the head is posted, so a later poll never writes these rows again.
+  shareRating(repo, pr.number, mark.sha, owners, pending);
   return true;
 }
 
@@ -188,7 +226,7 @@ export async function pollOnce(deps: GateDeps = ghDeps): Promise<number> {
   const open = await deps.listOpen(repo);
   const live = new Set(open.map((p) => markKey(repo, p.number)));
   for (const [key] of kv.list(`${PREFIX}${repo.toLowerCase()}#`)) if (!live.has(key)) kv.delete(key);
-  const due: { pr: OpenPR; mark: RiskMark }[] = [];
+  const due: { pr: OpenPR; mark: RiskMark; owners: Thread[] }[] = [];
   for (const pr of open) {
     if (pr.isDraft || pr.isCrossRepository) continue;
     const owners = threads.byRepoBranch(repo, pr.headRefName);
@@ -196,7 +234,7 @@ export async function pollOnce(deps: GateDeps = ghDeps): Promise<number> {
     if (!owners.length) continue;
     try {
       const mark = await markFor(repo, pr, deps);
-      if (!mark.posted && !busy(owners)) due.push({ pr, mark });
+      if (!mark.posted && !busy(owners)) due.push({ pr, mark, owners });
     } catch (err) {
       console.error(`[merge-risk] ${repo}#${pr.number}:`, err);
     }
@@ -206,9 +244,9 @@ export async function pollOnce(deps: GateDeps = ghDeps): Promise<number> {
   // No rubric on main: the gate does not rate this repo.
   if (!rubric) return 0;
   let wrote = 0;
-  for (const { pr, mark } of due) {
+  for (const { pr, mark, owners } of due) {
     try {
-      if (await gateOne(repo, pr, mark, rubric, deps)) wrote++;
+      if (await gateOne(repo, pr, mark, rubric, owners, deps)) wrote++;
     } catch (err) {
       console.error(`[merge-risk] ${repo}#${pr.number}:`, err);
     }

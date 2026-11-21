@@ -90,6 +90,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   lanes?: { turns: TurnView<A, C>[]; flags: Collision[]; files: Record<string, string[]>; latest: Record<string, string | null>; stacked: boolean } | null;
   /** Collision flags raised during the turn outside its lanes. */
   flags?: Collision[];
+  /** The merge-risk gate's ratings of the thread's PR written after the turn's reply (merge-risk.ts), shown under it. */
+  risks?: Extract<Item, { type: 'merge_risk' }>[];
 }
 
 const LANE_STATUS: Record<LaneState, TurnStatus> = { working: 'running', done: 'done', failed: 'failed', stopped: 'stopped' };
@@ -235,6 +237,11 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     if (it.type === 'collision') {
       cur ??= start(it.key, it.at);
       (cur.flags ??= []).push(it.c);
+      continue;
+    }
+    if (it.type === 'merge_risk') {
+      cur ??= start(it.key, it.at);
+      (cur.risks ??= []).push(it);
       continue;
     }
     // A report that started no turn belongs to the turn that delegated its thread, placed below.
