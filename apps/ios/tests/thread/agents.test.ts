@@ -31,8 +31,8 @@ describe('memberRows', () => {
   it('lists the lead first with no Remove, and each member with its state and run', () => {
     const working = { ...group, members: group.members!.map((m) => (m.lead ? m : { ...m, state: 'working' as const })) };
     expect(memberRows(working)).toEqual([
-      { agent: 'builder', name: 'Builder', lead: true, state: 'Idle', glyph: 'done', ring: null, removable: false, run: null },
-      { agent: 'reviewer', name: 'Reviewer', lead: false, state: 'Working', glyph: 'running', ring: 'working', removable: true, run: 'Claude Code · claude-haiku-4-5' },
+      { agent: 'builder', name: 'Builder', lead: true, state: 'Idle', glyph: 'done', member: 'done', removable: false, run: null },
+      { agent: 'reviewer', name: 'Reviewer', lead: false, state: 'Working', glyph: 'running', member: 'working', removable: true, run: 'Claude Code · claude-haiku-4-5' },
     ]);
   });
 });

@@ -1,25 +1,26 @@
 import type { CrewRole } from '@omni/client-core';
-import { agentDisc, agentInitials } from '@omni/shared/agent-avatar.ts';
-import { avatarInk } from '@omni/shared/avatar-color.ts';
-import { CREW, type CrewRole as BuiltIn } from '@omni/shared/brand.ts';
+import { agentColor as sharedColor, agentFace as sharedFace, type CharacterFace, type FaceOptions, type IconFace } from '@omni/shared/agent-avatar.ts';
+import { eyesFor } from '@omni/shared/crew-eyes.ts';
+import type { EyeState } from '@omni/shared/crew-shapes.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 
 /** What an avatar reads of an agent. */
 export type AgentLook = Pick<CrewRole, 'id' | 'name' | 'avatar'>;
 
+/** The ring a photo or icon avatar gets while its agent works, or waits on the user. A character shows it in its eyes (D8). */
+export type AvatarRing = 'working' | 'needs' | null;
+
 /**
- * What an agent's avatar draws (ADR 0019, How it looks), in the Web UI's order (AgentAvatar): the image the user
- * uploaded, else its icon or emoji on its color, else a built-in's mark, else a disc with two letters unique across
- * the agents, its color from the agent's id. Below 18px the disc shows its color only.
+ * What an agent's avatar draws (ADR 0021, D1), the shared agent face's chain: the image the user uploaded, else its
+ * icon or emoji on its color, else its crew character. The app only draws an image from the agent's own avatar path.
  */
 export type AgentFace =
   /** `v`: the image's version, which `hub.avatarSource` reads from the agent's own avatar path. */
-  | { kind: 'image'; agent: string; v: string }
-  | { kind: 'icon'; icon: string; bg: string | null }
-  | { kind: 'mark'; role: BuiltIn }
-  | { kind: 'disc'; bg: string; ink: string; letters: string | null };
+  | { kind: 'image'; agent: string; v: string; ring: AvatarRing }
+  | (IconFace & { ring: AvatarRing })
+  | CharacterFace;
 
-const isBuiltIn = (id: string): id is BuiltIn => Object.hasOwn(CREW, id);
+const RING: Partial<Record<EyeState, AvatarRing>> = { thinking: 'working', working: 'working', needs: 'needs' };
 
 /**
  * The version of an uploaded image, when `image` is the agent's own avatar path (`/api/crew/<id>/avatar?v=<hex>`, as
@@ -40,21 +41,15 @@ export const agentLook = (id: string, agents: readonly AgentLook[]): AgentLook =
 
 export const agentName = (id: string, agents: readonly Pick<CrewRole, 'id' | 'name'>[]) => crewRoleName(id, agents) ?? id;
 
-export function agentFace(id: string, agents: readonly AgentLook[], size: number): AgentFace {
-  const agent = agentLook(id, agents);
-  const look = agent.avatar;
+export function agentFace(id: string, agents: readonly AgentLook[], size: number, opts: Omit<FaceOptions, 'size'> = {}): AgentFace {
+  const look = agentLook(id, agents).avatar;
+  const ring = RING[eyesFor(opts.shows, opts.placement === 'focus')] ?? null;
   const v = imageVersion(id, look?.image);
-  if (v) return { kind: 'image', agent: id, v };
-  if (look?.icon) return { kind: 'icon', icon: look.icon, bg: look.bg ?? null };
-  if (!look?.bg && isBuiltIn(id)) return { kind: 'mark', role: id };
-  // Unique across this machine's agents and the one drawn, which may not be listed yet.
-  const list = agents.some((r) => r.id === id) ? agents : [...agents, agent];
-  const disc = agentDisc(id, agentInitials(list).get(id) ?? '', size);
-  return look?.bg ? { kind: 'disc', bg: look.bg, ink: avatarInk(look.bg), letters: disc.letters } : { kind: 'disc', ...disc };
+  if (v) return { kind: 'image', agent: id, v, ring };
+  // An image from anywhere else is left out, so the chain goes on to the icon or the character.
+  const face = sharedFace({ id, avatar: look && { ...look, image: null } }, { ...opts, size }) as IconFace | CharacterFace;
+  return face.kind === 'icon' ? { ...face, ring } : face;
 }
 
-/**
- * An agent's own color, for its mention pill (ADR 0019): its avatar's background, else its initials disc's color, as
- * the Web UI's agentColor reads it.
- */
-export const agentColor = (id: string, agents: readonly AgentLook[]) => agentLook(id, agents).avatar?.bg ?? agentDisc(id, '', 24).bg;
+/** An agent's own color, for its mention pill (ADR 0021, D4 and D13): its avatar's background, else its shape's paired color. */
+export const agentColor = (id: string, agents: readonly AgentLook[]) => sharedColor(agentLook(id, agents));

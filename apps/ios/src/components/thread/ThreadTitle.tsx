@@ -67,7 +67,7 @@ export function ThreadTitle({ title, status, statusLabel, channel, role = null, 
         {(statusLabel || channel) && role ? sep : null}
         {role ? (
           <View style={styles.lead}>
-            {lead ? <AgentAvatar agent={lead} size={14} /> : null}
+            {lead ? <AgentAvatar agent={lead} size={16} /> : null}
             <Text numberOfLines={1} accessibilityLabel={`Runs as ${role}${talksOnly ? `, ${TALKS_ONLY}` : ''}`} style={[styles.sub, styles.role, { color: colors.fg3 }]}>
               {talksOnly ? `${role} · ${TALKS_ONLY}` : role}
             </Text>
