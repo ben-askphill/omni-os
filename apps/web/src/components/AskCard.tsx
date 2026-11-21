@@ -6,7 +6,7 @@ import { askCaption } from '@omni/shared/ask.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import type { Thread } from '../api.ts';
 import { withLive } from '../transcript/delegation.ts';
-import { CrewMark, isCrewRole } from './brand.tsx';
+import { AgentAvatar, useAgent } from './AgentAvatar.tsx';
 import { RemoteMark } from './ConnectAgent.tsx';
 import { DelegationCard } from './Delegation.tsx';
 import { Icon } from './ui.tsx';
@@ -17,6 +17,7 @@ import { Icon } from './ui.tsx';
  */
 export function AskItem({ p, byId, reports, answer }: { p: AskP; byId: Map<string, Thread>; reports?: Map<string, string>; answer?: ReportP }) {
   const branch = withLive({ id: p.thread_id, title: p.title, role: p.role, channel: p.channel, harness: p.harness, task_id: null, status: 'queued' }, byId);
+  const agent = useAgent(p.role);
   return (
     <div data-ask className="flex flex-col gap-3">
       <div className="flex flex-col items-end">
@@ -24,7 +25,7 @@ export function AskItem({ p, byId, reports, answer }: { p: AskP; byId: Map<strin
         <div className="max-w-[92%] rounded-[22px] rounded-tr-lg bg-bubble px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">{p.question}</div>
       </div>
       <DelegationCard
-        mark={isCrewRole(p.role) ? <CrewMark role={p.role} size={16} className="text-fg" /> : <Icon name="message" size={15} className="text-fg" />}
+        mark={agent ? <AgentAvatar agent={agent} size={16} /> : <Icon name="message" size={15} className="text-fg" />}
         label={
           <>
             Asked {p.name}

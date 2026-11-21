@@ -1,7 +1,7 @@
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { ChannelLearnings } from '../components/ChannelLearnings.tsx';
-import { autoAvatarColor } from '@omni/shared/avatar-color.ts';
+import { autoAvatarColor, CHANNEL_SWATCHES } from '@omni/shared/avatar-color.ts';
 import { claudeModelId } from '@omni/shared/claude-aliases.ts';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
@@ -326,7 +326,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           <IconPicker describedBy={fieldHintId('ch-icon')} avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
         </Field>
         <Field label="Avatar background" hint="Automatic follows the avatar. A custom color stays when you change the icon.">
-          <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={isConductor} value={f.avatar_bg} manual={!!f.avatar_bg_manual}
+          <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={isConductor} value={f.avatar_bg} manual={!!f.avatar_bg_manual} swatches={CHANNEL_SWATCHES}
             onChange={(color) => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: color, avatar_bg_manual: 1 })); }}
             onAuto={() => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: autoAvatarColor(prev.icon) ?? '', avatar_bg_manual: 0 })); }} />
         </Field>

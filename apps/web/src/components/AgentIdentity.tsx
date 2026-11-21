@@ -1,24 +1,31 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { AVATAR_UPLOAD_MAX_BYTES } from '@omni/shared/agent-avatar.ts';
-import { AVATAR_SOURCES, avatarSourceLabel, glyphOf, iconFor, isSvgFile, sourceOf, styleTakesColor, uploadStyle, type AvatarStash, type AvatarStyle } from '@omni/shared/agent-identity.ts';
+import { agentFace, agentShape, AVATAR_UPLOAD_MAX_BYTES } from '@omni/shared/agent-avatar.ts';
+import { AVATAR_SOURCES, avatarSourceLabel, characterLine, CREW_SHAPE_NAMES, EYE_STATE_NAMES, glyphOf, iconFor, isSvgFile, shapeTile, sourceOf, styleTakesColor, uploadStyle, type AvatarStash, type AvatarStyle } from '@omni/shared/agent-identity.ts';
+import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
 import { CHANNEL_GLYPHS, glyphIcon, readSvgIcon, SVG_MAX } from '@omni/shared/channel-icon.ts';
+import { CREW_SHAPE_IDS, CREW_SHAPES, EYE_STATES } from '@omni/shared/crew-shapes.ts';
 import { errorText } from '../api.ts';
 import { squareAvatar } from '../agent-avatar-upload.ts';
 import { lastGrapheme } from '../format.ts';
+import { useCrewRoles } from '../store.tsx';
 import { AgentAvatar, type AgentLook } from './AgentAvatar.tsx';
 import { AvatarColorPicker } from './AvatarColorPicker.tsx';
 import { Button, ErrorNote, Icon, Segmented } from './ui.tsx';
+import { ROVING_ITEM, useRovingFocus } from './ui/use-roving-focus.ts';
 
 // The identity block at the top of an agent's page in Settings > Agents, and of New agent: the live preview with a
-// thread-sized sample under it, its name and description, and one Avatar control with four sources (agent-identity.ts):
-// Initials (Built-in for an agent with a mark), Emoji, Icon and Upload, which takes a photo or an SVG. Picking one
-// replaces the others. The background color sits under every source but a photo. Nothing here saves on its own: the
-// photo picked, the icon and the color go with the editor's Save.
+// reply-sized and a rail-sized sample and the eye states under it, its name and description, and one Avatar control
+// with four sources (agent-identity.ts): Character (its crew character, where every agent starts), Emoji, Icon and
+// Upload, which takes a photo or an SVG. Picking one replaces the others. Character picks a shape; the color sits
+// under every source but a photo. Nothing here saves on its own: the photo picked, the icon, the shape and the color
+// go with the editor's Save.
 
-/** What the block edits besides the name and description: the style, what each style holds, the color and a picked photo. */
+/** What the block edits besides the name and description: the style, what each style holds, the shape, the color and a picked photo. */
 export interface IdentityValue {
   style: AvatarStyle;
   stash: AvatarStash;
+  /** A crew shape id, empty for the one its id picks. Kept under every source, so Character finds it again. */
+  shape: string;
   bg: string;
   /** A photo picked and cropped here, as a data URL, waiting for Save. */
   picked: string | null;
@@ -29,11 +36,12 @@ export function identityLook(id: string, name: string, value: IdentityValue, sav
   const image = value.style === 'photo' ? (value.picked ?? saved) : undefined;
   const icon = iconFor(value.style, value.stash);
   const bg = styleTakesColor(value.style) ? value.bg : '';
-  return { id, name, avatar: image || icon || bg ? { ...(image && { image }), ...(icon && { icon }), ...(bg && { bg }) } : undefined };
+  const shape = value.shape;
+  return { id, name, avatar: image || icon || shape || bg ? { ...(image && { image }), ...(icon && { icon }), ...(shape && { shape }), ...(bg && { bg }) } : undefined };
 }
 
 /** A line under the preview: where the face comes from. */
-function sourceLine(value: IdentityValue, opts: { saved?: string; offered?: boolean; builtInMark: boolean }) {
+function sourceLine(id: string, value: IdentityValue, opts: { saved?: string; offered?: boolean }) {
   switch (value.style) {
     case 'photo':
       if (value.picked) return 'New photo. Save to use it.';
@@ -45,8 +53,8 @@ function sourceLine(value: IdentityValue, opts: { saved?: string; offered?: bool
       return value.stash.emoji ? 'An emoji on its color.' : 'Type an emoji.';
     case 'icon':
       return value.stash.glyph ? 'An icon on its color.' : 'Pick an icon.';
-    case 'auto':
-      return opts.builtInMark ? 'Its built-in mark.' : 'Its initials, on a color from its id.';
+    case 'character':
+      return characterLine(id, value);
   }
 }
 
@@ -57,7 +65,6 @@ export function AgentIdentity({
   onChange,
   saved,
   offered,
-  builtInMark,
   fields,
 }: {
   id: string;
@@ -68,30 +75,47 @@ export function AgentIdentity({
   saved?: string;
   /** The image is the one a remote agent's server offered. */
   offered?: boolean;
-  /** What it shows without a look of its own: a built-in's mark (true) or its initials. */
-  builtInMark: boolean;
   /** The name, id and description fields, beside the preview. */
   fields: ReactNode;
 }) {
   const look = identityLook(id, name, value, saved);
   const set = (patch: Partial<IdentityValue>) => onChange({ ...value, ...patch });
-  // A built-in shows its mark only with no color of its own: a picked color puts its initials on it.
-  const shownAuto = builtInMark && !value.bg;
+  const face = agentFace(look, { size: 88 });
+  // The color Automatic draws: the one its shape is paired with (ADR 0021, D13), the shape picked or its id's.
+  const paired = CREW_SHAPES[agentShape({ id, avatar: { shape: value.shape } })].color;
+  // The wrapper the agent-switch pop plays on (ADR 0021, Motion), apart from the avatar's own loops: the key changes
+  // with what it shows, its shape and its color.
+  const pop = face.kind === 'character' ? `${face.shape} ${face.body}` : face.kind === 'icon' ? `${face.icon} ${face.bg}` : face.image;
   return (
     <div className="space-y-5" data-agent-identity>
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         <figure className="flex shrink-0 flex-col items-center gap-2.5 sm:w-[132px]" aria-label="Avatar preview">
           <span className="relative">
-            <AgentAvatar agent={look} size={88} />
+            <span className="block" data-crew-pop={pop}>
+              <AgentAvatar agent={look} size={88} placement="focus" />
+            </span>
             {value.picked && <span className="absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full bg-[var(--live)] shadow-[0_0_0_2.5px_var(--surface)]" title="Not saved yet" />}
           </span>
-          {/* How it reads on a reply's author line, at the size threads draw it. */}
+          {/* How it reads on a reply's author line, at the size threads draw it, and in a rail row, at 18px. */}
           <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-bg py-1 pr-2.5 pl-1" title="On a message in a thread">
-            <AgentAvatar agent={look} size={20} />
+            <AgentAvatar agent={look} size={20} placement="still" />
             <span className="min-w-0 truncate text-[12px] font-medium">{name}</span>
           </span>
+          <span className="inline-flex max-w-full items-center gap-2 px-1 text-[12px] text-fg-2" title="In a row of the rail">
+            <AgentAvatar agent={look} size={18} placement="still" />
+            <span className="min-w-0 truncate">{name}</span>
+          </span>
+          {face.kind === 'character' && (
+            <ul className="grid grid-cols-6 gap-1.5 sm:grid-cols-3 sm:gap-2" aria-label="Eye states">
+              {EYE_STATES.map((eyes) => (
+                <li key={eyes} title={EYE_STATE_NAMES[eyes]} aria-label={EYE_STATE_NAMES[eyes]}>
+                  <AgentAvatar agent={look} size={32} shows={{ eyes }} placement="still" />
+                </li>
+              ))}
+            </ul>
+          )}
           <figcaption className="text-center text-[11.5px] leading-[15px] text-balance text-fg-3" aria-live="polite">
-            {sourceLine(value, { saved, offered, builtInMark: shownAuto })}
+            {sourceLine(id, value, { saved, offered })}
           </figcaption>
         </figure>
         <div className="min-w-0 flex-1 space-y-4">{fields}</div>
@@ -105,19 +129,21 @@ export function AgentIdentity({
           value={sourceOf(value.style)}
           onChange={(source) => set({ style: source === 'upload' ? uploadStyle(value, saved) : source })}
           className="max-w-full overflow-x-auto"
-          options={AVATAR_SOURCES.map((s) => ({ id: s, label: avatarSourceLabel(s, builtInMark) }))}
+          options={AVATAR_SOURCES.map((s) => ({ id: s, label: avatarSourceLabel(s) }))}
         />
-        <SourcePanel value={value} saved={saved} name={name} set={set} builtInMark={builtInMark} />
+        <SourcePanel id={id} value={value} saved={saved} name={name} set={set} />
       </div>
 
       {styleTakesColor(value.style) && (
         <div className="space-y-2">
-          <span className="block text-[13px] font-medium text-fg">Background</span>
+          <span className="block text-[13px] font-medium text-fg">Color</span>
           <AvatarColorPicker
             icon={iconFor(value.style, value.stash)}
             name={name}
             value={value.bg}
             manual={!!value.bg}
+            swatches={AGENT_PALETTE}
+            auto={paired}
             preview={false}
             onChange={(bg) => set({ bg })}
             onAuto={() => set({ bg: '' })}
@@ -128,7 +154,47 @@ export function AgentIdentity({
   );
 }
 
-function SourcePanel({ value, saved, name, set, builtInMark }: { value: IdentityValue; saved?: string; name: string; set: (p: Partial<IdentityValue>) => void; builtInMark: boolean }) {
+/**
+ * The Character source's shape picker: a Default tile (the shape its id picks) and the 16 crew shapes at 24px in their
+ * paired colors, one radio group with one Tab stop (the arrow keys, Home and End move and pick). A tile says Built-in
+ * on the agent's own built-in shape, and names the other agents a shape shows on.
+ */
+function ShapePicker({ id, name, shape, onPick }: { id: string; name: string; shape: string; onPick: (shape: string) => void }) {
+  const crew = useCrewRoles();
+  const roving = useRovingFocus<HTMLDivElement>({ stop: 'selected', activate: true, vertical: true });
+  const known = (CREW_SHAPE_IDS as readonly string[]).includes(shape);
+  const own = agentShape({ id });
+  return (
+    <div ref={roving.ref} onKeyDown={roving.onKeyDown} onFocus={roving.onFocus} role="radiogroup" aria-label="Shape" className="flex flex-wrap gap-1">
+      <ShapeTile agent={{ id, name }} checked={!known} note="Default" label={`Default, ${CREW_SHAPE_NAMES[own].toLowerCase()}`} onPick={() => onPick('')} />
+      {CREW_SHAPE_IDS.map((s) => {
+        const tile = shapeTile(s, id, crew);
+        return <ShapeTile key={s} agent={{ id, name, avatar: { shape: s } }} checked={shape === s} note={tile.note} label={tile.label} onPick={() => onPick(s)} />;
+      })}
+    </div>
+  );
+}
+
+function ShapeTile({ agent, checked, note, label, onPick }: { agent: AgentLook; checked: boolean; note: string | null; label: string; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      onClick={onPick}
+      {...ROVING_ITEM}
+      data-shape-tile={agent.avatar?.shape ?? 'default'}
+      className={`flex h-[56px] w-[66px] flex-col items-center justify-center gap-1 rounded-[12px] transition-colors ${checked ? 'bg-surface-2 shadow-[inset_0_0_0_1.5px_var(--fg)]' : 'hov [--hov:var(--surface-2)]'}`}
+    >
+      <AgentAvatar agent={agent} size={24} placement="still" />
+      <span className={`h-[13px] max-w-full truncate px-1 text-[10px] leading-[13px] ${checked ? 'text-fg-2' : 'text-fg-3'}`}>{note}</span>
+    </button>
+  );
+}
+
+function SourcePanel({ id, value, saved, name, set }: { id: string; value: IdentityValue; saved?: string; name: string; set: (p: Partial<IdentityValue>) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
@@ -225,8 +291,8 @@ function SourcePanel({ value, saved, name, set, builtInMark }: { value: Identity
         </div>
       );
       break;
-    case 'auto':
-      panel = <p className={hint}>{builtInMark ? 'Its built-in mark, until you give it a color: then its initials on that color.' : 'Two letters from its name, unique across your agents.'}</p>;
+    case 'character':
+      panel = <ShapePicker id={id} name={name} shape={value.shape} onPick={(shape) => set({ shape })} />;
       break;
   }
   return (

@@ -134,6 +134,8 @@ export interface CrewDraft {
   name: string;
   description: string;
   icon: string;
+  /** A crew shape id (ADR 0021), empty for the one its id picks. */
+  shape: string;
   bg: string;
   harness: string;
   model: string;
@@ -156,6 +158,7 @@ const fieldsOf = (r: CrewListed) => ({
   name: r.name,
   description: r.description,
   icon: r.avatar?.icon ?? '',
+  shape: r.avatar?.shape ?? '',
   bg: r.avatar?.bg ?? '',
   harness: r.harness ?? '',
   model: r.model ?? '',
@@ -177,7 +180,7 @@ export function crewDraftOf(d: CrewDetailView): CrewDraft {
 
 /** A blank role of the user's own. */
 export function blankCrewDraft(): CrewDraft {
-  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, noEdits: false, delegatable: true, conductorTools: false, review: false, memory: 'read-write', memoryWrites: 'review', charter: '', charterMode: 'replace' };
+  return { name: '', description: '', icon: '', shape: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, noEdits: false, delegatable: true, conductorTools: false, review: false, memory: 'read-write', memoryWrites: 'review', charter: '', charterMode: 'replace' };
 }
 
 /** Why the form cannot be saved yet, or null. */
@@ -210,7 +213,7 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
   const fields: Record<string, unknown> = {};
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   for (const k of Object.keys(now) as FieldKey[]) {
-    if (k === 'icon' || k === 'bg') continue;
+    if (k === 'icon' || k === 'shape' || k === 'bg') continue;
     if (before && same(now[k], before[k])) continue;
     const key = WIRE[k];
     const value = k === 'conductorTools' ? (now[k] ? ['omni'] : []) : k === 'noEdits' ? (now[k] ? 'no-edits' : 'full') : now[k];
@@ -219,10 +222,10 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
     const unset = builtIn ? same(now[k], builtIn[k]) : k in SWITCH_DEFAULTS && now[k] === SWITCH_DEFAULTS[k as keyof typeof SWITCH_DEFAULTS];
     fields[key] = unset ? (typeof value === 'string' ? '' : null) : value;
   }
-  // The avatar's icon and color go together, a cleared one as null: a save changes only the avatar keys it names, so
-  // an uploaded image (PUT /api/crew/:id/avatar) stays. Null for both drops them.
-  if (!before || before.icon !== now.icon || before.bg !== now.bg) {
-    fields.avatar = now.icon || now.bg ? { icon: now.icon || null, bg: now.bg || null } : null;
+  // The avatar's icon, shape and color go together, a cleared one as null: a save changes only the avatar keys it
+  // names, so an uploaded image (PUT /api/crew/:id/avatar) stays. Null for all three drops them.
+  if (!before || before.icon !== now.icon || before.shape !== now.shape || before.bg !== now.bg) {
+    fields.avatar = now.icon || now.shape || now.bg ? { icon: now.icon || null, shape: now.shape || null, bg: now.bg || null } : null;
   }
   const body: CrewSaveBody = { fields };
   if (!detail || d.charter.trim() !== (detail.charters.own ?? '').trim()) body.charter = d.charter;
@@ -237,6 +240,7 @@ const WIRE: Record<FieldKey, string> = {
   name: 'name',
   description: 'description',
   icon: 'avatar',
+  shape: 'avatar',
   bg: 'avatar',
   harness: 'harness',
   model: 'model',
@@ -258,7 +262,7 @@ function fromDraft(d: CrewDraft, base: CrewListed | undefined): CrewListed {
     id: base?.id ?? '',
     name: d.name.trim(),
     description: d.description.trim(),
-    avatar: d.icon || d.bg ? { ...(d.icon && { icon: d.icon }), ...(d.bg && { bg: d.bg }) } : undefined,
+    avatar: d.icon || d.shape || d.bg ? { ...(d.icon && { icon: d.icon }), ...(d.shape && { shape: d.shape }), ...(d.bg && { bg: d.bg }) } : undefined,
     harness: d.harness || undefined,
     model: d.model || undefined,
     effort: d.effort || undefined,

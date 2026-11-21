@@ -279,7 +279,7 @@ export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null
     <RailItem
       row={
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={ROW_CARD}>
-          <BranchFace role={type} title={str(c.input.description) || 'Sub-agent'} status={status}>
+          <BranchFace title={str(c.input.description) || 'Sub-agent'} status={status}>
             <span>{type || 'agent'}</span>
             {(task?.background || c.input.run_in_background === true) && <span>background</span>}
             {calls > 0 && <span className="font-num">{plural(calls, 'tool')}</span>}
