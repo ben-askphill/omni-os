@@ -19,15 +19,16 @@ import { Avatar, COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, use
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
-import { PHASE, turnPhase } from '@omni/shared/status.ts';
+import { PHASE, turnPhase, type Mark } from '@omni/shared/status.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
 import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
 import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
-import { OmniMark } from './brand.tsx';
-import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
@@ -472,6 +473,42 @@ const ItemRow = memo(
 );
 
 
+/**
+ * The heads of the replies being written, which alone show live eyes (ADR 0021, D11), with what each shows. A thread
+ * of one agent: while it runs, the head of the run of replies the transcript ends on (back from the last row, past
+ * the rows that do not part a run). A group thread: each agent that works or waits on Ben shows its own state on its
+ * latest head, unless a message to it came after (its new reply has no head yet).
+ */
+function liveHeads(items: readonly Item[], heads: ReadonlyMap<number, string>, o: { running: boolean; lead: string | null; seats: Seats; mark: Mark }): Map<number, FaceShows> {
+  const out = new Map<number, FaceShows>();
+  if (o.seats?.length) {
+    const busy = new Map(o.seats.filter((s) => s.state === 'working' || s.state === 'needs').map((s) => [s.agent, s.state]));
+    const decided = new Set<string>();
+    for (let i = items.length - 1; i >= 0 && decided.size < busy.size; i--) {
+      const it = items[i];
+      if (it.type === 'user') for (const a of it.p.to?.length ? it.p.to : o.lead ? [o.lead] : []) if (busy.has(a)) decided.add(a);
+      const agent = heads.get(it.key);
+      if (!agent || !busy.has(agent) || decided.has(agent)) continue;
+      out.set(it.key, { member: busy.get(agent)! });
+      decided.add(agent);
+    }
+    return out;
+  }
+  if (!o.running) return out;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.type === 'mod' || it.type === 'result' || it.type === 'merge_risk' || (it.type === 'user' && it.p.source === 'lead')) continue;
+    if (!isReply(it)) break;
+    if (heads.has(it.key)) {
+      out.set(it.key, { mark: o.mark });
+      break;
+    }
+  }
+  return out;
+}
+
+type Seats = readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model' | 'state'>[] | undefined;
+
 export const Transcript = memo(function Transcript({
   threadId,
   events,
@@ -491,6 +528,7 @@ export const Transcript = memo(function Transcript({
   model,
   channelId,
   seats,
+  mark = 'working',
 }: {
   threadId: string;
   /** The thread's channel, which a remote agent's lock line names and links (ADR 0020). */
@@ -500,8 +538,10 @@ export const Transcript = memo(function Transcript({
   /** The thread's run now, for the author line's harness and model on replies after its last switch. */
   harness?: string;
   model?: string | null;
-  /** The thread's seated agents (`thread.members`): a member's author line names its own run, not the lead's. */
-  seats?: readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model'>[];
+  /** The thread's seated agents (`thread.members`): a member's author line names its own run and shows its own state, not the lead's. */
+  seats?: Seats;
+  /** The thread's status mark, as the header's pill draws it: the head of the reply being written shows it (ADR 0021, D11). */
+  mark?: Mark;
   /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
   code?: boolean;
   /** Every row held, anchors included. */
@@ -580,12 +620,13 @@ export const Transcript = memo(function Transcript({
   // open to remote agents lets them read, so it draws none.
   const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
   const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
-  // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
-  const conductorLook = channel(CONDUCTOR_CHANNEL);
-  const faceOf = (look: AgentLook) =>
-    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon ? (
-      conductorLook && hasOwnLook(conductorLook) ? <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} /> : <OmniMark size={24} />
-    ) : undefined;
+  // The Conductor answers in its face on every surface (conductorChannelLook): its agent's photo or icon, else its
+  // channel's saved look, else its crew character.
+  const conductorChannel = channel(CONDUCTOR_CHANNEL);
+  const faceOf = (look: AgentLook) => {
+    const c = conductorChannelLook(look, conductorChannel);
+    return c ? <Avatar name={c.name} omni channelIcon={c.icon} avatarBg={c.avatar_bg} size={24} /> : undefined;
+  };
 
   // Mod log lines and merge-risk cards are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'merge_risk');
@@ -616,6 +657,10 @@ export const Transcript = memo(function Transcript({
     const it = items[at];
     return !it || !isReply(it) || (it.agent ?? lead) !== lead;
   })();
+  // The heads of the replies being written, which alone show live eyes; every other head is history and stays idle (D11).
+  // A run with no head of its own yet (the live head below, or the lanes) leaves every head above it to history.
+  const tailWritten = running && !liveHead && !lanesLive;
+  const writing = useMemo(() => liveHeads(items, heads, { running: tailWritten, lead, seats, mark }), [items, heads, tailWritten, lead, seats, mark]);
   const author = (key: number) => {
     const id = heads.get(key);
     if (!id) return null;
@@ -623,7 +668,7 @@ export const Transcript = memo(function Transcript({
     const look = agents.find((a) => a.id === id) ?? (id === lead ? leadLook : null) ?? { id, name: id };
     return (
       <div key={`h${key}`} className="mb-2">
-        <AuthorLine agent={look} at={it && isReply(it) ? replyAt(it) : null} run={runs.get(key)} face={faceOf(look)} />
+        <AuthorLine agent={look} at={it && isReply(it) ? replyAt(it) : null} run={runs.get(key)} face={faceOf(look)} shows={writing.get(key)} />
       </div>
     );
   };
@@ -688,7 +733,7 @@ export const Transcript = memo(function Transcript({
           {edgeRow(-1)}
           {!lanesLive && liveHead && leadLook && (liveSteps || !asking) && (
             <div key="live-head" className="mb-2">
-              <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} />
+              <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} shows={agentShows(seats, leadLook.id, mark)} />
             </div>
           )}
           {!lanesLive && liveSteps && (

@@ -1,7 +1,7 @@
-CrewRoleRow is one crew role in Settings > Crew, on desktop web, phone web and the desktop app (`CrewSection` in `apps/web/src/pages/SettingsCrew.tsx`, chips from `crewChips` in `packages/shared/crew-settings.ts`). It is composed of existing parts: `CrewAvatar` (the role's own look on `Avatar`, else its `CrewMark`, else its monogram), `Chip` and the settings card's row rhythm.
+CrewRoleRow is one crew role in Settings > Crew, on desktop web, phone web and the desktop app (`CrewSection` in `apps/web/src/pages/SettingsCrew.tsx`, chips from `crewChips` in `packages/shared/crew-settings.ts`). It is composed of existing parts: `AgentAvatar` (the role's photo, its icon on its color, else its crew character), `Chip` and the settings card's row rhythm.
 
 ```jsx
-<CrewAvatar role={role} size={30} />     // own look, built-in mark, or initials
+<AgentAvatar agent={role} size={30} />   // photo, icon, or crew character
 <Chip tone="outline">Built-in</Chip>      // where it comes from
 <Chip tone="default">Edited</Chip>
 <Chip tone="default">Yours</Chip>
@@ -19,7 +19,7 @@ CrewRoleRow is one crew role in Settings > Crew, on desktop web, phone web and t
 
 ## The avatar
 
-A role's `avatar` in its frontmatter is a shared icon (`icon:<name>`) or one emoji, on a hex background: the channel avatar model without the SVG upload, which would not read in a markdown file. The editor reuses the channel `IconPicker` (SVG off) and `AvatarColorPicker`. Unset, a built-in keeps its `CrewMark` and any other role shows its monogram.
+A role's `avatar` in its frontmatter is a shared icon (`icon:<name>`) or one emoji, on a hex background: the channel avatar model without the SVG upload, which would not read in a markdown file. The editor reuses the channel `IconPicker` (SVG off) and `AvatarColorPicker`. Unset, the role shows its crew character (`AgentAvatar`).
 
 ## The editor
 
@@ -34,4 +34,4 @@ A built-in Omni relies on (the Conductor, usage-scan, the reviewer) sends `locks
 <LockNote>The Conductor only routes work, so it never gets working tools.</LockNote>
 ```
 
-Implementation: `apps/web/src/pages/SettingsCrew.tsx`, `apps/web/src/components/CrewAvatar.tsx`, `LockNote` in `apps/web/src/pages/settings-parts.tsx`.
+Implementation: `apps/web/src/pages/SettingsCrew.tsx`, `apps/web/src/components/AgentAvatar.tsx`, `LockNote` in `apps/web/src/pages/settings-parts.tsx`.

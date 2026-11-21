@@ -245,6 +245,11 @@ describe("a remote agent's server card", () => {
     expect(await image()).toBe(OTHER_AVATAR.split(',')[1]);
     // The page says the image is the one its server offered.
     expect((await crew()).find((r) => r.id === 'nomos').server).toMatchObject({ avatarOffered: true });
+    // A shape Ben picks is his own look too (ADR 0021): the next offer leaves the avatar alone.
+    expect((await call('/crew/nomos', json('PUT', { fields: { avatar: { shape: 'cloud' } } }))).status).toBe(200);
+    eve.offer = { ...eve.offer, avatar: AVATAR };
+    await call('/crew/nomos/server/test', json('POST', {}));
+    expect(await image()).toBe(OTHER_AVATAR.split(',')[1]);
     // Ben's own upload stays through the next offer.
     expect((await call('/crew/nomos/avatar', json('PUT', { image: AVATAR }))).status).toBe(200);
     eve.offer = { ...eve.offer, avatar: OTHER_AVATAR };

@@ -43,7 +43,7 @@ by `Icon`; vendor, crew and link marks use `ui/Brand.tsx`.
 | `components/continue/CarryoverSections.tsx` | Text triangles on exact-text disclosure | `chevronDown`, `chevronRight` |
 | `components/thread/rows/Steps.tsx` | Tool categories absent, only status dots | `terminal`, `file`, `globe`, `layers`, `tool`, plus disclosure chevrons; status remains separate |
 | `components/thread/rows/Cards.tsx`, cloud card | Vendor mark absent, links and branch text only | `HarnessLogo` for Cursor Cloud, `branch`, `pr`, `external` |
-| `components/thread/rows/Cards.tsx`, delegated children | Crew role text only | `CrewMark` when the role has a shared mark |
+| `components/thread/rows/Cards.tsx`, delegated children and crew reports | Crew role text only | `AgentAvatar` for the agent the thread ran as (the crew marks retired, ADR 0021) |
 | `components/thread/rows/Cards.tsx`, artifact card | File extension as icon | `image` for image/screenshot, `globe` for HTML/SVG, otherwise `file`, matching web `kindIcon` |
 | `components/thread/rows/Cards.tsx`, plan | Completed item used a status dot | `check` for completed items |
 | `components/thread/rows/Cards.tsx`, prompt caption | Interrupted/queued/dropped caption text only | `stop`, `send`, `x` where those captions apply |
@@ -67,7 +67,7 @@ by `Icon`; vendor, crew and link marks use `ui/Brand.tsx`.
   search results use `ChannelAvatar` and geometric `StatusDot` drawings.
 - `ui/EmptyState.tsx`, `ui/GroupedList.tsx`, `ui/OptionRow.tsx`, settings parts
   and section rows use shared drawings. Agent settings and run pickers use
-  `HarnessLogo` and `CrewMark`. Composer and attachment controls use `Icon`.
+  `HarnessLogo` and `AgentAvatar`. Composer and attachment controls use `Icon`.
 - `screens/PullRequestScreen.tsx` already uses GitHub `LinkBrand`.
   Emoji selected as a channel's actual identity and letter-avatar fallbacks
   are also web behavior; they are not substitute application icons.

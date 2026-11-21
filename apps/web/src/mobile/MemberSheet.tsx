@@ -16,7 +16,7 @@ export function MemberSheet({ thread, adding, onClose }: { thread: Thread; addin
   );
 }
 
-/** The header's avatars on the phone, in place of the status pill: a ring marks each agent that works. */
+/** The header's avatars on the phone, in place of the status pill: each shows its agent's state in its eyes (ADR 0021). */
 export function MemberButton({ thread, onOpen }: { thread: Thread; onOpen: () => void }) {
   const members = thread.members ?? [];
   const running = members.filter((m) => m.state === 'working').map((m) => m.name);

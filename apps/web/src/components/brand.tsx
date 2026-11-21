@@ -1,8 +1,9 @@
-import { MARK_TRANSFORM, HARNESS_LOGOS as LOGO, HARNESS, CREW } from '@omni/shared/brand.ts';
+import { MARK_TRANSFORM, HARNESS_LOGOS as LOGO, HARNESS } from '@omni/shared/brand.ts';
 import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
 import { angDiff, c01, easeWeights, MARK_DROPLETS, MARK_R, MARK_START, MARK_TARGETS, MARK_W, markFrame, type MarkDrop, type MarkState } from '@omni/shared/mark.ts';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { HarnessId } from '../api.ts';
+import { useReducedMotion } from '../motion.ts';
 
 // ---------- the Omni mark ----------
 
@@ -13,17 +14,6 @@ const W = MARK_W;
 const DROPLETS = MARK_DROPLETS;
 export { MARK_TRANSFORM } from '@omni/shared/brand.ts';
 export type { MarkState } from '@omni/shared/mark.ts';
-
-export function useReducedMotion() {
-  const [rm, setRm] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const on = () => setRm(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return rm;
-}
 
 /** The mark without motion: ring plus satellite. Used for reduced motion and favicons. */
 export function StaticMark({ size = 32, title = 'Omni', className = '' }: { size?: number; title?: string; className?: string }) {
@@ -206,23 +196,5 @@ export function HarnessMark({ harness, withLabel = false }: { harness: string; w
       {tag}
       {label}
     </span>
-  );
-}
-
-// ---------- crew marks ----------
-
-/* Five silhouettes derived from the ring. 24 grid, 1.75 stroke, round joins to sit with the icon set. */
-export type CrewRole = keyof typeof CREW;
-export const isCrewRole = (r: string | null | undefined): r is CrewRole => !!r && r in CREW;
-
-export function CrewMark({ role, size = 16, className = '', title }: { role: CrewRole; size?: number; className?: string; title?: string }) {
-  const c = CREW[role];
-  return (
-    <svg className={`block shrink-0 ${className}`} width={size} height={size} viewBox="0 0 24 24" role="img" aria-label={title ?? c.label}>
-      {c.shapes.map(({ kind, ...props }, i) => {
-        const Shape = kind;
-        return <Shape key={i} {...props} />;
-      })}
-    </svg>
   );
 }

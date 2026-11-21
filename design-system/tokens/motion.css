@@ -17,4 +17,17 @@
 --dur-pulse:1400ms; /* @kind other */
 --dur-ping:1600ms; /* @kind other */
 --dur-tick:2400ms; /* @kind other */
+/* Crew characters (ADR 0021): the body breathes on --dur-breathe (idle) and sways on --dur-tick (thinking). Documented
+   here only: the clients play them from packages/shared/crew-motion.ts, the one copy, and index.css holds none. */
+--dur-crew-bounce:840ms; /* @kind other */
+--dur-crew-wait:3200ms; /* @kind other */
+--dur-crew-glance:7000ms; /* @kind other */
+--dur-crew-look:4300ms; /* @kind other */
+--dur-crew-scan:400ms; /* @kind other */
+--dur-crew-hop:950ms; /* @kind other */
+--dur-crew-squeeze:110ms; /* @kind other */
+--dur-crew-open:260ms; /* @kind other */
+--dur-crew-wide:260ms; /* @kind other */
+--dur-crew-wide-hold:300ms; /* @kind other */
+--dur-crew-pop:600ms; /* @kind other */
 }

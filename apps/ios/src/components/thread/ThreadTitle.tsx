@@ -1,4 +1,5 @@
 import type { ThreadStatus } from '@omni/client-core';
+import type { FaceShows } from '@omni/shared/agent-avatar.ts';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { fontSize, useOmniTheme, weight } from '../../theme';
@@ -27,6 +28,8 @@ interface ThreadTitleProps {
   onOpenMachine?: () => void;
   /** The lead agent's id, for its avatar beside its name. */
   lead?: string | null;
+  /** What the lead's eyes show: the thread's state, or in a group thread the lead's own (leadEyes). */
+  leadShows?: FaceShows;
   /** A remote agent leads it: "talks only" after its name (ADR 0020). */
   talksOnly?: boolean;
   /** The member avatars sit beside the menu button, so the title takes less of the bar. */
@@ -37,7 +40,7 @@ interface ThreadTitleProps {
  * The open thread's navigation bar title, left-aligned: the title on one line, and under it the status dot and word,
  * the channel, the crew role it runs as and the machine the thread runs on. They replace the status and chips rows under the bar.
  */
-export function ThreadTitle({ title, status, statusLabel, channel, role = null, device, account = null, onOpenMachine, lead = null, talksOnly = false, wide = false }: ThreadTitleProps) {
+export function ThreadTitle({ title, status, statusLabel, channel, role = null, device, account = null, onOpenMachine, lead = null, leadShows, talksOnly = false, wide = false }: ThreadTitleProps) {
   const { colors } = useOmniTheme();
   const { width } = useWindowDimensions();
   const live = status === 'running';
@@ -67,7 +70,8 @@ export function ThreadTitle({ title, status, statusLabel, channel, role = null, 
         {(statusLabel || channel) && role ? sep : null}
         {role ? (
           <View style={styles.lead}>
-            {lead ? <AgentAvatar agent={lead} size={14} /> : null}
+            {/* The open thread's agent is in focus: its character moves (ADR 0021, D10). */}
+            {lead ? <AgentAvatar agent={lead} size={16} shows={leadShows} placement="focus" /> : null}
             <Text numberOfLines={1} accessibilityLabel={`Runs as ${role}${talksOnly ? `, ${TALKS_ONLY}` : ''}`} style={[styles.sub, styles.role, { color: colors.fg3 }]}>
               {talksOnly ? `${role} · ${TALKS_ONLY}` : role}
             </Text>

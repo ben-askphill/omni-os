@@ -16,6 +16,7 @@ const { avatarOf, charterHash, crewForNewThread, getCrew, listCrew, splitCrewFil
 const { crewRunProblem } = await import('../crew-store.ts');
 const { channels } = await import('../db.ts');
 const { updateUserConfig } = await import('../user-config.ts');
+const { crewDraftOf, crewSaveBody } = await import('@omni/shared/crew-settings.ts');
 
 const shipped = mkdtempSync(join(tmpdir(), 'omni-crew-shipped-'));
 paths.crew = shipped;
@@ -143,6 +144,47 @@ describe('Settings > Crew (S3)', () => {
     expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: 'amber' } } })).status).toBe(400);
     await send('PUT', '/crew/builder', { fields: { avatar: null } });
     expect(getCrew('builder')?.avatar).toBeUndefined();
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('saves a crew shape with its color, and refuses a shape it does not know with the ones it does', async () => {
+    const res = await send('PUT', '/crew/builder', { fields: { avatar: { shape: 'droplet', bg: '#52CDFE' } } });
+    expect(res.status).toBe(200);
+    expect((await json(res)).role.avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+    expect(own('builder')).toContain('avatar:\n  shape: droplet\n  bg: "#52CDFE"');
+    expect((await json(await send('GET', '/crew'))).find((r: { id: string }) => r.id === 'builder').avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+
+    const refused = await send('PUT', '/crew/builder', { fields: { avatar: { shape: 'hexagon' } } });
+    expect(refused.status).toBe(400);
+    const { error } = await json(refused);
+    expect(error).toMatch(/^An avatar shape is one of circle, droplet, squircle, .*, bucket\.$/);
+    expect(getCrew('builder')?.avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+    // Clearing the avatar clears the shape with the icon and color.
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: null } })).status).toBe(200);
+    expect(getCrew('builder')?.avatar).toBeUndefined();
+    expect(own('builder')).not.toContain('shape');
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('reads past a shape this build does not draw, as a file from a later build names one', async () => {
+    writeOwn('builder', '---\ncharter_mode: append\navatar:\n  shape: hexagon\n  bg: "#52cdfe"\n---\n');
+    expect(getCrew('builder')?.avatar).toEqual({ bg: '#52cdfe' });
+    writeOwn('builder', '---\ncharter_mode: append\navatar:\n  shape: hexagon\n---\n');
+    expect(getCrew('builder')?.avatar).toBeUndefined();
+    // An edit from this build keeps the key for the build that draws it.
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: '#ff4983' } } })).status).toBe(200);
+    expect(own('builder')).toContain('shape: hexagon');
+    expect(getCrew('builder')?.avatar).toEqual({ bg: '#ff4983' });
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('keeps a later build’s shape when Settings saves only a new color', async () => {
+    writeOwn('builder', '---\ncharter_mode: append\navatar:\n  shape: hexagon\n  bg: "#52cdfe"\n---\n');
+    const view = await json(await send('GET', '/crew/builder'));
+    const draft = { ...crewDraftOf(view), bg: '#ff4983' };
+    expect((await send('PUT', '/crew/builder', crewSaveBody(draft, view))).status).toBe(200);
+    expect(own('builder')).toContain('shape: hexagon');
+    expect(getCrew('builder')?.avatar).toEqual({ bg: '#ff4983' });
     await send('POST', '/crew/builder/reset');
   });
 

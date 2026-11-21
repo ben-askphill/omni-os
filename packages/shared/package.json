@@ -9,7 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:link-icons": "tsx scripts/build-link-icons.ts"
+    "build:link-icons": "tsx scripts/build-link-icons.ts",
+    "build:crew-shapes": "tsx scripts/build-crew-shapes.ts"
   },
   "devDependencies": {
     "@omni/test-fixtures": "*",

@@ -16,7 +16,7 @@ import { canMarkDone } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp, useNeedOf, useNow, useUserName } from '../store.tsx';
 import { ownedByOther } from '@omni/shared/thread-owner.ts';
-import { MoAvatar, MoRound } from './parts.tsx';
+import { MoRound, MoRowLead, MoRowMark } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell } from './shell.tsx';
 import { drawsFaces, MarkLine } from '../components/thread/AvatarMark.tsx';
@@ -61,10 +61,10 @@ function RowActions({ actions }: { actions: RowAction[] }) {
 }
 
 /**
- * A thread as the sidebar's Inbox card: its status on the avatar and on the right, the title, the channel and the
- * machine. A job has its tally at the end of the second line and its tree under it, and the other channels it works
- * in before its channel's name. `working`: the row is on the
- * Working shelf, so what runs under it shows too.
+ * A thread as the sidebar's Inbox card: its agent's avatar, the title, its status in words and its mark at the far end
+ * (ADR 0021, D23), then the channel and the machine. A job has its tally at the end of the second line and its tree
+ * under it, and the other channels it works in before its channel's name. `working`: the row is on the Working shelf,
+ * so what runs under it shows too.
  */
 export function MoInboxRow({
   t,
@@ -93,6 +93,8 @@ export function MoInboxRow({
   const forOwner = ownedByOther(t.owner, userName) ? ` · for ${t.owner!.trim()}` : '';
   const phase = threadPhase(t);
   const blocker = useNeedOf(t.id)?.blockers[0];
+  // What the avatar's eyes and the mark at the title line's end show.
+  const state = { state: status?.glyph ?? (phase ? 'running' : t.status), phase, mark: blocker ? blockerMark(blocker) : null };
   // The machine it runs on or last ran on, then the run's time; the branch only without a machine.
   const where = ranOnLine(t, now);
   const label = where.machine ?? where.branch;
@@ -105,11 +107,12 @@ export function MoInboxRow({
     <div>
     <div className="relative">
       <button type="button" onClick={() => shell.open(href.thread(t.id))} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-        <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} state={status?.glyph ?? (phase ? 'running' : t.status)} phase={phase} mark={blocker ? blockerMark(blocker) : null} />
+        <MoRowLead role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} {...state} members={t.members} />
         <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last || under ? '' : 'border-b border-line'}`} style={{ paddingRight: reserve }}>
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 flex-1 truncate text-[15px] leading-[1.3] text-fg">{title}</span>
             <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{status ? status.label : shortTime(t.updated_at ?? t.created_at, now)}</span>
+            <MoRowMark {...state} />
           </span>
           {/* A group thread at work says who: "Builder asks you · Designer working" (Q35). */}
           {drawsFaces(t.members) && <MarkLine members={t.members} className="text-[12.5px] leading-[1.35] text-fg-2" />}

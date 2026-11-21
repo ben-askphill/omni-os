@@ -7,10 +7,11 @@ import { drag, useFolders } from '../folders.tsx';
 import { groupByDay, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
-import { Avatar, Button, Chip, Empty, ErrorNote, Icon, Loading, StatusDot, ThreadDot } from './ui.tsx';
+import { Button, Chip, Empty, ErrorNote, Icon, Loading, RowDot, StatusDot, rowShows, useRowMark } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
 import { AvatarMark, drawsFaces } from './thread/AvatarMark.tsx';
+import { ThreadAvatar } from './ThreadAvatar.tsx';
 
 /** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
@@ -61,29 +62,30 @@ function PRMark({ pr }: { pr: BranchPRMark }) {
   );
 }
 
+/**
+ * A thread in a list (ADR 0021, D23): its agent's avatar (else its channel's), the title with its chips and time, and
+ * its status mark at the far end; the preview under it. The avatar's eyes show the row's mark. A group thread whose
+ * agents run or wait on Ben draws their faces in the avatar's slot. `showChannel`: a list of several channels names
+ * the channel on the second line.
+ */
 export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boolean; pr?: BranchPRMark }) {
   useNow(60_000);
   const { channels, mods, profile } = useApp();
+  const row = useRowMark(t, { pr });
+  const ch = channels.find((c) => c.id === t.channel_id);
   const source = SOURCE_LABEL[t.source];
   // A mod's pinned status, compact beside the running indicator. The newest one when several mods set one.
   const mod = mods.findLast((m) => m.thread_id === t.id);
   const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : showsRunning(t) ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
   return (
     <a href={href.thread(t.id)} className="item group flex items-start gap-3 rounded-[var(--r-sm)] px-3 py-2.5 md:px-3.5">
-      {showChannel ? (
-        <span className="relative mt-0.5 shrink-0">
-          <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />
-          {!drawsFaces(t.members) && (
-            <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-              <ThreadDot t={t} pr={pr} size={7} faces={false} />
-            </span>
-          )}
-        </span>
-      ) : (
-        <span className="mt-0.5 grid h-8 min-w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          <ThreadDot t={t} pr={pr} size={9} faces={18} />
-        </span>
-      )}
+      <span className="mt-0.5 grid h-8 min-w-8 shrink-0 place-items-center" data-row-lead>
+        {drawsFaces(t.members) ? (
+          <AvatarMark members={t.members} size={18} facesOnly />
+        ) : (
+          <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row)} size={32} />
+        )}
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`min-w-0 truncate text-[14px] group-hover:text-fg ${t.done_at ? 'text-fg-3' : 'text-fg-2'}`}>{t.title || 'Untitled'}</span>
@@ -96,9 +98,10 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
           )}
           {source && <Chip tone="outline">{source}</Chip>}
           {pr && <PRMark pr={pr} />}
-          {/* A group thread's agents at work: their faces are its mark, here beside the time (Q35). */}
-          {showChannel && <AvatarMark members={t.members} size={16} className="ml-auto" />}
-          <span className={`${showChannel && drawsFaces(t.members) ? '' : 'ml-auto '}shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums`}>{relTime(t.updated_at)}</span>
+          <span className="ml-auto shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums">{relTime(t.updated_at)}</span>
+          <span className="grid min-w-3 shrink-0 place-items-center" data-row-mark>
+            <RowDot row={row} size={8} />
+          </span>
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}

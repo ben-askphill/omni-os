@@ -5,6 +5,7 @@ import type { ThreadRow } from '../live/channel-model';
 import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
 import { Icon } from '../ui/Icon';
 import { glyphFor, StatusDot } from './StatusDot';
+import { ROW_AVATAR } from './ThreadAvatar';
 import { ThreadSwipeRow } from './ThreadSwipeRow';
 
 export interface HandoffRowViewProps {
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s2,
-    marginLeft: space.s8 + 36 + space.s6 - space.s4,
+    marginLeft: space.s8 + ROW_AVATAR + space.s6 - space.s4,
     paddingHorizontal: space.s4,
     alignSelf: 'flex-start',
     borderRadius: radius.pill,
@@ -86,7 +87,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.caption,
   },
   children: {
-    marginLeft: space.s8 + 18,
+    marginLeft: space.s8 + ROW_AVATAR / 2,
     paddingLeft: space.s6,
     borderLeftWidth: 1,
     marginBottom: space.s2,

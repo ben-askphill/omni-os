@@ -102,8 +102,8 @@ const SHAPE: Record<Mark | 'loading', ReactNode> = {
 // A shape that is not a plain dot loses itself below 8px, and one with a satellite below 9.
 const MIN_SHAPED = 8;
 const PLAIN: ReadonlySet<Mark> = new Set(['working', 'idle', 'starting']);
-const CREW: ReadonlySet<Mark> = new Set(['delegating', 'crew_question', 'crew_failed']);
-const boxOf = (mark: Mark, size: number) => (CREW.has(mark) ? Math.max(size, MIN_SHAPED + 1) : PLAIN.has(mark) ? size : Math.max(size, MIN_SHAPED));
+const CREW_MARKS: ReadonlySet<Mark> = new Set(['delegating', 'crew_question', 'crew_failed']);
+const boxOf = (mark: Mark, size: number) => (CREW_MARKS.has(mark) ? Math.max(size, MIN_SHAPED + 1) : PLAIN.has(mark) ? size : Math.max(size, MIN_SHAPED));
 
 /**
  * The one status mark, for every state a thread can be in (`Mark` in @omni/shared/status.ts). Its shape says who has
@@ -185,26 +185,55 @@ export function DoneMark({ size = 8, className = '' }: { size?: number; classNam
 
 type Marked = { id?: string; status: string; delegating?: boolean; setup?: string | null; limit_state?: string | null; done_at?: string | null; members?: ThreadMember[] };
 
+/** A row's mark: the state it draws, a step larger while it is at work, or the check once Ben marked it done. */
+export interface RowMark {
+  mark: Mark;
+  /** At work: the dot draws a step larger. */
+  working: boolean;
+  /** Ben marked it done: the check, and done eyes on its avatar. */
+  done: boolean;
+}
+
+type RowMarkOptions = { state?: Glyph; busy?: boolean } & Pick<MarkContext, 'pr' | 'turn'>;
+
 /**
  * A thread's mark on a row: what holds it up for Ben (its Needs you item), its phase while it is at work, the check
  * once Ben marked it done, else how it ended. `state`: the glyph the row settled on (the thread tree's needs you and
  * failed come before the thread's own), which a phase gives way to. `busy`: the row knows of work the thread's own
- * state does not say, as sub-agents a stopped turn left behind. `pr`: the pull request on its branch.
+ * state does not say, as sub-agents a stopped turn left behind. `pr`: the pull request on its branch. The row's dot
+ * (RowDot) draws it, and the avatar the row leads with shows it in its eyes (rowShows; ADR 0021, D23).
  */
-export function ThreadDot({ t, state, busy = false, size = 7, pr, turn, faces = 16 }: { t: Marked; state?: Glyph; busy?: boolean; size?: number; faces?: number | false } & Pick<MarkContext, 'pr' | 'turn'>) {
+export function useRowMark(t: Marked, { state, busy = false, pr, turn }: RowMarkOptions = {}): RowMark {
   const need = useNeedOf(t.id);
-  // A group thread whose agents run or wait on Ben draws their faces as its mark (thread/AvatarMark.tsx); `faces`
-  // false keeps the dot where a face cannot fit.
-  if (faces && drawsFaces(t.members)) return <AvatarMark members={t.members} size={faces} />;
   const mark = threadMark(t, { need, pr, turn });
   const own = MARK[mark].glyph;
+  const row = (m: Mark, working = false): RowMark => ({ mark: m, working, done: false });
   // The tree put a state first that the thread's own mark does not say: draw the tree's.
-  if (state && state !== 'running' && state !== 'queued' && own !== state && !need?.blockers.length) return <StatusDot status={state} size={size} />;
-  if (need?.blockers.length) return <StatusDot mark={mark} size={size} />;
-  if (own === 'running' && mark !== 'queued') return <StatusDot mark={mark} size={size + 1} />;
-  if (busy || state === 'running') return <StatusDot mark="delegating" size={size + 1} />;
-  if (t.done_at) return <DoneMark size={size} />;
-  return <StatusDot mark={mark} size={size} />;
+  if (state && state !== 'running' && state !== 'queued' && own !== state && !need?.blockers.length) return row(markOf(state));
+  if (need?.blockers.length) return row(mark);
+  if (own === 'running' && mark !== 'queued') return row(mark, true);
+  if (busy || state === 'running') return row('delegating', true);
+  return { mark, working: false, done: !!t.done_at };
+}
+
+/** What a row's avatar shows in its eyes: the row's mark, or done once Ben marked it done. */
+export const rowShows = (row: RowMark): { mark: Mark } => ({ mark: row.done ? 'done' : row.mark });
+
+/** A row's mark as its dot, or the check once Ben marked it done. */
+export function RowDot({ row, size = 7 }: { row: RowMark; size?: number }) {
+  if (row.done) return <DoneMark size={size} />;
+  return <StatusDot mark={row.mark} size={row.working ? size + 1 : size} />;
+}
+
+/**
+ * A thread's mark on a row (useRowMark), as a dot. A group thread whose agents run or wait on Ben draws their faces
+ * as its mark (thread/AvatarMark.tsx); `faces` false keeps the dot where a face cannot fit, or where the row draws
+ * the faces itself.
+ */
+export function ThreadDot({ t, state, busy = false, size = 7, pr, turn, faces = 16 }: { t: Marked; size?: number; faces?: number | false } & RowMarkOptions) {
+  const row = useRowMark(t, { state, busy, pr, turn });
+  if (faces && drawsFaces(t.members)) return <AvatarMark members={t.members} size={faces} />;
+  return <RowDot row={row} size={size} />;
 }
 
 /** A failure announces itself (role="alert"); every other state is a polite status. */

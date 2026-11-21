@@ -11,6 +11,9 @@ import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
 import { HeaderActions } from './HeaderActions.tsx';
 import { MemberAvatars } from './Members.tsx';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import type { Mark } from '@omni/shared/status.ts';
 
 /** The status lines the thread's mods pinned with $.ui.status, one per plugin, while its process runs. */
 function ModStatusLines({ lines }: { lines: ModStatus[] }) {
@@ -27,12 +30,12 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
-/** The agent the thread runs as, its lead, beside the crumbs: its avatar and its name. */
-function RoleChip({ role, name }: { role: string; name: string }) {
+/** The agent the thread runs as, its lead, beside the crumbs: its avatar, showing what it does, and its name. */
+function RoleChip({ role, name, shows }: { role: string; name: string; shows: FaceShows | undefined }) {
   const look = useAgent(role);
   return (
     <Chip className="ml-1 gap-1 font-normal" title={`Runs as ${name}`}>
-      {look && <AgentAvatar agent={{ ...look, name }} size={14} />}
+      {look && <AgentAvatar agent={{ ...look, name }} size={16} shows={shows} placement="focus" />}
       <span data-role={role}>{name}</span>
     </Chip>
   );
@@ -64,6 +67,7 @@ export function ThreadHeader({
   actions,
   roleName = null,
   account = null,
+  mark = 'idle',
 }: {
   thread: Thread;
   channel: Channel | null | undefined;
@@ -76,6 +80,8 @@ export function ThreadHeader({
   roleName?: string | null;
   /** The account its harness last ran as (useThreadAccount). */
   account?: ThreadAccount | null;
+  /** The thread's status mark, as the header's pill draws it: the lead's eyes show it (ADR 0021). */
+  mark?: Mark;
 }) {
   const remoteLead = isRemoteAgentHarness(thread.harness) && !!thread.role;
   return (
@@ -96,7 +102,7 @@ export function ThreadHeader({
               </a>
             </>
           )}
-          {roleName && (headerShowsRole(thread) || remoteLead) && <RoleChip role={thread.role!} name={roleName} />}
+          {roleName && (headerShowsRole(thread) || remoteLead) && <RoleChip role={thread.role!} name={roleName} shows={agentShows(thread.members, thread.role, mark)} />}
           {/* A remote agent leads talk-only; a local member seated in it changes files (ADR 0020). */}
           {remoteLead && (
             <span className="shrink-0" data-talks-only>

@@ -12,7 +12,9 @@
 <script type="text/babel">
 omReady(({ ThreadRow }) => {
 
-function App(){return <div className="om-thread"><div className="om-transcript"><ThreadRow title="Compare checkout funnel before/after the deploy" taskId="T-4F2A" state="done" role="researcher" harness="codex" time="4m" preview="The drop is at the shipping step, not payment."/></div></div>}
+const S={"researcher_done":"<svg aria-hidden=\"true\" data-shape=\"droplet\" data-grid=\"128\" data-eyes=\"done\" width=\"32\" height=\"32\" viewBox=\"0 0 128 128\"><g transform=\"translate(64 64) skewX(-10) translate(-64 -64)\"><path d=\"M43.9 34.6L37.5 39.6L34.5 42.4L31.7 45.4L29.3 48.7L27.2 52.2L25.4 55.9L24.0 59.8L23.0 63.8L22.4 67.8L22.2 71.9L22.4 76.0L23.0 80.1L24.0 84.1L25.4 87.9L27.1 91.6L29.2 95.2L31.7 98.5L34.4 101.5L37.5 104.3L40.8 106.7L44.3 108.8L48.0 110.6L51.8 112.0L55.8 113.0L59.9 113.6L64.0 113.8L68.1 113.6L72.1 113.0L76.1 112.0L80.0 110.6L83.7 108.8L87.2 106.7L90.5 104.3L93.5 101.5L96.3 98.5L98.7 95.2L100.8 91.7L102.6 88.0L104.0 84.1L105.0 80.1L105.6 76.1L105.8 72.0L105.6 67.9L105.0 63.8L104.0 59.9L102.6 56.0L100.9 52.3L98.8 48.8L96.3 45.4L93.5 42.4L90.5 39.7L85.7 36.1L84.1 34.6L65.4 15.7L64.4 15.1L63.4 15.2L62.6 15.7Z\" fill=\"#52cdfe\" stroke=\"var(--fg)\" stroke-width=\"11\" stroke-linejoin=\"round\"></path><path d=\"M49.969 79.571a3.281 3.281 0 0 1 6.562 0\" fill=\"none\" stroke=\"#17181a\" stroke-width=\"5.313\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M71.469 79.571a3.281 3.281 0 0 1 6.562 0\" fill=\"none\" stroke=\"#17181a\" stroke-width=\"5.313\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path></g></svg>"};
+const F=({s})=><span style={{display:'grid'}} dangerouslySetInnerHTML={{__html:s}}/>;
+function App(){return <div className="om-thread"><div className="om-transcript"><ThreadRow avatar={<F s={S.researcher_done}/>} title="Compare checkout funnel before/after the deploy" taskId="T-4F2A" state="done" role="researcher" harness="codex" time="4m" preview="The drop is at the shipping step, not payment."/></div></div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 });
 </script>

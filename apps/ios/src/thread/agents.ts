@@ -10,7 +10,6 @@ import { replyTo, routingHint } from '@omni/shared/members.ts';
 import { isRemoteAgentHarness, remoteLeadPlaceholder } from '@omni/shared/remote-agent.ts';
 
 import { agentName } from '../components/agent-face';
-import type { AvatarRing } from '../components/AgentAvatar';
 import { harnessLabel } from './format';
 
 export interface ThreadAgents {
@@ -38,7 +37,8 @@ export interface MemberRowView {
   /** Its state in words, as the Web UI's member list says it. */
   state: string;
   glyph: Glyph;
-  ring: AvatarRing;
+  /** Its state as the server sends it, which its avatar's eyes show (crew-eyes.ts). */
+  member: ThreadMember['state'];
   /** Every member but the lead, which is fixed for the thread's life (Q5). */
   removable: boolean;
   /** A member's own run, which the composer's model pill does not change (Q51). Null for the lead and a remote agent. */
@@ -55,7 +55,7 @@ export function memberRows(thread: Pick<Thread, 'members'>): MemberRowView[] {
     lead: m.lead,
     state: STATE_LABEL[m.state],
     glyph: STATE_GLYPH[m.state],
-    ring: m.state === 'working' ? 'working' : m.state === 'needs' ? 'needs' : null,
+    member: m.state,
     removable: !m.lead,
     run: m.lead || isRemoteAgentHarness(m.harness) ? null : [harnessLabel(m.harness), m.model].filter(Boolean).join(' · '),
   }));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crewRoleName, headerShowsRole } from '../crew-role.ts';
+import { builtInName, crewRoleName, headerShowsRole } from '../crew-role.ts';
 
 describe('crewRoleName', () => {
   it('names no role for a thread not started as one', () => {
@@ -14,10 +14,12 @@ describe('crewRoleName', () => {
     expect(crewRoleName('builder', crew)).toBe('Builder');
   });
 
-  it('falls back to the built-in label before the roles load, then to the stored id', () => {
+  it('falls back to the built-in name before the roles load, then to the stored id', () => {
     expect(crewRoleName('store-ops')).toBe('Store ops');
     expect(crewRoleName('researcher', [{ id: 'researcher', name: '  ' }])).toBe('Researcher');
     expect(crewRoleName('usage-scan')).toBe('usage-scan');
+    expect(['conductor', 'researcher', 'builder', 'store-ops', 'inbox'].map((id) => builtInName(id))).toEqual(['Conductor', 'Researcher', 'Builder', 'Store ops', 'Inbox']);
+    expect(builtInName('toString')).toBeUndefined();
     // A charter removed after the thread ran: the id it was stored with, never a guess.
     expect(crewRoleName('my-role', [{ id: 'builder', name: 'Builder' }])).toBe('my-role');
   });

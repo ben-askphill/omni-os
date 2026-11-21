@@ -49,8 +49,8 @@ describe('the crew role of a thread', () => {
     expect(html).toContain('data-role="store-ops"');
     expect(html).toContain('>Store ops<');
     expect(html).toContain('title="Runs as Store ops"');
-    // A built-in's mark, as its avatar: the chip's text names it.
-    expect(html).toMatch(/title="Runs as Store ops"[^>]*><span aria-hidden="true"[^>]*><svg/);
+    // Its crew character at 16px, as its avatar: the chip's text names it.
+    expect(html).toMatch(/title="Runs as Store ops"[^>]*><svg aria-hidden="true" data-shape="triangle"[^>]*width="16"/);
   });
 
   it('has an Agent row in Details, right under Channel', () => {
@@ -58,6 +58,8 @@ describe('the crew role of a thread', () => {
     expect(rows(html).slice(0, 3)).toEqual(['Channel', 'Agent', 'Harness']);
     expect(html).toContain('data-role="builder"');
     expect(html).toContain('Builder');
+    // Its crew character at 16px, where the built-in mark stood (ADR 0021, D9).
+    expect(html).toMatch(/data-role="builder"><svg aria-hidden="true" data-shape="squircle"[^>]*width="16"/);
   });
 
   it('shows neither on a thread not started as a crew role', () => {
