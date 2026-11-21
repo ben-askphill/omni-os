@@ -145,10 +145,8 @@ export function MemberButton({ thread, onOpen }: { thread: Thread; onOpen: () =>
       style={styles.facepile}
     >
       <View style={styles.faces}>
-        {shown.map((m, i) => (
-          <View key={m.agent} style={i > 0 && styles.overlap}>
-            <AgentAvatar agent={m.agent} size={22} shows={{ member: m.state }} placement="focus" />
-          </View>
+        {shown.map((m) => (
+          <AgentAvatar key={m.agent} agent={m.agent} size={22} shows={{ member: m.state }} placement="focus" />
         ))}
       </View>
       <Text style={[styles.count, { color: colors.fg2 }]}>{members.length}</Text>
@@ -172,7 +170,6 @@ const styles = StyleSheet.create({
   actionText: { fontSize: fontSize.ui, fontWeight: weight.semibold },
   error: { paddingHorizontal: space.s4 },
   facepile: { flexDirection: 'row', alignItems: 'center', gap: space.s2, minHeight: minTarget, paddingHorizontal: space.s2 },
-  faces: { flexDirection: 'row', alignItems: 'center' },
-  overlap: { marginLeft: -6 },
+  faces: { flexDirection: 'row', alignItems: 'center', gap: space.s1 },
   count: { fontSize: fontSize.caption, fontWeight: weight.medium },
 });

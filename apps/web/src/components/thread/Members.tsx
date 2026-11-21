@@ -45,11 +45,9 @@ export function Facepile({ members, size = 22, max = 3, count = true, placement 
   const shown = [...members].sort((a, b) => (LOUD[b.state] ?? 0) - (LOUD[a.state] ?? 0)).slice(0, max);
   const more = count ? members.length - shown.length : 0;
   return (
-    <span className="flex items-center">
-      {shown.map((m, i) => (
-        <span key={m.agent} className="relative rounded-full" style={{ marginLeft: i ? -size * 0.3 : 0, zIndex: shown.length - i }}>
-          <MemberFace member={m} size={size} placement={placement} />
-        </span>
+    <span className="flex items-center gap-0.5">
+      {shown.map((m) => (
+        <MemberFace key={m.agent} member={m} size={size} placement={placement} />
       ))}
       {more > 0 && <span className="ml-1 text-[11.5px] font-medium text-fg-3">+{more}</span>}
     </span>
