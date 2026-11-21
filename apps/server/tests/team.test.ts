@@ -266,13 +266,13 @@ describe('seating by an agent thread', () => {
     // At creation: a team or a delegation with members in #conductor is refused, and nothing is made.
     const inConductor = await call('POST', '/threads/team', { channel: 'conductor', title: 'x', prompt: 'x', role: 'lead', tasks: PARTS.slice(0, 1) }, as);
     expect(inConductor.status).toBe(403);
-    expect(inConductor.json.error).toMatch(/never seated in a #conductor thread/);
+    expect(inConductor.json.error).toMatch(/#conductor thread only in its own/);
     expect((await call('POST', '/threads', { channel: 'conductor', prompt: 'x', role: 'lead', members: ['designer'] }, as)).status).toBe(403);
     // Left empty, the channel is the lead's own, and the rule holds for that one too.
     expect((await call('POST', '/crew', { id: 'router', fields: { name: 'Router', harness: 'claude-code', model: 'sonnet', channel: 'conductor' }, charter: 'You route.' })).status).toBe(201);
     const ownChannel = await call('POST', '/threads/team', { channel: '', title: 'x', prompt: 'x', role: 'router', tasks: PARTS.slice(0, 1) }, as);
     expect(ownChannel.status).toBe(403);
-    expect(ownChannel.json.error).toMatch(/never seated in a #conductor thread/);
+    expect(ownChannel.json.error).toMatch(/#conductor thread only in its own/);
     expect((await call('POST', '/threads', { channel: '', prompt: 'x', role: 'router', members: ['designer'] }, as)).status).toBe(403);
     expect(H.db.threads.children(conductor.id)).toEqual([]);
 
@@ -292,7 +292,7 @@ describe('seating by an agent thread', () => {
     const critic = H.db.events.since(d.id).find((r) => r.kind === 'user' && JSON.parse(r.payload).to)!;
     expect(JSON.parse(critic.payload)).toMatchObject({ source: 'conductor', to: ['critic'] });
 
-    // Not in a thread it did not delegate, nor in a #conductor thread, its own included.
+    // Not in a thread it did not delegate, nor in another #conductor thread.
     const bens = await idle('ben started this');
     const notMine = await call('POST', `/threads/${bens.id}/messages`, { prompt: '@Critic look', context: [mention('critic', 'Critic')], wake_cold: true }, as);
     expect(notMine.status).toBe(403);
@@ -306,6 +306,45 @@ describe('seating by an agent thread', () => {
     await H.untilResults(mine.id, 1);
     expect((await call('POST', `/threads/${mine.id}/messages`, { prompt: '@Critic look', context: [mention('critic', 'Critic')] })).status).toBe(200);
     expect(H.db.members.seated(mine.id).map((m) => m.agent)).toEqual(['lead', 'critic']);
+  });
+});
+
+describe('seating in the Conductor\'s own thread', () => {
+  it('seats an agent there, which opens its own thread and relays the report it gets back', T, async () => {
+    if (!H.db.channels.get('conductor')) H.db.channels.create({ id: 'conductor', name: 'Conductor', kind: 'internal', use_worktree: 0, base_dir: H.tmp });
+    const mention = (agent: string, name: string) => ({ id: `m-${agent}`, kind: 'agent_mention', v: 1, label: `@${name}`, body: { agent, name } });
+    const c = await H.runner.createThread({ channel: 'conductor', prompt: 'TOOL:3000 build the launch page', role: 'conductor' });
+    await H.untilTool(c.id);
+    // Mid-turn, the Conductor seats the Designer in its own thread: the brief goes to the Designer, not to itself.
+    const seated = await call('POST', `/threads/${c.id}/messages`, { prompt: 'Build the launch page in #scratch', from: 'conductor', context: [mention('designer', 'Designer')] }, liveToken(c.id));
+    expect(seated.status).toBe(200);
+    expect(H.db.members.seated(c.id).map((m) => m.agent)).toEqual(['conductor', 'designer']);
+    await H.until('the designer replied', () => rowsBy(c.id, 'designer', 'result').length === 1);
+    const brief = H.db.events.since(c.id).find((r) => r.kind === 'user' && JSON.parse(r.payload).to)!;
+    expect(JSON.parse(brief.payload)).toMatchObject({ source: 'conductor', to: ['designer'] });
+
+    // The Designer opens its own thread in the client channel (omni new, with its session's token): it files under that session.
+    const session = sessionOf(c.id, 'designer');
+    const { buildSystemPrompt } = await import('../runner/prompts.ts');
+    const { getCrew } = await import('../crew.ts');
+    const told = buildSystemPrompt(H.thread(session), H.db.channels.get('conductor')!, getCrew('designer')!);
+    expect(told).toMatch(/This is a #conductor thread: you were seated to take this work on/);
+    expect(told).not.toMatch(/Edit files only/);
+    const opened = await call('POST', '/threads', { channel: 'scratch', prompt: 'build the page', role: 'designer' }, mint(session).token);
+    expect(opened.status).toBe(200);
+    expect(opened.json.parent_id).toBe(session);
+    // Its report lands in the #conductor thread as the Designer's, and wakes the Designer to relay it.
+    await H.until('the report', () => rowsBy(c.id, 'designer', 'crew_report').length === 1);
+    await H.until('the designer relayed it', () => rowsBy(c.id, 'designer', 'result').length === 2);
+    expect(H.byKind(c.id, 'crew_report').length).toBe(1);
+
+    // Another agent leading a #conductor thread, and the Conductor in a #conductor thread that is not its own, are refused.
+    const other = await H.runner.createThread({ channel: 'conductor', prompt: 'TOOL:3000 hi', role: 'lead' });
+    await H.untilTool(other.id);
+    const refused = await call('POST', `/threads/${other.id}/messages`, { prompt: 'look', from: 'conductor', context: [mention('critic', 'Critic')] }, liveToken(other.id));
+    expect(refused.status).toBe(403);
+    expect((await call('POST', `/threads/${other.id}/messages`, { prompt: 'look', from: 'conductor', context: [mention('critic', 'Critic')] }, liveToken(c.id))).status).toBe(403);
+    expect(H.db.members.seated(other.id)).toEqual([]);
   });
 });
 
