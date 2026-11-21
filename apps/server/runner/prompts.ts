@@ -215,7 +215,24 @@ const SESSION_CACHE_RULE =
  */
 const TEAM_RULE =
   'delegate_team makes one thread in the channel: its lead plans on your brief, then gives each member its part, the members work at once, and the lead reports once they have all finished. ' +
-  'An agent with two parts gets one seat. You seat agents only in a thread you delegate, never in a #conductor thread: with delegate_team, with members on delegate, or with agents on message_thread to a thread you delegated.';
+  'An agent with two parts gets one seat. You seat agents in your own #conductor thread with seat_agents, and in a thread you delegate with delegate_team, members on delegate, or agents on message_thread. Never in any other #conductor thread.';
+
+/**
+ * A member the Conductor seated in its own #conductor thread (ADR 0019, amended): it talks with the user there and
+ * takes the work on, opening its own thread in the client channel once the work needs one. That thread's report comes
+ * back to this member's session, so it relays the outcome in the #conductor thread.
+ */
+function conductorSeatLines(name: string, role: CrewRole | undefined, command: boolean) {
+  const self = role?.id ?? '<your agent id>';
+  return [
+    `This is a #conductor thread: the Conductor seated you to take this work on, and ${name} talks with you here. It has no repo and no worktree.`,
+    `Answer what you can here: questions, a plan, a light lookup. When the work needs files, a repo, a browser, a long run or a report, open your own thread for it in the client's channel and keep it out of this one.`,
+    command
+      ? `Open it with \`omni new "<brief>" -c <channel> -a ${self}\`: the channel (and folder) the Conductor named, else the one the work belongs in. Write the brief so it stands alone: that thread cannot see this one.`
+      : 'You have no way to open a thread from here: do the work here as far as your tools reach, and say what is left.',
+    ...(command ? [`Then end your turn saying which thread has it. Its report comes back to you here: relay what matters to ${name} in a short update, and do not redo the work.`] : []),
+  ];
+}
 
 /** A team thread's lead (runner/team.ts): plan, give out the parts with message_members, then report once woken. */
 function teamLeadLines(name: string): string[] {
@@ -340,9 +357,12 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       '## Group thread',
       `You are seated in a group thread with ${name} and other agents. ${leadName} leads this thread. Its messages go to the agents they name, and agents named in one message work at the same time in this one worktree.`,
       ...(team ? [`This thread is a team: ${leadName} gives you your part. Stick to it, and end your turn with what you did and found: your final message goes back to ${leadName}.`] : []),
+      ...(lead?.channel_id === 'conductor' && !remoteAgent ? conductorSeatLines(name, role, !remote && hasOmniCommand()) : []),
       remoteAgent
         ? 'You talk only: the local agents seated here change the files.'
-        : remote
+        : lead?.channel_id === 'conductor'
+          ? ''
+          : remote
           ? `You work in your own checkout on a branch of your own, not in this thread's worktree. Push your work to that branch and do not open a pull request: when you finish, ${leadName} pulls your branch into the thread's branch.`
           : `Edit files only. ${committer} commits and opens the pull request: never run git commit, git push, git rebase, git reset, git stash or git checkout, and never open a pull request. When another agent changed a file you changed, Omni tells you which files: read them again before you edit them and keep their changes.`,
     );

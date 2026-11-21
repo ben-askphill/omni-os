@@ -120,7 +120,8 @@ describe('parseCrewFile', () => {
     expect(charter).toContain('Answer quick asks yourself, in this thread.');
     expect(charter).not.toContain('a single lookup still goes to a crewmate');
     expect(charter).not.toContain('No folder fits; want me to create');
-    expect(charter).toContain('When none fits, delegate without one and do not ask about it.');
+    expect(charter).toContain('When none fits, leave it out and do not ask about it.');
+    expect(charter).toContain('Your first action is `seat_agents`');
     expect(charter).toContain('A quick answer you give yourself needs none of this.');
     expect(charter).toContain('pass `follow_up: true` on `delegate`');
   });

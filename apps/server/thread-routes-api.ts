@@ -124,14 +124,16 @@ const createSchema = z.object({
 
 /**
  * Why an agent thread may not seat agents in this thread, or null when it may (ADR 0019, Q45). Only Ben's clients name
- * no caller, and he seats agents anywhere. An agent thread (the Conductor) seats agents only in a thread it delegated,
- * one whose parent is itself, and never in a #conductor thread. `seating` is the thread to be, or the thread a
- * message goes to.
+ * no caller, and he seats agents anywhere. An agent thread (the Conductor) seats agents in a thread it delegated, one
+ * whose parent is itself, outside #conductor, and in its own #conductor thread, where the agent it seats takes the
+ * work on and opens its own thread for it in the client channel (seat_agents). `seating` is the thread to be, or the
+ * thread a message goes to (with its `id`).
  */
-function seatingRefusal(c: Context, seating: { channel: string; parent_id?: string | null }): string | null {
+function seatingRefusal(c: Context, seating: { id?: string; channel: string; parent_id?: string | null }): string | null {
   const caller = callerOf(c);
   if (!caller) return null;
-  if (seating.channel === 'conductor') return 'Agents are never seated in a #conductor thread by an agent. Delegate the work to its channel and seat them there.';
+  if (seating.id === caller && seating.channel === 'conductor' && getCrew(threads.get(caller)?.role)?.delegateOnly) return null;
+  if (seating.channel === 'conductor') return 'An agent seats agents in a #conductor thread only in its own, with seat_agents. Delegate the work to its channel and seat them there.';
   if (seating.parent_id !== caller) return 'An agent seats agents only in a thread it delegated. Delegate a new thread, with members, instead.';
   return null;
 }
@@ -413,7 +415,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
   // An agent thread's agent mention seats agents only where it may (Q45), and only in a thread that runs here.
   const seats = mentionedAgents(stamped.value).length > 0;
   if (seats && callerOf(c)) {
-    const no = seatingRefusal(c, { channel: target.channel_id, parent_id: target.parent_id });
+    const no = seatingRefusal(c, { id: target.id, channel: target.channel_id, parent_id: target.parent_id });
     if (no) return c.json({ error: no }, 403);
     if (remoteHolder(target)) return c.json({ error: 'This thread runs on another machine: seat agents in it there.' }, 409);
   }

@@ -363,7 +363,7 @@ server.registerTool(
         .optional()
         .describe(
           'Agent ids to seat in the new thread as members, besides the agent it runs as (its lead). They join with no turn and work only when a later message ' +
-            'names them: send one with message_thread and `agents`. The brief goes to the lead, whose report comes back when its turn ends. Never in #conductor, and only on this machine. ' +
+            'names them: send one with message_thread and `agents`. The brief goes to the lead, whose report comes back when its turn ends. Never in #conductor (use seat_agents for your own thread), and only on this machine. ' +
             'For parts of one job that should run at once, use delegate_team instead.',
         ),
     },
@@ -549,7 +549,7 @@ server.registerTool(
         .optional()
         .describe(
           'Agent ids this message goes to, as agent mentions: each one not seated in the thread yet is seated, and the message goes to them, not to the lead unless you name it. ' +
-            'Only in a thread you delegated, never in a #conductor thread: anywhere else the server refuses it. Use list_crew for ids.',
+            'Only in a thread you delegated, never in a #conductor thread (seat agents in your own with seat_agents): anywhere else the server refuses it. Use list_crew for ids.',
         ),
     },
   },
@@ -565,6 +565,31 @@ server.registerTool(
       body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }), ...(context.length && { context }) }),
     });
     return text({ thread_id: t.id, status: t.status, ...(t.forwarded_to && { forwarded_to: t.forwarded_to }) });
+  },
+);
+
+server.registerTool(
+  'seat_agents',
+  {
+    description:
+      `Seat agents in this #conductor thread, the one you are talking to ${USER} in, and hand them the work: the message goes to them, not to you. ` +
+      `Each one joins the conversation, answers ${USER} here, and opens its own thread in the client channel when the work needs files, a repo, a browser or a long run. ` +
+      'Its report comes back to it here. Name the channel (and folder, if one fits) in the message. Only in your own thread; use list_crew for ids.',
+    inputSchema: {
+      agents: z.array(z.string()).min(1).max(12).describe('Agent ids to seat and send the message to. One already seated just gets the message.'),
+      message: z.string().describe('The brief: Goal, Done when, Proof back, plus the channel and folder its thread goes in.'),
+    },
+  },
+  async ({ agents, message }) => {
+    if (!SELF) throw new ApiError('seat_agents runs only inside a thread.', 400);
+    const crew = await call('/crew');
+    const context = agents.map((id) => {
+      const name = (crew.find((r: any) => r.id === id)?.name as string | undefined) ?? id;
+      return { id: randomUUID().slice(0, 12), kind: 'agent_mention', v: 1, label: `@${name}`, body: { agent: id, name } };
+    });
+    const t = await call(`/threads/${SELF}/messages`, { method: 'POST', body: JSON.stringify({ prompt: message, from: 'conductor', mode: 'steer', context }) });
+    const seated = (t.members ?? []).filter((m: any) => !m.lead).map((m: any) => ({ agent: m.agent, name: m.name }));
+    return text({ thread_id: t.id, members: seated });
   },
 );
 

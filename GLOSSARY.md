@@ -179,7 +179,7 @@ An agent seated in a thread beside its lead, with its own session there, which r
 _Avoid_: Participant, guest, collaborator, sub-agent (a helper inside one turn)
 
 **Seat**:
-To make an agent a member of a thread, with an agent mention or Add an agent in the member list. Only the user seats agents, except the Conductor in a thread it delegates. The member starts from a catch-up and stays until the user removes it.
+To make an agent a member of a thread, with an agent mention or Add an agent in the member list. Only the user seats agents, except the Conductor in its own #conductor thread and in a thread it delegates. The member starts from a catch-up and stays until the user removes it.
 _Avoid_: Invite, ask (the older question to another agent)
 
 **Agent mention**:

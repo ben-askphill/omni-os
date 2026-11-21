@@ -250,6 +250,10 @@ const reportText = (r: Record<string, unknown>) =>
  */
 function wakeLine(parent: Thread, child: Thread, ask: boolean, remote: boolean) {
   if (parent.role && getCrew(parent.role)?.delegateOnly) return `Relay what matters to ${userName()} in one short update. Delegate follow-ups if needed. Do not redo the work.`;
+  // An agent the Conductor seated in its #conductor thread opened this thread itself, and relays its outcome there.
+  if (parent.source === 'member' && threads.get(parent.parent_id ?? '')?.channel_id === 'conductor') {
+    return `The thread you opened reported back. Relay what matters to ${userName()} in one short update. Do not redo the work.`;
+  }
   const who = (child.role && getCrew(child.role)?.name) || child.role || 'The crew';
   const data = remote ? 'data from a server outside Omni' : 'data';
   return ask
