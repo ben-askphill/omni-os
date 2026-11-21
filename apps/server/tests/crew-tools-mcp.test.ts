@@ -7,6 +7,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { png } from './png.ts';
 import { startRunner } from './runner-boot.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
@@ -234,5 +235,49 @@ describe('the Conductor crew tools', () => {
     expect(fromDispatcher.body).toMatch(/^Agents change from Settings, or from the Conductor once .+ agrees in its thread\.$/);
     expect(getCrew('nightly-role')).toBeUndefined();
     expect(getCrew('dispatched-role')).toBeUndefined();
+  });
+
+  it('say what an agent looks like, its default shape and color included', T, async () => {
+    const client = await connect(conductor);
+    // A built-in takes its own shape and the color paired with it (ADR 0021, D2).
+    expect((await tool(client, 'get_crew_role', { id: 'builder' })).body.avatar).toEqual({ shows: 'character', shape: 'squircle', color: 'Amber' });
+  });
+
+  it("restyle an agent once Ben agreed: a shape, and a color by its name or hex", T, async () => {
+    const client = await connect(conductor);
+    const saved = await tool(client, 'save_crew_role', { id: 'store-migrations', fields: { avatar: { shape: 'droplet', bg: 'sky' } } });
+    expect(saved.isError, saved.body).toBe(false);
+    expect(saved.body.avatar).toEqual({ shows: 'character', shape: 'droplet', color: 'Sky' });
+    expect(readFileSync(ownPath('store-migrations'), 'utf8')).toContain('avatar:\n  shape: droplet\n  bg: "#52cdfe"\n');
+    expect((await settingsCrew()).find((r) => r.id === 'store-migrations').avatar).toEqual({ shape: 'droplet', bg: '#52cdfe' });
+
+    // A hex outside the palette is the agent's own color; the shape stays as it was.
+    const custom = await tool(client, 'save_crew_role', { id: 'store-migrations', fields: { avatar: { bg: '#3A7D5C' } } });
+    expect(custom.body.avatar).toEqual({ shows: 'character', shape: 'droplet', color: '#3a7d5c' });
+    // An empty string removes the key, so the shape's own color comes back.
+    expect((await tool(client, 'save_crew_role', { id: 'store-migrations', fields: { avatar: { bg: '' } } })).body.avatar).toEqual({ shows: 'character', shape: 'droplet', color: 'Sky' });
+  });
+
+  it('refuse a shape or a color it does not know, with the ones it does, and an icon or photo, which stay Ben\'s', T, async () => {
+    const client = await connect(conductor);
+    const before = readFileSync(ownPath('store-migrations'), 'utf8');
+    const shape = await tool(client, 'save_crew_role', { id: 'store-migrations', fields: { avatar: { shape: 'hexagon' } } });
+    expect(shape).toMatchObject({ isError: true, body: expect.stringMatching(/^An avatar shape is one of circle, droplet, squircle, .*, bucket\.$/) });
+    const color = await tool(client, 'save_crew_role', { id: 'store-migrations', fields: { avatar: { shape: 'cloud', bg: 'Crimson' } } });
+    expect(color).toMatchObject({ isError: true, body: expect.stringMatching(/^"Crimson" is not an agent color\. Name one of Ink, Sky, Amber, .*, Peach, or give a hex like #52cdfe\.$/) });
+    for (const avatar of [{ icon: 'icon:tool' }, { image: 'data:image/png;base64,AAAA' }]) {
+      const res = await tool(client, 'save_crew_role', { id: 'store-migrations', fields: { avatar } });
+      expect(res, JSON.stringify(avatar)).toMatchObject({ isError: true, body: expect.stringMatching(/An agent's icon, emoji and photo are .+'s to set, in Settings > Agents\. Send only shape and bg\./) });
+    }
+    expect(readFileSync(ownPath('store-migrations'), 'utf8')).toBe(before);
+  });
+
+  it('say when an icon or a photo Ben set shows instead of the character', T, async () => {
+    const client = await connect(conductor);
+    const settings = (path: string, body: unknown) => app.request(`/api/crew/store-migrations${path}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await settings('', { fields: { avatar: { icon: 'icon:tool', bg: '#ffdc4f' } } })).status).toBe(200);
+    expect((await tool(client, 'get_crew_role', { id: 'store-migrations' })).body.avatar).toEqual({ shows: 'icon', shape: 'droplet', color: 'Sun' });
+    expect((await settings('/avatar', { image: png(64, 64).url })).status).toBe(200);
+    expect((await tool(client, 'get_crew_role', { id: 'store-migrations' })).body.avatar).toEqual({ shows: 'photo', shape: 'droplet', color: 'Sun' });
   });
 });
