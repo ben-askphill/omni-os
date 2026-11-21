@@ -6,7 +6,9 @@ import { duration, plural } from '../../format.ts';
 import { href } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo } from '../brand.tsx';
-import { Icon, StatusDot, ThreadDot, threadStatusText, type IconName } from '../ui.tsx';
+import { Icon, StatusDot, ThreadDot, rowShows, threadStatusText, useRowMark, type IconName } from '../ui.tsx';
+import { ThreadAvatar } from '../ThreadAvatar.tsx';
+import { AvatarMark, drawsFaces } from '../thread/AvatarMark.tsx';
 import { showsRunning } from '@omni/shared/delegate-count.ts';
 import { showsAgents } from '@omni/shared/thread-tree.ts';
 import { useJobTree, treeLabel, type JobTree } from '../../thread-tree.ts';
@@ -43,10 +45,14 @@ export function RunningBadge({ n }: { n: number }) {
 }
 
 /**
- * Where a row's parts sit, by its indent: the tree line under its status mark, and its second line under its title.
- * `true`: under a channel or folder. `flush`: the Conductor's rows. `false`: the channel page's lists.
+ * Where a row's parts sit, by its indent: the tree line under the middle of its avatar, and its second line under its
+ * title. `true`: under a channel or folder. `flush`: the Conductor's rows and the rail's list. `false`: the Running
+ * and Pinned rows.
  */
-const TREE_AT = { true: { line: 'ml-[43px]', meta: 'ml-[57px]' }, flush: { line: 'ml-[22px]', meta: 'ml-[36px]' }, false: { line: 'ml-[18px]', meta: 'ml-[32px]' } } as const;
+const TREE_AT = { true: { line: 'ml-[46px]', meta: 'ml-[63px]' }, flush: { line: 'ml-[25px]', meta: 'ml-[42px]' }, false: { line: 'ml-[21px]', meta: 'ml-[38px]' } } as const;
+
+/** A sidebar row's avatar (ADR 0021, D23): 18px in a 32px row, 8px before the title. */
+const ROW_AVATAR = 18;
 
 /**
  * A job's second line (the other channels it works in, its branch or what sits under it, and the tally that opens and
@@ -69,7 +75,8 @@ function TreeUnder({ t, tree, at, onNavigate }: { t: ThreadStub; tree: JobTree; 
 /**
  * A thread nested under its channel, like a Claude Code session under its project, or under a folder (which sits flush
  * with its channel), with its running sub-agents nested under it and its harness's logo after the title. Dragged onto
- * a folder it files there; onto its channel's name, back to the ungrouped list.
+ * a folder it files there; onto its channel's name, back to the ungrouped list. The 32px row leads with the thread's
+ * agent (else its channel) and ends with its status mark (ADR 0021, D23), in the rail's list and the classic sidebar.
  */
 export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; indent?: boolean | 'flush'; tree?: JobTree | null }) {
   const title = t.title || 'Untitled';
@@ -79,6 +86,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
   const agents = own.length;
   // A thread whose turn ended still works while its sub-agents or the threads it delegated run.
   const busy = showsRunning(t) || agents > 0;
+  const at = TREE_AT[String(indent) as keyof typeof TREE_AT];
   return (
     <>
       <a
@@ -94,25 +102,52 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
         title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : threadStatusText(t)}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`item group/row flex h-8 items-center gap-2 px-3 text-[13px] md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
+        className={`item group/row flex h-[var(--h-nav)] items-center gap-2 px-3 text-[13px] md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
           active ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
-        <span className="grid min-w-3 shrink-0 place-items-center">
-          <ThreadDot t={t} busy={busy} />
-        </span>
+        <RowLead t={t} busy={busy} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {t.harness && (
           <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-3 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
             <HarnessLogo harness={t.harness} size={11} />
           </span>
         )}
+        <RowEnd t={t} busy={busy} />
       </a>
-      {tree && <TreeUnder t={t} tree={tree} at={TREE_AT[String(indent) as keyof typeof TREE_AT]} onNavigate={onNavigate} />}
+      {tree && <TreeUnder t={t} tree={tree} at={at} onNavigate={onNavigate} />}
       {own.map((k, i) => (
-        <AgentLink key={k.task_id} t={k} last={i === agents - 1} onNavigate={onNavigate} />
+        <AgentLink key={k.task_id} t={k} last={i === agents - 1} line={at.line} onNavigate={onNavigate} />
       ))}
     </>
+  );
+}
+
+/**
+ * A sidebar row's start: the thread's agent, its eyes on the row's mark, else its channel's avatar; a group thread whose
+ * agents run or wait on Ben draws their faces there instead (AvatarMark), with the row's mark at its far end (RowEnd).
+ */
+function RowLead({ t, busy }: { t: ThreadStub; busy: boolean }) {
+  const { channels } = useApp();
+  const row = useRowMark(t, { busy });
+  const ch = channels.find((c) => c.id === t.channel_id);
+  return (
+    <span className="grid shrink-0 place-items-center" style={{ minWidth: ROW_AVATAR, height: ROW_AVATAR }} data-row-lead>
+      {drawsFaces(t.members) ? (
+        <AvatarMark members={t.members} size={ROW_AVATAR} facesOnly />
+      ) : (
+        <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row)} size={ROW_AVATAR} />
+      )}
+    </span>
+  );
+}
+
+/** A sidebar row's status mark, at its far end. A group thread's too: its faces are in the avatar's slot. */
+function RowEnd({ t, busy }: { t: ThreadStub; busy: boolean }) {
+  return (
+    <span className="grid min-w-3 shrink-0 place-items-center" data-row-mark>
+      <ThreadDot t={t} busy={busy} faces={false} />
+    </span>
   );
 }
 
@@ -133,11 +168,10 @@ export function ChannelThreadEntry({ t, active, tasks, flush = false, onNavigate
 }
 
 /**
- * A sub-agent running in a thread, nested under it on a tree line from the thread's status dot, like a Claude Desktop
- * task under its session. It links to the thread that started it. `flush`: under a Running row, whose dot sits nearer
- * the edge than a channel's thread's.
+ * A sub-agent running in a thread, nested under it on a tree line from the middle of the thread's avatar (`line`), like
+ * a Claude Desktop task under its session. It links to the thread that started it.
  */
-function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; last: boolean; flush?: boolean; onNavigate?: () => void }) {
+function AgentLink({ t, last, line, onNavigate }: { t: BackgroundTask; last: boolean; line: string; onNavigate?: () => void }) {
   const now = useNow(1000);
   const tip = [t.description, t.tool_uses ? plural(t.tool_uses, 'tool') : null, t.last_tool && `last ${t.last_tool}`].filter(Boolean).join(' · ');
   return (
@@ -146,7 +180,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
       onClick={onNavigate}
       title={tip}
       data-agent-row
-      className={`item relative flex h-8 items-center gap-2 pr-3 pl-4 text-[12.5px] text-fg-3 hover:text-fg md:h-7 md:text-[12px] ${flush ? 'ml-[19px]' : 'ml-[43px]'}`}
+      className={`item relative flex h-8 items-center gap-2 pr-3 pl-4 text-[12.5px] text-fg-3 hover:text-fg md:h-7 md:text-[12px] ${line}`}
     >
       <span
         aria-hidden
@@ -160,11 +194,11 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
 }
 
 /**
- * A thread in the Running or Pinned section, flush with the channels: its status, its title and its
- * channel's name. In Pinned the name gives way on hover to the button that unpins it. It opens the thread as its row
- * under its channel does, and a right-click gives the same menu. `home`: the thread's only row (Running), which wears
- * the thumb while open and nests its running sub-agents. Otherwise (Pinned), open, it reads bold and the thumb stays
- * on the thread's own row.
+ * A thread in the Running or Pinned section, flush with the channels: its agent's avatar, its title, its channel's name
+ * and its status mark at the far end (ADR 0021, D23). In Pinned the name and the mark give way on hover to the button
+ * that unpins it. It opens the thread as its row under its channel does, and a right-click gives the same menu.
+ * `home`: the thread's only row (Running), which wears the thumb while open and nests its running sub-agents.
+ * Otherwise (Pinned), open, it reads bold and the thumb stays on the thread's own row.
  */
 export function SectionLink({ t, channel, active, home = false, tasks, unpin, tree, onNavigate }: { t: ThreadStub; channel: string; active: boolean; home?: boolean; tasks: BackgroundTask[]; unpin?: boolean; tree?: JobTree | null; onNavigate?: () => void }) {
   const { setPinned } = useApp();
@@ -182,18 +216,17 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
         title={`${title} · ${channel} · ${agents ? plural(agents, 'agent') + ' running' : threadStatusText(t)}`}
         aria-current={active && home ? 'page' : undefined}
         data-active={(active && home) || undefined}
-        className={`item flex h-9 min-w-0 flex-1 items-center gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
+        className={`item flex h-9 min-w-0 flex-1 items-center gap-2 px-3 text-[13.5px] md:h-[var(--h-nav)] md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
       >
-        <span className="grid min-w-[15px] shrink-0 place-items-center">
-          <ThreadDot t={t} busy={busy} />
-        </span>
+        <RowLead t={t} busy={busy} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         <span
-          className={`max-w-[45%] shrink-0 truncate text-[11px] font-normal text-fg-3 ${
+          className={`flex max-w-[45%] shrink-0 items-center gap-2 ${
             unpin ? 'mr-6 transition-opacity md:mr-0 md:group-focus-within/pin:opacity-0 md:group-hover/pin:opacity-0' : ''
           }`}
         >
-          {channel}
+          <span className="min-w-0 truncate text-[11px] font-normal text-fg-3">{channel}</span>
+          <RowEnd t={t} busy={busy} />
         </span>
       </a>
       {unpin && (
@@ -208,8 +241,8 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
         </button>
       )}
     </div>
-    {home && tree && <TreeUnder t={t} tree={tree} at={{ line: 'ml-[19px]', meta: 'ml-[37px]' }} onNavigate={onNavigate} />}
-    {home && own.map((k, i) => <AgentLink key={k.task_id} t={k} last={i === agents - 1} flush onNavigate={onNavigate} />)}
+    {home && tree && <TreeUnder t={t} tree={tree} at={TREE_AT.false} onNavigate={onNavigate} />}
+    {home && own.map((k, i) => <AgentLink key={k.task_id} t={k} last={i === agents - 1} line={TREE_AT.false.line} onNavigate={onNavigate} />)}
     </div>
   );
 }

@@ -1,9 +1,9 @@
 // The avatar mark (ADR 0019, Q35, Q68): while a group thread's agents run or wait on Ben, their avatars are the
 // thread's status mark, the one asking first, then the working ones, two at most, else one and a count. Each face shows
 // its own state in its eyes, or a photo's or icon's ring (ADR 0021, D8). Beside them, never on a face, sit the Needs
-// you diamond while one asks and a red dot for an agent that failed. The desktop thread lists, Inbox cards and the
-// Overview dashboard draw it in the mark's place; the phone rows say it on their second line (MarkLine). Rules in
-// @omni/shared/members.ts.
+// you diamond while one asks and a red dot for an agent that failed. The desktop thread lists and the rail's list draw
+// the faces in the avatar's slot, with the row's own mark at its far end (D23); Inbox cards and the Overview dashboard
+// draw it in the mark's place; the phone rows say it on their second line (MarkLine). Rules in @omni/shared/members.ts.
 import { avatarMark, markLine, type MarkFace, type ThreadMember } from '@omni/shared/members.ts';
 import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
 import { StatusDot } from '../ui/status.tsx';
@@ -20,8 +20,11 @@ function Face({ face, size }: { face: MarkFace; size: number }) {
   );
 }
 
-/** The faces, the diamond and the dot, with what they say as the label. Null while no agent works or waits on Ben. */
-export function AvatarMark({ members, size = 16, className = '' }: { members: Members; size?: number; className?: string }) {
+/**
+ * The faces, the diamond and the dot, with what they say as the label. Null while no agent works or waits on Ben.
+ * `facesOnly`: in a row's avatar slot, whose own mark at the far end carries the diamond and the failure (D8, D23).
+ */
+export function AvatarMark({ members, size = 16, facesOnly = false, className = '' }: { members: Members; size?: number; facesOnly?: boolean; className?: string }) {
   const mark = avatarMark(members);
   if (!mark) return null;
   const said = markLine(members) ?? '';
@@ -37,12 +40,12 @@ export function AvatarMark({ members, size = 16, className = '' }: { members: Me
           +{mark.more}
         </span>
       )}
-      {mark.faces[0].ring === 'needs' && (
+      {!facesOnly && mark.faces[0].ring === 'needs' && (
         <span aria-hidden="true" data-needs-mark className="ml-1 inline-flex shrink-0">
           <StatusDot mark="question" size={Math.max(7, Math.round(size * 0.5))} />
         </span>
       )}
-      {mark.failed && <span aria-hidden="true" data-failed-dot className="ml-1 h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--needs)]" />}
+      {!facesOnly && mark.failed && <span aria-hidden="true" data-failed-dot className="ml-1 h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--needs)]" />}
     </span>
   );
 }
