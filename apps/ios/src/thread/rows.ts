@@ -10,7 +10,7 @@ import type { MergeRiskP } from '@omni/shared/merge-risk.ts';
 import { showsSteps, stepsHeader, type StepState, type StepsView } from '@omni/shared/steps.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { conductorChannelLook, type FaceAgent, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { agentShows, eyesFor } from '@omni/shared/crew-eyes.ts';
 import { glyphFor, markOf, type Mark } from '@omni/shared/status.ts';
@@ -56,8 +56,8 @@ type RowOf =
   | { kind: 'question'; key: string; q: ThreadQuestion }
   /** `harness`: named at the end for a turn no agent wrote. */
   | { kind: 'outcome'; key: string; status: IosTurn['status']; tookMs: number | undefined; steps: number; harness: string | null }
-  /** The quiet "Conductor" line over its answer. `look`: the icon and background saved for it, null for the Omni mark. */
-  | { kind: 'conductor'; key: string; look: ConductorLook | null }
+  /** The quiet "Conductor" line on a thread from before agents. */
+  | { kind: 'conductor'; key: string; look: ConductorLook | null; agent?: 'conductor' }
   | { kind: 'error'; key: string; text: string }
   | { kind: 'cloud'; key: string; p: CloudAgentP }
   | { kind: 'prose'; key: string; text: string; clipped: number | null }
@@ -231,7 +231,8 @@ function* authored(t: IosTurn, rows: Iterable<ThreadRow>, input: RowsInput, show
   const first = t.items.find(isReply);
   const run = seatRun(input.thread.members, t.author) ?? { harness: t.harness, model: t.result?.model ?? null };
   const agent = input.agents?.find((a) => a.id === t.author) ?? { id: t.author };
-  const look = conductorLook(conductorChannelLook(agent, input.conductorChannel));
+  const channelLook = input.thread.channel_id === CONDUCTOR_CHANNEL ? null : input.conductorChannel;
+  const look = conductorLook(conductorChannelLook(agent, channelLook));
   yield { kind: 'author', key: `au${t.key}`, agent: t.author, at: first ? replyAt(first) : null, run, look, shows: shows ?? null };
   for (const r of reply) yield { ...r, inset: true };
 }
@@ -287,7 +288,12 @@ function* replyRows(t: IosTurn, { live, asking, label }: { live: boolean; asking
     // A finished Conductor answer introduces what it delegated: its author line says who wrote it, with no outcome
     // line. A turn with no author (a thread from before agents) keeps the quiet Conductor line.
     const quiet = input.conductor && t.status === 'done';
-    if (quiet && !t.author && (t.prose || t.children.length)) yield { kind: 'conductor', key: `co${t.key}`, look: conductorLook(input.conductorChannel) };
+    if (quiet && !t.author && (t.prose || t.children.length)) {
+      const key = `co${t.key}`;
+      yield thread.channel_id === CONDUCTOR_CHANNEL
+        ? { kind: 'conductor', key, look: null, agent: CONDUCTOR_CHANNEL }
+        : { kind: 'conductor', key, look: conductorLook(input.conductorChannel) };
+    }
     // An agent's turn names its harness on its author line, behind Show technical details.
     else if (!(quiet && t.author) && (t.result || t.error || t.status !== 'done')) yield { kind: 'outcome', key: `o${t.key}`, status: t.status, tookMs: t.result?.duration_ms, steps: t.progress?.steps.length ?? 0, harness: t.author ? null : t.harness };
     if (t.error) yield { kind: 'error', key: `e${t.key}`, text: t.error };
