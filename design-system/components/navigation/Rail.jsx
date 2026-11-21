@@ -1,6 +1,7 @@
 import React, { Fragment, useRef, useState } from 'react';
 import { StatusGlyph } from '../core/Status.jsx';
 import { Kbd } from '../core/Kbd.jsx';
+import { Monogram } from '../core/Monogram.jsx';
 import { Icon } from '../icons/Icon.jsx';
 import { OmniMark } from '../brand/OmniMark.jsx';
 import { OmniLogo } from '../brand/OmniLogo.jsx';
@@ -37,10 +38,17 @@ function UsageCard({ usage = [], footer }) {
   );
 }
 
+/* A thread row's lead (ADR 0021, D23): its agent's 18px avatar (`t.avatar`, an AgentAvatar with its eyes on the row's
+   state), else its channel's Monogram, so the rows line up. */
+function ThreadLead({ t, home }) {
+  return <span className="lead face">{t.avatar || <Monogram name={home || t.title} size={18} />}</span>;
+}
+
 /*
  * A thread section above the channels (Sidebar.tsx ThreadSection + SectionLink): Running, Pinned or Recent threads. A
- * caption with a chevron folds the rows away and shows the count while folded. A row is flush with the channels: status,
- * title, its channel's name in fg-4. It never wears the thumb (that stays on the thread's row under its channel); the open
+ * caption with a chevron folds the rows away and shows the count while folded. A row is flush with the channels: its
+ * agent's avatar (`avatar`, else its channel's Monogram), title, its channel's name in fg-4 and the status dot at the far
+ * end (ADR 0021, D23). It never wears the thumb (that stays on the thread's row under its channel); the open
  * one reads medium. In Pinned the channel's name gives way on hover to a pin that unpins. The caller leaves a section out
  * when it lists nothing.
  */
@@ -56,11 +64,12 @@ function RailSection({ s, activeId, onSelect }) {
         {closed && <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{threads.length}</span>}
       </button>
       {!closed && threads.map((t) => (
-        <button key={t.id} type="button" className="om-nav" onClick={() => onSelect && onSelect(t.id)} title={t.title + (t.channel ? ' · ' + t.channel : '')}
+        <button key={t.id} type="button" className="om-nav om-nav--thread" onClick={() => onSelect && onSelect(t.id)} title={t.title + (t.channel ? ' · ' + t.channel : '')}
           style={activeId === t.id ? { fontWeight: 500, color: 'var(--fg)' } : undefined}>
-          <span className="lead"><StatusGlyph state={t.state || 'done'} size={7} /></span>
+          <ThreadLead t={t} home={t.channel} />
           <span className="name">{t.title}</span>
           {t.channel && <span className="om-badge" style={{ color: 'var(--fg-4)', fontWeight: 400 }}>{t.channel}</span>}
+          <span className="end"><StatusGlyph state={t.state || 'done'} size={7} /></span>
         </button>
       ))}
     </div>
@@ -73,16 +82,17 @@ export function Rail({ channels = [], activeId, onSelect, conductor = { state: '
   const rowsKey = channels.map((c) => (c.threads || []).map((t) => t.id).join('.')).join('|') + sections.map((s) => (s.threads || []).length).join('.');
   const box = useSlidingThumb(listRef, activeId + ':' + rowsKey, true, '[data-active="true"]');
   const sel = (id) => () => onSelect && onSelect(id);
-  const thread = (t) => (
-    <button key={t.id} type="button" className="om-nav om-nav--sub" data-active={activeId === t.id || undefined} onClick={sel(t.id)} title={t.title}>
-      <span className="lead">{t.state === 'running' ? <StatusGlyph state="running" size={7} /> : <StatusGlyph state={t.state} size={7} />}</span>
+  const thread = (c) => (t) => (
+    <button key={t.id} type="button" className="om-nav om-nav--sub om-nav--thread" data-active={activeId === t.id || undefined} onClick={sel(t.id)} title={t.title}>
+      <ThreadLead t={t} home={c.name} />
       <span className="name">{t.title}</span>
+      <span className="end"><StatusGlyph state={t.state} size={7} /></span>
     </button>
   );
   const threads = (c) => {
     const list = c.threads || [];
     const shown = list.filter((t, i) => i < maxThreads || t.id === activeId);
-    return <>{shown.map(thread)}{list.length > shown.length && <button type="button" className="om-nav om-nav--sub om-nav--more" onClick={sel(c.id)}>{list.length - shown.length} more</button>}</>;
+    return <>{shown.map(thread(c))}{list.length > shown.length && <button type="button" className="om-nav om-nav--sub om-nav--more" onClick={sel(c.id)}>{list.length - shown.length} more</button>}</>;
   };
   const channel = (c) => (
     <Fragment key={c.id}>

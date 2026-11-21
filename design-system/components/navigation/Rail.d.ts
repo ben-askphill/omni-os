@@ -1,13 +1,21 @@
+import type { ReactNode } from 'react';
+
 /**
  * The sidebar (web/src Sidebar.tsx): wordmark, pill "Search or jump to ⌘K", ink "New thread", Home, the Conductor (its
  * mark is alive), pinned views, then the thread sections (Running, Pinned, Recent threads), then channels grouped
- * Clients / Internal / Personal with "#" leads, running threads nested under each channel (max 5, then "N more").
+ * Clients / Internal / Personal with "#" leads, running threads nested under each channel (max 5, then "N more"), each
+ * led by its agent's avatar with its status dot at the far end.
  * A white thumb slides to the active row (Bencho stretch + settle).
  * Channels carry a running count (ultramarine ping) and a needs count (vermilion diamond) — no per-channel color.
  * Footer: usage card (5h / week ticks per harness) and the theme segmented switch.
  * @startingPoint section="Navigation" subtitle="Sidebar with sliding thumb, thread sections, nested threads, usage" viewport="260x760"
  */
-export interface RailThread { id: string; title: string; state?: 'running' | 'needs' | 'done' | 'settled' | 'queued' }
+/**
+ * A thread's 32px row (ADR 0021, D23): its agent's 18px avatar, 8px before the title, and its status dot at the far end.
+ * `avatar` is the agent's AgentAvatar, its eyes on the row's state; leave it out for a thread with no agent and the
+ * channel's Monogram leads. A group thread whose agents work or wait on you passes their faces.
+ */
+export interface RailThread { id: string; title: string; state?: 'running' | 'needs' | 'done' | 'settled' | 'queued'; avatar?: ReactNode }
 export interface RailChannel {
   id: string;
   name: string;

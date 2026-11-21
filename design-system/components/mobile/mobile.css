@@ -45,7 +45,8 @@
 
 /* Avatar: crew mark in a surface-2 disc, the status glyph riding its corner */
 .om-mo-avatar{position:relative;flex:none;display:grid;place-items:center;border-radius:var(--r-pill);background:var(--surface-2);color:var(--fg-2)}
-.om-mo-avatar__status{position:absolute;right:-1px;bottom:-1px;display:grid;place-items:center;width:14px;height:14px;border-radius:var(--r-pill);background:var(--bg)}
+.om-mo-avatar--face{background:none}
+.om-mo-trow__mark{display:grid;place-items:center;flex:none;min-width:12px;align-self:center}
 .om-mo-diff{white-space:nowrap;font-variant-numeric:tabular-nums}
 .om-mo-diff .add{color:var(--fg-2)}.om-mo-diff .del{color:var(--fg-3)}
 

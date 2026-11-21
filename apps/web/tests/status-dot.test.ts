@@ -7,7 +7,8 @@ import { MARK, PHASE, type Mark, type Phase } from '@omni/shared/status.ts';
 import { Loader, StatusDot, ThreadDot } from '../src/components/ui/status.tsx';
 import { threadPill } from '../src/components/thread/thread-state.ts';
 import { rowOf } from '../src/mobile/rows.ts';
-import { MoRowLead } from '../src/mobile/parts.tsx';
+import { MoRow } from '../src/mobile/parts.tsx';
+import type { RowItem } from '../src/mobile/rows.ts';
 import type { ThreadMember } from '@omni/shared/members.ts';
 
 // One running signal: the status dot, in the thread's phase. No spinner and no moving Omni mark says that something
@@ -143,12 +144,16 @@ describe('the phase a thread shows by name', () => {
     expect(threadPill({ ...t, status: 'failed', setup: 'failed' })).toMatchObject({ glyph: 'failed', label: 'Setup failed', mark: 'setup_failed' });
   });
 
-  it("puts a phone row's mark beside the avatar, whose eyes show the same state, not on its corner (ADR 0021, D8)", () => {
-    const html = renderToStaticMarkup(createElement(MoRowLead, { role: 'builder', state: 'running', phase: 'tool' }));
-    const box = html.indexOf('</svg></span>');
-    expect(html.slice(0, box)).toMatch(/data-shape="squircle"[^>]*data-eyes="working"/);
-    expect(html.slice(0, box)).not.toContain('data-mark=');
-    expect(html.slice(box)).toContain('data-mark="tool"');
+  it("leads a phone row with the avatar, whose eyes show its state, and ends the title's line with the mark (ADR 0021, D8, D23)", () => {
+    const it: RowItem = { id: 't1', title: 'Ship the fix', channel: 'acme', channelId: 'acme', channelIcon: null, role: 'builder', status: 'running', phase: 'tool', settled: false, time: '2m', meta: null };
+    const html = renderToStaticMarkup(createElement(MoRow, { it, onOpen: () => {} }));
+    const [avatar, title, time, end] = [html.indexOf('data-shape="squircle"'), html.indexOf('Ship the fix'), html.indexOf('2m<'), html.indexOf('data-mark="tool"')];
+    expect(html.slice(avatar)).toMatch(/^data-shape="squircle"[^>]*data-eyes="working"/);
+    expect(avatar).toBeGreaterThan(-1);
+    expect(title).toBeGreaterThan(avatar);
+    expect(time).toBeGreaterThan(title);
+    expect(end).toBeGreaterThan(time);
+    expect(html.slice(0, title)).not.toContain('data-mark=');
   });
 
   it('names it on a phone list row', () => {

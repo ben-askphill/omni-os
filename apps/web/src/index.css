@@ -132,6 +132,8 @@
   --r-pill: 999px;
   /* Content widths: reading and forms, and list pages. Both centred in the pane. */
   --measure: 768px;
+  /* Sidebar and rail list rows (design-system tokens.css). */
+  --h-nav: 32px;
   --h-search: 40px;
   --w-page: 896px;
 }
