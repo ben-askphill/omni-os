@@ -60,11 +60,8 @@ function AutoValue({ label, value, note, onEdit }: { label: string; value: strin
 /** Bigger than any SVG that could be kept once cleaned, so it is refused before being read. */
 const SVG_FILE_MAX = 512 * 1024;
 
-/**
- * A channel's or crew role's icon: an emoji, one of the shared icons or, unless `svg` is off, an uploaded SVG. A crew
- * role's lives in its markdown file, where an SVG would not read.
- */
-export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, inputId = 'ch-icon', describedBy, preview }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void; svg?: boolean; inputId?: string; describedBy?: string; preview?: ReactNode }) {
+/** A channel's icon: an emoji, one of the shared icons or an uploaded SVG. An agent's is set in its Identity block (AgentIdentity.tsx). */
+function IconPicker({ value, name, avatarBg, omni, onChange, describedBy }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void; describedBy?: string }) {
   const mark = parseChannelIcon(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [svgError, setSvgError] = useState<string | null>(null);
@@ -86,9 +83,9 @@ export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        {preview ?? <Avatar name={name} omni={omni} channelIcon={value} avatarBg={avatarBg} size={36} />}
+        <Avatar name={name} omni={omni} channelIcon={value} avatarBg={avatarBg} size={36} />
         <input
-          id={inputId}
+          id="ch-icon"
           aria-describedby={describedBy}
           className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
           value={mark?.kind === 'emoji' ? mark.text : ''}
@@ -96,11 +93,9 @@ export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, 
           placeholder="Emoji"
           aria-label="Emoji"
         />
-        {svg && (
-          <Button type="button" icon="image" onClick={() => fileRef.current?.click()}>
-            {mark?.kind === 'svg' ? 'Replace SVG' : 'Upload SVG'}
-          </Button>
-        )}
+        <Button type="button" icon="image" onClick={() => fileRef.current?.click()}>
+          {mark?.kind === 'svg' ? 'Replace SVG' : 'Upload SVG'}
+        </Button>
         <input
           ref={fileRef}
           type="file"

@@ -115,7 +115,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'channel-model', section: 'models', title: 'Default model for new threads', keywords: ['auto', 'model', 'effort', 'reasoning', 'override', 'channel default'] },
   { id: 'concurrency', section: 'models', title: 'Turns at once per harness', keywords: ['max concurrent', 'queue', 'cap', 'parallel', 'limit'] },
   { id: 'model-options', section: 'models', title: 'Claude Code binary, fallback model and permission mode', keywords: ['OMNI_DEFAULT_MODEL', 'OMNI_PERMISSION_MODE', 'OMNI_CLAUDE_BIN', 'bypassPermissions', 'binary', 'path', '.env'] },
-  { id: 'crew-roles', section: 'crew', title: 'Agents', keywords: ['crew', 'crew roles', 'role', 'roles', 'charter', 'conductor', 'builder', 'reviewer', 'researcher', 'inbox', 'agent', 'agents', 'persona', 'prompt', 'instructions', 'new agent', 'new role', 'duplicate', 'hide', 'reset'] },
+  { id: 'crew-roles', section: 'crew', title: 'Agents', keywords: ['crew', 'crew roles', 'role', 'roles', 'charter', 'conductor', 'builder', 'reviewer', 'researcher', 'inbox', 'agent', 'agents', 'persona', 'prompt', 'instructions', 'new agent', 'new role', 'duplicate', 'hide', 'reset', 'avatar', 'photo', 'emoji', 'icon', 'svg', 'agent color'] },
   { id: 'harness-accounts', section: 'accounts', title: 'Harness accounts on each machine', keywords: ['account', 'email', 'login', 'signed in', 'sign in', 'subscription', 'plan', 'switch', 'org', 'who', 'claude code', 'codex', 'cursor', 'devices'] },
   { id: 'run-on', section: 'threads', title: 'Run new threads on', keywords: ['machine', 'device', 'where', 'remote', 'other mac'] },
   { id: 'keep-alive', section: 'threads', title: 'Keep sessions warm', keywords: ['keepalive', 'idle', 'process', 'background agents', 'interrupt'] },

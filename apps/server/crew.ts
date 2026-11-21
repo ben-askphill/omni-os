@@ -39,7 +39,7 @@ const isCrewTools = (v: unknown): v is CrewTools => CREW_TOOLS.includes(v as Cre
 
 /**
  * A role's own look: an image Ben uploaded (a data URL, agent-avatar.ts), else an icon (`icon:<name>` from the shared
- * set, or one emoji) on a background, as a channel's. The API sends the image as a URL (crew-api.ts).
+ * set, one emoji, or an uploaded SVG as `svg:<markup>`) on a background, as a channel's. The API sends the image as a URL (crew-api.ts).
  */
 export interface CrewAvatar {
   /** A square PNG, JPEG or WebP, at most 256px a side, as a data URL. */
@@ -183,8 +183,8 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : und
 export const AVATAR_BG = /^#[0-9a-f]{6}$/i;
 
 /**
- * The avatar a file names: an uploaded image (agent-avatar.ts, never an SVG), a shared icon or an emoji, and a hex
- * color. A key that does not check out is left out, so a hand edit gone wrong falls back to the next look.
+ * The avatar a file names: an uploaded image (agent-avatar.ts, never an SVG), a shared icon, an emoji or an SVG icon
+ * (channel-icon.ts checks it as it does a channel's), and a hex color. A key that does not check out is left out, so a hand edit gone wrong falls back to the next look.
  */
 export function avatarOf(v: unknown): CrewAvatar | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
@@ -192,7 +192,7 @@ export function avatarOf(v: unknown): CrewAvatar | undefined {
   const kind = typeof icon === 'string' ? parseChannelIcon(icon)?.kind : undefined;
   const out: CrewAvatar = {
     ...(typeof image === 'string' && !('problem' in parseAvatarImage(image)) ? { image } : {}),
-    ...(kind === 'glyph' || kind === 'emoji' ? { icon: icon as string } : {}),
+    ...(kind ? { icon: (icon as string).trim() } : {}),
     ...(typeof bg === 'string' && AVATAR_BG.test(bg) ? { bg: bg.toLowerCase() } : {}),
   };
   return out.image || out.icon || out.bg ? out : undefined;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import {
   blankCrewDraft,
   CHANGED_CHARTER_ACTIONS,
@@ -15,31 +15,35 @@ import {
   type CrewDetailView,
   type CrewDraft,
 } from '@omni/shared/crew-settings.ts';
+import { avatarStyleOf, iconFor, imageChangeOf, stashOf } from '@omni/shared/agent-identity.ts';
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
-import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
+import { AgentIdentity, type IdentityValue } from '../components/AgentIdentity.tsx';
+import { isCrewRole } from '../components/brand.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
-import { AVATAR_UPLOAD_MAX_BYTES } from '@omni/shared/agent-avatar.ts';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
 import { useApp, useIsMobile } from '../store.tsx';
 import { href, navigate, useRoute } from '../router.ts';
-import { squareAvatar } from '../agent-avatar-upload.ts';
-import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
+import { RunDefaultsField } from './ChannelSettings.tsx';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 import { remoteRoleNote } from '@omni/shared/crew-settings.ts';
 import { isRemoteAgentHarness, serverStatus, type RemoteServer } from '@omni/shared/remote-agent.ts';
 import { ConnectAgentSheet, RemoteMark } from '../components/ConnectAgent.tsx';
 import { useTechnical } from '../display.ts';
 import { InThreadsCard, ServerCard } from './RemoteAgentCards.tsx';
-import { Card, LockNote } from './settings-parts.tsx';
+import { Advanced, Card, LockNote } from './settings-parts.tsx';
 
 // Settings > Agents: every agent this machine has, hidden ones included. Each opens as a page of its own
-// (`#/settings/crew/<id>`, group threads slice 1): its avatar on top, an Avatar card that uploads an image, and the
-// editor (plan slice S3, docs/plans/2026-11-18-user-defined-crew.md). New agent opens the editor in a dialog. Saves go
+// (`#/settings/crew/<id>`, group threads slice 1): the Identity block on top (its name, description and the one avatar
+// it shows, AgentIdentity.tsx), then the editor's groups (plan slice S3, docs/plans/2026-11-18-user-defined-crew.md):
+// Instructions, Run defaults, Permissions and Memory, then Advanced, the one group folded shut: the tool switches, Edit
+// as Markdown, Duplicate and Compare. Hide, Reset and Delete close the page. New agent opens the same editor in a
+// dialog. Saves go
 // to /api/crew (apps/server/crew-api.ts): a role of your own is its whole file in data/crew/, an edit of a built-in is
-// an overlay that adds to its charter or replaces it. The editor's Memory tab holds the role's lessons (slice S6,
-// components/RoleMemory.tsx), which save one by one. Add remote agent connects a server and makes its agent (ADR 0020);
+// an overlay that adds to its charter or replaces it. A photo picked in the Identity block goes with Save too, through
+// PUT /api/crew/:id/avatar. The Memory group lists the role's lessons (slice S6, components/RoleMemory.tsx), which save
+// one by one. Add remote agent connects a server and makes its agent (ADR 0020);
 // a remote agent's page has a Server card and an In threads card (RemoteAgentCards.tsx) in place of its run and the
 // powers Omni cannot hold it to. The same page is the phone's Settings section and the desktop app's.
 
@@ -153,8 +157,8 @@ export function CrewSection({ agent }: { agent?: string }) {
 }
 
 /**
- * One agent as a page (ADR 0019, How it looks): its avatar, name and description on top, the Avatar card, then the
- * editor. A save keeps the page open and reads the agent again; Cancel and Delete go back to the list.
+ * One agent as a page (ADR 0019, How it looks): its name on top, then the editor, whose first group is the Identity
+ * block. A save keeps the page open and reads the agent again; Cancel and Delete go back to the list.
  */
 function AgentPage({ id, roles, onSaved }: { id: string; roles: CrewRole[] | undefined; onSaved: () => void }) {
   const { crew } = useApp();
@@ -179,106 +183,41 @@ function AgentPage({ id, roles, onSaved }: { id: string; roles: CrewRole[] | und
       </div>
     );
   const name = listed?.name ?? id;
+  const remote = listed?.server ? (
+    <>
+      <ServerCard agent={listed as CrewRole & { server: RemoteServer }} onChanged={onSaved} />
+      <InThreadsCard agent={listed} />
+    </>
+  ) : null;
   return (
-    <div className="space-y-5 pt-6 pb-16 md:pt-10">
+    <div className="space-y-4 pt-6 md:pt-10">
       <a href={href.settingsSection('crew')} className="inline-flex items-center gap-1 text-[12.5px] text-fg-3 hover:text-fg max-md:hidden">
         <Icon name="chevronLeft" size={12} /> Agents
       </a>
-      <header className={phone ? 'flex flex-col items-center gap-2 text-center' : 'flex items-center gap-4'}>
-        {listed ? <AgentAvatar agent={listed} size={phone ? 88 : 72} /> : <span className="rounded-full bg-surface-2" style={{ width: phone ? 88 : 72, height: phone ? 88 : 72 }} />}
-        <div className="min-w-0">
-          <h1 className={`font-display leading-tight font-semibold ${phone ? 'text-[22px]' : 'text-[26px]'}`}>{name}</h1>
-          {listed?.description && <p className="mt-1 text-[13px] text-fg-3">{listed.description}</p>}
-        </div>
+      <header className="min-w-0">
+        <h1 className={`font-display leading-tight font-semibold text-balance ${phone ? 'text-[22px]' : 'text-[26px]'}`}>{name}</h1>
+        {listed?.description && <p className="mt-1 line-clamp-2 text-[13px] text-fg-3">{listed.description}</p>}
       </header>
-      {listed && <AvatarCard agent={listed} onSaved={saved} />}
-      {listed?.server && (
-        <>
-          <ServerCard agent={listed as CrewRole & { server: RemoteServer }} onChanged={onSaved} />
-          <InThreadsCard agent={listed} />
-        </>
-      )}
-      <Card title={view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : 'Agent'} subtitle={view === 'edit' ? 'Its name, charter, run defaults, powers and memory.' : undefined}>
+      {view === 'edit' ? (
         <EditorBody
           key={`${id}:${round}`}
           id={id}
           page
           waiting={listed?.memoryWaiting ?? 0}
+          offered={!!listed?.server?.avatarOffered}
+          afterIdentity={remote}
           view={view}
           setView={setView}
           onClose={back}
           onOpen={(to) => navigate(href.agent(to))}
           onSaved={saved}
         />
-      </Card>
+      ) : (
+        <Card title={view === 'compare' ? `${name} and its built-in` : `Duplicate ${name}`}>
+          <EditorBody key={`${id}:${round}:${view}`} id={id} page waiting={0} view={view} setView={setView} onClose={back} onOpen={(to) => navigate(href.agent(to))} onSaved={saved} />
+        </Card>
+      )}
     </div>
-  );
-}
-
-/** Where an agent's face comes from, in a line under it. */
-function avatarSource(agent: CrewRole) {
-  if (agent.avatar?.image && agent.server?.avatarOffered) return 'The avatar its server offered. Test connection reads it again until you upload your own.';
-  if (agent.avatar?.image) return 'An image you uploaded. It syncs to your other machines with the agent.';
-  if (agent.avatar?.icon) return 'Its icon, on its color. An uploaded image takes its place.';
-  if (agent.kind !== 'own' && !agent.avatar?.bg && ['conductor', 'researcher', 'builder', 'store-ops', 'inbox'].includes(agent.id)) return 'Its built-in mark. An uploaded image takes its place.';
-  return 'No image yet: its initials, on a color from its id.';
-}
-
-/**
- * The Avatar card: the agent's face, where it comes from, and Upload or Remove image. A picked file is cropped square
- * from its center and scaled to 256px here (agent-avatar-upload.ts), then saved at once (PUT /api/crew/:id/avatar).
- * The icon and color stay in the editor's form, as the look an agent shows without an image.
- */
-function AvatarCard({ agent, onSaved }: { agent: CrewRole; onSaved: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const put = async (image: () => Promise<string | null>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.put(`/crew/${encodeURIComponent(agent.id)}/avatar`, { image: await image() });
-      onSaved();
-    } catch (err) {
-      setError(errorText(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Card entry="agent-avatar" title="Avatar" subtitle={`Shown on every message ${agent.name} writes.`}>
-      <div className="flex flex-wrap items-center gap-4">
-        <AgentAvatar agent={agent} size={60} />
-        <div className="min-w-0 flex-1 basis-48">
-          <div className="text-[12.5px] text-fg-3">{avatarSource(agent)}</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="sm" icon="image" busy={busy} onClick={() => input.current?.click()}>
-              {agent.avatar?.image ? 'Replace image' : 'Upload image'}
-            </Button>
-            {agent.avatar?.image && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => void put(async () => null)}>
-                Remove image
-              </Button>
-            )}
-          </div>
-          <div className="mt-1.5 text-[11.5px] text-fg-3">PNG, JPEG or WebP up to {AVATAR_UPLOAD_MAX_BYTES / 1024 / 1024} MB. Omni crops it square from the center.</div>
-          <input
-            ref={input}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="sr-only"
-            tabIndex={-1}
-            aria-label={`Upload an avatar for ${agent.name}`}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) void put(() => squareAvatar(file));
-            }}
-          />
-        </div>
-      </div>
-      {error && <ErrorNote>{error}</ErrorNote>}
-    </Card>
   );
 }
 
@@ -296,7 +235,17 @@ function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtIn
 
 type View = 'edit' | 'compare' | 'duplicate';
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * One labelled group of the editor: a settings card on the agent page, a titled fieldset in the New agent dialog.
+ * `entry`: the search entry it holds, so a result scrolls here.
+ */
+function Group({ page, title, subtitle, entry, actions, children }: { page?: boolean; title: string; subtitle?: string; entry?: string; actions?: ReactNode; children: ReactNode }) {
+  if (page)
+    return (
+      <Card title={title} subtitle={subtitle} entry={entry} actions={actions}>
+        {children}
+      </Card>
+    );
   return (
     <fieldset className="space-y-3">
       <legend className="caption mb-2">{title}</legend>
@@ -321,8 +270,8 @@ function Switch({ label, hint, checked, onChange, locked }: { label: string; hin
   return (
     <div className="flex items-start justify-between gap-3">
       <span className="min-w-0">
-        <span className="block text-[12.5px] font-medium text-fg-2">{label}</span>
-        <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">{hint}</span>
+        <span className="block text-[13px] font-medium text-fg">{label}</span>
+        <span className="mt-0.5 block text-[12.5px] leading-[18px] text-fg-3">{hint}</span>
         {locked && <LockNote>{locked}</LockNote>}
       </span>
       <Toggle checked={checked} onChange={onChange} label={label} disabled={!!locked} />
@@ -330,15 +279,34 @@ function Switch({ label, hint, checked, onChange, locked }: { label: string; hin
   );
 }
 
-/** A dialog's footer, or on the agent page a row of its own under the form. */
-function Footer({ page, children }: { page?: boolean; children: ReactNode }) {
-  return page ? <div className="flex items-center justify-end gap-2 border-t border-line pt-4">{children}</div> : <ModalFooter>{children}</ModalFooter>;
+/**
+ * A dialog's footer, or on the agent page a bar that sticks to the bottom of the scroll, so Save is in reach from any
+ * group. `dirty`: the page says the form holds changes not saved yet.
+ */
+function Footer({ page, dirty, children }: { page?: boolean; dirty?: boolean; children: ReactNode }) {
+  if (!page) return <ModalFooter>{children}</ModalFooter>;
+  return (
+    <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex items-center justify-end gap-2 border-t border-line bg-bg px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] md:-mx-8 md:px-8" data-agent-save-bar>
+      {dirty && (
+        <span className="mr-auto inline-flex items-center gap-1.5 text-[12.5px] text-fg-2" role="status">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--live)]" aria-hidden="true" />
+          Unsaved changes
+        </span>
+      )}
+      {children}
+    </div>
+  );
 }
+
+/** The identity block's value for a role as it stands, or a new one. */
+const identityOf = (avatar: CrewRole['avatar'] | undefined): IdentityValue => ({ style: avatarStyleOf(avatar), stash: stashOf(avatar?.icon), bg: avatar?.bg ?? '', picked: null });
 
 function EditorBody({
   id,
   page,
   waiting,
+  offered,
+  afterIdentity,
   view,
   setView,
   onClose,
@@ -348,8 +316,12 @@ function EditorBody({
   id: string | null;
   /** On the agent page, not in a dialog: a save stays (`onSaved` opens it again on the saved agent), Cancel goes back. */
   page?: boolean;
-  /** Lessons its threads proposed that wait for the user: the Memory tab's count. */
+  /** Lessons its threads proposed that wait for the user: the Memory group's count. */
   waiting: number;
+  /** Its image is the one its remote server offered (ADR 0020). */
+  offered?: boolean;
+  /** Cards that follow the Identity block on the page: a remote agent's Server and In threads cards. */
+  afterIdentity?: ReactNode;
   view: View;
   setView: (v: View) => void;
   onClose: () => void;
@@ -361,8 +333,9 @@ function EditorBody({
   const [draft, setDraft] = useState<CrewDraft | null>(id ? null : blankCrewDraft());
   const [newId, setNewId] = useState<string | null>(null);
   const [mode, setMode] = useState<'form' | 'markdown'>('form');
-  // The Memory tab: the role's lessons, saved one by one, beside the draft the Form and Markdown tabs share.
-  const [memoryTab, setMemoryTab] = useState(false);
+  // The Identity block: which avatar style shows, what each style holds, the color and a photo waiting for Save. The
+  // draft's icon and bg follow it.
+  const [identity, setIdentity] = useState<IdentityValue>(() => identityOf(undefined));
   const [markdown, setMarkdown] = useState(id ? '' : crewMarkdownOf(null));
   // The Markdown tab's text as it last matched the form. An edit there is read into the form on the way back.
   const [synced, setSynced] = useState(markdown);
@@ -376,19 +349,25 @@ function EditorBody({
   useEffect(() => {
     if (!detail.data || draft) return;
     setDraft(crewDraftOf(detail.data));
+    setIdentity(identityOf(detail.data.role.avatar));
     setMarkdown(crewMarkdownOf(detail.data));
     setSynced(crewMarkdownOf(detail.data));
   }, [detail.data, draft]);
 
-  // The role as it opened, so a close asks first once the form or its Markdown differs.
-  const snapshot = draft ? JSON.stringify([draft, markdown]) : null;
+  // The role as it opened, so a close asks first once the form, its Markdown or the avatar differs.
+  const snapshot = draft ? JSON.stringify([draft, markdown, identity.style, identity.picked]) : null;
   const [pristine, setPristine] = useState<string | null>(null);
   useEffect(() => {
     if (pristine === null && snapshot !== null) setPristine(snapshot);
   }, [pristine, snapshot]);
-  useUnsavedChanges(pristine !== null && snapshot !== pristine);
+  const dirty = pristine !== null && snapshot !== pristine;
+  useUnsavedChanges(dirty);
 
   const set = <K extends keyof CrewDraft>(k: K, v: CrewDraft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
+  const changeIdentity = (v: IdentityValue) => {
+    setIdentity(v);
+    setDraft((d) => (d ? { ...d, icon: iconFor(v.style, v.stash), bg: v.bg } : d));
+  };
   const d = detail.data ?? null;
   const builtIn = !!d?.builtIn;
   const role = d?.role;
@@ -454,6 +433,8 @@ function EditorBody({
       } else if (markdown !== synced) {
         const { detail: made } = await drafted({ markdown });
         setDraft(crewDraftOf(made));
+        // The file may name another icon or color: the block reads it, and keeps a photo picked but not saved.
+        setIdentity((now) => ({ ...identityOf(made.role.avatar), ...(now.style === 'photo' && { style: 'photo' as const, picked: now.picked }) }));
         setBase({ own: markdown, detail: made });
         setSynced(markdown);
       }
@@ -464,12 +445,17 @@ function EditorBody({
   const save = (e?: FormEvent) => {
     e?.preventDefault();
     if (!draft || problem) return;
+    // A photo picked waits for Save; any other style takes a saved image away, or it would hide what the preview shows.
+    const image = imageChangeOf(identity.style, role?.avatar?.image, identity.picked);
+    const putImage = (to: string) => (image.kind === 'keep' ? undefined : api.put(`/crew/${encodeURIComponent(to)}/avatar`, { image: image.kind === 'set' ? image.dataUrl : null }));
     void act(async () => {
       const body = mode === 'markdown' ? { markdown } : base ? { markdown: (await drafted(crewSaveBody(draft, base.detail), base.own)).markdown } : crewSaveBody(draft, d);
-      if (id) await api.put(`/crew/${encodeURIComponent(id)}`, body);
-      else {
+      if (id) {
+        await api.put(`/crew/${encodeURIComponent(id)}`, body);
+        await putImage(id);
+      } else {
         await api.post('/crew', { id: theId, ...body });
-        // A new agent opens on its page, where its avatar is uploaded.
+        await putImage(theId);
         onOpen(theId);
       }
     });
@@ -496,42 +482,24 @@ function EditorBody({
       />
     );
 
+  const agentName = draft.name || theId || 'Agent';
+  // What the folded Advanced group holds, and which of its switches are on.
+  const toolsOn = remoteAgent ? [] : [draft.delegateOnly ? 'Only routes work' : draft.conductorTools && 'Conductor tools', draft.noEdits && !draft.delegateOnly && 'No file edits'].filter(Boolean);
+  const advancedSummary = toolsOn.length ? `${toolsOn.join(', ')} on` : remoteAgent ? 'Markdown, duplicate, compare' : 'Tools, Markdown, duplicate, compare';
+  const charterHint = remoteAgent
+    ? "Sent to its server as instructions only when you write one. Empty, its server's own instructions lead."
+    : builtIn && draft.charterMode === 'append'
+      ? 'Added after the built-in charter, so release fixes to it still reach this agent. {{user}} and the other placeholders are filled in.'
+      : builtIn
+        ? 'Replaces the built-in charter. Omni says when a release changes the one you replaced.'
+        : '{{user}} and the other placeholders are filled in when a thread starts.';
+
   return (
     <form onSubmit={save} autoComplete="off">
-      <div className={page ? 'space-y-5 pb-5' : 'space-y-5 px-6 pb-5'}>
+      <div className={page ? 'space-y-4' : 'space-y-6 px-6 pb-5'}>
         {role && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <RoleChips role={role} />
-            <span className="ml-auto min-w-0 truncate font-mono text-[11.5px] text-fg-3">data/crew/{role.id}.md</span>
-          </div>
-        )}
-        {role && (
-          <div>
-            {Object.values(can).some(Boolean) && (
-              <div className="flex flex-wrap gap-1.5" aria-label="Agent actions">
-                {can.duplicate && (
-                  <Button type="button" size="sm" variant="ghost" icon="copy" onClick={() => setView('duplicate')} disabled={busy}>
-                    Duplicate
-                  </Button>
-                )}
-                {can.edited && (
-                  <Button type="button" size="sm" variant="ghost" icon="diff" onClick={() => setView('compare')} disabled={busy}>
-                    Compare with built-in
-                  </Button>
-                )}
-                {can.hide && (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => void act(async () => detail.setData(await api.post<CrewDetail>(path('/hidden'), { hidden: !role.hidden })), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
-                    {role.hidden ? 'Show' : 'Hide'}
-                  </Button>
-                )}
-                {can.edited && (
-                  <InlineConfirm label="Reset to built-in" icon="undo" confirmLabel="Reset" busyLabel="Resetting" onConfirm={() => act(() => api.post(path('/reset')))} />
-                )}
-                {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete agent" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()), true, true)} />}
-              </div>
-            )}
-            {refusedActions.duplicate && <LockNote>{refusedActions.duplicate}</LockNote>}
-            {refusedActions.hide && <LockNote>{refusedActions.hide}</LockNote>}
           </div>
         )}
         {role?.builtInChanged && (
@@ -543,138 +511,99 @@ function EditorBody({
           </div>
         )}
 
-        <Segmented
-          label="Edit as"
-          size="sm"
-          value={memoryTab ? 'memory' : mode}
-          onChange={(v) => {
-            setMemoryTab(v === 'memory');
-            if (v !== 'memory') switchTo(v);
-          }}
-          options={[
-            { id: 'form', label: 'Form' },
-            { id: 'markdown', label: 'Markdown' },
-            ...(role
-              ? [
-                  {
-                    id: 'memory' as const,
-                    label: 'Memory',
-                    ...(waiting > 0 && { badge: <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{waiting}</span>, title: `${waiting} ${waiting === 1 ? 'lesson waits' : 'lessons wait'} for you` }),
-                  },
-                ]
-              : []),
-          ]}
-        />
-
-        {memoryTab && role ? (
-          <RoleMemory role={role} />
-        ) : mode === 'markdown' ? (
-          <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole agent: frontmatter and charter. Saved as written.'}>
-            <textarea id="crew-md" aria-describedby={fieldHintId('crew-md')} className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
-          </Field>
+        {mode === 'markdown' ? (
+          <Group
+            page={page}
+            title="Markdown"
+            subtitle={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole agent: frontmatter and charter. Saved as written.'}
+            actions={
+              <Button type="button" size="sm" icon="chevronLeft" onClick={() => switchTo('form')} disabled={busy}>
+                Back to form
+              </Button>
+            }
+          >
+            <Field id="crew-md" label="File" hint={role ? <span className="font-mono">data/crew/{role.id}.md</span> : undefined}>
+              <textarea id="crew-md" aria-describedby={fieldHintId('crew-md')} className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
+            </Field>
+          </Group>
         ) : (
           <>
-            <Section title="Identity">
-              <Field id="crew-name" label="Name">
-                <input id="crew-name" className="field" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Store ops" autoFocus={!id} />
-              </Field>
-              {!id && (
-                <Field id="crew-id" label="Id" hint="The file's name and what threads store. It never changes.">
-                  <input id="crew-id" aria-describedby={fieldHintId('crew-id')} {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
-                </Field>
-              )}
-              <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick an agent for a task.">
-                <textarea id="crew-desc" aria-describedby={fieldHintId('crew-desc')} className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
-              </Field>
-              <Field label="Icon" hint={`Shown when there is no uploaded image. ${builtIn ? 'Without one, the built-in mark.' : 'Without one, its initials.'}`}>
-                <IconPicker
-                  inputId="crew-icon"
-                  svg={false}
-                  value={draft.icon}
-                  name={draft.name || theId || 'Agent'}
-                  avatarBg={draft.bg}
-                  onChange={(v) => set('icon', v)}
-                  preview={<AgentAvatar agent={{ id: theId, name: draft.name || theId || 'Agent', avatar: draft.icon || draft.bg ? { icon: draft.icon || undefined, bg: draft.bg || undefined } : undefined }} size={36} />}
-                />
-              </Field>
-              <Field label="Icon background">
-                <AvatarColorPicker icon={draft.icon} name={draft.name || theId || 'Agent'} value={draft.bg} manual={!!draft.bg} onChange={(v) => set('bg', v)} onAuto={() => set('bg', '')} />
-              </Field>
-            </Section>
+            <Group page={page} title="Identity" entry="agent-identity" subtitle={`Its name, what it does, and the face on every message ${draft.name || 'it'} writes.`}>
+              <AgentIdentity
+                id={theId}
+                name={agentName}
+                value={identity}
+                onChange={changeIdentity}
+                saved={role?.avatar?.image}
+                offered={offered}
+                builtInMark={isCrewRole(theId)}
+                fields={
+                  <>
+                    <Field id="crew-name" label="Name">
+                      <input id="crew-name" className="field" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Store ops" autoFocus={!id} />
+                    </Field>
+                    {!id && (
+                      <Field id="crew-id" label="Id" hint="The file's name and what threads store. It never changes.">
+                        <input id="crew-id" aria-describedby={fieldHintId('crew-id')} {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
+                      </Field>
+                    )}
+                    <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick an agent for a task.">
+                      <textarea id="crew-desc" aria-describedby={fieldHintId('crew-desc')} className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
+                    </Field>
+                  </>
+                }
+              />
+            </Group>
 
-            <Section title="Instructions">
+            {afterIdentity}
+
+            <Group page={page} title="Instructions" subtitle="Its charter: what every thread started as it is told first.">
+              {builtIn &&
+                (locked.charter_mode ? (
+                  <LockNote>{locked.charter_mode}</LockNote>
+                ) : (
+                  <Segmented
+                    label="Your text"
+                    size="sm"
+                    value={draft.charterMode}
+                    onChange={(v) => set('charterMode', v)}
+                    options={[
+                      { id: 'append', label: 'Add to built-in' },
+                      { id: 'replace', label: 'Replace' },
+                    ]}
+                  />
+                ))}
+              <Field id="crew-charter" label={builtIn ? (draft.charterMode === 'append' ? 'Your additions' : 'Your charter') : 'Charter'} hint={charterHint}>
+                <textarea id="crew-charter" aria-describedby={fieldHintId('crew-charter')} className="field field-mono field-xs min-h-[160px] resize-y leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
+              </Field>
               {builtIn && (
+                <details className="rounded-[14px] bg-surface-2 px-3.5 py-2.5">
+                  <summary className="cursor-pointer text-[12.5px] font-medium text-fg-2">Built-in charter</summary>
+                  <pre className="mt-2 max-h-60 overflow-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-fg-2">{d?.charters.builtIn}</pre>
+                </details>
+              )}
+            </Group>
+
+            <Group page={page} title="Run defaults" subtitle="What a thread started as it gets when the thread or delegation does not pick.">
+              {!remoteAgent && (
                 <>
-                  {locked.charter_mode ? (
-                    <LockNote>{locked.charter_mode}</LockNote>
-                  ) : (
-                    <Segmented
-                      label="Your text"
-                      size="sm"
-                      value={draft.charterMode}
-                      onChange={(v) => set('charterMode', v)}
-                      options={[
-                        { id: 'append', label: 'Add to built-in' },
-                        { id: 'replace', label: 'Replace' },
-                      ]}
-                    />
+                  <Field label="Harness, model and effort" hint="Default leaves it to the channel, then Auto.">
+                    <RunDefaultsField value={{ harness: draft.harness, model: draft.model, effort: draft.effort }} onChange={(v) => setDraft((x) => (x ? { ...x, ...v } : x))} />
+                  </Field>
+                  {isRemoteHarnessId(draft.harness) && (
+                    <p className="text-[12.5px] leading-[18px] text-fg-2" data-remote-note>
+                      {remoteRoleNote(draft.harness)}
+                    </p>
                   )}
-                  <details className="rounded-[14px] bg-surface-2 px-3.5 py-2.5">
-                    <summary className="cursor-pointer text-[12.5px] font-medium text-fg-2">Built-in charter</summary>
-                    <pre className="mt-2 max-h-60 overflow-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-fg-2">{d?.charters.builtIn}</pre>
-                  </details>
                 </>
               )}
-              <Field
-                id="crew-charter"
-                label={builtIn ? (draft.charterMode === 'append' ? 'Your additions' : 'Your charter') : 'Charter'}
-                hint={
-                  remoteAgent
-                    ? "Sent to its server as instructions only when you write one. Empty, its server's own instructions lead."
-                    : builtIn && draft.charterMode === 'append'
-                    ? 'Added after the built-in charter, so release fixes to it still reach this agent. {{user}} and the other placeholders are filled in.'
-                    : builtIn
-                      ? 'Replaces the built-in charter. Omni says when a release changes the one you replaced.'
-                      : '{{user}} and the other placeholders are filled in when a thread starts.'
-                }
-              >
-                <textarea id="crew-charter" aria-describedby={fieldHintId('crew-charter')} className="field field-mono field-xs min-h-[200px] resize-y leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
-              </Field>
-            </Section>
-
-            {!remoteAgent && <Section title="Run">
-              <Field label="Harness, model and effort" hint="Default leaves it to the channel, then Auto. A thread or delegation that names its own run wins.">
-                <RunDefaultsField value={{ harness: draft.harness, model: draft.model, effort: draft.effort }} onChange={(v) => setDraft((x) => (x ? { ...x, ...v } : x))} />
-              </Field>
-              {isRemoteHarnessId(draft.harness) && (
-                <p className="text-[12.5px] leading-[18px] text-fg-2" data-remote-note>
-                  {remoteRoleNote(draft.harness)}
-                </p>
-              )}
-            </Section>}
-
-            <Section title="Where">
               <Field label="Default channel" hint="Where a thread starts as this agent when no channel is named.">
                 <Picker size="field" label="Default channel" value={draft.channel} onChange={(v) => set('channel', v)} options={channelOptions} searchable />
               </Field>
-            </Section>
+            </Group>
 
-            <Section title="Powers">
+            <Group page={page} title="Permissions" subtitle="Whether the Conductor hands it work, and whether it checks other agents' work.">
               <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the agent pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} locked={locked.delegatable} />
-              {/* A remote agent runs its own tools on its own server, where Omni cannot take any away (Q32). */}
-              {!remoteAgent && (
-                <>
-                  <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other agents." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
-                  <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
-                  <Switch
-                    label="No file edits"
-                    hint={NO_EDITS_NOTE}
-                    checked={draft.noEdits && !draft.delegateOnly}
-                    onChange={(v) => set('noEdits', v)}
-                    locked={draft.delegateOnly ? 'Only routes work takes the shell and every edit tool away already.' : undefined}
-                  />
-                </>
-              )}
               <Switch
                 label="Reviews work"
                 hint="A review on a GPT model runs at high effort, and one the Conductor starts for a thread runs on the other model family from that thread's."
@@ -682,9 +611,14 @@ function EditorBody({
                 onChange={(v) => set('review', v)}
                 locked={locked.review}
               />
-            </Section>
+            </Group>
 
-            <Section title="Memory">
+            <Group
+              page={page}
+              title="Memory"
+              subtitle="The lessons its threads read, and what happens to the ones they propose."
+              actions={waiting > 0 ? <Chip tone="needs" title={`${waiting} ${waiting === 1 ? 'lesson waits' : 'lessons wait'} for you`}>{waiting} waiting</Chip> : undefined}
+            >
               <Field label="Lessons" hint={ROLE_MEMORY_CHOICES.find((c) => c.id === draft.memory)?.hint}>
                 <Segmented label="Lessons" size="sm" value={draft.memory} onChange={(v) => set('memory', v)} options={ROLE_MEMORY_CHOICES.map((c) => ({ id: c.id, label: c.label }))} />
               </Field>
@@ -694,7 +628,7 @@ function EditorBody({
                   hint={
                     draft.memoryWrites === 'auto'
                       ? 'Applies at once, and each lesson names its thread. A thread under an automation, or a lesson for every channel, still waits for you.'
-                      : 'Waits for you in the Memory tab. Approve, edit or dismiss each one.'
+                      : 'Waits for you below. Approve, edit or dismiss each one.'
                   }
                 >
                   <Segmented
@@ -709,12 +643,73 @@ function EditorBody({
                   />
                 </Field>
               )}
-            </Section>
+              {role && (
+                <div className="border-t border-line pt-4">
+                  <RoleMemory role={role} note={false} />
+                </div>
+              )}
+            </Group>
+
+            <Advanced title="Advanced" summary={advancedSummary} open={!!problem?.includes('conductor tools')}>
+              {/* A remote agent runs its own tools on its own server, where Omni cannot take any away (Q32). */}
+              {!remoteAgent && (
+                <div className="space-y-3">
+                  <span className="caption block">Tools</span>
+                  <Switch
+                    label="No file edits"
+                    hint={NO_EDITS_NOTE}
+                    checked={draft.noEdits && !draft.delegateOnly}
+                    onChange={(v) => set('noEdits', v)}
+                    locked={draft.delegateOnly ? 'Only routes work takes the shell and every edit tool away already.' : undefined}
+                  />
+                  <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other agents." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
+                  <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
+                </div>
+              )}
+              <div className="space-y-2 border-t border-line pt-4">
+                <span className="caption block">File</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button type="button" size="sm" icon="file" onClick={() => switchTo('markdown')} disabled={busy}>
+                    Edit as Markdown
+                  </Button>
+                  {role && can.duplicate && (
+                    <Button type="button" size="sm" icon="copy" onClick={() => setView('duplicate')} disabled={busy}>
+                      Duplicate
+                    </Button>
+                  )}
+                  {can.edited && (
+                    <Button type="button" size="sm" icon="diff" onClick={() => setView('compare')} disabled={busy}>
+                      Compare with built-in
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[12.5px] text-fg-3">
+                  {role && <span className="font-mono text-[11.5px]">data/crew/{role.id}.md</span>}
+                  {role && ' · '}
+                  {builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text.' : 'The whole agent as a file: frontmatter and charter.'} Keys the form does not show are kept.
+                </p>
+                {role && refusedActions.duplicate && <LockNote>{refusedActions.duplicate}</LockNote>}
+              </div>
+            </Advanced>
           </>
+        )}
+        {role && (can.hide || can.edited || can.delete || refusedActions.hide) && (
+          <div className="space-y-2 pt-1" aria-label="Agent actions">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {can.hide && (
+                <Button type="button" size="sm" variant="ghost" onClick={() => void act(async () => detail.setData(await api.post<CrewDetail>(path('/hidden'), { hidden: !role.hidden })), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
+                  {role.hidden ? 'Show' : 'Hide'}
+                </Button>
+              )}
+              {can.edited && <InlineConfirm label="Reset to built-in" icon="undo" confirmLabel="Reset" busyLabel="Resetting" onConfirm={() => act(() => api.post(path('/reset')))} />}
+              {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete agent" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()), true, true)} />}
+            </div>
+            {refusedActions.hide && <LockNote>{refusedActions.hide}</LockNote>}
+          </div>
         )}
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
-      <Footer page={page}>
+      <Footer page={page} dirty={dirty}>
         <Button variant="ghost" onClick={onClose} disabled={busy}>
           Cancel
         </Button>

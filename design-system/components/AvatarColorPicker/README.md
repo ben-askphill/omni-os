@@ -1,6 +1,6 @@
-Channel avatar background control, composed of the existing Avatar, field, Button and ErrorNote primitives. Used in channel settings on desktop web, phone web and Electron.
+Channel avatar background control, composed of the existing Avatar, field, Button and ErrorNote primitives. Used in channel settings and in an agent's Identity block (`AgentIdentity`) on desktop web, phone web and Electron.
 
-- A 56px live avatar, native color input, six-digit hex field and Reset to auto button wrap at phone widths.
+- A 56px live avatar (left out with `preview={false}` where the caller draws the avatar, as `AgentIdentity` does), native color input, six-digit hex field and Reset to auto button wrap at phone widths.
 - Standard swatches and literal SVG paint colors are 32px round buttons with an accessible color name, pressed state and selected outline.
 - An uploaded SVG adds a 128px image sampler. Click a painted point to set a custom background. Transparent points show an ErrorNote. Palette buttons offer a keyboard alternative.
 - Automatic colors use a full-size SVG background shape when present. Otherwise they choose a random swatch with WCAG contrast of at least 4.5 against the main foreground. Glyph ink adapts to the selected background. Emoji uses a dark outline proxy.

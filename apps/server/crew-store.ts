@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
-import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { parseChannelIcon, SVG_MAX, SVG_PREFIX } from '@omni/shared/channel-icon.ts';
 import { parseAvatarImage } from './agent-avatar.ts';
 import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
@@ -37,8 +37,8 @@ const OMNI_MCP = new Set(['omni']);
 const optText = (max: number) => z.string().trim().max(max).optional();
 
 /**
- * A role's avatar: an uploaded image (agent-avatar.ts), a shared icon (`icon:<name>`) or one emoji, and a hex
- * background. A save changes the keys it names and keeps the rest; null or an empty string removes one. `avatar: null`
+ * A role's avatar: an uploaded image (agent-avatar.ts), a shared icon (`icon:<name>`), one emoji or an SVG icon
+ * (`svg:<markup>`, checked as a channel's), and a hex background. A save changes the keys it names and keeps the rest; null or an empty string removes one. `avatar: null`
  * removes the icon and background, as it did before uploads: the image goes only when a save names it.
  */
 const avatar = z
@@ -55,8 +55,8 @@ const avatar = z
       .optional(),
     icon: z
       .string()
-      .max(64)
-      .refine((v) => !v || ['glyph', 'emoji'].includes(parseChannelIcon(v)?.kind ?? ''), 'An avatar icon is one of the shared icons or one emoji.')
+      .max(SVG_PREFIX.length + SVG_MAX)
+      .refine((v) => !v || !!parseChannelIcon(v), 'An avatar icon is one of the shared icons, one emoji or a plain SVG.')
       .nullable()
       .optional(),
     bg: z.string().regex(/^$|^#[0-9a-f]{6}$/i, 'An avatar background is a hex color like #f5e6ba.').nullable().optional(),
@@ -324,13 +324,13 @@ export function draftCrew(id: string | undefined, save: CrewSave, own?: string |
   return { markdown, detail: detailOf(role, texts.shipped, markdown) };
 }
 
-/** Set or remove a role's uploaded image (`null`), keeping its icon and background: Settings' Avatar card. */
+/** Set or remove a role's uploaded image (`null`), keeping its icon and background: a photo saved from Settings' Identity block. */
 export const saveCrewAvatar = (id: string, image: string | null, ctx: CrewSaveContext): CrewDetail => saveCrew(id, { fields: { avatar: { image } } }, ctx);
 
 /** What `avatar_offered:` records of an image: enough to tell the offered one from one Ben set. */
 const imageMark = (image: string) => createHash('sha256').update(image).digest('hex').slice(0, 12);
 
-/** The agent's image is the one its server offered, not one Ben uploaded since: the Avatar card says so. */
+/** The agent's image is the one its server offered, not one Ben uploaded since: the Identity block says so. */
 export function avatarOffered(role: Pick<CrewRole, 'id' | 'avatar'>): boolean {
   const image = role.avatar?.image;
   if (!image) return false;

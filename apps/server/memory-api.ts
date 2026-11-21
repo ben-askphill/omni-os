@@ -139,7 +139,7 @@ crewMemoryApi.post('/crew/:id/memory', async (c) => {
 
   const text = maskSecrets(parsed.value, await secretValues()).text;
   const fact = memories.create({ channel_id: channel, role: role.id, text, status, proposed_by: from ? 'agent' : 'user', source_thread_id: from?.id ?? null });
-  // Every lesson a role kept at once names its thread, here and in the role's Memory tab.
+  // Every lesson a role kept at once names its thread, here and in the role's Memory group.
   if (from && status === 'approved') console.log(`[memory] ${role.id} kept lesson ${fact.id} at once (memory_writes: auto), from thread ${from.id}`);
   publishFeed({ type: 'memory', channel_id: fact.channel_id, role: role.id });
   return c.json(fact, 201);

@@ -101,7 +101,7 @@ The agent Omni makes on Connect takes the avatar the server offers, so it looks 
 
 - **The value** is a data URL, `data:image/png;base64,...` (PNG, JPEG or WebP), square, at most 256px a side and 256 KB decoded. Omni reads at most that much of the body. Anything else is not taken: the agent gets the initials disc, and Find says why.
 - **Saved** inline in the agent's file, as an uploaded avatar is, with `avatar_offered:` and a short hash of the image, so it syncs with the file.
-- **Read again** on every passing Test connection. A new offer replaces the avatar only while it is still the one the server offered: once Ben sets his own on the agent's Avatar card, the offer is ignored.
+- **Read again** on every passing Test connection. A new offer replaces the avatar only while it is still the one the server offered: once Ben sets his own in the agent's Identity block, the offer is ignored.
 
 ## eve agents
 
