@@ -90,6 +90,7 @@ In the Conductor's reply box, or in the composer that starts a Conductor thread 
 - When you send, Omni writes each machine's current name and how this machine's Tailscale sees it into the message. A machine it no longer knows (removed, or reset under a new id) refuses the message: remove the mention and pick the machine again.
 - A mentioned machine that cannot take its task (offline on Tailscale, or sync not running) makes that `delegate` fail, and the Conductor tells you. It never runs the task on another machine instead.
 - Teams run on this machine, so the Conductor uses one `delegate` per mentioned machine rather than `delegate_team`.
+- A new thread whose Machine chip names another machine starts there, mentions and all: the mentions travel with the first message, and the hub shows that message with its pills until the other machine takes it. A mention never changes where the thread starts, and an offline mentioned machine only fails its own `delegate` later.
 - Desktop web, phone web and the desktop app have the menu. The iOS app shows a mention on a sent message as a plain chip and has no menu.
 - A quick ask runs here with read-only tools, so it leaves machine mentions out, and the phone's New sheet lists no machines in Ask mode.
 
