@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { fixture } from '@omni/test-fixtures';
 import { reportPrs, reportShape, stackTables } from '../report-shape.ts';
 
 // A builder's report as T-889E sent it: its running narration, then its final message with an outcome and ## parts.
@@ -56,6 +58,24 @@ describe('reportShape', () => {
     expect(s.lead).toBe(FINAL.split('\n\n')[0]);
     expect(s.notes).toEqual(NARRATION);
     expect(s.sections.map((x) => x.title)).toEqual(['Root cause', 'Tests', 'Backfill']);
+  });
+
+  it('reads the real T-889E report (saved before notes were split off) as one short outcome and folded parts', () => {
+    const r = JSON.parse(readFileSync(fixture('reports', 'crew-report-long.json'), 'utf8')) as { text: string };
+    const s = reportShape(r.text);
+    expect(s.lead).toMatch(/^I've opened \[PR #947\]\(https:\/\/github\.com\/acme\/omni\/pull\/947\)\. On the QA stack/);
+    expect(s.lead.split('\n\n')).toHaveLength(1);
+    expect(s.prs).toEqual([{ label: 'PR #947', href: 'https://github.com/acme/omni/pull/947' }]);
+    expect(s.sections.map((x) => [x.title, x.count])).toEqual([
+      ['Root cause', 3],
+      ['What I chose and why', 2],
+      ['Backfill', 2],
+      ['Tests', 4],
+      ['Screenshots', 3],
+      ['Docs', null],
+    ]);
+    expect(s.notes).toHaveLength(29);
+    expect(s.notes[0]).toMatch(/^Checking which `source`/);
   });
 
   it('keeps a short reply whole, with nothing to fold', () => {
