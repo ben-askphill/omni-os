@@ -75,11 +75,11 @@ describe('a delegate-only role', () => {
       'For real work your first action is seat_agents, not delegate: when the work writes or edits files, runs commands, browses at length, changes code, a store, an inbox, a calendar or Notion, or will clearly grow past a few lookups, seat the agent for it in this thread',
     );
     expect(delegation).toContain(
-      `Use delegate or delegate_team directly, instead of seating, only for a review, a team ${name} asked for, tasks on machines ${name} @mentioned, or when ${name} asks you to delegate.`,
+      `Use delegate or delegate_team directly, instead of seating, only for a review, research that a build depends on and the build after it, a team ${name} asked for, tasks on machines ${name} @mentioned, or when ${name} asks you to delegate.`,
     );
     // The same exceptions, in the same order, as the charter's own line.
     expect(conductorRole.charter).toContain(
-      'Use `delegate` or `delegate_team` directly, instead of seating, only for a review (below), a team the user asked for, tasks on machines the user @mentioned, or when the user asks you to delegate.',
+      'Use `delegate` or `delegate_team` directly, instead of seating, only for a review (below), research that a build depends on and the build after it (above), a team the user asked for, tasks on machines the user @mentioned, or when the user asks you to delegate.',
     );
     expect(conductorRole.charter).toContain('Your first action is `seat_agents`');
 
