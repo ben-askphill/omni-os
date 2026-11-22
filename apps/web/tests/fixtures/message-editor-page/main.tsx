@@ -48,6 +48,9 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
   if (url.startsWith('/api/mentions')) {
     const q = new URL(url, location.href).searchParams.get('q')?.toLowerCase() ?? '';
+    // `?slow=<ms>`: a server that takes that long to answer a search.
+    const slow = Number(new URLSearchParams(location.search).get('slow') ?? 0);
+    if (slow) await new Promise((r) => setTimeout(r, slow));
     return Response.json(rows.filter((r) => r.insert.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)));
   }
   if (url.startsWith('/api/commands')) return Response.json(commands);
