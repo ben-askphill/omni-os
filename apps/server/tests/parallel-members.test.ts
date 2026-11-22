@@ -5,7 +5,7 @@
 // Ben's dismissal. One turn checkpoint covers the whole message. Stop ends every agent; only the lead commits.
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
@@ -42,14 +42,20 @@ const untilIdle = (threadId: string, results: number) =>
   H.until(`${results} results in ${threadId}`, () => !busy(threadId) && H.byKind(threadId, 'result').length >= results, 25_000);
 
 let n = 0;
-/** A worktree channel on a fresh repo with one commit. */
-function repoChannel() {
+/** A fresh repo with one commit. */
+function repoDir() {
   const dir = join(H.tmp, `parallel-repo-${++n}`);
   mkdirSync(dir);
   git(dir, 'init', '-q', '-b', 'main');
   writeFileSync(join(dir, 'a.ts'), 'export const a = 1;\n');
   git(dir, 'add', '.');
   git(dir, 'commit', '-q', '-m', 'start');
+  return dir;
+}
+
+/** A worktree channel on a fresh repo with one commit. */
+function repoChannel() {
+  const dir = repoDir();
   const id = `parallel-${n}`;
   H.db.channels.create({ id, name: id, repo_path: dir, use_worktree: 1 });
   return id;
@@ -127,6 +133,21 @@ describe('parallel turns', () => {
     expect((await call(`/threads/${t.id}/summary`)).json.collisions).toEqual([{ path: 'a.ts', agents: flag.p.agents }]);
     // The notice is no message of Ben's: the transcript shows none.
     expect(H.byKind(t.id, 'user').map((u) => u.p.text)).toEqual(['plain start', 'WRITE:a.ts TOOL:1500 both of you edit a.ts']);
+  });
+
+  it('flags a.ts when the thread’s folder is reached through a symlink', T, async () => {
+    // A harness names a file from its working directory as the OS resolves it, past any symlink. macOS keeps temp
+    // folders under /var, a link to /private/var, so there every edit came in outside the thread's folder.
+    const dir = repoDir();
+    const id = `parallel-link-${n}`;
+    const link = join(H.tmp, id);
+    symlinkSync(dir, link);
+    H.db.channels.create({ id, name: id, repo_path: link, use_worktree: 0 });
+    const t = await groupThread(id);
+    expect(t.cwd).toBe(link);
+    await say(t.id, 'WRITE:a.ts TOOL:1200 both edit a.ts', ['lead', 'Lead'], ['designer', 'Designer']);
+    await untilIdle(t.id, 3);
+    expect(H.byKind(t.id, 'collision').map((e) => e.p.path)).toEqual(['a.ts']);
   });
 
   it('tells Cursor Agent at its next turn, without interrupting the one it runs', T, async () => {
