@@ -105,8 +105,9 @@ export const cursorMcpServer = (id: string): string => {
 /**
  * Keeps one copy of each message Cursor writes. With partial output on, it streams a message as timestamped chunks,
  * then sends the whole message again before its next tool call and at the end of the turn. The copy at the end has no
- * timestamp; since CLI 2026.11 the copy before a tool call has one, with its model call's id, so it is told apart by
- * that id and by repeating text already streamed. A message that never streamed is kept whole. One per turn.
+ * timestamp; since CLI 2026.11 the copy before a tool call has one, with its model call's id, which no chunk carries
+ * (tests/fixtures/cursor-live-steps.jsonl). A copy shows only what its chunks missed at the end, and a message that
+ * never streamed is kept whole. One per turn.
  */
 export class CursorReplyText {
   private streamed = '';
@@ -115,18 +116,21 @@ export class CursorReplyText {
   take(raw: unknown): string {
     const evt = obj(raw);
     const text = textOf(obj(evt.message).content);
-    const stamped = typeof evt.timestamp_ms === 'number';
     const seen = this.streamed;
-    const copy = !stamped || (!!evt.model_call_id && !!text.trim() && seen.trimEnd().endsWith(text.trim()));
+    const copy = typeof evt.timestamp_ms !== 'number' || !!evt.model_call_id;
     if (!copy) {
       this.streamed += text;
-      // A chunk of only a space is the gap between two words; before the message's first word it is nothing yet.
-      return seen.trim() ? text : text.trimStart();
+      if (seen.trim()) return text;
+      // Before the message's first word: whitespace waits for that word and shows with it, so a lone space adds no
+      // message of its own and an indented code block keeps its indent.
+      return this.streamed.trim() ? this.streamed : '';
     }
     this.streamed = '';
     if (!seen.trim()) return text;
-    // A copy longer than what streamed: show the part the chunks missed.
-    return text.startsWith(seen) ? text.slice(seen.length) : '';
+    // The chunks missed the end: show that part. Missed elsewhere, the message already shows as streamed.
+    const head = seen.trimStart();
+    const whole = text.trimStart();
+    return whole.startsWith(head) ? whole.slice(head.length) : '';
   }
 }
 

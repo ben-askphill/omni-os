@@ -286,8 +286,8 @@ describe('CursorReplyText', () => {
       .toEqual(['Looking', ' around.', '', 'Done', '.', '']);
   });
 
-  it('keeps a space between two words, but none before the first', () => {
-    expect(shown([chunk(' '), chunk('There'), chunk(' are'), chunk(' '), chunk('0'), copy('There are 0')])).toEqual(['', 'There', ' are', ' ', '0', '']);
+  it('keeps a space between two words, and holds one before the first word until that word comes', () => {
+    expect(shown([chunk(' '), chunk('There'), chunk(' are'), chunk(' '), chunk('0'), copy('There are 0')])).toEqual(['', ' There', ' are', ' ', '0', '']);
   });
 
   it('keeps a message that arrived whole, and the tail of a copy the chunks missed', () => {
@@ -297,5 +297,28 @@ describe('CursorReplyText', () => {
 
   it('keeps a stamped message with a model call id that repeats nothing', () => {
     expect(shown([copy('Starting.')])).toEqual(['Starting.']);
+  });
+
+  // The stored pieces of a replayed stream, as the adapter writes them (readCursorEvent).
+  const replay = (events: object[]) => {
+    const reply = new CursorReplyText();
+    return events.flatMap((e) => readCursorEvent(e, reply)?.records ?? []).filter((r) => r.kind === 'assistant_text').map((r) => (r.payload as { text: string }).text);
+  };
+  const toolCall = { type: 'tool_call', subtype: 'started', call_id: 't1', tool_call: { shellToolCall: { args: { command: 'ls' } } }, timestamp_ms: 3, model_call_id: 'm1' };
+
+  it('shows a message once when its chunks missed the end: the copy before the tool call adds only the rest', () => {
+    expect(replay([chunk('Setting'), chunk(' up the'), copy('Setting up the plan.'), toolCall, chunk('Done.'), copy('Done.', false)]))
+      .toEqual(['Setting', ' up the', ' plan.', 'Done.']);
+  });
+
+  it('shows a message once when its chunks missed a word in the middle', () => {
+    expect(replay([chunk('Setting'), chunk(' the plan.'), copy('Setting up the plan.'), toolCall])).toEqual(['Setting', ' the plan.']);
+  });
+
+  it('keeps the indent of a message that opens with an indented code block', () => {
+    expect(replay([chunk('    npm test\n'), chunk('    npm run typecheck\n'), copy('    npm test\n    npm run typecheck\n')]))
+      .toEqual(['    npm test\n', '    npm run typecheck\n']);
+    // The indent can come as a chunk of its own: it is held until the first word and shown with it.
+    expect(replay([chunk('    '), chunk('npm test'), copy('    npm test', false)])).toEqual(['    npm test']);
   });
 });
