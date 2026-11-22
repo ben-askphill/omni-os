@@ -386,6 +386,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       '',
       '## Delegated task',
       `The conductor handed you this task${thread.task_id ? ` as ${thread.task_id}` : ''}. Your final message is automatically reported back to it. Report outcomes and blockers, even if the answer is "nothing found".`,
+      // The report card (packages/shared/report-shape.ts) leads with what comes before the first heading and folds each heading.
+      'That final message is the whole report; what you said while working is not part of it. Put the outcome in its first one to three lines, then the details under ## headings (such as Checks, Changes, Open items), as bullet lists rather than tables.',
     );
   }
   if (events.teamOf(thread.id) !== null) lines.push(...teamLeadLines(name));

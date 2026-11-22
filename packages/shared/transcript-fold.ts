@@ -90,7 +90,10 @@ export interface ResultP {
   output_tokens?: number;
 }
 export interface ReportP {
+  /** The child run's final message. A report saved before `notes` existed has every message of the run here. */
   text: string;
+  /** The run's messages before its final one, which the card folds (report-shape.ts). */
+  notes?: string[];
   task_id?: string | null;
   thread_id: string;
   title?: string;

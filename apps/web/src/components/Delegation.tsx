@@ -9,8 +9,7 @@ import { useNow } from '../store.tsx';
 import type { Branch } from '../transcript/delegation.ts';
 import { AgentAvatar, useAgent } from './AgentAvatar.tsx';
 import { HarnessMark } from './brand.tsx';
-import { Folded } from './Folded.tsx';
-import { Markdown } from './Markdown.tsx';
+import { ReportBody } from './thread/ReportBody.tsx';
 import { Icon, StatusPill } from './ui.tsx';
 
 // The rail's ink: --line-strong flattened onto the page, so the rail and an elbow do not darken where they overlap.
@@ -77,9 +76,7 @@ export function BranchFace({ role, title, status, children }: { role?: string | 
 export function Answer({ r }: { r: ReportP }) {
   return (
     <div className="mt-2 rounded-[16px] bg-bg px-3.5 py-3 text-[14px] shadow-[var(--shadow-card)]">
-      <Folded>
-        <Markdown text={r.text || '(no reply)'} />
-      </Folded>
+      <ReportBody r={r} />
     </div>
   );
 }

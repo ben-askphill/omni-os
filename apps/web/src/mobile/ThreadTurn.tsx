@@ -312,7 +312,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
       );
     })}
     {t.reports.map((r, k) => (
-      <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} remote={r.remote ? (r.harness_name ?? r.harness ?? '') : undefined} />
+      <Report key={k} r={r} remote={r.remote ? (r.harness_name ?? r.harness ?? '') : undefined} />
     ))}
     {t.lanes ? (
       <MoLanes t={t} c={c} />

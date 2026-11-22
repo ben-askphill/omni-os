@@ -41,6 +41,47 @@ describe('crew reports', () => {
     expect(H.byKind(parent.id, 'result')).toHaveLength(2);
   });
 
+  it("reports the run's final message, with what it said while working kept as notes the parent's harness does not read", T, async () => {
+    const parent = await H.start('builder waiting');
+    await H.untilResults(parent.id, 1);
+    const child = await H.start('child narrates', { parent_id: parent.id, role: 'builder' });
+    await H.untilResults(child.id, 1);
+    await H.untilResults(parent.id, 2);
+    expect(reports(parent.id)[0].payload).toMatchObject({ text: 'ack: child narrates', notes: [] });
+
+    // A second turn as a builder writes one: a line before each tool call, then its final message in two blocks.
+    const add = (kind: string, payload: unknown) => H.db.events.add(child.id, kind, payload);
+    add('user', { text: 'now fix it' });
+    add('assistant_text', { text: 'Checking which source the CLI sends.' });
+    add('tool_use', { id: 'tu1', name: 'Bash', input: { command: 'rg source' } });
+    add('assistant_text', { text: 'Both tests pass. Confirming the new test fails without the fix.' });
+    add('tool_use', { id: 'tu2', name: 'Bash', input: { command: 'npm test' } });
+    add('assistant_text', { text: 'Opened PR #9.' });
+    add('assistant_text', { text: '## Tests\n- 13 of 13 pass' });
+    const said = H.db.events.lastRunReport(child.id);
+    expect(said).toEqual({
+      text: 'Opened PR #9.\n\n## Tests\n- 13 of 13 pass',
+      notes: ['Checking which source the CLI sends.', 'Both tests pass. Confirming the new test fails without the fix.'],
+    });
+    H.runner.reportToParent(child.id, 'done', said);
+    await H.untilResults(parent.id, 3);
+    expect(H.byKind(parent.id, 'crew_report').at(-1)!.p).toMatchObject({ status: 'done', ...said });
+    const woke = H.claudeTexts(parent.id).at(-1)!;
+    expect(woke).toContain('Opened PR #9.\n\n## Tests\n- 13 of 13 pass');
+    expect(woke).not.toContain('Checking which source');
+
+    // A run that failed has no final message: its parent's harness gets what it said before that too.
+    add('user', { text: 'and the docs' });
+    add('assistant_text', { text: 'Editing the docs.' });
+    add('tool_use', { id: 'tu3', name: 'Edit', input: {} });
+    add('assistant_text', { text: 'Now the README.' });
+    add('tool_use', { id: 'tu4', name: 'Edit', input: {} });
+    H.runner.reportToParent(child.id, 'failed', H.db.events.lastRunReport(child.id));
+    await H.untilResults(parent.id, 4);
+    expect(H.byKind(parent.id, 'crew_report').at(-1)!.p).toMatchObject({ status: 'failed', text: 'Now the README.', notes: ['Editing the docs.'] });
+    expect(H.claudeTexts(parent.id).at(-1)).toContain('Now the README.\n\nWhat it said before that:\n\nEditing the docs.');
+  });
+
   it('keeps a report for a parent Ben stopped, held for Resume, and Resume delivers it once', T, async () => {
     const parent = await H.start('TOOL:30000 conductor at work');
     await H.untilTool(parent.id);

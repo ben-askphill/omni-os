@@ -19,6 +19,7 @@ import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
 import { glyphFor, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
 import { QuestionCard } from '../QuestionCard';
+import { ReportBody } from './ReportBody';
 import { useRowActions } from './actions';
 import { MentionText, SentTo } from './Group';
 
@@ -81,7 +82,7 @@ export function ReportRow({ row }: Of<'report'>) {
         <View style={styles.grow} />
         {r.task_id ? <Text style={[styles.caption, { color: colors.fg3, fontFamily: MONO }]}>{r.task_id}</Text> : null}
       </Pressable>
-      <MarkdownIn text={r.text} />
+      <ReportBody r={r} />
     </View>
   );
 }
@@ -205,7 +206,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
         </Pressable>
         {row.answers[k.id] && k.status !== 'running' && k.status !== 'queued' ? (
           <View style={styles.answer}>
-            <MarkdownIn text={row.answers[k.id].text || '(no reply)'} />
+            <ReportBody r={row.answers[k.id]} />
           </View>
         ) : null}
         </View>
