@@ -122,6 +122,52 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     expect((await state()).records).toHaveLength(1);
   });
 
+  it("a chip's name sits on the baseline of the words beside it, and the chip stays inside the line", async () => {
+    await load();
+    // The menu can lag behind the typing under load, so these wait longer than `until` for its one row.
+    const only = (name: string) =>
+      page.waitForFunction(
+        (n) => {
+          const rows = document.querySelectorAll('[role="option"]');
+          return rows.length === 1 && !!rows[0].textContent?.includes(n);
+        },
+        name,
+        { timeout: 10_000 },
+      );
+    await page.keyboard.type('ask @rev');
+    await only('Reviewer');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('to run it on @om');
+    await only('omarchy');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('now');
+    await until(async () => (await chips()).length === 2);
+    const offsets = await page.evaluate(() => {
+      const box = document.querySelector('[data-slot="token-input-editor"]')!;
+      const rect = (node: Node, at: number) => {
+        const r = document.createRange();
+        r.setStart(node, at);
+        r.setEnd(node, at + 1);
+        return r.getBoundingClientRect();
+      };
+      // The "a" of "ask": the same font puts every letter's box the same distance under the baseline.
+      const word = rect([...box.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.startsWith('ask'))!, 0);
+      return [...box.querySelectorAll('.mention-pill')].map((pill) => {
+        const name = [...pill.childNodes].reverse().find((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim())!;
+        const p = pill.getBoundingClientRect();
+        return {
+          name: name.textContent!.trim(),
+          baseline: Math.round(rect(name, 0).bottom - word.bottom),
+          center: Math.round((p.top + p.bottom) / 2 - (word.top + word.bottom) / 2),
+        };
+      });
+    });
+    expect(offsets).toEqual([
+      { name: 'Reviewer', baseline: 0, center: 0 },
+      { name: 'omarchy', baseline: 0, center: 0 },
+    ]);
+  });
+
   it('/ at the start lists the commands and picks one', async () => {
     await load();
     await page.keyboard.type('/de');

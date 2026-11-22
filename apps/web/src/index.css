@@ -1337,10 +1337,13 @@
     color: var(--fg-3);
     pointer-events: none;
   }
-  /* A machine @mention inline: a chip in the composer (MessageEditor.tsx) and in a sent message (MentionText.tsx). */
+  /* A machine or agent @mention inline: a chip in the composer (MessageEditor.tsx) and in a sent message
+     (MentionText.tsx). Its name is baseline-aligned, so the pill takes its baseline from the name and sits on the line
+     with the words around it. With every item centered it took the icon's or avatar's bottom edge as its baseline,
+     which lifted the name and made the line taller. The icon or avatar stays centered in the pill. */
   .mention-pill {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.25em;
     padding: 0 0.4em;
     border-radius: 6px;
@@ -1356,6 +1359,9 @@
   .mention-pill-sent:focus-visible {
     outline: 2px solid var(--live);
     outline-offset: 1px;
+  }
+  .mention-pill > * {
+    align-self: center;
   }
   .mention-icon {
     width: 0.85em;
