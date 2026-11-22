@@ -191,6 +191,9 @@ const NAMES = [
   'thread-members.json',
   // A work thread, as the Conductor's detail lists it, with its seat's session still holding the report.
   'seated-delegations.json',
+  // A delegated thread that kept a plan, as its parent's detail lists it: its list in brief (`progress`), which the
+  // delegation card's bar and step line read (@omni/shared/steps.ts StepProgress). Last, so the ids before it stay put.
+  'delegated-progress.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -1040,6 +1043,12 @@ async function scenario() {
   expect(children).toHaveLength(1);
   expect(children[0]).toMatchObject({ id: work.id, parent_id: seat.session_thread, seated_delegation: { thread_id: job.id, agent: 'builder' } });
   keep('seated-delegations.json', children);
+
+  const planner = (await call('POST', '/threads', { channel: 'acme', prompt: 'RICH fix the cart total', title: 'Fix the cart total', parent_id: conductor.id })) as Thread;
+  await eventually(async () => (await detail(planner.id)).thread.status === 'done', 'the delegated planner to finish');
+  const brief = ((await get(`/threads/${conductor.id}`)).children as { id: string; progress?: unknown }[]).filter((c) => c.id === planner.id);
+  expect(brief[0]?.progress).toMatchObject({ count: 3, done: 3, live: false });
+  keep('delegated-progress.json', brief);
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

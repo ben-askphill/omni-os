@@ -1,5 +1,6 @@
 import type { SeatedDelegation, ThreadMember } from '@omni/shared/members.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
+import type { StepProgress } from '@omni/shared/steps.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { apiPath, sendWithFiles, type HttpClient, type WithFiles } from '../http.ts';
 
@@ -60,6 +61,11 @@ export interface Thread {
   updated_at: string;
   /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), from @omni/shared/steps.ts. Absent otherwise. */
   step?: string;
+  /**
+   * A delegated thread's step list in brief, on its parent's detail and the feed, running or not (@omni/shared/steps.ts
+   * StepProgress). Absent with no list, and on the other thread endpoints.
+   */
+  progress?: StepProgress;
   /** A group thread's agents, the lead first, while an agent besides the lead is seated (@omni/shared/members.ts). */
   members?: ThreadMember[];
   seated_delegation?: SeatedDelegation;

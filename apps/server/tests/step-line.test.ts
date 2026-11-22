@@ -9,7 +9,7 @@ import { hasMcpBuild } from './support.ts';
 
 const r = await startRunner();
 const { bus } = await import('../bus.ts');
-const { STEP_SETTLE_MS, threadStep, watchSteps } = await import('../step-line.ts');
+const { STEP_SETTLE_MS, progressField, threadStep, watchSteps } = await import('../step-line.ts');
 const { withDelegating } = await import('../delegating.ts');
 const { threads } = await import('../db.ts');
 const stop = watchSteps();
@@ -62,5 +62,31 @@ describe.skipIf(!hasMcpBuild)('a thread whose agent posts steps', () => {
     expect(results.filter((x) => x.startsWith('Showing '))).toHaveLength(4);
     expect(results).toContain('Showing all 3 steps as done.');
     expect(step(t.id)).toBeUndefined();
+  });
+});
+
+describe.skipIf(!hasMcpBuild)('a delegated thread on its parent\'s delegation card', () => {
+  it('carries its list in brief on the feed while it runs, and how it ended once it is done', { timeout: 30_000 }, async () => {
+    const parent = await r.start('THINK:1 hand it off');
+    await r.untilResults(parent.id, 1);
+    /** The child's brief as the feed sent it, one entry per change. */
+    const briefs: string[] = [];
+    let childId: string | undefined;
+    const onFeed = (e: { type: string; thread?: { id: string } }) => {
+      if (e.type !== 'thread' || !childId || e.thread?.id !== childId) return;
+      const p = progressField(e.thread as ReturnType<typeof threads.get> & object).progress;
+      const line = p ? `${p.at}/${p.count} ${p.title ?? ''} ${p.live ? 'live' : 'ended'}` : 'none';
+      if (briefs.at(-1) !== line) briefs.push(line);
+    };
+    bus.on('feed', onFeed);
+    const child = await r.start('STEPS:900 pick a review app', { parent_id: parent.id });
+    childId = child.id;
+    await r.untilResults(child.id, 1, 25_000);
+    bus.off('feed', onFeed);
+    expect(briefs).toEqual(expect.arrayContaining(['1/3 Find candidate apps live', '2/3 Read the reviews live', '3/3 Compare prices live']));
+    // Done: the whole list, nothing it does now.
+    expect(progressField(r.thread(child.id)).progress).toMatchObject({ count: 3, done: 3, at: 0, now: null, live: false });
+    // A thread nobody delegated to carries none: the list endpoints leave it off.
+    expect(progressField(r.thread(parent.id))).toEqual({});
   });
 });
