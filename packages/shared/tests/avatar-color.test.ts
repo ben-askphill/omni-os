@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { scaleSvgIcon } from '../channel-icon.ts';
 import { autoAvatarColor, AVATAR_SWATCHES, avatarInk, contrast, contrastingColor, hexColor, resolveAvatarColor, svgColors } from '../avatar-color.ts';
 
 describe('avatar colors', () => {
@@ -42,5 +43,14 @@ describe('avatar colors', () => {
     expect(resolveAvatarColor({ avatar_bg: '#abcdef' }, current).avatar_bg_manual).toBe(1);
     expect(resolveAvatarColor({ avatar_bg: '#abcdef', avatar_bg_manual: 0 }, current)).toMatchObject({ avatar_bg: '#abcdef', avatar_bg_manual: 0 });
     expect(resolveAvatarColor({ icon: '🍋' }, { ...current, avatar_bg_manual: 0 }).avatar_bg).toMatch(/^#[\da-f]{6}$/);
+  });
+});
+
+describe('a resized SVG', () => {
+  it('keeps its automatic background: a new size is not a new icon', () => {
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle fill="#f5a524" r="10"/></svg>';
+    const current = { icon: `svg:${markup}`, avatar_bg: '#283c62', avatar_bg_manual: 0 };
+    expect(resolveAvatarColor({ icon: `svg:${scaleSvgIcon(markup, 70)}` }, current)).toEqual({ icon: `svg:${scaleSvgIcon(markup, 70)}` });
+    expect(resolveAvatarColor({ icon: '🍋' }, current).avatar_bg).not.toBe('#283c62');
   });
 });
