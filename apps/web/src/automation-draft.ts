@@ -171,7 +171,7 @@ export function draftProblem(d: Draft): string | null {
   if (!d.name.trim()) return 'Give it a name.';
   if (!d.prompt.trim()) return 'Write the prompt it runs.';
   if (d.trigger === 'schedule' && d.cron.trim().split(/\s+/).length !== 5) return 'A schedule takes five cron fields, like 0 8 * * 1-5.';
-  if (d.trigger === 'schedule' && d.timezone.trim() && !isTimezone(d.timezone.trim())) return 'Pick a timezone from the list, like Europe/Amsterdam.';
+  if (d.trigger === 'schedule' && d.timezone.trim() && !isTimezone(d.timezone.trim())) return 'Pick a timezone from the list, like America/New_York.';
   if (d.trigger === 'event' && d.event === 'github_webhook' && !/^[\w.-]+\/[\w.-]+$/.test(d.repo.trim())) return 'A GitHub webhook needs its repo as owner/name.';
   if (d.trigger === 'event' && d.event === 'github_webhook' && !d.webhookEvents.length) return 'Pick at least one GitHub event.';
   if (d.approve && d.expires.trim() && !/^\d+(\.\d+)?\s*[smhd]?$/i.test(d.expires.trim())) return 'An expiry takes a duration like 90m, 8h or 2d.';

@@ -72,9 +72,10 @@ changes, move them into `data/crew/` and run `git checkout -- crew`.
 
 ## Upgrading an install from before the config file
 
-An Omni data dir with threads but no `data/omni.config.json` writes one at its first boot with the defaults the code
-used to have (workspace `~/phillbert` if it exists, timezone Europe/Amsterdam, `~/central-brain` if it exists, your
-first name from `git config user.name`) and skips onboarding. Check it afterwards in Settings.
+An Omni data dir with threads but no `data/omni.config.json` writes one at its first boot and skips onboarding. It
+keeps your first name (from the old profile, else `git config user.name`), your git email and the GitHub owner of the
+checkout's `origin`. The workspace, notes folder and timezone take a fresh install's fallbacks (`~/Omni`, none, this
+machine's timezone). Check them afterwards in Settings.
 
 ## Contributing back
 

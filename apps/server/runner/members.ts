@@ -22,6 +22,7 @@ import { seatRefusal } from '../message-context/agent-mention.ts';
 import { channelCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun, setsRun } from '../harness/resolve.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
+import { autoNeedOptions } from '../display.ts';
 import { usageByHarness } from '../usage.ts';
 import { userName } from '../profile.ts';
 import type { Attachment } from '../uploads.ts';
@@ -81,7 +82,7 @@ function memberRun(t: Thread, agent: string, prompt: string, own: MemberRunPick 
   const run = resolveRun(asked, setsRun(role) ? role : undefined, cat, channelDefaults);
   if (run.ok && !('auto' in run)) return { harness: run.harness, model: run.model || null, effort: run.effort ?? '', auto_reason: null };
   if (!run.ok) return { harness: role?.harness ?? (isRemoteAgentHarness(t.harness) ? DEFAULT_HARNESS : t.harness), model: role?.model ?? null, effort: role?.effort ?? '', auto_reason: null };
-  const auto = routeTask(profileTask(prompt || t.title), { catalog: cat, usage: usageByHarness(), images: false });
+  const auto = routeTask(profileTask(prompt || t.title, autoNeedOptions()), { catalog: cat, usage: usageByHarness(), images: false });
   return { harness: auto.harness, model: auto.model || null, effort: auto.effort, auto_reason: auto.reason };
 }
 

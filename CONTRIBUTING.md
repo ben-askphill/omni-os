@@ -26,6 +26,7 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | `cd apps/server && npx vitest run tests/<file>.test.ts` | One file |
 | `npx turbo run test --affected` | Only what changed against `main` |
 | `npm run test:rust` | The Rust crates' tests (`crates/`), which `npm test` does not run. Needs `cargo`. See [Rust port](docs/internals/rust-port.md) |
+| `npx tsx apps/desktop/scripts/personal-terms.ts` | Every line of shipped text (desktop build, Rust binaries, iOS app, relay) that names one person's own setup: a name, company, client, machine, folder or timezone. `npm test` and the desktop release fail on one; `ALLOWED_HITS` in that file holds the agreed exceptions |
 
 `npm test` runs on macOS and Linux and needs Node 24 and git. It runs two packages at a time, each on half the cores. On a small machine, pass a lower cap: `npx turbo run test --concurrency=1 -- --maxWorkers=2`. The server suite points `TMPDIR` at one `omni-test-*` folder per run (`apps/server/tests/global-tmpdir.ts`) and removes it afterwards, so leftover mkdtemp folders do not fill a quota'd `/tmp`. Sandbox tests set their own temp `OMNI_DATA_DIR` before `config.ts` loads, so a live install's `omni.config.json` cannot leak into them. Some tests need more and skip without it:
 

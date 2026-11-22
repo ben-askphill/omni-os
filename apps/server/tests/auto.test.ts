@@ -93,6 +93,14 @@ describe('detectNeeds', () => {
   it('puts the needs on the profile', () => {
     expect(profileTask('Quickly rename the button label').needs).toContain('speed');
   });
+
+  it("reads an install's own connector words, and only those it adds", () => {
+    expect(detectNeeds('Check the portal for the client brief')).not.toContain('connectors');
+    expect(detectNeeds('Check the portal for the client brief', { connectors: ['portal'] })).toContain('connectors');
+    expect(detectNeeds('Pull the deal from HubSpot', { connectors: [' HubSpot ', ''] })).toContain('connectors');
+    expect(detectNeeds('Fix the teleportal bug', { connectors: ['portal'] })).not.toContain('connectors');
+    expect(profileTask('Check the portal', { connectors: ['portal'] }).needs).toContain('connectors');
+  });
 });
 
 describe('routeTask', () => {

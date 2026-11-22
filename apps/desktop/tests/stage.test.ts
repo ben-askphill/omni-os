@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
-import { personalTermProblems, SHIPPED_SOURCES } from '../scripts/personal-terms.ts';
+import { personalTermIn, personalTermProblems, rustShippedText, SHIPPED_SOURCES } from '../scripts/personal-terms.ts';
 import { cargoArgs, NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
 import { NATIVE_CLI } from '../src/cli-shim.ts';
 import {
@@ -168,6 +168,66 @@ describe('stage.ts and the server bundle', () => {
       ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("flags one person's machines, handles, folders and timezone in any case, and passes the words around them", () => {
+    expect(personalTermIn("run it on omarchy")).toBe('omarchy');
+    expect(personalTermIn('"@MacBook Air build it"')).toBe('MacBook Air');
+    expect(personalTermIn("placeholder: 'macbook pro'")).toBe('macbook pro');
+    expect(personalTermIn('mail ben@example.com')).toBe('ben@');
+    expect(personalTermIn('https://github.com/ben-askphill/omni-os')).toBe('askphill');
+    expect(personalTermIn('~/central-brain')).toBe('central-brain');
+    expect(personalTermIn('Use an IANA name like Europe/Amsterdam.')).toBe('Amsterdam');
+    expect(personalTermIn('An Acne Studios drop')).toBe('Acne');
+    // The first one in the line wins, whichever list it is on.
+    expect(personalTermIn('Volero on omarchy')).toBe('Volero');
+    for (const fine of ['benchmark', 'stay productive', 'a React portal', 'acne cream', 'Benjamin', 'macbooks', 'Use an IANA name like America/New_York.']) {
+      expect(personalTermIn(fine), fine).toBeNull();
+    }
+  });
+
+  it('reads a Rust source as its binary carries it: no comments, no test module', () => {
+    const rs = [
+      '/// Runs on omarchy.',
+      'pub fn hint() -> &\'static str {',
+      '    "See https://example.com" // on omarchy',
+      '}',
+      'const NAME: &str = "Volero";',
+      '#[cfg(test)]',
+      'mod tests {',
+      '    #[test]',
+      '    fn host() {',
+      '        assert_eq!(super::hint(), "omarchy.tail1234.ts.net");',
+      '    }',
+      '}',
+      'pub const AFTER: &str = "Ask Phill";',
+    ].join('\n');
+    const lines = rustShippedText(rs);
+    expect(lines.map((l) => l.text.trim()).filter(Boolean)).toEqual([
+      "pub fn hint() -> &'static str {",
+      '"See https://example.com"',
+      '}',
+      'const NAME: &str = "Volero";',
+      'pub const AFTER: &str = "Ask Phill";',
+    ]);
+    expect(lines.find((l) => l.text.includes('AFTER'))?.line).toBe(13);
+    const dir = mkdtempSync(join(tmpdir(), 'omni-stage-rs-'));
+    try {
+      mkdirSync(join(dir, 'crates/x/src'), { recursive: true });
+      writeFileSync(join(dir, 'crates/x/src/lib.rs'), rs);
+      expect(personalTermProblems(dir, ['crates/x/src']).map((p) => p.split(': ').slice(0, 2).join(': '))).toEqual([
+        'crates/x/src/lib.rs:5: Volero',
+        'crates/x/src/lib.rs:13: Ask Phill',
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('covers every app that ships: the desktop build, the Rust binaries, the iOS app and the relay', () => {
+    for (const src of ['apps/server', 'apps/web/src', 'apps/desktop/src', 'packages/shared', 'crates/omni-cli/src', 'crates/omni-mcp/src', 'apps/ios/src', 'packages/client-core', 'apps/relay/src']) {
+      expect(SHIPPED_SOURCES).toContain(src);
     }
   });
 

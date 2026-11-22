@@ -24,7 +24,7 @@ export const profileInput = z.object({
   timezone: z
     .string()
     .trim()
-    .refine((tz) => tz === '' || isTimezone(tz), 'Unknown timezone. Use an IANA name like Europe/Amsterdam.')
+    .refine((tz) => tz === '' || isTimezone(tz), 'Unknown timezone. Use an IANA name like America/New_York.')
     .optional(),
 });
 
