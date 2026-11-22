@@ -31,6 +31,7 @@ import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
 import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
+import { progressField } from './step-line.ts';
 import { memberFields } from './member-view.ts';
 import { collisionsOf } from './runner/collisions.ts';
 import { machineNames } from './ran-on.ts';
@@ -286,7 +287,8 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const pending = pendingFor(t.id);
   const ids = delegatingIds();
   const names = machineNames();
-  const shown = <T extends { id: string; status?: string }>(list: T[]) => list.map((x) => withDelegating(x, ids, names));
+  // A delegated thread's list in brief rides along for the delegation cards (step-line.ts progressField).
+  const shown = <T extends Thread>(list: T[]) => list.map((x) => ({ ...withDelegating(x, ids, names), ...progressField(x) }));
   const children = threads.children(t.id);
   const delegatedBySeats = t.channel_id === 'conductor' ? threads.seatedDelegations(t.id).map((child) => ({
     ...child,

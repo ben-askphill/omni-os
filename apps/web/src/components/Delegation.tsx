@@ -8,6 +8,7 @@ import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
 import type { Branch } from '../transcript/delegation.ts';
 import { AgentAvatar, useAgent } from './AgentAvatar.tsx';
+import { BranchProgress } from './BranchProgress.tsx';
 import { HarnessMark } from './brand.tsx';
 import { Folded } from './Folded.tsx';
 import { Markdown } from './Markdown.tsx';
@@ -47,9 +48,10 @@ export const ROW_CARD = 'press flex w-full min-w-0 items-start gap-3 rounded-[16
 /**
  * What a row shows: the avatar of the agent its thread runs as (`role`), title, a meta line and its state. The avatar's
  * eyes show `status` live, and its character moves while the thread works (ADR 0021, D29), without opening the thread. A row with
- * no agent (a thread without one, or a harness's own sub-agent) shows the layers icon on a disc instead.
+ * no agent (a thread without one, or a harness's own sub-agent) shows the layers icon on a disc instead. `below`: what
+ * sits under the meta line, a delegated thread's step progress.
  */
-export function BranchFace({ role, title, status, children }: { role?: string | null; title: string; status: string; children: ReactNode }) {
+export function BranchFace({ role, title, status, children, below }: { role?: string | null; title: string; status: string; children: ReactNode; below?: ReactNode }) {
   const agent = useAgent(role);
   return (
     <>
@@ -65,6 +67,7 @@ export function BranchFace({ role, title, status, children }: { role?: string | 
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[14px] font-medium text-fg">{title}</span>
         <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">{children}</span>
+        {below}
       </span>
       <span className="shrink-0">
         <StatusPill status={status} />
@@ -97,7 +100,7 @@ function BranchRow({ b, report, answer }: { b: Branch; report?: string; answer?:
     <RailItem
       row={
         <a href={href.thread(b.id)} className={ROW_CARD}>
-          <BranchFace role={b.role} title={b.title} status={b.status}>
+          <BranchFace role={b.role} title={b.title} status={b.status} below={b.progress && <BranchProgress p={b.progress} className="mt-2" />}>
             {b.role && <span>{b.role}</span>}
             {b.channel && <span>#{b.channel}</span>}
             <HarnessMark harness={b.harness} />

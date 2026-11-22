@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
-import { isStepsTool, plainCall, stepLine, stepsHeader, turnSteps, turnsOf, type StepsView } from '../steps.ts';
+import { isStepsTool, plainCall, progressInk, progressLine, stepLine, stepProgress, stepsHeader, turnSteps, turnsOf, type StepsView } from '../steps.ts';
 import { buildItems, type TranscriptEvent } from '../transcript-fold.ts';
 
 // The plain step view over each harness's way of keeping a plan: set_steps (Claude Code, Codex and Cursor get the
@@ -322,5 +322,42 @@ describe('turnsOf', () => {
     const { items } = buildItems([user('One'), text('a'), user('Also this'), text('b'), result(), user('Two'), text('c')]);
     const turns = turnsOf(items);
     expect(turns.map((t) => t.filter((it) => it.type === 'user').length)).toEqual([2, 1]);
+  });
+});
+
+describe('a delegated thread\'s list in brief, for the delegation card', () => {
+  const list = ['Find the card', 'Design the short report card', 'Build it', 'Test it', 'Open the PR'];
+  const turn = (current: number, more: TranscriptEvent[] = []) => [user('Build the card'), ...call('s', 'mcp__omni-steps__set_steps', { steps: list, current }), ...more];
+
+  it('names the step it is on and what it does now while it runs', () => {
+    const p = stepProgress(steps(turn(1, [tool('r', 'Read', { file_path: '/repo/apps/web/src/Card.tsx' })])));
+    expect(p).toEqual({ count: 5, done: 1, at: 2, state: 'active', title: 'Design the short report card', now: 'Reading "Card.tsx"', live: true });
+    expect(progressLine(p!)).toBe('Step 2 of 5 · Design the short report card');
+    expect(progressInk(p!)).toBeNull();
+  });
+
+  it('turns amber while a question waits on Ben', () => {
+    const p = stepProgress(steps(turn(2), true, { asking: true }))!;
+    expect(p.state).toBe('needs');
+    expect(progressInk(p)).toBe('needs');
+  });
+
+  it('keeps how the list ended once the turn is over', () => {
+    const all = stepProgress(steps(turn(5, [text('Done'), result()]), false))!;
+    expect(all).toMatchObject({ count: 5, done: 5, at: 0, now: null, live: false });
+    expect(progressLine(all)).toBe('All 5 steps done');
+    const failed = stepProgress(steps(turn(3, [ev('result', { ok: false, subtype: 'error_during_execution' })]), false))!;
+    expect(failed).toMatchObject({ at: 4, state: 'failed', title: 'Test it', now: null });
+    expect(progressLine(failed)).toBe('Failed on step 4 of 5 · Test it');
+    expect(progressInk(failed)).toBe('muted');
+  });
+
+  it('reads "Wrapping up" once every step is done and the turn still runs', () => {
+    expect(progressLine(stepProgress(steps(turn(5)))!)).toBe('Wrapping up');
+  });
+
+  it('is nothing for a thread with no list: grouped phases are Omni\'s guess, not a plan', () => {
+    expect(stepProgress(steps([user('Go'), ...call('w', 'WebSearch', { query: 'x' })]))).toBeNull();
+    expect(stepProgress(null)).toBeNull();
   });
 });
