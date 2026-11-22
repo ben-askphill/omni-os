@@ -146,7 +146,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'network', section: 'access', title: 'Tailscale logins and public MCP URL', keywords: ['tailscale', 'tailnet', 'serve', 'mcp', 'claude.ai', 'chatgpt', 'clerk', 'remote access'] },
   { id: 'secrets', section: 'secrets', title: 'Secrets', keywords: ['api key', 'token', 'env', 'keychain', 'password', 'credentials'] },
   { id: 'wispr-flow', section: 'extras', title: 'Dictate with Wispr Flow', keywords: ['wispr flow', 'dictate', 'dictation', 'voice', 'speak', 'talk', 'quick prompt'] },
-  { id: 'shopify', section: 'extras', title: 'Shopify add-on', keywords: ['shopify', 'store', 'store domain', 'myshopify', 'portal', 'portal slug', 'ask phill', 'pack', 'add-on'] },
+  { id: 'shopify', section: 'extras', title: 'Shopify add-on', keywords: ['shopify', 'store', 'store domain', 'myshopify', 'portal', 'portal slug', 'pack', 'add-on'] },
   { id: 'grok-bot', section: 'extras', title: 'Grok Bot', keywords: ['grok', 'grok bot', 'webhook', 'GROKBOT_WEBHOOK_URL', 'send to grok bot'] },
   { id: 'hermes', section: 'extras', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY', 'integrations'] },
   { id: 'brain', section: 'extras', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests', 'knowledge base'] },

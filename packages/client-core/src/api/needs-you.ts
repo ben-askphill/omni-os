@@ -67,7 +67,7 @@ export function needsYouApi(http: HttpClient) {
   return {
     /** Unread results and blockers across every thread that is not archived or done, newest first. */
     needsYou: (scope: NeedsYouScope = {}) => http.request<NeedsYou>('GET', apiPath`/needs-you`, { query: { ...scope } }),
-    /** Ben saw a result. Only that result and older ones count as read. A 404 for a uid this server does not have. */
+    /** The user saw a result. Only that result and older ones count as read. A 404 for a uid this server does not have. */
     markResultRead: (uid: string) => http.request<ResultRead>('POST', apiPath`/needs-you/read`, { body: { uid } }),
   };
 }

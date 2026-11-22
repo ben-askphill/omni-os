@@ -71,6 +71,8 @@ export interface QAArgs {
   out: string;
   /** A packaged app: Omni.app, its binary, or an AppImage. Null runs this checkout's dev build. */
   app: string | null;
+  /** --updates: the packaged app's updater runs, for a check against a local feed. Off by default (OMNI_SELF_UPDATE=off). */
+  updates: boolean;
   overrides: { port?: number; dataDir?: string; appUrl?: string; appearance?: Appearance; zoom?: number; size?: Size };
 }
 
@@ -285,7 +287,7 @@ export function parseScript(raw: unknown, overrides: QAArgs['overrides'] = {}): 
 }
 
 export function parseArgs(argv: readonly string[]): Result<QAArgs> {
-  const out: QAArgs = { script: '', out: '', app: null, overrides: {} };
+  const out: QAArgs = { script: '', out: '', app: null, updates: false, overrides: {} };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const eq = arg.startsWith('--') ? arg.indexOf('=') : -1;
@@ -310,6 +312,9 @@ export function parseArgs(argv: readonly string[]): Result<QAArgs> {
         out.app = v;
         break;
       }
+      case '--updates':
+        out.updates = true;
+        break;
       case '--port': {
         const port = parsePort(value());
         if (port === null) return { error: '--port needs a port from 1 to 65535' };
@@ -542,6 +547,10 @@ async function main(argv: readonly string[]): Promise<number> {
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && key !== 'OMNI_TOKEN' && key !== 'ELECTRON_RUN_AS_NODE' && key !== 'NODE_OPTIONS') env[key] = value;
   }
+  // A packaged app shares the installed app's AppImage path and updater cache: left on, an update it found and
+  // installed at the run's quit would replace the installed app and take that app's download (updates.ts).
+  if (args.updates) delete env.OMNI_SELF_UPDATE;
+  else env.OMNI_SELF_UPDATE = 'off';
 
   const { _electron } = await import('playwright');
   let app: ElectronApplication;

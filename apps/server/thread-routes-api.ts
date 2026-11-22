@@ -112,8 +112,9 @@ const createSchema = z.object({
   base: basePick.nullish(),
   device: z.string().max(100).nullish(),
   /**
-   * Thread references on the first message (the new-thread composer's chips), checked by parseContexts and stamped by
-   * stampNewThreadReferences. No other kind: the rest point into the thread they are written in.
+   * Thread references and machine mentions on the first message (the new-thread composer's chips and pills), checked
+   * by parseContexts and stamped by stampNewThreadReferences and stampMachineMentions. No other kind: the rest point
+   * into the thread they are written in. A machine mention never picks where the thread starts: `device` does.
    */
   context: z.unknown().optional(),
   /** A quick ask (packages/shared/quick-ask.ts): answered in place, out of the lists but Recent asks. */
@@ -277,8 +278,7 @@ function openingOf(id: string, pending: PendingMsg[]): Opening | null {
   if (events.firstUserText(id) !== null) return null;
   const lead = leadOf(pending);
   if (lead) return { text: lead.text, uuid: lead.uuid, ...(lead.attachments?.length && { attachments: lead.attachments }), ...(lead.context && { context: lead.context }) };
-  const prompt = freshPrompt(id);
-  return prompt ? { text: prompt } : null;
+  return freshPrompt(id);
 }
 
 /** The detail with `page`'s events: every event, the head and its `history`, or none (the stream's sync). */
@@ -288,6 +288,10 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const names = machineNames();
   const shown = <T extends { id: string; status?: string }>(list: T[]) => list.map((x) => withDelegating(x, ids, names));
   const children = threads.children(t.id);
+  const delegatedBySeats = t.channel_id === 'conductor' ? threads.seatedDelegations(t.id).map((child) => ({
+    ...child,
+    seated_delegation: threads.seatedDelegationOf(child),
+  })) : [];
   const parent = t.parent_id ? threads.get(t.parent_id) : null;
   const detail = {
     thread: withDelegating(t, ids, names),
@@ -298,7 +302,7 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     // The newest files and screenshots of the threads it delegated to, at any depth, each with its thread's title.
     // New ones come on the stream as crew_artifact (artifacts.ts announceArtifact).
     crew_artifacts: artifacts.crew(t.id, CREW_ARTIFACTS_MAX),
-    children: shown(children),
+    children: shown([...children, ...delegatedBySeats].sort((a, b) => a.created_at.localeCompare(b.created_at))),
     // Members of the teams this thread started, so its delegation cards can show their state.
     team: shown(children.flatMap((ch) => threads.team(ch.id))),
     parent: parent ? withDelegating(parent, ids, names) : null,

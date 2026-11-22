@@ -2,12 +2,12 @@
 // Metrics are the design's, in CSS pixels on a 390-wide phone.
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
-import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
-import { CrewMark, isCrewRole } from '../components/brand.tsx';
+import { ThreadAvatar } from '../components/ThreadAvatar.tsx';
 import { Folded } from '../components/Folded.tsx';
 import { FindTargetCtx } from '../transcript/find-target.ts';
-import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
-import type { Mark, Phase } from '@omni/shared/status.ts';
+import { Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
+import type { ThreadMember } from '@omni/shared/members.ts';
+import { glyphFor, markOf, type Mark, type Phase } from '@omni/shared/status.ts';
 import type { RowItem } from './rows.ts';
 import { LayerShownCtx, SheetHostCtx } from './sheet-stack.ts';
 import { drawsFaces, MarkLine } from '../components/thread/AvatarMark.tsx';
@@ -117,27 +117,32 @@ export function MoEmpty({ children }: { children: ReactNode }) {
   return <p className="m-0 px-5 py-[18px] text-[14px] leading-[1.5] text-pretty text-fg-3">{children}</p>;
 }
 
-/**
- * Who works the thread: its crew mark, or the channel's avatar when it runs without a role, with its status on the
- * corner. A Conductor thread wears the Conductor's saved icon and background once it has them, as on the desktop Inbox
- * and the iPhone; its crew ring is only the default.
- */
-export function MoAvatar({ role, channel, channelIcon, avatarBg, state, phase, mark, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null; size?: number }) {
-  const ring = isCrewRole(role) && !(role === 'conductor' && hasOwnLook({ icon: channelIcon, avatar_bg: avatarBg }));
+/** Who works the thread (ThreadAvatar): its agent's avatar, its eyes showing `shows` as a list row's do, else its channel's. */
+export function MoAvatar({ size = 36, ...who }: Omit<Parameters<typeof ThreadAvatar>[0], 'size'> & { size?: number }) {
   return (
-    <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      {ring ? (
-        <span className="grid h-full w-full place-items-center rounded-full bg-surface-2 text-fg-2">
-          <CrewMark role={role} size={Math.round(size * 0.46)} />
-        </span>
-      ) : (
-        <Avatar name={channel ?? '?'} channelIcon={channelIcon} avatarBg={avatarBg} omni={channel === CONDUCTOR_CHANNEL} size={size} />
-      )}
-      {state && (
-        <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-          <StatusDot status={state} phase={phase} mark={mark} size={8} />
-        </span>
-      )}
+    <span className="grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+      <ThreadAvatar {...who} size={size} />
+    </span>
+  );
+}
+
+type RowState = { state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null };
+
+/**
+ * A thread row's start: who works it, its eyes on the row's state (ADR 0021, D23). A group thread's lead shows its own
+ * state, as the busy faces on the row's second line show theirs. The row's mark sits at its far end (MoRowMark).
+ */
+export function MoRowLead({ state, phase, mark, members, ...who }: Omit<Parameters<typeof MoAvatar>[0], 'shows' | 'size'> & RowState & { members?: readonly Pick<ThreadMember, 'lead' | 'state'>[] }) {
+  const lead = members?.find((m) => m.lead);
+  return <MoAvatar {...who} shows={lead ? { member: lead.state } : state ? { mark: mark ?? markOf(glyphFor(state), phase) } : undefined} />;
+}
+
+/** A thread row's status mark, at the far end of its title's line (ADR 0021, D23). Nothing without a state. */
+export function MoRowMark({ state, phase, mark }: RowState) {
+  if (!state) return null;
+  return (
+    <span className="grid min-w-3 shrink-0 place-items-center self-center">
+      <StatusDot status={state} phase={phase} mark={mark} size={8} />
     </span>
   );
 }
@@ -155,11 +160,12 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () => void; last?: boolean; trailing?: ReactNode }) {
   return (
     <button type="button" onClick={onOpen} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-      <MoAvatar role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} phase={it.phase} />
+      <MoRowLead role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} phase={it.phase} members={it.members} />
       <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`}>
         <span className="flex items-baseline gap-2">
           <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${it.settled ? 'text-fg-2' : 'text-fg'}`}>{it.title}</span>
           <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{it.time}</span>
+          <MoRowMark state={it.status} phase={it.phase} />
         </span>
         {/* A group thread at work says who on its second line: "Builder asks you · Designer working" (Q35). */}
         {drawsFaces(it.members) ? (

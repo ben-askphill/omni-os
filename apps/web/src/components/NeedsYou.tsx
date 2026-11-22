@@ -5,42 +5,37 @@ import type { NeedsYou as Inbox, NeedsYouItem } from '../api.ts';
 import { canMarkDone, reasonOf, splitNeeds } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
-import { Avatar, Icon, StatusDot, type IconName } from './ui.tsx';
+import { Icon, StatusDot, type IconName } from './ui.tsx';
+import { ThreadAvatar } from './ThreadAvatar.tsx';
 
 /**
- * One thread that needs Ben: why, and the result's last words or Setup's reason. Opening it reads the result. On
- * hover, a check marks it done: out of here until something new happens in it (right-click has it too).
+ * One thread that needs Ben: its agent's avatar (else its channel's), why, and the result's last words or Setup's
+ * reason, with its mark at the far end (ADR 0021, D23). Opening it reads the result. On hover, a check marks it done:
+ * out of here until something new happens in it (right-click has it too).
  */
 export function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: boolean }) {
   useNow(60_000);
   const { channels } = useApp();
   const markDone = useMarkDone();
   const t = item.thread;
+  const ch = channels.find((c) => c.id === t.channel_id);
   const reason = reasonOf(item);
   const unread = !!item.result;
   return (
     <div className="group/ny relative">
     <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-2.5 [--hov:var(--surface)] md:px-3.5">
-      {showChannel ? (
-        <span className="relative mt-0.5 shrink-0">
-          <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />
-          <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-            <StatusDot mark={reason.mark} size={8} />
-          </span>
-        </span>
-      ) : (
-        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          <StatusDot mark={reason.mark} size={10} />
-        </span>
-      )}
+      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center" data-row-lead>
+        <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={{ mark: reason.mark }} size={32} />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`min-w-0 truncate text-[14px] group-hover:text-fg ${unread ? 'text-fg' : 'text-fg-2'}`}>{t.title || 'Untitled'}</span>
           {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-fg" aria-label="Unread" role="img" />}
-          <span
-            className={`ml-auto shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums ${canMarkDone(t.status) ? 'md:group-focus-within/ny:opacity-0 md:group-hover/ny:opacity-0' : ''}`}
-          >
-            {relTime(item.at)}
+          <span className={`ml-auto flex shrink-0 items-center gap-2 pl-2 ${canMarkDone(t.status) ? 'md:group-focus-within/ny:opacity-0 md:group-hover/ny:opacity-0' : ''}`}>
+            <span className="font-num text-[12px] text-fg-3 tabular-nums">{relTime(item.at)}</span>
+            <span className="grid min-w-3 place-items-center" data-row-mark>
+              <StatusDot mark={reason.mark} size={8} />
+            </span>
           </span>
         </div>
         <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] text-fg-3">

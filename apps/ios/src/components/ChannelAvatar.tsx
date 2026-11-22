@@ -9,18 +9,16 @@ import { Icon } from '../ui/Icon';
 import { rounded, useOmniTheme, weight } from '../theme';
 import { monogram } from '@omni/shared/monogram.ts';
 import { channelFace, type ChannelFace } from './channel-face';
-import { type Glyph, StatusDot } from './StatusDot';
 
 /**
  * A channel as the Web UI's Avatar draws it, everywhere a channel shows: its own icon (an emoji, a design system icon
- * or an uploaded SVG) or its monogram (packages/shared/monogram.ts) in a soft circle, the Omni mark for the Conductor until it has an icon of its own, and a thread's status glyph
- * on the corner when given.
+ * or an uploaded SVG) or its monogram (packages/shared/monogram.ts) in a soft circle, the Omni mark for the Conductor
+ * until it has an icon of its own. A thread row puts its status dot at its far end, not on the avatar (ADR 0021).
  */
 export function ChannelAvatar({
   name,
   icon,
   conductor,
-  glyph,
   size = 36,
   disc,
   avatarBg,
@@ -28,7 +26,6 @@ export function ChannelAvatar({
   name: string;
   icon?: string | null;
   conductor?: boolean;
-  glyph?: Glyph | null;
   size?: number;
   /** The circle's colour, for an avatar that sits on surface-2 itself, such as a pill. */
   disc?: string;
@@ -40,11 +37,6 @@ export function ChannelAvatar({
       <View style={[styles.disc, { width: size, height: size, borderRadius: size / 2, backgroundColor: avatarBg || disc || colors.surface2 }]}>
         <Face face={channelFace(name, icon, conductor)} name={name} size={size} color={avatarBg ? avatarInk(avatarBg) : colors.fg2} />
       </View>
-      {glyph ? (
-        <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-          <StatusDot glyph={glyph} size={8} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -89,15 +81,5 @@ const styles = StyleSheet.create({
   letter: {
     fontFamily: rounded,
     fontWeight: weight.medium,
-  },
-  badge: {
-    position: 'absolute',
-    right: -1,
-    bottom: -1,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

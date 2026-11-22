@@ -11,7 +11,7 @@ const home = mkdtempSync(join(tmpdir(), 'omni-home-'));
 const r = await startRunner({ HOME: home, OMNI_TZ: '' });
 delete process.env.OMNI_TZ;
 const { app } = await import('../app.ts');
-const { configPath, userConfig, resolved, updateUserConfig } = await import('../user-config.ts');
+const { configPath, userConfig, resolved, updateUserConfig, fallbacks, systemTimezone } = await import('../user-config.ts');
 const { legacyConfig, migrateLegacyConfig } = await import('../config-migrate.ts');
 const { listCrew } = await import('../crew.ts');
 const { loadAutomations } = await import('../automations.ts');
@@ -358,29 +358,34 @@ describe('personal overrides', () => {
 });
 
 describe('legacy migration', () => {
-  it("an install from before the config keeps the old defaults: workspace ~/phillbert, Amsterdam, its name", async () => {
+  it('an install from before the config keeps its name and skips onboarding, with no one else\'s folders or timezone', async () => {
     rmSync(configPath());
+    // Folders the old code looked for by its author's names: a new file must not pick them up.
     mkdirSync(join(home, 'phillbert'), { recursive: true });
     mkdirSync(join(home, 'central-brain'), { recursive: true });
-    r.db.kv.set('profile', { name: 'Ben' });
+    r.db.kv.set('profile', { name: 'Ada' });
     const brain = process.env.OMNI_BRAIN_DIR;
+    const tz = process.env.OMNI_TZ;
     delete process.env.OMNI_BRAIN_DIR;
+    delete process.env.OMNI_TZ;
     try {
       const c = legacyConfig();
-      expect(c.user.name).toBe('Ben');
-      expect(c.user.timezone).toBe('Europe/Amsterdam');
-      expect(c.workspace.root).toBe('~/phillbert');
-      expect(c.integrations.centralBrainDir).toBe('~/central-brain');
+      expect(c.user.name).toBe('Ada');
+      expect(c.user.timezone).toBe('');
+      expect(c.workspace.root).toBe('');
+      expect(c.integrations.centralBrainDir).toBe('');
       expect(c.onboardedAt).toBeTruthy();
       // The data dir has threads (the welcome one), so boot writes it and skips onboarding.
       expect(migrateLegacyConfig()).toBe(true);
-      expect(resolved.workspaceRoot()).toBe(join(home, 'phillbert'));
-      expect(resolved.timezone()).toBe('Europe/Amsterdam');
+      expect(resolved.workspaceRoot()).toBe(fallbacks().workspaceRoot);
+      expect(resolved.timezone()).toBe(systemTimezone());
       expect((await json(await send('GET', '/api/setup'))).onboarded).toBe(true);
       // Only once.
       expect(migrateLegacyConfig()).toBe(false);
     } finally {
       process.env.OMNI_BRAIN_DIR = brain;
+      if (tz === undefined) delete process.env.OMNI_TZ;
+      else process.env.OMNI_TZ = tz;
     }
   });
 });

@@ -31,7 +31,7 @@ describe('ChannelRail', () => {
       { id: 'plain', name: 'Plain', kind: 'client', icon: null, avatar_bg: null, running: 0 },
     ];
     const html = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'channel', id: 'acne' } }));
-    expect(disc(html, 'Acne Studios')).toContain('background-color:#e6a491;color:#202020');
+    expect(disc(html, 'Acne Studios')).toContain('background-color:#e6a491;color:#17181a');
     expect(disc(html, 'Acne Studios')).toContain('ring-2');
     expect(disc(html, 'Volero')).toContain('background-color:#283c62;color:#ffffff');
     expect(disc(html, 'Plain')).not.toContain('background-color');

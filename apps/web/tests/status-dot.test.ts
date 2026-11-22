@@ -7,6 +7,9 @@ import { MARK, PHASE, type Mark, type Phase } from '@omni/shared/status.ts';
 import { Loader, StatusDot, ThreadDot } from '../src/components/ui/status.tsx';
 import { threadPill } from '../src/components/thread/thread-state.ts';
 import { rowOf } from '../src/mobile/rows.ts';
+import { MoRow } from '../src/mobile/parts.tsx';
+import type { RowItem } from '../src/mobile/rows.ts';
+import type { ThreadMember } from '@omni/shared/members.ts';
 
 // One running signal: the status dot, in the thread's phase. No spinner and no moving Omni mark says that something
 // runs, anywhere in the Web UI.
@@ -84,6 +87,20 @@ describe("a thread row's mark", () => {
     expect(mark({ t: { status: 'failed', limit_state: 'limited' } })).toContain('data-s="limited"');
   });
 
+  it("draws a group thread's busy agents as its mark, each showing its own state, with nothing on a face (ADR 0021, D8)", () => {
+    const seat = (agent: string, state: ThreadMember['state'], lead = false) => ({ agent, name: agent, lead, state, status: 'running', harness: 'claude-code', model: null, effort: '', seated_at: '' }) as ThreadMember;
+    const html = mark({ t: { status: 'running', members: [seat('builder', 'working', true), seat('reviewer', 'needs'), seat('writer', 'failed')] } });
+    // The one asking first, then the working one: their eyes say which, and a character wears no ring.
+    expect([...html.matchAll(/data-eyes="(\w+)"/g)].map((m) => m[1])).toEqual(['needs', 'working']);
+    expect(html).not.toContain('avatar-ring');
+    // The Needs you diamond and the failed dot sit beside the faces, never in a face's box.
+    const beside = html.indexOf('data-needs-mark');
+    expect(beside).toBeGreaterThan(html.lastIndexOf('data-face'));
+    expect(html.slice(0, beside)).not.toContain('data-mark=');
+    expect(html.slice(beside)).toContain('data-mark="question"');
+    expect(html.indexOf('data-failed-dot')).toBeGreaterThan(beside);
+  });
+
   it('says how it ended beyond the status: a folder that never got ready, a pull request to review', () => {
     expect(mark({ t: { status: 'failed', setup: 'failed' } })).toContain('data-mark="setup_failed"');
     expect(mark({ t: { status: 'done' }, pr: { state: 'OPEN', isDraft: false } })).toContain('data-mark="review"');
@@ -125,6 +142,18 @@ describe('the phase a thread shows by name', () => {
     expect(threadPill({ ...t, status: 'done' }, { need: { blockers: [{ kind: 'recovered' }] } })).toMatchObject({ label: 'Message held', mark: 'held' });
     expect(threadPill({ ...t, status: 'done' }, { pr: { state: 'OPEN', isDraft: false } })).toEqual({ glyph: 'done', label: 'Ready for review', mark: 'review' });
     expect(threadPill({ ...t, status: 'failed', setup: 'failed' })).toMatchObject({ glyph: 'failed', label: 'Setup failed', mark: 'setup_failed' });
+  });
+
+  it("leads a phone row with the avatar, whose eyes show its state, and ends the title's line with the mark (ADR 0021, D8, D23)", () => {
+    const it: RowItem = { id: 't1', title: 'Ship the fix', channel: 'acme', channelId: 'acme', channelIcon: null, role: 'builder', status: 'running', phase: 'tool', settled: false, time: '2m', meta: null };
+    const html = renderToStaticMarkup(createElement(MoRow, { it, onOpen: () => {} }));
+    const [avatar, title, time, end] = [html.indexOf('data-shape="squircle"'), html.indexOf('Ship the fix'), html.indexOf('2m<'), html.indexOf('data-mark="tool"')];
+    expect(html.slice(avatar)).toMatch(/^data-shape="squircle"[^>]*data-eyes="working"/);
+    expect(avatar).toBeGreaterThan(-1);
+    expect(title).toBeGreaterThan(avatar);
+    expect(time).toBeGreaterThan(title);
+    expect(end).toBeGreaterThan(time);
+    expect(html.slice(0, title)).not.toContain('data-mark=');
   });
 
   it('names it on a phone list row', () => {

@@ -25,12 +25,12 @@ export const TIERS_ORDER: Tier[] = ['light', 'standard', 'heavy', 'max'];
 /**
  * What a brief asks of the run beyond its kind and difficulty. Each one can decide the harness (see LANES).
  * - `image-generation`: make an image. Only Codex generates images here.
- * - `connectors`: Ben's mail, calendar, Notion, Slack, Productive or Portal, which are claude.ai connectors in Claude Code.
- *   Notion also works in any local harness through OMNI_NOTION_TOKEN (runner/prompts.ts); it stays here because a
- *   brief that names it usually names another connector too.
+ * - `connectors`: the user's mail, calendar, Notion, Slack or Productive, which are claude.ai connectors in Claude Code,
+ *   and any word an install adds (NeedOptions). Notion also works in any local harness through OMNI_NOTION_TOKEN
+ *   (runner/prompts.ts); it stays here because a brief that names it usually names another connector too.
  * - `review`: a second look at code or a PR, best from another model family than the one that wrote it.
  * - `bulk`: one mechanical change applied everywhere, which a fast cheap coding model does as well as a big one.
- * - `speed`: Ben asked for it fast. Lowers the effort a step and prefers the fastest model that can do the kind.
+ * - `speed`: the user asked for it fast. Lowers the effort a step and prefers the fastest model that can do the kind.
  */
 export type Need = 'image-generation' | 'connectors' | 'review' | 'bulk' | 'speed';
 
@@ -38,13 +38,24 @@ const NEED_CUES: Record<Need, RegExp> = {
   'image-generation':
     /^\s*\/imagegen\b|\b(image generation|text-to-image|gpt-image)\b|\b(generate|create|draw|design|render|produce|paint|make me)\s+(me\s+)?((an?|some|the|new|\d+|two|three|a few)\s+)?([\w-]+\s+){0,3}(images?|pictures?|photos?|illustrations?|logos?|icons?|banners?|graphics?|artwork|mock-?ups?|thumbnails?|avatars?|posters?|wallpapers?)\b(?!\s+(component|class|font|button|prop|file|set|library|sprite sheet))/i,
   connectors:
-    /\b(gmail|my (e-?mail|mail|inbox)|calendar|meetings?|notion|slack|productive|log (my )?(time|hours)|time entr(y|ies)|portal|granola|google (drive|docs|sheets))\b/i,
+    /\b(gmail|my (e-?mail|mail|inbox)|calendar|meetings?|notion|slack|productive|log (my )?(time|hours)|time entr(y|ies)|granola|google (drive|docs|sheets))\b/i,
   review: /\bcode review\b|\b(review|audit|critique|second opinion on)\b[^.\n]{0,30}\b(pr|pull request|diff|changes|branch|commits?|code|implementation)\b/i,
   bulk: /\b(codemod|find and replace|search and replace|bulk|mass|sweep)\b|\b(rename|replace|bump|update|change|migrate|convert)\b[^.\n]{0,40}\b(across|everywhere|in (all|every))\b|\bfix (all )?(the )?lint\b/i,
   speed: /\b(quick(ly)?|fast|asap|right (now|away)|urgent(ly)?|in a hurry|hurry|speedy|real quick|no need to be thorough|as soon as possible)\b/i,
 };
 
-export const detectNeeds = (prompt: string): Need[] => (Object.keys(NEED_CUES) as Need[]).filter((n) => NEED_CUES[n].test(prompt));
+/** What an install adds to the cues: `connectors`, more words that name one of its connectors. */
+export interface NeedOptions {
+  connectors?: readonly string[];
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const detectNeeds = (prompt: string, opts: NeedOptions = {}): Need[] => {
+  const extra = (opts.connectors ?? []).map((w) => w.trim()).filter(Boolean);
+  const named = extra.length > 0 && new RegExp(`\\b(${extra.map(escapeRe).join('|')})\\b`, 'i').test(prompt);
+  return (Object.keys(NEED_CUES) as Need[]).filter((n) => NEED_CUES[n].test(prompt) || (n === 'connectors' && named));
+};
 
 export interface TaskProfile {
   kind: TaskKind;
@@ -181,10 +192,10 @@ export function baseScore(prompt: string): { score: number; signals: string[] } 
   return { score, signals };
 }
 
-export function profileTask(prompt: string): TaskProfile {
+export function profileTask(prompt: string, opts: NeedOptions = {}): TaskProfile {
   const kind = detectKind(prompt);
   const { score, signals } = baseScore(prompt);
-  return { kind, difficulty: clamp01(score + KIND_LIFT[kind]), tier: tierFor(score, kind), signals, needs: detectNeeds(prompt) };
+  return { kind, difficulty: clamp01(score + KIND_LIFT[kind]), tier: tierFor(score, kind), signals, needs: detectNeeds(prompt, opts) };
 }
 
 // ---------- policy ----------

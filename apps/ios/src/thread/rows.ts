@@ -10,7 +10,10 @@ import type { MergeRiskP } from '@omni/shared/merge-risk.ts';
 import { showsSteps, stepsHeader, type StepState, type StepsView } from '@omni/shared/steps.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { conductorChannelLook, type FaceAgent, type FaceShows } from '@omni/shared/agent-avatar.ts';
+import { agentShows, eyesFor } from '@omni/shared/crew-eyes.ts';
+import { glyphFor, markOf, type Mark } from '@omni/shared/status.ts';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 
 import { harnessLabel } from './format';
@@ -44,15 +47,17 @@ type RowOf =
   | { kind: 'prompt'; key: string; p: Prompt; caption: string | null; to: { agent: string; name: string }[]; chips: unknown[] }
   /**
    * The line that opens an agent's reply: its avatar in the gutter, its name and the time. `run` is the harness and
-   * model it ran on, shown with Show technical details. `look`: the Conductor channel's saved face, on the Conductor's.
+   * model it ran on, shown with Show technical details. `look`: the Conductor channel's saved face, when the
+   * Conductor wears it (conductorChannelLook). `shows`: what the avatar's eyes show while this reply is being written;
+   * null for a past reply, whose head stays idle (ADR 0021, D11).
    */
-  | { kind: 'author'; key: string; agent: string; at: string | null; run: { harness: string; model: string | null }; look: ConductorLook | null }
+  | { kind: 'author'; key: string; agent: string; at: string | null; run: { harness: string; model: string | null }; look: ConductorLook | null; shows: FaceShows | null }
   | { kind: 'report'; key: string; r: ReportP }
   | { kind: 'question'; key: string; q: ThreadQuestion }
   /** `harness`: named at the end for a turn no agent wrote. */
   | { kind: 'outcome'; key: string; status: IosTurn['status']; tookMs: number | undefined; steps: number; harness: string | null }
-  /** The quiet "Conductor" line over its answer. `look`: the icon and background saved for it, null for the Omni mark. */
-  | { kind: 'conductor'; key: string; look: ConductorLook | null }
+  /** The quiet "Conductor" line on a thread from before agents. */
+  | { kind: 'conductor'; key: string; look: ConductorLook | null; agent?: 'conductor' }
   | { kind: 'error'; key: string; text: string }
   | { kind: 'cloud'; key: string; p: CloudAgentP }
   | { kind: 'prose'; key: string; text: string; clipped: number | null }
@@ -150,6 +155,8 @@ export interface RowsInput {
   disclosure?: Disclosure;
   /** This machine's agents, for the names a message went to. A remote agent's has `server` set. */
   agents?: readonly RowAgent[];
+  /** The thread's status mark, as the header's lead shows it: the head of the reply being written shows it too (D11). */
+  mark?: Mark;
   /** The thread's channel: whether remote agents can see its work, for the lock line under a remote agent's reply. */
   channel?: { name: string; remote_work?: number } | null;
 }
@@ -158,6 +165,8 @@ export interface RowAgent {
   id: string;
   name: string;
   server?: unknown;
+  /** Its photo or icon, which the Conductor wears over its channel's look (conductorChannelLook). */
+  avatar?: FaceAgent['avatar'];
 }
 
 function conductorLook(c: RowsInput['conductorChannel']): ConductorLook | null {
@@ -207,7 +216,8 @@ function* turnRows(t: IosTurn, i: number, input: RowsInput): Generator<ThreadRow
   const label = t.author && t.author !== thread.role ? 'Thinking' : (statusLabel(input.events) ?? 'Thinking');
   // A turn several agents answered is its lanes, as on phone web.
   if (t.lanes) yield* laneRows(t, t.lanes, input);
-  else yield* authored(t, replyRows(t, { live, asking, label }, input), input);
+  // The reply being written shows live eyes, as the header's lead does; a past one's head stays idle (D11).
+  else yield* authored(t, replyRows(t, { live, asking, label }, input), input, live ? agentShows(thread.members, t.author, input.mark ?? markOf(glyphFor(thread.status))) : undefined);
   for (const f of t.flags ?? []) yield { kind: 'collision', key: `x${f.key}`, c: f };
   for (const it of t.switches) yield { kind: 'switch', key: `w${it.key}`, it, running: thread.status === 'running' };
   for (const it of t.members) yield { kind: 'member', key: `j${it.key}`, text: memberLine(it.p), event: it.p.event };
@@ -215,13 +225,15 @@ function* turnRows(t: IosTurn, i: number, input: RowsInput): Generator<ThreadRow
 }
 
 /** A turn's reply under its author line, set beside the avatar. A turn no agent wrote shows as it always did. */
-function* authored(t: IosTurn, rows: Iterable<ThreadRow>, input: RowsInput): Generator<ThreadRow> {
+function* authored(t: IosTurn, rows: Iterable<ThreadRow>, input: RowsInput, shows: FaceShows | undefined): Generator<ThreadRow> {
   const reply = [...rows];
   if (!t.author || !reply.length) return yield* reply;
   const first = t.items.find(isReply);
   const run = seatRun(input.thread.members, t.author) ?? { harness: t.harness, model: t.result?.model ?? null };
-  const look = t.author === 'conductor' ? conductorLook(input.conductorChannel) : null;
-  yield { kind: 'author', key: `au${t.key}`, agent: t.author, at: first ? replyAt(first) : null, run, look };
+  const agent = input.agents?.find((a) => a.id === t.author) ?? { id: t.author };
+  const channelLook = input.thread.channel_id === CONDUCTOR_CHANNEL ? null : input.conductorChannel;
+  const look = conductorLook(conductorChannelLook(agent, channelLook));
+  yield { kind: 'author', key: `au${t.key}`, agent: t.author, at: first ? replyAt(first) : null, run, look, shows: shows ?? null };
   for (const r of reply) yield { ...r, inset: true };
 }
 
@@ -242,7 +254,10 @@ function* laneRows(t: IosTurn, lanes: NonNullable<IosTurn['lanes']>, input: Rows
   const live = lane.status === 'running' || lane.status === 'queued';
   // Its own latest line while it works, not the thread's status.
   const label = lanes.latest[agent] ?? 'Working';
-  const rows: ThreadRow[] = [...authored(lane, replyRows(lane, { live, asking: live && lane.questions.length > 0, label }, input), input)];
+  // While any lane works, the lane's head shows its own lane's state, as its tab does; once all ended they are history.
+  const anyLive = lanes.turns.some((l) => l.status === 'running' || l.status === 'queued');
+  const shows = anyLive ? { eyes: eyesFor({ mark: markOf(glyphFor(lane.status)) }) } : undefined;
+  const rows: ThreadRow[] = [...authored(lane, replyRows(lane, { live, asking: live && lane.questions.length > 0, label }, input), input, shows)];
   const files = lanes.files[agent] ?? [];
   if (files.length) rows.push({ kind: 'files', key: 'fl', files: files.map((path) => ({ path, label: collisionLabel(path), flagged: flagged(path) })), inset: true });
   // A lane's rows are keyed under its turn: an empty lane has no event of its own to key on.
@@ -273,7 +288,12 @@ function* replyRows(t: IosTurn, { live, asking, label }: { live: boolean; asking
     // A finished Conductor answer introduces what it delegated: its author line says who wrote it, with no outcome
     // line. A turn with no author (a thread from before agents) keeps the quiet Conductor line.
     const quiet = input.conductor && t.status === 'done';
-    if (quiet && !t.author && (t.prose || t.children.length)) yield { kind: 'conductor', key: `co${t.key}`, look: conductorLook(input.conductorChannel) };
+    if (quiet && !t.author && (t.prose || t.children.length)) {
+      const key = `co${t.key}`;
+      yield thread.channel_id === CONDUCTOR_CHANNEL
+        ? { kind: 'conductor', key, look: null, agent: CONDUCTOR_CHANNEL }
+        : { kind: 'conductor', key, look: conductorLook(input.conductorChannel) };
+    }
     // An agent's turn names its harness on its author line, behind Show technical details.
     else if (!(quiet && t.author) && (t.result || t.error || t.status !== 'done')) yield { kind: 'outcome', key: `o${t.key}`, status: t.status, tookMs: t.result?.duration_ms, steps: t.progress?.steps.length ?? 0, harness: t.author ? null : t.harness };
     if (t.error) yield { kind: 'error', key: `e${t.key}`, text: t.error };

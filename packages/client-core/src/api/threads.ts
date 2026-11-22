@@ -1,10 +1,10 @@
-import type { ThreadMember } from '@omni/shared/members.ts';
+import type { SeatedDelegation, ThreadMember } from '@omni/shared/members.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { apiPath, sendWithFiles, type HttpClient, type WithFiles } from '../http.ts';
 
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
-export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
+export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team' | 'member';
 
 /** A thread row, as every thread endpoint sends it. */
 export interface Thread {
@@ -62,14 +62,18 @@ export interface Thread {
   step?: string;
   /** A group thread's agents, the lead first, while an agent besides the lead is seated (@omni/shared/members.ts). */
   members?: ThreadMember[];
+  seated_delegation?: SeatedDelegation;
   /** Why it takes no new messages: its lead agent was deleted or is hidden. */
   read_only?: string;
 }
 
 /** The part of a thread the channel list sends for each of its threads. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at' | 'updated_at' | 'folder_id' | 'harness' | 'pinned_at' | 'done_at' | 'parent_id' | 'source' | 'limit_state'> &
-  /** For the thread tree's child rows, `setup` for the Starting dot and `members` for a group thread's mark. Older servers leave them out. */
-  Partial<Pick<Thread, 'model' | 'branch' | 'setup' | 'owner' | 'members'>>;
+  /**
+   * `role` for the agent whose avatar leads the row, `model` and `branch` for the thread tree's child rows, `setup` for
+   * the Starting dot and `members` for a group thread's mark. Older servers leave them out.
+   */
+  Partial<Pick<Thread, 'role' | 'model' | 'branch' | 'setup' | 'owner' | 'members'>>;
 
 export interface ListThreads {
   channel?: string;

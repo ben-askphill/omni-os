@@ -47,6 +47,7 @@ import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCar
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
 import { defers, LIVE_TURNS } from '../transcript/defer.ts';
 import { FindBar } from '../components/thread/FindBar.tsx';
@@ -180,6 +181,8 @@ export function ThreadScreen() {
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
+  const reconnecting = !s.live && ready;
+  const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
   // The agent it runs as, its lead, with its avatar beside its name.
   const agentName = conductor ? null : crewRoleName(thread.role, roles);
   const lead = agentName && thread.role ? (roles.find((r) => r.id === thread.role) ?? { id: thread.role, name: agentName }) : null;
@@ -191,7 +194,7 @@ export function ThreadScreen() {
       {lead && agentName && (
         <>
           {' · '}
-          <AgentAvatar agent={{ ...lead, name: agentName }} size={14} className="inline-grid align-[-2px]" /> {agentName}
+          <AgentAvatar agent={{ ...lead, name: agentName }} size={16} shows={agentShows(thread.members, lead.id, own.mark)} placement="focus" className="inline-block align-[-3px]" /> {agentName}
         </>
       )}
       {' · '}
@@ -202,11 +205,10 @@ export function ThreadScreen() {
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
-  const reconnecting = !s.live && ready;
-  const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
-  const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
-  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, agents: roles, ch, changes, pr, now, shell, status, turn };
+  // The Conductor answers in its channel's look in any thread it is seated in, as on the desktop.
+  const conductorChannel = channel(CONDUCTOR_CHANNEL);
+  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, agents: roles, ch, changes, pr, now, shell, status, turn, mark: own.mark };
 
   const openFromCard = (tab: PanelTab) => {
     setQuick(false);

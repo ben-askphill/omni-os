@@ -15,7 +15,7 @@ Auto picks a new thread's harness, model and effort from its first prompt (`apps
 Each lane is a reason to leave Claude Code's tier model. Auto skips a lane whose harness is signed out or at 90% of a plan window and tries the next one.
 
 1. **Image generation: Codex**, busy or not, since nothing else here makes images. Codex's `imageGeneration` item carries the PNG as base64; `codex/images.ts` writes it to the thread's artifacts and the transcript row keeps only the file name.
-2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack, Productive and the Portal are claude.ai connectors, which only Claude Code loads. Omni's own MCP servers reach Claude Code, Codex and Cursor Agent. Hermes and Cursor Cloud have no Omni MCP servers.
+2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack and Productive are claude.ai connectors, which only Claude Code loads. With the Shopify add-on on, "portal" (the channels' client portal) counts too (`autoNeedOptions` in `apps/server/display.ts`). Omni's own MCP servers reach Claude Code, Codex and Cursor Agent. Hermes and Cursor Cloud have no Omni MCP servers.
 3. **Review: Codex**, at `high` effort whatever the tier (`GPT_REVIEW_EFFORT`). A second model family catches what the first misses in its own work. A thread as a review role (`review: true`, such as the shipped `reviewer`) on any GPT model is held at `high` too, however it was picked (`reviewerEffort` in `harness/resolve.ts`).
 4. **Claude plan busy: Codex.**
 5. **Both plans busy, code: Composer.**

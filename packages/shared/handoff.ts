@@ -10,6 +10,7 @@
 //   handoff.reply.<thread>   written by the Mac taking it, naming the offer it answers.
 
 import { relTime } from './format.ts';
+import type { MessageContext } from './message-context.ts';
 
 /** A synced Mac as it describes itself in kv `devices.<id>`. */
 export interface DeviceRecord {
@@ -84,6 +85,12 @@ export type HandoffOffer = {
       senders?: string[];
       /** A fresh thread's first files, in Storage by sha (apps/server/sync/files.ts sendUploads). */
       files?: { name: string; sha: string; size: number; mime: string; image: boolean }[];
+      /**
+       * A fresh thread's first message's records (its thread references and machine mentions), as the hub stamped
+       * them. The machine that takes it sends them with the first prompt. Older builds neither write nor read it: one
+       * that takes the offer starts the thread from the prompt's text alone.
+       */
+      context?: MessageContext[];
       /** Storage path of a git bundle with the worktree's commits and uncommitted changes, for a worktree thread. */
       bundle: { path: string; base: string; wip: string } | null;
       /** Uncommitted changes in a shared repo folder that cannot travel, e.g. "~/phillbert has uncommitted changes". */

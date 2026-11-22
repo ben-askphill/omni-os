@@ -10,6 +10,7 @@ import { openArtifact } from '../../navigation/open-artifact';
 import type { RootStackParamList } from '../../navigation/types';
 import { CLOSED, type Disclosure, threadRows, type ThreadRow } from '../../thread/rows';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import type { Mark } from '@omni/shared/status.ts';
 import { fontSize, minTarget, space, useOmniTheme, weight } from '../../theme';
 import { CrewQuestions } from './CrewQuestions';
 import { NeedsCards } from './NeedsCards';
@@ -28,7 +29,7 @@ const toggled = <T,>(set: ReadonlySet<T>, v: T): ReadonlySet<T> => {
   return next;
 };
 
-function useThreadRows(view: ThreadView, disclosure: Disclosure): ThreadRow[] {
+function useThreadRows(view: ThreadView, disclosure: Disclosure, mark: Mark | null): ThreadRow[] {
   const prev = useRef<readonly ThreadRow[]>([]);
   const { thread } = view;
   const conductor = thread?.channel_id === CONDUCTOR_CHANNEL;
@@ -48,26 +49,31 @@ function useThreadRows(view: ThreadView, disclosure: Disclosure): ThreadRow[] {
         children: view.children,
         atStart: !view.hasOlder,
         conductor,
-        conductorChannel: conductor && look.name ? { name: look.name, icon: look.icon, avatar_bg: look.avatarBg } : null,
+        // The Conductor answers in its channel's look in any thread it is seated in, as on the Web UI.
+        conductorChannel: look.name ? { name: look.name, icon: look.icon, avatar_bg: look.avatarBg } : null,
         disclosure,
         agents,
         channel,
+        mark: mark ?? undefined,
       },
       prev.current,
     ).rows;
-  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure, agents, channel]);
+  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure, agents, channel, mark]);
   useEffect(() => {
     prev.current = rows;
   }, [rows]);
   return rows;
 }
 
-/** The transcript, newest at the bottom, with the messages the agent has not read yet and paging toward older rows. */
-export function ThreadBody({ view, live }: { view: ThreadView; live: ThreadLive | null }) {
+/**
+ * The transcript, newest at the bottom, with the messages the agent has not read yet and paging toward older rows.
+ * `mark`: the thread's status mark as the header shows it, which the head of the reply being written shows too.
+ */
+export function ThreadBody({ view, live, mark }: { view: ThreadView; live: ThreadLive | null; mark: Mark | null }) {
   const { colors } = useOmniTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [disclosure, setDisclosure] = useState<Disclosure>(CLOSED);
-  const rows = useThreadRows(view, disclosure);
+  const rows = useThreadRows(view, disclosure, mark);
   // The list is inverted, so the newest row sits at index 0 and scrolling up reaches older rows.
   const data = useMemo(() => [...rows].reverse(), [rows]);
   useMarkResultRead(view.threadId, view.thread?.status);

@@ -190,6 +190,15 @@ describe('threadRows', () => {
     expect(of(rows, 'conductor').length).toBeGreaterThan(0);
   });
 
+  it('uses the agent avatar on the first reply in #conductor, including older threads', () => {
+    const conductorChannel = { name: 'Conductor', icon: 'icon:play', avatar_bg: '#1e1e1e' };
+    const channel_id = 'conductor';
+    const current = threadRows(input(rich, { thread: thread('done', { channel_id, role: 'conductor' }), conductor: true, conductorChannel }));
+    const older = threadRows(input(rich, { thread: thread('done', { channel_id }), conductor: true, conductorChannel }));
+    expect(of(current.rows, 'author')[0]).toMatchObject({ agent: 'conductor', look: null });
+    expect(of(older.rows, 'conductor')[0]).toMatchObject({ agent: 'conductor', look: null });
+  });
+
   it("draws the Conductor line with the Omni mark while the Conductor has no look of its own", () => {
     for (const conductorChannel of [undefined, null, { name: 'Conductor', icon: null, avatar_bg: null }, { name: 'Conductor', icon: 'icon:not-a-glyph' }]) {
       const { rows } = threadRows(input(rich, { conductor: true, conductorChannel }));

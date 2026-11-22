@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { CREW_SHAPE_IDS, type CrewShapeId } from '@omni/shared/crew-shapes.ts';
 import { parseAvatarImage } from './agent-avatar.ts';
 import type { CrewLockedField, CrewLocks } from '@omni/shared/crew-settings.ts';
 import { paths } from './config.ts';
@@ -40,13 +41,16 @@ const isCrewTools = (v: unknown): v is CrewTools => CREW_TOOLS.includes(v as Cre
 
 /**
  * A role's own look: an image Ben uploaded (a data URL, agent-avatar.ts), else an icon (`icon:<name>` from the shared
- * set, one emoji, or an uploaded SVG as `svg:<markup>`) on a background, as a channel's. The API sends the image as a URL (crew-api.ts).
+ * set, one emoji, or an uploaded SVG as `svg:<markup>`) on a background, as a channel's, else its crew shape (ADR 0021).
+ * The API sends the image as a URL (crew-api.ts), and the shape only when the file names one: clients pick the default.
  */
 export interface CrewAvatar {
   /** A square PNG, JPEG or WebP, at most 256px a side, as a data URL. */
   image?: string;
   icon?: string;
-  /** A six-digit hex color. */
+  /** One of CREW_SHAPE_IDS. Unset: the shape the agent's id picks. */
+  shape?: CrewShapeId;
+  /** A six-digit hex color: the agent's one color, for the shape's body, an icon's disc and its mention pill. */
   bg?: string;
 }
 
@@ -188,20 +192,25 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : und
 
 export const AVATAR_BG = /^#[0-9a-f]{6}$/i;
 
+/** One of the 16 crew shapes this build draws (packages/shared/crew-shapes.ts). */
+export const isCrewShape = (v: unknown): v is CrewShapeId => typeof v === 'string' && (CREW_SHAPE_IDS as readonly string[]).includes(v);
+
 /**
  * The avatar a file names: an uploaded image (agent-avatar.ts, never an SVG), a shared icon, an emoji or an SVG icon
- * (channel-icon.ts checks it as it does a channel's), and a hex color. A key that does not check out is left out, so a hand edit gone wrong falls back to the next look.
+ * (channel-icon.ts checks it as it does a channel's), a crew shape and a hex color. A key that does not check out is
+ * left out, so a hand edit gone wrong falls back to the next look, and a shape from a later build to the default one.
  */
 export function avatarOf(v: unknown): CrewAvatar | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
-  const { image, icon, bg } = v as Record<string, unknown>;
+  const { image, icon, shape, bg } = v as Record<string, unknown>;
   const kind = typeof icon === 'string' ? parseChannelIcon(icon)?.kind : undefined;
   const out: CrewAvatar = {
     ...(typeof image === 'string' && !('problem' in parseAvatarImage(image)) ? { image } : {}),
     ...(kind ? { icon: (icon as string).trim() } : {}),
+    ...(isCrewShape(shape) ? { shape } : {}),
     ...(typeof bg === 'string' && AVATAR_BG.test(bg) ? { bg: bg.toLowerCase() } : {}),
   };
-  return out.image || out.icon || out.bg ? out : undefined;
+  return out.image || out.icon || out.shape || out.bg ? out : undefined;
 }
 /** A field the overlay sets wins; one it leaves out (or empties) falls back to the shipped file's. */
 const pick = (key: string, over: Record<string, unknown>, base: Record<string, unknown>) =>

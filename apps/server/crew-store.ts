@@ -12,8 +12,9 @@ import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
 import { parseChannelIcon, SVG_MAX, SVG_PREFIX } from '@omni/shared/channel-icon.ts';
+import { CREW_SHAPE_IDS } from '@omni/shared/crew-shapes.ts';
 import { parseAvatarImage } from './agent-avatar.ts';
-import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, SKILLS_MAX, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, isCrewShape, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, SKILLS_MAX, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import { isCommandName } from '@omni/shared/slash.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { ROLE_MEMORY_MODES } from '@omni/shared/memory.ts';
@@ -39,8 +40,9 @@ const optText = (max: number) => z.string().trim().max(max).optional();
 
 /**
  * A role's avatar: an uploaded image (agent-avatar.ts), a shared icon (`icon:<name>`), one emoji or an SVG icon
- * (`svg:<markup>`, checked as a channel's), and a hex background. A save changes the keys it names and keeps the rest; null or an empty string removes one. `avatar: null`
- * removes the icon and background, as it did before uploads: the image goes only when a save names it.
+ * (`svg:<markup>`, checked as a channel's), a crew shape (one of CREW_SHAPE_IDS, ADR 0021) and a hex background, the
+ * agent's one color. A save changes the keys it names and keeps the rest; null or an empty string removes one.
+ * `avatar: null` removes the icon, shape and background, as it did before uploads: the image goes only when a save names it.
  */
 const avatar = z
   .object({
@@ -58,6 +60,11 @@ const avatar = z
       .string()
       .max(SVG_PREFIX.length + SVG_MAX)
       .refine((v) => !v || !!parseChannelIcon(v), 'An avatar icon is one of the shared icons, one emoji or a plain SVG.')
+      .nullable()
+      .optional(),
+    shape: z
+      .string()
+      .refine((v) => !v || isCrewShape(v), `An avatar shape is one of ${CREW_SHAPE_IDS.join(', ')}.`)
       .nullable()
       .optional(),
     bg: z.string().regex(/^$|^#[0-9a-f]{6}$/i, 'An avatar background is a hex color like #f5e6ba.').nullable().optional(),
@@ -304,7 +311,7 @@ function savedText(save: CrewSave, shipped: string | null, own: string | null): 
 function setAvatar(doc: Document, save: AvatarSave) {
   const before = doc.get('avatar');
   const now: Record<string, unknown> = isMap(before) ? { ...(before.toJSON() as Record<string, unknown>) } : {};
-  const changes = save === null ? { icon: null, bg: null } : (save ?? {});
+  const changes = save === null ? { icon: null, shape: null, bg: null } : (save ?? {});
   for (const [k, v] of Object.entries(changes)) {
     if (v === undefined) continue;
     if (v === null || v === '') delete now[k];
@@ -349,8 +356,8 @@ export function avatarOffered(role: Pick<CrewRole, 'id' | 'avatar'>): boolean {
 
 /**
  * Put the avatar a remote agent's server offers on it (ADR 0020, Q29), and record in `avatar_offered:` that it was
- * offered. With `unlessOwn`, an avatar Ben set stays: an upload of his, or an icon or color he picked. A later offer
- * replaces only an offered one. Null when nothing changed.
+ * offered. With `unlessOwn`, an avatar Ben set stays: an upload of his, or an icon, shape (ADR 0021) or color he
+ * picked. A later offer replaces only an offered one. Null when nothing changed.
  */
 export function saveOfferedAvatar(id: string, image: string, ctx: CrewSaveContext, opts: { unlessOwn?: boolean } = {}): CrewDetail | null {
   const role = getCrew(id);
@@ -361,7 +368,7 @@ export function saveOfferedAvatar(id: string, image: string, ctx: CrewSaveContex
   const mark = imageMark(image);
   if (opts.unlessOwn) {
     const now = role.avatar;
-    const bens = !!now && !(now.image && imageMark(now.image) === offered && !now.icon);
+    const bens = !!now && !(now.image && imageMark(now.image) === offered && !now.icon && !now.shape);
     if (bens || offered === mark) return null;
   }
   const { doc, body } = openOwn(own);

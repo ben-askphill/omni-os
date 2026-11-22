@@ -9,6 +9,7 @@ import {
   type HandoffRequest,
   type HandoffView,
 } from '@omni/shared/handoff.ts';
+import type { MessageContext } from '@omni/shared/message-context.ts';
 import { publishFeed } from '../bus.ts';
 import { assignments, kv, outbox, threads, type Thread } from '../db.ts';
 import { safeSegment } from '../sync/paths.ts';
@@ -50,6 +51,7 @@ function parseOffer(threadId: string, v: unknown): HandoffOffer | null {
       Array.isArray(o.queued) &&
       o.queued.every((q: unknown) => typeof q === 'string') &&
       (o.senders === undefined || (Array.isArray(o.senders) && o.senders.every((s: unknown) => typeof s === 'string'))) &&
+      (o.context === undefined || (Array.isArray(o.context) && o.context.every((c: unknown) => !!c && typeof c === 'object' && !Array.isArray(c)))) &&
       bundle(o.bundle) &&
       isText(o.leftBehind),
     cancelled: () => true,
@@ -193,8 +195,9 @@ export function handoffBlock(t: Pick<Thread, 'id' | 'status' | 'updated_at'>, ta
   return waits ? handoffText(v) : null;
 }
 
-/** A new thread sent to another machine to run there: its first prompt, which the offer carries. Null for any other thread. */
-export function freshPrompt(threadId: string): string | null {
+/** A new thread sent to another machine to run there: its first prompt and records, which the offer carries. Null for any other thread. */
+export function freshPrompt(threadId: string): { text: string; context?: MessageContext[] } | null {
   const offer = offerOf(threadId);
-  return offer?.fresh && offer.state === 'offered' ? (offer.queued[0] ?? null) : null;
+  if (!offer?.fresh || offer.state !== 'offered' || offer.queued[0] === undefined) return null;
+  return { text: offer.queued[0], ...(offer.context?.length && { context: offer.context }) };
 }

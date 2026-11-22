@@ -372,7 +372,7 @@ export function settingProblem(f: SettingField, raw: string, on: 'file' | 'save'
   if (!v) return on === 'form' ? (f.required ?? null) : null;
   switch (f.input) {
     case 'timezone':
-      return isTimezone(v) ? null : 'Unknown timezone. Use an IANA name like Europe/Amsterdam.';
+      return isTimezone(v) ? null : 'Unknown timezone. Use an IANA name like America/New_York.';
     case 'email':
       return EMAIL.test(v) ? null : 'Enter a valid email, or leave it empty.';
     case 'owner':

@@ -327,12 +327,17 @@ const pendingView = (m: Msg & { event: { kind: Exclude<Msg['event']['kind'], 'no
   });
 };
 
-/** A saved request as the runner carries it. Only for one Omni wrote itself; Ben's go through `messageFor` (api.ts). */
+/**
+ * A saved request as the runner carries it. Only for one Omni wrote itself; Ben's go through `messageFor` (api.ts).
+ * Its records go with it: a new thread's first message, kept here when the machine it was sent to could not take it
+ * (handoff.ts restoreFresh), keeps its machine mentions for the agent.
+ */
 export const requestMsg = (r: MessageRequest): Msg => ({
   uuid: r.id,
   requestId: r.request_id,
   text: r.prompt,
   mode: r.mode,
+  ...(r.context?.length && { contexts: r.context }),
   event: { kind: r.kind, payload: r.payload ?? { text: r.prompt, source: r.source } },
   byOmni: true,
 });

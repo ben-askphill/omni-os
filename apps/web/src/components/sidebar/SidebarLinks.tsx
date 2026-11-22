@@ -34,7 +34,7 @@ export function WorkspaceLinks({ onNavigate }: { onNavigate?: () => void }) {
 /** The link under a channel's threads to its full list: "See all threads", or "N more". */
 export function ChannelListLink({ channelId, onNavigate, children }: { channelId: string; onNavigate?: () => void; children: ReactNode }) {
   return (
-    <a href={href.channel(channelId)} onClick={onNavigate} className="item ml-[25px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-3 hover:text-fg-2">
+    <a href={href.channel(channelId)} onClick={onNavigate} className="item ml-[25px] flex h-7 items-center pr-3 pl-[38px] text-[12px] text-fg-3 hover:text-fg-2">
       {children}
     </a>
   );

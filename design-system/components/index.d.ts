@@ -570,16 +570,24 @@ export interface CommandPaletteProps {
 export function CommandPalette(props: CommandPaletteProps): JSX.Element;
 
 // ---- components/navigation/Rail.d.ts
+import type { ReactNode } from 'react';
+
 /**
  * The sidebar (web/src Sidebar.tsx): wordmark, pill "Search or jump to ⌘K", ink "New thread", Home, the Conductor (its
  * mark is alive), pinned views, then the thread sections (Running, Pinned, Recent threads), then channels grouped
- * Clients / Internal / Personal with "#" leads, running threads nested under each channel (max 5, then "N more").
+ * Clients / Internal / Personal with "#" leads, running threads nested under each channel (max 5, then "N more"), each
+ * led by its agent's avatar with its status dot at the far end.
  * A white thumb slides to the active row (Bencho stretch + settle).
  * Channels carry a running count (ultramarine ping) and a needs count (vermilion diamond) — no per-channel color.
  * Footer: usage card (5h / week ticks per harness) and the theme segmented switch.
  * @startingPoint section="Navigation" subtitle="Sidebar with sliding thumb, thread sections, nested threads, usage" viewport="260x760"
  */
-export interface RailThread { id: string; title: string; state?: 'running' | 'needs' | 'done' | 'settled' | 'queued' }
+/**
+ * A thread's 32px row (ADR 0021, D23): its agent's 18px avatar, 8px before the title, and its status dot at the far end.
+ * `avatar` is the agent's AgentAvatar, its eyes on the row's state; leave it out for a thread with no agent and the
+ * channel's Monogram leads. A group thread whose agents work or wait on you passes their faces.
+ */
+export interface RailThread { id: string; title: string; state?: 'running' | 'needs' | 'done' | 'settled' | 'queued'; avatar?: ReactNode }
 export interface RailChannel {
   id: string;
   name: string;
@@ -981,9 +989,10 @@ export function QuestionCard(props: QuestionCardProps): JSX.Element;
 import type { ReactNode } from 'react';
 
 /**
- * Thread row (web/src ThreadList.tsx). 18px-radius row with a Bencho hover wash; 32px round lead holding the status
- * dot (or channel avatar + dot badge when `channel` is set); line 1: 14px title, flags/chips, mono time; line 2:
- * harness, branch pill, preview, T-id. Idle rows drop to regular weight in fg-2. Compact density hides line 2.
+ * Thread row (web/src ThreadList.tsx, ADR 0021 D23). 18px-radius row with a Bencho hover wash; the agent's 32px avatar
+ * leads it (`avatar`, an AgentAvatar showing the row's state in its eyes), else the channel's Monogram for a thread with
+ * no agent; line 1: 14px title, flags/chips, mono time and the 8px status dot at the far end; line 2: harness, branch
+ * pill, preview, T-id. Idle rows drop to regular weight in fg-2. Compact density hides line 2.
  * @startingPoint section="Thread" subtitle="Thread list row + day group" viewport="760x320"
  */
 export interface ThreadRowProps {
@@ -999,8 +1008,15 @@ export interface ThreadRowProps {
   branch?: string;
   meta?: string;
   preview?: string;
-  /** Show the channel avatar + #name (cross-channel lists) */
+  /**
+   * The agent's avatar (AgentAvatar, 32px), its eyes on the row's state. Leave it out for a thread with no agent: the
+   * channel's Monogram leads instead. A group thread whose agents work or wait on you passes their faces (the avatar mark).
+   */
+  avatar?: ReactNode;
+  /** Show #name on line 2 (cross-channel lists); its Monogram leads a thread with no agent. */
   channel?: string;
+  /** The channel a single channel's list shows, for its Monogram when the thread has no agent. */
+  home?: string;
   /**
    * Ben marked it done: out of Needs you, still listed in its channel. A grey check replaces the status dot, the
    * title goes fg-4 and an outline Done chip shows, whatever `state` is.
@@ -1106,10 +1122,13 @@ export interface MoSectionProps {
 export function MoSection(props: MoSectionProps): JSX.Element;
 
 // ---- components/mobile/MoThreadRow.d.ts
+import type { ReactNode } from 'react';
+
 /**
- * MoThreadRow: one row wherever a thread is listed on the phone. 36pt crew avatar with the status glyph, 15pt title,
- * time, then channel and meta; running progress in live text; diff or artifact count on the right.
- * MoAvatar: crew mark in a surface-2 disc with the status glyph on its corner. MoDiff: +add −del, tabular.
+ * MoThreadRow: one row wherever a thread is listed on the phone (ADR 0021, D23). The agent's 36pt avatar, 15pt title,
+ * time and the status glyph at the far end, then channel and meta; running progress in live text; diff or artifact
+ * count on the right. MoAvatar: the agent's avatar, else the crew mark in a surface-2 disc; nothing sits on it.
+ * MoDiff: +add −del, tabular.
  * @startingPoint section="Phone" subtitle="Thread rows: needs, running, done" viewport="860x320"
  */
 export type MoState = 'running' | 'needs' | 'done' | 'settled' | 'idle' | 'queued' | 'failed' | 'stopped';
@@ -1119,6 +1138,8 @@ export interface MoThreadRowProps {
   title: string;
   state?: MoState;
   role?: MoRole;
+  /** The agent's avatar (AgentAvatar), its eyes on the row's state. */
+  avatar?: ReactNode;
   /** Without the #. */
   channel?: string;
   /** Running only, in live text: "step 5/9", "140 of 212". */
@@ -1136,8 +1157,8 @@ export interface MoThreadRowProps {
 export function MoThreadRow(props: MoThreadRowProps): JSX.Element;
 
 export interface MoAvatarProps {
+  avatar?: ReactNode;
   role?: MoRole;
-  state?: MoState;
   size?: number;
 }
 export function MoAvatar(props: MoAvatarProps): JSX.Element;

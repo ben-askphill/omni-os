@@ -1,4 +1,5 @@
 import type { AskP } from './ask.ts';
+import type { SeatedDelegation } from './members.ts';
 import type { HandoverP, SwitchP } from './run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from './question.ts';
 import type { PRWakeItem } from './pr-watch.ts';
@@ -490,6 +491,41 @@ export const replyAt = (it: ReplyItem): string | null => (it.type === 'tools' ? 
 
 /** Who wrote a reply item: the agent its row names, else the thread's lead (rows from before Omni recorded it). */
 export const authorOf = (it: ReplyItem, lead: string | null | undefined) => it.agent ?? lead ?? null;
+
+/** Put work opened from a seat beside its last transcript row at creation time. The parent link identifies the
+ * agent even when its CLI call had no recorded tool result. Loaded spans keep older cards beside their own replies. */
+export function seatedDelegationsAt<C extends { created_at: string; seated_delegation?: SeatedDelegation }>(
+  children: readonly C[], items: readonly Item[], events: readonly TranscriptEvent[], spans?: readonly Span[],
+): Map<number, C[]> {
+  const out = new Map<number, C[]>();
+  const seated = children.filter((c) => c.seated_delegation);
+  if (!seated.length) return out;
+  const rows = new Map(items.map((it) => [it.key, it]));
+  const timeline = events.filter((e) => !spans || spanIndex(spans, e.id) >= 0);
+  for (const child of seated) {
+    const agent = child.seated_delegation!.agent;
+    const before = timeline.findLastIndex((e) => e.created_at <= child.created_at);
+    if (before < 0) continue;
+    const span = spans && spanIndex(spans, timeline[before].id);
+    const after = timeline[before + 1];
+    if (spans && span !== undefined && spans[span].to !== null && (!after || spanIndex(spans, after.id) !== span)) continue;
+    for (let i = before; i >= 0; i--) {
+      const e = timeline[i];
+      if (spans && spanIndex(spans, e.id) !== span) break;
+      const it = rows.get(e.id);
+      if (!it) continue;
+      if ((isReply(it) || it.type === 'report') && e.agent === agent ||
+          it.type === 'user' && it.p.to?.includes(agent) ||
+          it.type === 'member' && it.p.agent === agent && it.p.event === 'joined') {
+        const group = out.get(it.key);
+        if (group) group.push(child);
+        else out.set(it.key, [child]);
+        break;
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * Where an author line goes (ADR 0019, How it looks): the key of each reply item that opens a run of replies from one

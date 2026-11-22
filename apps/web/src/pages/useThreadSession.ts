@@ -6,6 +6,7 @@ import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { withOpening, type Opening } from '@omni/shared/opening.ts';
 import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { crewShown, withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
+import { isDelegatedTo } from '@omni/shared/members.ts';
 import { holds } from '../thread-history.ts';
 import { asPending, inFlight, useSending } from '../sending.ts';
 import { streamedPending } from '../streamed-pending.ts';
@@ -232,7 +233,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     if (e.type !== 'thread') return;
     const t = e.thread;
     const upsert = (prev: Thread[]) => (prev.some((c) => c.id === t.id) ? prev.map((c) => (c.id === t.id ? t : c)) : [...prev, t]);
-    if (t.parent_id === id) setChildren(upsert);
+    if (isDelegatedTo(t, id)) setChildren(upsert);
     // A member of a team this thread started: its delegation card shows the change.
     if (t.source === 'team' && children.some((c) => c.id === t.parent_id)) setTeam(upsert);
     if (parent && t.id === parent.id) setParent(t);

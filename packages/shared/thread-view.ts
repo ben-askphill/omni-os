@@ -7,10 +7,10 @@ import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
 import { connectorOf, isOutsideConnector, type Connector } from './connectors.ts';
 import { turnSteps, type StepsView } from './steps.ts';
-import { authorOf, buildItems, isAsking, isReply, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
+import { authorOf, buildItems, isAsking, isReply, seatedDelegationsAt, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
 import { laneFold, type LaneState } from './lanes.ts';
 import type { Collision } from './collisions.ts';
-import type { ThreadMember } from './members.ts';
+import type { SeatedDelegation, ThreadMember } from './members.ts';
 
 export type TurnStatus = 'running' | 'queued' | 'done' | 'failed' | 'stopped';
 
@@ -27,6 +27,7 @@ export interface TurnChild {
   id?: string;
   created_at: string;
   source?: string | null;
+  seated_delegation?: SeatedDelegation;
 }
 
 /** What a thread view reads of the thread itself. */
@@ -326,10 +327,20 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   if (turns.length) {
     for (const a of artifacts) turnAt(a.updated_at).artifacts.push(a);
     // Team members show under their lead, not as delegations of their own.
-    for (const c of children) if (c.source !== 'team') turnAt(c.created_at).children.push(c);
+    for (const c of children) if (c.source !== 'team' && !c.seated_delegation) turnAt(c.created_at).children.push(c);
+    for (const [key, seated] of seatedDelegationsAt(children, all, events, spans)) {
+      for (const c of seated) {
+        const turn = laneTurns.find((t) => t.items.some((it) => it.key === key)) ??
+          turns.find((t) => t.items.some((it) => it.key === key) || t.members.some((it) => it.key === key)) ??
+          turnAt(c.created_at);
+        const lane = turn.lanes?.turns.find((t) => t.author === c.seated_delegation?.agent);
+        (lane ?? turn).children.push(c);
+      }
+    }
     // On the card of its thread; one whose delegating turn is not loaded shows as a report on the newest turn.
     for (const r of shown) {
-      const t = turns.find((t) => t.children.some((c) => c.id === r.thread_id)) ?? turns[turns.length - 1];
+      const t = turns.find((t) => t.children.some((c) => c.id === r.thread_id)) ??
+        laneTurns.find((t) => t.children.some((c) => c.id === r.thread_id)) ?? turns[turns.length - 1];
       if (t.children.some((c) => c.id === r.thread_id)) t.answers[r.thread_id] = r;
       else t.reports.push(r);
     }

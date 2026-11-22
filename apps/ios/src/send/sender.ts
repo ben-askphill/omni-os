@@ -192,7 +192,7 @@ export function createCatalog(load: () => Promise<readonly HarnessInfo[]>) {
 export function createSenders(deps: Omit<SenderDeps, 'threadId'>) {
   const senders = new Map<string, ThreadSender>();
   return {
-    /** One sender per thread for the life of the hub, so a message that failed is still there when Ben comes back to the thread. */
+    /** One sender per thread for the life of the hub, so a message that failed is still there when the user comes back to the thread. */
     for(threadId: string): ThreadSender {
       let sender = senders.get(threadId);
       if (!sender) {

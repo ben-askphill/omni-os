@@ -95,6 +95,10 @@ export function withLive(b: Branch, known: Map<string, Thread>): Branch {
   return t ? { ...b, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at } : b;
 }
 
+export const branchOf = (t: Thread): Branch => ({
+  id: t.id, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at,
+});
+
 /** The delegations among a group of tool calls, consecutive delegate calls folded into one card. Failed calls are left out. */
 export function delegations(calls: ToolCall[]): Delegation[] {
   const out: Delegation[] = [];
@@ -155,4 +159,4 @@ export function answersFor(calls: ToolCall[], answers: Map<string, ReportP>): Re
 export const teamOf = (children: Thread[]): Branch[] =>
   children
     .filter((t) => t.source === 'team')
-    .map((t) => ({ id: t.id, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at }));
+    .map(branchOf);

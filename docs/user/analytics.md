@@ -1,6 +1,6 @@
 # Usage analytics
 
-Omni can send usage analytics to your own PostHog project: which screens and features get used, and errors. It sends nothing until you give it a project key, and Settings > About > Usage analytics turns it off for every machine.
+Omni can send usage analytics to your own PostHog project: which screens and features get used, and errors. It sends nothing until you give it a project key, and Settings > About > Usage analytics turns it off for every machine. The iOS app has the same switch in Settings > About.
 
 ## Turn it on
 

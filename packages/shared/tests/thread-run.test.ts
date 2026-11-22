@@ -47,6 +47,22 @@ describe('threadRunLabels', () => {
     });
   });
 
+  it.each([
+    ['claude-opus-5-5', 'Opus 5.5'],
+    ['claude-sonnet-5-5', 'Sonnet 5.5'],
+    ['claude-haiku-5-5', 'Haiku 5.5'],
+    ['claude-fable-5-1', 'Fable 5.1'],
+    ['claude-fable-5-2', 'Fable 5.2'],
+    ['claude-haiku-4-5-20251001', 'Haiku 4.5'],
+    ['claude-opus-5[1m]', 'Opus 5'],
+    ['custom-model', 'custom-model'],
+  ])('labels a stored Claude model %s when it is missing from the catalog', (id, label) => {
+    const run = { harness: 'claude-code', model: id, effort: 'high' };
+    expect(threadRunLabels(run, catalog).model).toBe(label);
+    expect(threadChoice(run, catalog).model).toBe(id);
+    expect(threadRunLabels({ ...run, harness: 'cursor' }, null).model).toBe(id);
+  });
+
   it('marks a model Auto picked, keeping its name', () => {
     expect(threadRunLabels({ harness: 'claude-code', model: 'opus', effort: 'high', auto_reason: 'Hard code task: Opus, high effort' }, catalog)).toEqual({
       model: 'Auto · Opus',

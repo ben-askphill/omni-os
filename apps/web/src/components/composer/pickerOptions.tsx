@@ -21,7 +21,7 @@ export function channelAvatar(c: Channels[number]): Pick<PickerOption<string>, '
  * The new-thread composer's Channel and Role pickers: the channels still open (plus the one in use) and the crew. A role
  * the Conductor may not delegate to (usage-scan) is left out, as list_crew leaves it out; the Conductor stays, since
  * the composer attaches it in #conductor. Each role wears its avatar, as AgentAvatar draws it: its uploaded image, its
- * icon, a built-in's mark, else its initials disc.
+ * icon, else its crew character.
  */
 export function pickerOptions(visibleChannels: Channels, channel: string, crew: Crew) {
   const channelOptions: PickerOption<string>[] = visibleChannels.map((c) => ({

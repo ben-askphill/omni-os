@@ -1,4 +1,4 @@
-import { CrewMark, HarnessLogo, isCrewRole } from '../../../ui/Brand';
+import { HarnessLogo } from '../../../ui/Brand';
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { useState } from 'react';
@@ -11,7 +11,9 @@ import { showsBubble } from '../../../context/labels';
 import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
 import { STEP_GLYPH } from '@omni/shared/steps.ts';
+import { markOf } from '@omni/shared/status.ts';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
+import { AgentAvatar } from '../../AgentAvatar';
 import { ContextChips } from '../../ContextChips';
 import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
 import { glyphFor, StatusDot } from '../../StatusDot';
@@ -73,7 +75,7 @@ export function ReportRow({ row }: Of<'report'>) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, r.dropped && styles.dim]}>
       <Pressable accessibilityRole="button" onPress={() => openThread(r.thread_id)} style={styles.line}>
-        {isCrewRole(r.role) ? <CrewMark role={r.role} /> : null}
+        {r.role ? <AgentAvatar agent={r.role} size={16} /> : null}
         <Text style={[styles.cardTitle, { color: colors.fg }]}>{`Report from ${r.role || 'the crew'}`}</Text>
         {r.dropped ? <Text style={[styles.caption, { color: colors.fg3 }]}>{r.undelivered ? `Not delivered · ${r.undelivered}` : 'Not delivered'}</Text> : null}
         <View style={styles.grow} />
@@ -104,13 +106,14 @@ export function OutcomeRow({ row }: Of<'outcome'>) {
   );
 }
 
-/** The Conductor's name over its answer, with the icon and background saved for it, else the Omni mark (web: ThreadTurn). */
+/** The Conductor's name over a reply on a thread from before agents. */
 export function ConductorRow({ row }: Of<'conductor'>) {
   const { colors } = useOmniTheme();
-  const { look } = row;
+  const { look, agent } = row;
+  const channelAvatar = look ? <ChannelAvatar name={look.name} icon={look.icon} avatarBg={look.avatar_bg} conductor size={18} /> : <OmniMark size={14} color={colors.fg3} />;
   return (
     <View style={styles.line}>
-      {look ? <ChannelAvatar name={look.name} icon={look.icon} avatarBg={look.avatar_bg} conductor size={18} /> : <OmniMark size={14} color={colors.fg3} />}
+      {agent ? <AgentAvatar agent={agent} size={18} /> : channelAvatar}
       <Text style={[styles.meta, { color: colors.fg3 }]}>Conductor</Text>
     </View>
   );
@@ -189,7 +192,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
           onPress={() => openThread(k.id)}
           style={({ pressed }) => [styles.kid, { backgroundColor: pressed ? colors.surface3 : colors.bg }]}
         >
-          {isCrewRole(k.role) ? <CrewMark role={k.role} /> : null}
+          {k.role ? <AgentAvatar agent={k.role} size={16} shows={{ mark: markOf(glyphFor(k.status)) }} placement="row" /> : null}
           <StatusDot glyph={glyphFor(k.status)} />
           <View style={styles.grow}>
             <Text numberOfLines={1} style={[styles.kidTitle, { color: colors.fg }]}>

@@ -33,7 +33,7 @@ export type HarnessWithRunning = HarnessInfo & { running: number; /** How to ins
 export type CommandList = HarnessCommands & { recent?: string[] };
 
 // ---------- response shapes ----------
-import type { ThreadMember } from '@omni/shared/members.ts';
+import type { SeatedDelegation, ThreadMember } from '@omni/shared/members.ts';
 import type { RemoteServer } from '@omni/shared/remote-agent.ts';
 
 /** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
@@ -48,13 +48,14 @@ export type Thread = ThreadRow & {
   delegating?: boolean;
   /** A group thread's agents, the lead first, while an agent besides the lead is seated (packages/shared/members.ts). */
   members?: ThreadMember[];
+  seated_delegation?: SeatedDelegation;
   /** Why it takes no new messages: its lead agent was deleted or is hidden (apps/server/member-view.ts). */
   read_only?: string;
 } & RanOnFields & StepField;
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &
-  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating' | 'limit_state' | 'setup' | 'model' | 'branch' | 'goal_objective' | 'goal_status' | 'ran_on' | 'run_started_at' | 'step' | 'members'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
+  Partial<Pick<Thread, 'role' | 'parent_id' | 'source' | 'delegating' | 'limit_state' | 'setup' | 'model' | 'branch' | 'goal_objective' | 'goal_status' | 'ran_on' | 'run_started_at' | 'step' | 'members'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
 /** A Conductor job and its cross-channel delegated threads, as the channel API sends them. */
 export interface ConductorHandoffGroup {
   parent: ThreadStub;
@@ -206,9 +207,10 @@ export interface CrewRole {
   description: string;
   /**
    * The role's own look: the URL of an image Ben uploaded (GET /api/crew/:id/avatar), else a shared icon (`icon:<name>`)
-   * or an emoji, and a hex background. Unset: a built-in's mark, else its initials disc (AgentAvatar).
+   * or an emoji, and a hex background. Unset: its crew character, its shape and color picked from its id (AgentAvatar).
+   * `shape`: a crew shape id (ADR 0021), sent only when the file names one. One this build does not know is ignored.
    */
-  avatar?: { image?: string; icon?: string; bg?: string };
+  avatar?: { image?: string; icon?: string; shape?: string; bg?: string };
   /** A harness id from the server's catalog. An open string, not a fixed list: outside runtimes join the catalog by id. */
   harness?: string;
   /** A remote agent's server (ADR 0020): set exactly when the agent runs on Hermes or a server Ben connected. Never a key. */

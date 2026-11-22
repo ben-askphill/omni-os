@@ -1,9 +1,10 @@
-Channel avatar background control, composed of the existing Avatar, field, Button and ErrorNote primitives. Used in channel settings and in an agent's Identity block (`AgentIdentity`) on desktop web, phone web and Electron.
+Avatar color control, composed of the existing Avatar, field, Button and ErrorNote primitives. Used in channel settings (the avatar background) and in an agent's Identity block (`AgentIdentity`, the agent's one color) on desktop web, phone web and Electron.
 
-- A 56px live avatar (left out with `preview={false}` where the caller draws the avatar, as `AgentIdentity` does), native color input, six-digit hex field and Reset to auto button wrap at phone widths.
-- Standard swatches and literal SVG paint colors are 32px round buttons with an accessible color name, pressed state and selected outline.
-- An uploaded SVG adds a 128px image sampler. Click a painted point to set a custom background. Transparent points show an ErrorNote. Palette buttons offer a keyboard alternative.
-- Automatic colors use a full-size SVG background shape when present. Otherwise they choose a random swatch with WCAG contrast of at least 4.5 against the main foreground. Glyph ink adapts to the selected background. Emoji uses a dark outline proxy.
-- Custom backgrounds survive avatar changes. Reset clears the manual flag. An unset background retains the existing neutral avatar.
+- It takes its swatches from its caller, by name: channels pass `CHANNEL_SWATCHES` (Lavender, Sky, Mint, Sand, Peach, Rose, Navy, Forest, Plum, Rust), agents pass `AGENT_PALETTE` (Ink, Sky, Amber, Violet, Rose, Mint, Green, Sun, Lilac, Magenta, Azure, Aqua, Teal, Peach, ADR 0021 D20), both from `packages/shared/avatar-color.ts`. The two sets never mix (D5).
+- A 56px live avatar (left out with `preview={false}` where the caller draws the avatar, as `AgentIdentity` does), native color input, six-digit hex field, Reset to auto button and a status that wrap at phone widths. The status names the color: Automatic (with the color it draws, "Automatic, Amber", when the caller gives one), a swatch's name, or Custom color for one off the swatches.
+- `auto`: the color Automatic draws while the value is empty. The well and the hex placeholder show it. Agents pass the shape's paired color, so Reset to auto returns to it.
+- Swatches and literal SVG paint colors are 32px round buttons with a `line-strong` hairline (so Ink reads on the dark surface), an accessible color name, pressed state and selected outline.
+- An uploaded SVG adds a 128px image sampler. Click a painted point to set a custom color. Transparent points show an ErrorNote. Palette buttons offer a keyboard alternative.
+- Channels: automatic colors use a full-size SVG background shape when present. Otherwise they choose a random swatch with WCAG contrast of at least 4.5 against the main foreground. Glyph ink adapts to the selected background. Emoji uses a dark outline proxy. Custom backgrounds survive avatar changes. Reset clears the manual flag.
 
 Implementation: `apps/web/src/components/AvatarColorPicker.tsx`. Shared color logic: `packages/shared/avatar-color.ts`.

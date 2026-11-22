@@ -7,13 +7,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { Channel, Thread } from '../src/api.ts';
 import type { TurnView } from '../src/mobile/ThreadCards.tsx';
 
-// The author line over a finished Conductor answer on the phone (AuthorLine). It names the Conductor as the turn's
-// author, so it wears the icon and background saved for the Conductor, as its rows and header do
-// (packages/shared/channel-icon.ts hasOwnLook). Without one it keeps the live Omni mark, delegating while its crew runs.
+// The author line over a finished Conductor answer on the phone.
 vi.mock('../src/store.tsx', () => ({
   useApp: () => ({ channels: [], channel: () => undefined, needsYou: null, profile: null, tasks: [] }),
   useNow: () => Date.parse('2026-01-05T12:00:00.000Z'),
   useNeedOf: () => null,
+  useChannel: () => undefined,
+  useCrewRoles: () => [],
   readPref: (_key: string, fallback: unknown) => fallback,
   writePref: () => {},
 }));
@@ -24,6 +24,7 @@ vi.mock('../src/mobile/shell.tsx', async (load) => ({ ...(await load<object>()),
 import { Turn, type TurnCtx } from '../src/mobile/ThreadTurn.tsx';
 
 const OMNI_MARK = 'class="mark ';
+const CHARACTER = 'data-shape="circle"';
 const BG = 'background-color:#283c62';
 const base = (JSON.parse(readFileSync(resolve(WIRE_FIXTURES, 'recent.json'), 'utf8')) as Thread[])[0];
 const thread = { ...base, id: 'lead', channel_id: 'conductor', role: 'conductor', parent_id: null, status: 'done' } as Thread;
@@ -50,39 +51,50 @@ const label = (c: TurnCtx) => {
 };
 
 describe("the Conductor's name over its answer on the phone", () => {
-  it('draws the Omni mark while the Conductor has no look of its own', () => {
+  it("draws the Conductor's crew character while the Conductor has no look of its own", () => {
     for (const conductorChannel of [undefined, conductor(), conductor({ icon: 'icon:not-a-glyph' })]) {
       const line = label(ctx({ conductorChannel }));
-      expect(line).toContain(OMNI_MARK);
+      expect(line).toContain(CHARACTER);
+      expect(line).not.toContain(OMNI_MARK);
       expect(line).not.toContain('background-color');
     }
   });
 
-  it('never makes the mark a running signal: the status dots say what works', () => {
+  it('keeps its eyes idle while its crew runs: the status dots say what works', () => {
     const line = label(ctx({ crew: [{ ...thread, id: 'kid', status: 'running' } as Thread] }));
-    expect(line).toContain('aria-label="Omni"');
+    expect(line).toContain('data-eyes="idle"');
     expect(line).not.toContain('delegating');
   });
 
-  it('draws the icon and background saved for it instead', () => {
-    const line = label(ctx({ conductorChannel: conductor({ icon: '🎼', avatar_bg: '#283c62' }) }));
-    expect(line).not.toContain(OMNI_MARK);
-    expect(line).toContain('🎼');
-    expect(line).toContain(BG);
+  it('draws the agent avatar on the first reply in #conductor even with a saved channel icon', () => {
+    const line = label(ctx({ conductorChannel: conductor({ icon: 'icon:play', avatar_bg: '#283c62' }) }));
+    expect(line).toContain(CHARACTER);
+    expect(line).not.toContain(BG);
   });
 
-  it('takes either half of the look: a saved icon alone, or a background alone behind the Omni mark', () => {
-    const icon = label(ctx({ conductorChannel: conductor({ icon: 'icon:target' }) }));
+  it('uses the agent’s configured character on the first reply', () => {
+    const line = label(ctx({
+      conductorChannel: conductor({ icon: 'icon:play', avatar_bg: '#283c62' }),
+      agents: [{ id: 'conductor', name: 'Conductor', avatar: { shape: 'cloud', bg: '#52cdfe' } }],
+    }));
+    expect(line).toContain('data-shape="cloud"');
+    expect(line).toContain('#52cdfe');
+  });
+
+  it('takes a saved icon or background alone on Conductor replies in another channel', () => {
+    const other = { ...thread, channel_id: 'acme' };
+    const icon = label(ctx({ thread: other, conductorChannel: conductor({ icon: 'icon:target' }) }));
     expect(icon).not.toContain(OMNI_MARK);
+    expect(icon).not.toContain(CHARACTER);
     expect(icon).toContain('<svg');
-    const bg = label(ctx({ conductorChannel: conductor({ avatar_bg: '#283c62' }) }));
+    const bg = label(ctx({ thread: other, conductorChannel: conductor({ avatar_bg: '#283c62' }) }));
     expect(bg).toContain(OMNI_MARK);
     expect(bg).toContain(BG);
   });
 
   it("follows the Conductor's look on a conductor-role thread in another channel, not that channel's", () => {
     const line = label(ctx({ thread: { ...thread, channel_id: 'acme' }, ch: { ...conductor(), id: 'acme', name: 'acme', icon: '🛍️' }, conductorChannel: conductor() }));
-    expect(line).toContain(OMNI_MARK);
+    expect(line).toContain(CHARACTER);
     expect(line).not.toContain('🛍️');
   });
 });

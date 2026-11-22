@@ -1,4 +1,4 @@
-import { parseChannelIcon } from './channel-icon.ts';
+import { parseChannelIcon, sameIcon } from './channel-icon.ts';
 
 /** Opaque sRGB colors only, so stored values work on web and native clients. */
 export function hexColor(value: string): string | null {
@@ -19,8 +19,56 @@ export function contrast(a: string, b: string): number {
   const x = luminance(a), y = luminance(b);
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
-export const AVATAR_SWATCHES = ['#e8d9f5', '#d4e9fa', '#d3eee4', '#f5e6ba', '#f6d9cd', '#f0d8e3', '#283c62', '#354f42', '#573c65', '#733e35'];
-export const avatarInk = (bg: string) => contrast(bg, '#202020') >= contrast(bg, '#ffffff') ? '#202020' : '#ffffff';
+/** The channels' swatches by name, as the color picker lists them. Agents take AGENT_PALETTE (ADR 0021, D5). */
+export const CHANNEL_SWATCHES = [
+  { name: 'Lavender', hex: '#e8d9f5' },
+  { name: 'Sky', hex: '#d4e9fa' },
+  { name: 'Mint', hex: '#d3eee4' },
+  { name: 'Sand', hex: '#f5e6ba' },
+  { name: 'Peach', hex: '#f6d9cd' },
+  { name: 'Rose', hex: '#f0d8e3' },
+  { name: 'Navy', hex: '#283c62' },
+  { name: 'Forest', hex: '#354f42' },
+  { name: 'Plum', hex: '#573c65' },
+  { name: 'Rust', hex: '#733e35' },
+] as const;
+/** The channels' swatches. */
+export const AVATAR_SWATCHES: string[] = CHANNEL_SWATCHES.map((s) => s.hex);
+
+/**
+ * The agent palette (ADR 0021, D20): a crew character's body, an icon's disc and the agent's mention pill, in the order
+ * the shapes pair them. None is a status color: Ultramarine, Vermilion and Volt (--live, --needs, --done) stay state's.
+ */
+export const AGENT_PALETTE = [
+  { name: 'Ink', hex: '#17181a' },
+  { name: 'Sky', hex: '#52cdfe' },
+  { name: 'Amber', hex: '#ffa839' },
+  { name: 'Violet', hex: '#9834fd' },
+  { name: 'Rose', hex: '#ff4983' },
+  { name: 'Mint', hex: '#4aefa7' },
+  { name: 'Green', hex: '#02c650' },
+  { name: 'Sun', hex: '#ffdc4f' },
+  { name: 'Lilac', hex: '#bda7fe' },
+  { name: 'Magenta', hex: '#df00c5' },
+  { name: 'Azure', hex: '#0093e4' },
+  { name: 'Aqua', hex: '#0ee6e9' },
+  { name: 'Teal', hex: '#00a8a2' },
+  { name: 'Peach', hex: '#feb98b' },
+] as const;
+export type AgentColorName = (typeof AGENT_PALETTE)[number]['name'];
+
+/**
+ * How much of the agent's color a mention pill's fill takes over the surface under it, per theme: light enough in the
+ * light theme, and dark enough in the dark one, that the name, in the text color, reads at 4.5:1 or more on every agent
+ * color and surface. The Web UI's .mention-pill-agent (index.css) and the iOS pill draw it; the web's
+ * token-contrast.test.ts checks the CSS against it.
+ */
+export const AGENT_PILL_TINT = { light: 0.45, dark: 0.3 } as const;
+
+/** The dark ink on an avatar, the light theme's --fg: a crew character's eyes, and a channel avatar's mark (D19). */
+export const AVATAR_INK = '#17181a';
+/** The ink that reads on `bg`: the dark ink or white, whichever has more contrast. */
+export const avatarInk = (bg: string) => contrast(bg, AVATAR_INK) >= contrast(bg, '#ffffff') ? AVATAR_INK : '#ffffff';
 export function contrastingColor(foreground: string, random: () => number = Math.random): string {
   const choices = AVATAR_SWATCHES.filter((c) => contrast(c, foreground) >= 4.5);
   const colors = choices.length ? choices : ['#000000', '#ffffff'].filter((c) => contrast(c, foreground) >= 4.5);
@@ -60,7 +108,7 @@ export function svgColors(markup: string): { palette: string[]; background: stri
   const background = rect || circle ? shapes[0]?.fill ?? null : null;
   const counts = new Map<string, number>();
   for (const shape of shapes) for (const c of [shape.fill, shape.stroke]) if (c && c !== background) counts.set(c, (counts.get(c) ?? 0) + 1);
-  const foreground = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '#202020';
+  const foreground = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? AVATAR_INK;
   return { palette, background, foreground };
 }
 export function autoAvatarColor(icon: string | null | undefined, random: () => number = Math.random): string | null {
@@ -71,7 +119,7 @@ export function autoAvatarColor(icon: string | null | undefined, random: () => n
     return colors.background ?? contrastingColor(colors.foreground, random);
   }
   // A dark neutral is the proxy for emoji outlines. Glyphs use this same ink on light backgrounds.
-  return contrastingColor('#202020', random);
+  return contrastingColor(AVATAR_INK, random);
 }
 
 export interface AvatarColorState { icon?: string | null; avatar_bg?: string | null; avatar_bg_manual?: number }
@@ -79,7 +127,7 @@ export interface AvatarColorState { icon?: string | null; avatar_bg?: string | n
 export function resolveAvatarColor(patch: AvatarColorState, current?: AvatarColorState): AvatarColorState {
   const icon = patch.icon === undefined ? current?.icon : patch.icon;
   const manual = patch.avatar_bg_manual ?? (patch.avatar_bg != null ? 1 : current?.avatar_bg_manual ?? 0);
-  const iconChanged = icon !== current?.icon;
+  const iconChanged = !sameIcon(icon, current?.icon);
   if (patch.avatar_bg_manual === 0 || (!manual && iconChanged)) {
     const reset = patch.avatar_bg_manual === 0 && patch.avatar_bg === undefined;
     const regenerate = iconChanged || !!current?.avatar_bg_manual || reset;

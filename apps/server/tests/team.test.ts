@@ -8,6 +8,7 @@ import { once } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { threadView } from '@omni/shared/thread-view.ts';
 import { startRunner } from './runner-boot.ts';
 import { hasMcpBuild } from './support.ts';
 import { legacyTeam } from './legacy-team.ts';
@@ -330,13 +331,33 @@ describe('seating in the Conductor\'s own thread', () => {
     const told = buildSystemPrompt(H.thread(session), H.db.channels.get('conductor')!, getCrew('designer')!);
     expect(told).toMatch(/This is a #conductor thread: you were seated to take this work on/);
     expect(told).not.toMatch(/Edit files only/);
-    const opened = await call('POST', '/threads', { channel: 'scratch', prompt: 'build the page', role: 'designer' }, mint(session).token);
+    const opened = await call('POST', '/threads', { channel: 'scratch', prompt: 'THINK:900 build the page', title: 'Build the launch page', role: 'designer', source: 'conductor', folder: 'Features' }, mint(session).token);
     expect(opened.status).toBe(200);
     expect(opened.json.parent_id).toBe(session);
+    expect(opened.json.folder_id).toBeTruthy();
+    // The lists nest it under the #conductor thread, not the hidden session, and its folder keeps the parent link.
+    const listing = (await call('GET', '/channels')).json as { id: string; handoffs?: { parent: { id: string }; children: { id: string; parent_id: string; folder_id: string }[] }[] }[];
+    const handoffs = listing.find((ch) => ch.id === 'conductor')?.handoffs ?? [];
+    expect(handoffs.find((g) => g.parent.id === session)).toBeUndefined();
+    expect(handoffs.find((g) => g.parent.id === c.id)?.children).toEqual([
+      expect.objectContaining({ id: opened.json.id, parent_id: session, folder_id: opened.json.folder_id }),
+    ]);
+    const card = async () => {
+      const { json: detail } = await call('GET', `/threads/${c.id}?history=recent`);
+      expect(detail.children).toHaveLength(1); // The hidden session is never a card.
+      const view = threadView({ ...detail, spans: [detail.history] });
+      return view.turns.find((turn) => turn.children.length)?.children;
+    };
+    const branch = {
+      id: opened.json.id, title: 'Build the launch page', parent_id: session, role: 'designer', channel_id: 'scratch',
+      task_id: opened.json.task_id, harness: 'claude-code', seated_delegation: { thread_id: c.id, agent: 'designer' },
+    };
+    expect(await card()).toMatchObject([{ ...branch, status: 'running' }]);
     // Its report lands in the #conductor thread as the Designer's, and wakes the Designer to relay it.
     await H.until('the report', () => rowsBy(c.id, 'designer', 'crew_report').length === 1);
     await H.until('the designer relayed it', () => rowsBy(c.id, 'designer', 'result').length === 2);
     expect(H.byKind(c.id, 'crew_report').length).toBe(1);
+    expect(await card()).toMatchObject([{ ...branch, status: 'done' }]);
 
     // Another agent leading a #conductor thread, and the Conductor in a #conductor thread that is not its own, are refused.
     const other = await H.runner.createThread({ channel: 'conductor', prompt: 'TOOL:3000 hi', role: 'lead' });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { autoAvatarColor, avatarInk, contrast, contrastingColor, hexColor, resolveAvatarColor, svgColors } from '../avatar-color.ts';
+import { scaleSvgIcon } from '../channel-icon.ts';
+import { autoAvatarColor, AVATAR_SWATCHES, avatarInk, contrast, contrastingColor, hexColor, resolveAvatarColor, svgColors } from '../avatar-color.ts';
 
 describe('avatar colors', () => {
   it('normalizes literal colors and rejects non-opaque paint', () => {
@@ -29,6 +30,11 @@ describe('avatar colors', () => {
     expect(contrastingColor('#202020', () => 0)).not.toBe(contrastingColor('#202020', () => 0.9));
     expect(contrast(avatarInk('#283c62'), '#283c62')).toBeGreaterThanOrEqual(4.5);
   });
+  it("inks a channel avatar in the light theme's foreground or white, each swatch on the side it took before", () => {
+    // The dark ink was #202020 (ADR 0021, D19): the six pale swatches took it, the four dark ones white.
+    expect(AVATAR_SWATCHES.map(avatarInk)).toEqual([...Array(6).fill('#17181a'), ...Array(4).fill('#ffffff')]);
+    expect(avatarInk('#e6a491')).toBe('#17181a');
+  });
   it('keeps manual choices across avatar changes and does not reroll unrelated writes', () => {
     const current = { icon: '🌻', avatar_bg: '#123456', avatar_bg_manual: 1 };
     expect(resolveAvatarColor({ icon: '🍋' }, current)).toEqual({ icon: '🍋' });
@@ -37,5 +43,14 @@ describe('avatar colors', () => {
     expect(resolveAvatarColor({ avatar_bg: '#abcdef' }, current).avatar_bg_manual).toBe(1);
     expect(resolveAvatarColor({ avatar_bg: '#abcdef', avatar_bg_manual: 0 }, current)).toMatchObject({ avatar_bg: '#abcdef', avatar_bg_manual: 0 });
     expect(resolveAvatarColor({ icon: '🍋' }, { ...current, avatar_bg_manual: 0 }).avatar_bg).toMatch(/^#[\da-f]{6}$/);
+  });
+});
+
+describe('a resized SVG', () => {
+  it('keeps its automatic background: a new size is not a new icon', () => {
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle fill="#f5a524" r="10"/></svg>';
+    const current = { icon: `svg:${markup}`, avatar_bg: '#283c62', avatar_bg_manual: 0 };
+    expect(resolveAvatarColor({ icon: `svg:${scaleSvgIcon(markup, 70)}` }, current)).toEqual({ icon: `svg:${scaleSvgIcon(markup, 70)}` });
+    expect(resolveAvatarColor({ icon: '🍋' }, current).avatar_bg).not.toBe('#283c62');
   });
 });

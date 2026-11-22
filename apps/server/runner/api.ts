@@ -25,6 +25,7 @@ import { offMachineHarness } from '../thread-files.ts';
 import { capabilitiesOf, providerWhere } from '../harness/registry.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
+import { autoNeedOptions } from '../display.ts';
 import { usageByHarness } from '../usage.ts';
 import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun, reviewerEffort, setsRun } from '../harness/resolve.ts';
@@ -148,8 +149,8 @@ export interface CreateThreadInput {
    */
   members?: string[];
   /**
-   * Records on the first message, already normalized (parseContexts), as on a message Ben posts. Only for a thread
-   * that runs here: one sent to another machine is refused, since its first prompt travels as text.
+   * Records on the first message, already normalized (parseContexts), as on a message Ben posts. A thread sent to
+   * another machine carries them in its handoff offer (handoff.ts sendNewThread).
    */
   context?: MessageContext[];
   /**
@@ -261,7 +262,7 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   if (!run.ok) run = resolve(getCatalog(), false);
   if (!run.ok) throw new Error(run.error);
   const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
-  const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
+  const auto = 'auto' in run ? routeTask(profileTask(input.prompt, autoNeedOptions()), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const picked = auto ?? (run as Resolved);
   const { harness, model } = picked;
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
@@ -338,8 +339,9 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
   // comes back to the parent (run-on.ts).
   const route = input.source === 'team' || input.quick ? null : await runnerPorts().routing.targetFor(input.device);
+  // The first message's records (thread references, machine mentions) go with it to the machine the chip picked: a
+  // machine mention says where a task in it should run, never where the thread itself starts.
   const context = input.context?.length ? input.context : undefined;
-  if (route && context) throw refusal(`A first message with attachments from Omni runs here, not on ${route.to.name}.`, 409);
   if (route && seats.length) throw refusal(`A thread with members runs here, not on ${route.to.name}. Seat them once it runs there.`, 409);
   if (route) {
     // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
@@ -354,7 +356,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     const files = sent.map((f, i) => ({ ...f, name: saved[i]?.name ?? f.name }));
     tx(() => {
       assignRouted(thread.id, route.to.id);
-      runnerPorts().handoff.sendNewThread(thread.id, input.prompt, route.from, route.to, files);
+      runnerPorts().handoff.sendNewThread(thread.id, input.prompt, route.from, route.to, { files, context });
     });
     if (!input.title) void generateTitle(thread.id, input.prompt);
     emitThread(thread.id);

@@ -19,6 +19,19 @@ export interface ThreadMember {
   seated_at: string;
 }
 
+/** A work thread opened from a seated agent's session appears in its group transcript. Its actual parent gets the report. */
+export interface SeatedDelegation {
+  thread_id: string;
+  agent: string;
+}
+
+export function isDelegatedTo(
+  child: { parent_id: string | null; source: string; seated_delegation?: SeatedDelegation },
+  threadId: string,
+): boolean {
+  return child.source !== 'member' && (child.parent_id === threadId || child.seated_delegation?.thread_id === threadId);
+}
+
 /**
  * The busiest-state order (Q34, Q61): Needs you, then Failed (with Usage limit, Setup failed and Message held), then
  * Working, then Done (with Stopped), then Idle.
@@ -86,7 +99,7 @@ export function groupMark(own: Mark, members: readonly Pick<ThreadMember, 'lead'
   return out;
 }
 
-/** One face in the avatar mark: an agent that waits on Ben (the Needs you ring and diamond) or works (the Working ring). */
+/** One face in the avatar mark: an agent that waits on Ben or works, which its eyes show (a photo or icon in its ring). */
 export interface MarkFace {
   agent: string;
   name: string;

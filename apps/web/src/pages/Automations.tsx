@@ -7,7 +7,7 @@ import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
 import { AutomationEditor, type EditorTarget } from '../components/AutomationEditor.tsx';
 import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, Segmented, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
 import { pageColumn, PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
-import { CrewMark, isCrewRole } from '../components/brand.tsx';
+import { AgentAvatar, useAgent } from '../components/AgentAvatar.tsx';
 import { statusLabel } from '../components/ui.tsx';
 import { describeCron, spanWords } from '@omni/shared/cron.ts';
 import { relTime } from '@omni/shared/format.ts';
@@ -229,6 +229,7 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
   const { channel } = useApp();
   const hereName = useHereName();
   const machine = machineChip(a, devices, hereName);
+  const agent = useAgent(a.role);
   const [enabled, setEnabled] = useState(a.enabled);
   const [toggling, setToggling] = useState(false);
   const [running, setRunning] = useState<'run' | 'dry' | null>(null);
@@ -298,9 +299,9 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
               <Icon name="hash" size={12} className="text-fg-3" />
               {ch?.name ?? a.channel}
             </a>
-            {a.role && (
+            {agent && (
               <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5" title={`Runs as ${a.role}`}>
-                {isCrewRole(a.role) ? <CrewMark role={a.role} size={12} /> : <Icon name="layers" size={12} className="text-fg-3" />}
+                <AgentAvatar agent={agent} size={16} />
                 {a.role}
               </span>
             )}

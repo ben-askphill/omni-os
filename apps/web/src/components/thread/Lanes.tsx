@@ -4,7 +4,7 @@
 // lanes in the history. The desktop transcript draws it; the phone draws one lane per tab (mobile/ThreadTurn.tsx).
 // The fold is @omni/shared/lanes.ts.
 import { useState, type ReactNode } from 'react';
-import type { Lane, LanesItem } from '@omni/shared/lanes.ts';
+import { lanesEnded, type Lane, type LanesItem } from '@omni/shared/lanes.ts';
 import { turnSteps, showsSteps, type StepsView } from '@omni/shared/steps.ts';
 import type { Collision } from '@omni/shared/collisions.ts';
 import { AgentAvatar, useAgent } from '../AgentAvatar.tsx';
@@ -19,14 +19,16 @@ const STATE_WORD = { done: 'Done', failed: 'Failed', stopped: 'Stopped', working
 /** How a lane draws its items: the transcript's own rows, with a finished lane's steps folded onto its first calls. */
 export type LaneItems = (items: readonly Item[], steps: StepsView | null) => ReactNode;
 
-function LaneHead({ lane, open, onToggle }: { lane: Lane; open: boolean; onToggle?: () => void }) {
+/**
+ * A lane's agent, name and state. `live`: some lane of the message still works, so each face shows its own lane's
+ * state; once they all ended, the lanes are history and their faces stay idle (ADR 0021, D11).
+ */
+function LaneHead({ lane, open, live, onToggle }: { lane: Lane; open: boolean; live: boolean; onToggle?: () => void }) {
   const agent = useAgent(lane.agent) ?? { id: lane.agent, name: lane.agent };
   const working = lane.state === 'working';
   const body = (
     <>
-      <span className={`inline-grid shrink-0 rounded-full ${working ? 'member-ring-working' : ''}`}>
-        <AgentAvatar agent={agent} size={22} />
-      </span>
+      <AgentAvatar agent={agent} size={22} shows={live ? { member: lane.state } : undefined} placement={live ? 'focus' : 'still'} />
       <span className="shrink-0 text-[13px] font-medium text-fg">{agent.name}</span>
       {!open && lane.latest && <span className={`min-w-0 flex-1 truncate text-[12.5px] ${working ? 'shimmer-text text-fg-2' : 'text-fg-3'}`}>{lane.latest}</span>}
       <span className={`flex shrink-0 items-center gap-1.5 text-[11.5px] text-fg-3 ${open || !lane.latest ? 'ml-auto' : ''}`}>
@@ -64,7 +66,7 @@ function LaneFiles({ lane, flags }: { lane: Lane; flags: readonly Collision[] })
   );
 }
 
-function LaneCard({ lane, flags, render, stacked }: { lane: Lane; flags: readonly Collision[]; render: LaneItems; stacked: boolean }) {
+function LaneCard({ lane, flags, render, stacked, live }: { lane: Lane; flags: readonly Collision[]; render: LaneItems; stacked: boolean; live: boolean }) {
   // Stacked lanes open collapsed to their latest line; side by side, each shows whole.
   const [open, setOpen] = useState(!stacked);
   const working = lane.state === 'working';
@@ -72,7 +74,7 @@ function LaneCard({ lane, flags, render, stacked }: { lane: Lane; flags: readonl
   const shownSteps = showsSteps(steps) ? steps : null;
   return (
     <section className="lane min-w-0 px-3.5 pt-3 pb-2.5" data-lane={lane.agent} data-state={lane.state}>
-      <LaneHead lane={lane} open={open} onToggle={stacked ? () => setOpen((o) => !o) : undefined} />
+      <LaneHead lane={lane} open={open} live={live} onToggle={stacked ? () => setOpen((o) => !o) : undefined} />
       {open && (
         <div className="mt-2.5 min-w-0 space-y-3">
           {render(lane.items, working ? null : shownSteps)}
@@ -110,7 +112,7 @@ export function LanesBlock({ block, threadId, render }: { block: LanesItem; thre
       <div className="@container">
         <div className={`grid grid-cols-1 gap-3 ${block.stacked ? '' : '@xl:grid-cols-2'}`}>
           {block.lanes.map((lane) => (
-            <LaneCard key={lane.agent} lane={lane} flags={block.flags} render={render} stacked={block.stacked} />
+            <LaneCard key={lane.agent} lane={lane} flags={block.flags} render={render} stacked={block.stacked} live={!lanesEnded(block)} />
           ))}
         </div>
       </div>

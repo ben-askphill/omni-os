@@ -56,6 +56,7 @@ const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
 const { startDiskWatch } = await import('./disk-space.ts');
 const { startPush } = await import('./push-sender.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
+const { migrateCrewAvatars } = await import('./crew-avatar-migrate.ts');
 const { revokeAllThreadTokens } = await import('./thread-tokens.ts');
 const { convertRemoteAgents } = await import('./remote-agents.ts');
 const { computerName } = await import('./sync/devices.ts');
@@ -63,6 +64,9 @@ const { onRestart, RESTART_EXIT_CODE, startUpdateCheck } = await import('./updat
 
 // An install from before data/omni.config.json keeps its old settings and skips onboarding.
 migrateLegacyConfig();
+// Agents wearing a shared glyph icon switch to their crew characters, once on each machine (ADR 0021, D3).
+const switched = migrateCrewAvatars();
+if (switched.length) console.log(`[omni] crew characters: cleared the glyph icon on ${switched.join(', ')}`);
 // A channel with no access level of its own: full access on an install with history, Ask first on a fresh one.
 (await import('./access-default.ts')).settleInstallDefault();
 

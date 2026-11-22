@@ -7,6 +7,29 @@ color-scheme:light;
 /* diffs: the one place a line gets a wash */
 --diff-add:color-mix(in srgb,var(--done) 22%,transparent);
 --diff-del:color-mix(in srgb,var(--needs) 12%,transparent);
+/* agent colors: identity only, the same in both themes. A crew character's body, an agent icon's disc and the agent's
+   mention pill; never a state. Code: AGENT_PALETTE in packages/shared/avatar-color.ts, which apps/ios/src/theme.ts derives
+   its agentInk to agentPeach from; apps/web/src/index.css carries the same --agent-* (its token-contrast test holds both
+   copies to the palette). Channels keep their own swatches.
+   A mention pill tints the agent color over the surface (45% light, 30% dark, AGENT_PILL_TINT) under a name in --fg, which
+   then reads at 4.5:1 or more on all 14; selected, it takes an inset 1.5px --fg ring. */
+--agent-ink:#17181a;
+--agent-sky:#52cdfe;
+--agent-amber:#ffa839;
+--agent-violet:#9834fd;
+--agent-rose:#ff4983;
+--agent-mint:#4aefa7;
+--agent-green:#02c650;
+--agent-sun:#ffdc4f;
+--agent-lilac:#bda7fe;
+--agent-magenta:#df00c5;
+--agent-azure:#0093e4;
+--agent-aqua:#0ee6e9;
+--agent-teal:#00a8a2;
+--agent-peach:#feb98b;
+/* reserved for state, never an agent color: --ultramarine #2b3bff (live), --vermilion #ff4420 (needs you), --volt #c6f52b (done) */
+/* avatar ink: a crew character's eyes, and the mark on a channel avatar, take --ink or #ffffff, whichever has more
+   contrast with the fill (3:1 or more on every agent color, Magenta with white the lowest at 4.25:1) */
 }
 [data-theme="dark"],.scheme-dark{color-scheme:dark;--danger-text:#ff8a6e}
 /* .scheme-dark: the sidebar always draws with the dark tokens */

@@ -19,15 +19,16 @@ import { Avatar, COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, use
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
-import { PHASE, turnPhase } from '@omni/shared/status.ts';
+import { PHASE, turnPhase, type Mark } from '@omni/shared/status.ts';
+import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import { AuthorLine, REPLY_INDENT, type ReplyRun } from './AuthorLine.tsx';
 import { seatRun, type ThreadMember } from '@omni/shared/members.ts';
 import { RemoteLockLine } from './thread/RemoteLockLine.tsx';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { AgentAvatar, useAgent, type AgentLook } from './AgentAvatar.tsx';
-import { OmniMark } from './brand.tsx';
-import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { leadMessage } from '@omni/shared/members.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
@@ -37,9 +38,9 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { MentionText } from '../message-context/MentionText.tsx';
 import { sentContext } from '@omni/shared/message-context-machine.ts';
 import { SentTo } from '../message-context/agent-mention.tsx';
-import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
+import { buildItems, buildTasks, isReply, keepSame, replyAt, replyHeads, replyTails, same, seatedDelegationsAt, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP, type MemberP, memberLine } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
-import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { answersFor, branchOf, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { defers, LIVE_ROWS } from '../transcript/defer.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
@@ -353,6 +354,8 @@ interface ItemRowProps {
   running: boolean;
   /** The team card's members, on the first item when it is the thread's first message. */
   team?: Branch[];
+  /** Work threads a seated agent opened from this row. */
+  seated?: Thread[];
   /** The first item is the brief the delegating thread sent: it folds. */
   brief?: boolean;
   reports: Map<string, string>;
@@ -382,7 +385,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer, indent }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, seated, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer, indent }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -457,20 +460,57 @@ const ItemRow = memo(
     })();
     const shown = Array.isArray(body) ? body.length > 0 : !!body;
     // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
-    return shown ? (
+    return shown || seated?.length ? (
       <div data-key={it.key} className={`${defer ? 'tx-row ' : ''}space-y-4${indent ? ` ${REPLY_INDENT}` : ''}`}>
         {body}
+        {seated?.length ? <DelegationCard branches={seated.map(branchOf)} reports={reports} /> : null}
       </div>
     ) : null;
   },
   (a, b) => {
     for (const k of Object.keys(b) as (keyof ItemRowProps)[]) {
-      if (k === 'pages' || k === 'steps' || k === 'answers' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
+      if (k === 'pages' || k === 'steps' || k === 'answers' || k === 'seated' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
     }
     return Object.keys(a).length === Object.keys(b).length;
   },
 );
 
+
+/**
+ * The heads of the replies being written, which alone show live eyes (ADR 0021, D11), with what each shows. A thread
+ * of one agent: while it runs, the head of the run of replies the transcript ends on (back from the last row, past
+ * the rows that do not part a run). A group thread: each agent that works or waits on Ben shows its own state on its
+ * latest head, unless a message to it came after (its new reply has no head yet).
+ */
+function liveHeads(items: readonly Item[], heads: ReadonlyMap<number, string>, o: { running: boolean; lead: string | null; seats: Seats; mark: Mark }): Map<number, FaceShows> {
+  const out = new Map<number, FaceShows>();
+  if (o.seats?.length) {
+    const busy = new Map(o.seats.filter((s) => s.state === 'working' || s.state === 'needs').map((s) => [s.agent, s.state]));
+    const decided = new Set<string>();
+    for (let i = items.length - 1; i >= 0 && decided.size < busy.size; i--) {
+      const it = items[i];
+      if (it.type === 'user') for (const a of it.p.to?.length ? it.p.to : o.lead ? [o.lead] : []) if (busy.has(a)) decided.add(a);
+      const agent = heads.get(it.key);
+      if (!agent || !busy.has(agent) || decided.has(agent)) continue;
+      out.set(it.key, { member: busy.get(agent)! });
+      decided.add(agent);
+    }
+    return out;
+  }
+  if (!o.running) return out;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.type === 'mod' || it.type === 'result' || it.type === 'merge_risk' || (it.type === 'user' && it.p.source === 'lead')) continue;
+    if (!isReply(it)) break;
+    if (heads.has(it.key)) {
+      out.set(it.key, { mark: o.mark });
+      break;
+    }
+  }
+  return out;
+}
+
+type Seats = readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model' | 'state'>[] | undefined;
 
 export const Transcript = memo(function Transcript({
   threadId,
@@ -491,6 +531,7 @@ export const Transcript = memo(function Transcript({
   model,
   channelId,
   seats,
+  mark = 'working',
 }: {
   threadId: string;
   /** The thread's channel, which a remote agent's lock line names and links (ADR 0020). */
@@ -500,8 +541,10 @@ export const Transcript = memo(function Transcript({
   /** The thread's run now, for the author line's harness and model on replies after its last switch. */
   harness?: string;
   model?: string | null;
-  /** The thread's seated agents (`thread.members`): a member's author line names its own run, not the lead's. */
-  seats?: readonly Pick<ThreadMember, 'agent' | 'lead' | 'harness' | 'model'>[];
+  /** The thread's seated agents (`thread.members`): a member's author line names its own run and shows its own state, not the lead's. */
+  seats?: Seats;
+  /** The thread's status mark, as the header's pill draws it: the head of the reply being written shows it (ADR 0021, D11). */
+  mark?: Mark;
   /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
   code?: boolean;
   /** Every row held, anchors included. */
@@ -533,6 +576,13 @@ export const Transcript = memo(function Transcript({
     held.current = keepSame(held.current, buildItems(events, spans).items);
     return held.current;
   }, [events, spans]);
+  const seated = useMemo(() => {
+    if (!known.some((t) => t.seated_delegation?.thread_id === threadId)) return new Map<number, Thread[]>();
+    const onCards = new Set(all.flatMap((it) => it.type === 'tools'
+      ? delegations(it.calls).flatMap((d) => [d.lead?.id, ...d.branches.map((b) => b.id)])
+      : it.type === 'ask' ? [it.p.thread_id] : []));
+    return seatedDelegationsAt(known.filter((t) => t.seated_delegation?.thread_id === threadId && !onCards.has(t.id)), all, events, spans);
+  }, [known, threadId, all, events, spans]);
   // A message several agents answered gathers their replies into lanes (ADR 0019, @omni/shared/lanes.ts). `items` is
   // the flow outside the lanes, which the author lines and the turns' steps read; each lane folds its own.
   const flow = useMemo<LaneFolded[]>(() => laneFold(all, { lead, cwd }), [all, lead, cwd]);
@@ -580,12 +630,12 @@ export const Transcript = memo(function Transcript({
   // open to remote agents lets them read, so it draws none.
   const readsOpen = remoteReadsOpen(channelId ? channel(channelId) : null);
   const tails = useMemo(() => (channelId && !readsOpen ? replyTails(items, lead, (id) => !!agents.find((a) => a.id === id)?.server) : new Map<number, string>()), [items, lead, agents, channelId, readsOpen]);
-  // The Conductor answers in its channel's look until Ben gives the Conductor agent an image or icon (the phone's too).
-  const conductorLook = channel(CONDUCTOR_CHANNEL);
-  const faceOf = (look: AgentLook) =>
-    look.id === 'conductor' && !look.avatar?.image && !look.avatar?.icon ? (
-      conductorLook && hasOwnLook(conductorLook) ? <Avatar name={conductorLook.name} omni channelIcon={conductorLook.icon} avatarBg={conductorLook.avatar_bg} size={24} /> : <OmniMark size={24} />
-    ) : undefined;
+  // Replies in #conductor use the author's agent avatar. The saved channel look can still stand in elsewhere.
+  const conductorChannel = channelId === CONDUCTOR_CHANNEL ? undefined : channel(CONDUCTOR_CHANNEL);
+  const faceOf = (look: AgentLook) => {
+    const c = conductorChannelLook(look, conductorChannel);
+    return c ? <Avatar name={c.name} omni channelIcon={c.icon} avatarBg={c.avatar_bg} size={24} /> : undefined;
+  };
 
   // Mod log lines and merge-risk cards are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod' && it.type !== 'merge_risk');
@@ -616,6 +666,10 @@ export const Transcript = memo(function Transcript({
     const it = items[at];
     return !it || !isReply(it) || (it.agent ?? lead) !== lead;
   })();
+  // The heads of the replies being written, which alone show live eyes; every other head is history and stays idle (D11).
+  // A run with no head of its own yet (the live head below, or the lanes) leaves every head above it to history.
+  const tailWritten = running && !liveHead && !lanesLive;
+  const writing = useMemo(() => liveHeads(items, heads, { running: tailWritten, lead, seats, mark }), [items, heads, tailWritten, lead, seats, mark]);
   const author = (key: number) => {
     const id = heads.get(key);
     if (!id) return null;
@@ -623,7 +677,7 @@ export const Transcript = memo(function Transcript({
     const look = agents.find((a) => a.id === id) ?? (id === lead ? leadLook : null) ?? { id, name: id };
     return (
       <div key={`h${key}`} className="mb-2">
-        <AuthorLine agent={look} at={it && isReply(it) ? replyAt(it) : null} run={runs.get(key)} face={faceOf(look)} />
+        <AuthorLine agent={look} at={it && isReply(it) ? replyAt(it) : null} run={runs.get(key)} face={faceOf(look)} shows={writing.get(key)} />
       </div>
     );
   };
@@ -643,6 +697,7 @@ export const Transcript = memo(function Transcript({
         byId={byId}
         artifacts={artifacts}
         pages={pages.get(it.key)}
+        seated={seated.get(it.key)}
         steps={steps && it.key === first ? steps : undefined}
         code={it.type === 'result' ? code : undefined}
         answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
@@ -670,6 +725,7 @@ export const Transcript = memo(function Transcript({
               cwd={cwd}
               running={running}
               team={idx === 0 && fromStart && team?.length ? team : undefined}
+              seated={seated.get(it.key)}
               brief={idx === 0 && fromStart && delegated}
               reports={reports}
               byId={byId}
@@ -688,7 +744,7 @@ export const Transcript = memo(function Transcript({
           {edgeRow(-1)}
           {!lanesLive && liveHead && leadLook && (liveSteps || !asking) && (
             <div key="live-head" className="mb-2">
-              <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} />
+              <AuthorLine agent={leadLook} run={run} face={faceOf(leadLook)} shows={agentShows(seats, leadLook.id, mark)} />
             </div>
           )}
           {!lanesLive && liveSteps && (

@@ -2,16 +2,17 @@
 // apps/web/src/inbox.ts (inboxLayout) and its card status shared with the web (inboxStatus). Pinned threads, then the
 // threads waiting on Ben, the latest back first; Working and Done fold away below them. Pure.
 import type { BackgroundTask, ChannelWithRunning, NeedsYou, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
+import type { FaceShows } from '@omni/shared/agent-avatar.ts';
 import { delegatedIds, isWorking } from '@omni/shared/delegate-count.ts';
 
 import { asksForYou, inboxStatus, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
 import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
 import { canMarkDone, targetOfStub, type ThreadTarget } from '../thread/target';
-import { shortAgo } from './channel-model';
+import { leadEyes, shortAgo } from './channel-model';
 import { agentsByThread, jobTree, treeSource, type JobTree } from './thread-tree';
 
 /** Any thread the inbox can list: a full row from the recent list, or the stub the pinned and channel lists send. */
-type InboxThread = ThreadStub & Partial<Pick<Thread, 'role' | 'branch' | 'archived' | 'step'>> & { delegating?: boolean };
+type InboxThread = ThreadStub & Partial<Pick<Thread, 'branch' | 'archived' | 'step'>> & { delegating?: boolean };
 
 /** What a row says on its right in place of the time, as the web and Home say it. */
 export type InboxStatus = RowStatus;
@@ -23,8 +24,12 @@ export interface InboxRow {
   /** The channel's name, shown as #name. */
   channel: string;
   channelId: string;
-  /** The avatar's corner: the status's glyph, else the thread's own. */
+  /** The status dot at the row's end: the status's glyph, else the thread's own. */
   glyph: Glyph;
+  /** The agent whose avatar leads the row (ADR 0021, D23); null for a thread with no agent, which leads with its channel's. */
+  agent: string | null;
+  /** What that avatar's eyes show (leadEyes). */
+  eyes: FaceShows;
   /** Null: nothing to say, so the right shows `time`. */
   status: InboxStatus | null;
   time: string;
@@ -127,13 +132,16 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
 
   const row = (t: InboxThread, working = false): InboxRow => {
     const status = inboxStatus(t, needOf.get(t.id));
+    // A group thread shows the busiest of its agents, whatever the lead's own state says (ADR 0019).
+    const glyph = groupGlyph(status?.glyph ?? threadGlyph(t), t.members);
     return {
       id: t.id,
       title: t.title || 'Untitled',
       channel: names.get(t.channel_id) ?? t.channel_id,
       channelId: t.channel_id,
-      // A group thread shows the busiest of its agents, whatever the lead's own state says (ADR 0019).
-      glyph: groupGlyph(status?.glyph ?? threadGlyph(t), t.members),
+      glyph,
+      agent: t.role ?? null,
+      eyes: leadEyes(glyph, t.members),
       status,
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,

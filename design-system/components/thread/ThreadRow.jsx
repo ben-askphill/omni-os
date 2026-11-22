@@ -10,23 +10,17 @@ function DoneMark({ size = 13 }) {
   return <span title="Marked done" style={{ display: 'grid', placeItems: 'center', color: 'var(--fg-4)' }}><Icon name="check" size={size} strokeWidth={2.2} /></span>;
 }
 
-/* ThreadRow (web/src ThreadList.tsx): 32px round lead, 14px title, chips, time; second line branch pill + preview. */
-export function ThreadRow({ title, taskId, state = 'settled', harness, crew, role, source, time, meta, branch, preview, channel, markedDone = false, selected = false, onClick }) {
+/* ThreadRow (web/src ThreadList.tsx, ADR 0021 D23): the agent's 32px avatar, else the channel's Monogram for a thread with
+   no agent; 14px title, chips, time and the status dot at the far end; second line branch pill + preview. */
+export function ThreadRow({ title, taskId, state = 'settled', harness, crew, role, source, time, meta, branch, preview, channel, home, avatar, markedDone = false, selected = false, onClick }) {
   const hot = !markedDone && (state === 'running' || state === 'needs' || state === 'done');
   const r = role || crew;
   const b = branch || meta;
   const text = preview ?? (state === 'running' ? 'Working' : state === 'queued' ? 'Waiting for a slot' : '');
-  const lead = markedDone ? <DoneMark size={channel ? 12 : 13} /> : <StatusGlyph state={state} />;
+  const mark = markedDone ? <DoneMark size={12} /> : <StatusGlyph state={state} size={8} />;
   return (
     <button type="button" className={'om-trow' + (hot ? '' : ' om-trow--quiet')} data-on={selected || undefined} onClick={onClick}>
-      {channel ? (
-        <span style={{ position: 'relative', flex: 'none', marginTop: 2 }}>
-          <Monogram name={channel} size={32} />
-          <span style={{ position: 'absolute', right: -2, bottom: -2, display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: '50%', background: 'var(--bg)' }}>{lead}</span>
-        </span>
-      ) : (
-        <span className="om-trow__lead">{lead}</span>
-      )}
+      <span className="om-trow__lead">{avatar || <Monogram name={channel || home || title} size={32} />}</span>
       <span className="om-trow__main">
         <span className="om-trow__top">
           <span className="om-trow__title" style={markedDone ? { color: 'var(--fg-4)' } : undefined}>{title || 'Untitled'}</span>
@@ -36,6 +30,7 @@ export function ThreadRow({ title, taskId, state = 'settled', harness, crew, rol
           {r && <Chip>{r}</Chip>}
           {source && <Chip tone="outline">{source}</Chip>}
           <span className="om-trow__time">{time}</span>
+          <span className="om-trow__mark">{mark}</span>
         </span>
         {(text || b || taskId || harness || channel) && (
           <span className="om-trow__sub">

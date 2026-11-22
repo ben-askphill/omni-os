@@ -28,7 +28,7 @@ Points on a 390 × 844 phone. The `phone` token family in `tokens.json` holds th
 | Action chip | 36 | Above the composer |
 | Answer button | 48 | Vermilion pill in decision cards |
 | List row | 52 minimum | Grouped lists |
-| Thread avatar | 36 | Status glyph on its corner |
+| Thread avatar | 36 | The agent's avatar; the status glyph ends the title's line (ADR 0021) |
 | Composer | 52, radius 26 | Chips above |
 | Card radius | 20 (inner sheets 14) | Decision, group, artifact |
 | Sheet radius | 28 | Grabber 36 × 5 |
@@ -69,7 +69,7 @@ SF Pro throughout, set by the system on iOS (no `fontFamily`). Weights are 400 a
 | MoArtifactCard | Artifact peek in a thread | `MoArtifactCard.jsx` | `native/MoArtifactCard.tsx` |
 | MoToast | Confirmation pill | `MoToast.jsx` | `native/MoToast.tsx` |
 
-The Expo set also carries what the web gets from the core components: `theme.ts` (every colour in light and dark, shadows, type, phone metrics, motion, `useOmniTheme()`), `Icon` with the full icon set (`icon-paths.ts`, generated from `components/icons/Icon.jsx`), `CrewMark`, `StatusGlyph` with the running ping, and `Press` (the .96 press spring).
+The Expo set also carries what the web gets from the core components: `theme.ts` (every colour in light and dark, shadows, type, phone metrics, motion, `useOmniTheme()`), `Icon` with the full icon set (`icon-paths.ts`, generated from `components/icons/Icon.jsx`), `CrewMark` (retired: the app draws `AgentAvatar`), `StatusGlyph` with the running ping, and `Press` (the .96 press spring).
 
 ## Using it in the iOS app
 

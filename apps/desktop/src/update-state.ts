@@ -27,11 +27,18 @@ export interface UpdateHost {
    * run from its disk image, or translocated from a quarantined download, is not.
    */
   installDirWritable: boolean;
+  /**
+   * OMNI_SELF_UPDATE=off: a copy the QA harness started. It shares the installed app's AppImage path and updater cache,
+   * so an update it installed at quit would replace the installed app behind its back and take the download that app
+   * was going to install.
+   */
+  selfUpdateOff: boolean;
 }
 
 /** Why this copy cannot update itself, or null when it can. */
 export function unsupportedReason(host: UpdateHost): string | null {
   if (!host.packaged) return 'A development build does not update itself.';
+  if (host.selfUpdateOff) return 'This copy was started with OMNI_SELF_UPDATE=off, so it leaves updates to the installed app.';
   if (host.platform !== 'darwin' && host.platform !== 'linux') return 'Updates are only set up for macOS and Linux.';
   // scripts/build-desktop.sh builds the unpacked app only (--dir), which electron-builder writes no feed into.
   if (!host.hasFeed) return 'This copy was built locally, so it updates by rebuilding, not from GitHub releases.';

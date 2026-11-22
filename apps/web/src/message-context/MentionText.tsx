@@ -7,7 +7,7 @@ import { readContexts } from '@omni/shared/message-context-kinds.ts';
 import { Icon } from '../components/ui.tsx';
 import { ContextInspector } from './ContextChips.tsx';
 import { reachLine } from './machine-mention.tsx';
-import { agentColor } from './agent-mention.tsx';
+import { agentPillStyle } from './agent-mention.tsx';
 import { AgentAvatar, useAgent } from '../components/AgentAvatar.tsx';
 
 /**
@@ -28,8 +28,8 @@ function SentPill({ name, span, open, onToggle }: { name: string; span: MentionS
 function AgentPill({ name, agentId, open, onToggle }: { name: string; agentId: string; open: boolean; onToggle: () => void }) {
   const agent = useAgent(agentId) ?? { id: agentId, name };
   return (
-    <button type="button" onClick={onToggle} aria-expanded={open} title={`Sent to ${name}`} className="mention-pill mention-pill-agent mention-pill-sent" style={{ '--agent': agentColor(agent) } as React.CSSProperties}>
-      <AgentAvatar agent={agent} size={14} />
+    <button type="button" onClick={onToggle} aria-expanded={open} title={`Sent to ${name}`} className="mention-pill mention-pill-agent mention-pill-sent" style={agentPillStyle(agent)}>
+      <AgentAvatar agent={agent} size={16} />
       {name}
     </button>
   );

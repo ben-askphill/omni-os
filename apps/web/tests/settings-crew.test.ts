@@ -7,8 +7,8 @@ import type { Channel, CrewRole } from '../src/api.ts';
 // Settings > Agents' agent page (`#/settings/crew/builder`): the form and Advanced > Edit as Markdown are one draft, so
 // an edit in either survives a switch to the other and a save from it, and a key only the file has stays. Hide shows
 // the role hidden at once. The Memory group counts the lessons that wait for you and adds one of yours. The Identity
-// block is the one place the avatar is set: an SVG on a color saves with Save, and any source but a photo upload takes
-// an uploaded image away.
+// block is the one place the avatar is set: it opens on the agent's crew character, an SVG on a color saves with Save,
+// and any source but a photo upload takes an uploaded image away.
 
 const state = vi.hoisted(() => ({ channels: [] as Channel[], crew: [] as CrewRole[] }));
 vi.mock('../src/store.tsx', async (importOriginal) => ({
@@ -216,7 +216,12 @@ const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle
 it('holds every avatar control in the one Identity block, and nowhere else on the page', async () => {
   expect(host.querySelectorAll('[data-agent-identity]')).toHaveLength(1);
   const identity = q('[data-agent-identity]');
-  expect([...host.querySelectorAll('[aria-label="Avatar"] [role="radio"]')].map((b) => b.textContent)).toEqual(['Built-in', 'Emoji', 'Icon', 'Upload']);
+  expect([...host.querySelectorAll('[aria-label="Avatar"] [role="radio"]')].map((b) => b.textContent)).toEqual(['Character', 'Emoji', 'Icon', 'Upload']);
+  // An agent with no look of its own opens on its character, on the shape its id picks.
+  expect(radio('Avatar', 'Character').getAttribute('aria-checked')).toBe('true');
+  expect(host.querySelectorAll('[role="radiogroup"][aria-label="Shape"] [role="radio"]')).toHaveLength(17);
+  expect(radio('Shape', 'Default, squircle').getAttribute('aria-checked')).toBe('true');
+  expect(radio('Shape', 'Squircle, built-in')).toBeDefined();
   // No other upload, icon or color control outside the block.
   const outside = [...host.querySelectorAll('input[type="file"], input[type="color"], [aria-label="Background swatches"]')].filter((el) => !identity.contains(el));
   expect(outside).toHaveLength(0);
@@ -228,14 +233,14 @@ it('saves an uploaded SVG on the background color picked, with Save', async () =
   // A photo fills the circle, so no color shows until the file is an SVG.
   expect(host.querySelector('[aria-label="Background swatches"]')).toBeNull();
   await pick(q<HTMLInputElement>('input[aria-label="Upload an image or SVG for Builder"]'), new File([SVG], 'mark.svg', { type: 'image/svg+xml' }));
-  await click(host.querySelector<HTMLButtonElement>('[aria-label="Background swatches"] button[aria-label="Navy"]')!);
+  await click(host.querySelector<HTMLButtonElement>('[aria-label="Background swatches"] button[aria-label="Azure"]')!);
   // The preview draws the SVG as an image before anything is saved.
   expect(q('[aria-label="Avatar preview"] img')?.getAttribute('src')).toContain('data:image/svg+xml');
   expect(saves()).toHaveLength(0);
   expect(host.textContent).toContain('Unsaved changes');
 
   await click(button('Save'));
-  expect(saves().map((c) => c.body.fields.avatar)).toEqual([{ icon: `svg:${SVG}`, bg: '#283c62' }]);
+  expect(saves().map((c) => c.body.fields.avatar)).toEqual([{ icon: `svg:${SVG}`, bg: '#0093e4' }]);
   // Builder had no uploaded image, so nothing goes to the avatar endpoint.
   expect(calls.filter((c) => c.url === '/api/crew/builder/avatar')).toHaveLength(0);
 });
