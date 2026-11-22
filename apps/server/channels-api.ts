@@ -155,18 +155,19 @@ const stub = (t: Thread, delegating: ReadonlySet<string>) => {
   return { id, channel_id, title, status, role, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, setup, delegating: delegating.has(id), ...(members && { members }) };
 };
 
-/** Conductor jobs with their delegated child threads, including children in other channels. */
+/**
+ * Conductor jobs with their delegated child threads, including children in other channels. Work an agent seated in a
+ * job opened nests under the job, not under the agent's hidden session (threads.conductorHandoffChildren).
+ */
 function conductorHandoffs(delegating: ReadonlySet<string>) {
   const groups = new Map<string, { parent: Thread; children: Thread[] }>();
-  for (const child of threads.conductorHandoffChildren()) {
-    const parentID = child.parent_id;
-    if (!parentID) continue;
-    let group = groups.get(parentID);
+  for (const { job_id: jobId, ...child } of threads.conductorHandoffChildren()) {
+    let group = groups.get(jobId);
     if (!group) {
-      const parent = threads.get(parentID);
+      const parent = threads.get(jobId);
       if (!parent) continue;
       group = { parent, children: [] };
-      groups.set(parentID, group);
+      groups.set(jobId, group);
     }
     group.children.push(child);
   }
