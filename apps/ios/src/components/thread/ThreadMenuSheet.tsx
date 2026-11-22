@@ -9,7 +9,7 @@ import { machineNote } from '../../machine/state';
 import { fontSize, minTarget, space, useOmniTheme } from '../../theme';
 import type { ThreadAction } from '../../thread/actions';
 import { useThreadActions } from '../../thread/hooks';
-import { menuExtras, menuLinks } from '../../thread/menu';
+import { menuExtras, menuLinks, type MenuLink } from '../../thread/menu';
 import { folderChoices, organizeItems, type ThreadTarget } from '../../thread/target';
 import { Callout } from '../../ui/Callout';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -50,6 +50,8 @@ interface ThreadMenuSheetProps {
   onChanges?: () => void;
   /** Opens the thread's pull request. Without it the menu has no Pull request row. */
   onPR?: () => void;
+  /** Opens the thread's artifacts. Without it the menu has no Artifacts row. */
+  onArtifacts?: () => void;
   /** Opens the member sheet's agent list. Without it the menu has no Add an agent row. */
   onAddAgent?: () => void;
   /** The page the sheet opens on: the machine name in the open thread's title opens Runs on directly. */
@@ -57,7 +59,7 @@ interface ThreadMenuSheetProps {
 }
 
 /** The thread menu as a sheet: pin, done, rename, move to folder and archive, from the header and from a list row. */
-export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, onFork, onActions, onChanges, onPR, onAddAgent, openOn = 'menu' }: ThreadMenuSheetProps) {
+export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, onFork, onActions, onChanges, onPR, onArtifacts, onAddAgent, openOn = 'menu' }: ThreadMenuSheetProps) {
   const { colors } = useOmniTheme();
   const run = useThreadActions();
   const [asked, setPage] = useState<MenuPage>(openOn);
@@ -80,7 +82,7 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
   const page = (asked === 'machine' || asked === 'takeover') && !picker ? 'menu' : asked;
   const items = useMemo(() => (target ? organizeItems(target) : []), [target]);
   const extras = useMemo(() => (target ? menuExtras(target, picker, !!onFork, !!onActions, !!onAddAgent) : []), [target, picker, onFork, onActions, onAddAgent]);
-  const links = useMemo(() => menuLinks(!!onChanges, !!onPR), [onChanges, onPR]);
+  const links = useMemo(() => menuLinks(!!onChanges, !!onPR, !!onArtifacts), [onChanges, onPR, onArtifacts]);
   const choices = useMemo(() => folderChoices(folders, target?.folderId ?? null), [folders, target?.folderId]);
 
   async function perform(action: ThreadAction) {
@@ -146,10 +148,10 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
                 key={link.id}
                 label={link.label}
                 sub={link.sub}
-                leading={<Icon name={link.id === 'changes' ? 'diff' : 'pr'} size={18} color={colors.fg2} />}
+                leading={<Icon name={LINK_ICON[link.id]} size={18} color={colors.fg2} />}
                 opens
                 disabled={pending}
-                onPress={() => (link.id === 'changes' ? onChanges?.() : onPR?.())}
+                onPress={() => (link.id === 'changes' ? onChanges : link.id === 'pr' ? onPR : onArtifacts)?.()}
                 last={i === links.length - 1}
               />
             ))}
@@ -222,6 +224,8 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
     </Sheet>
   );
 }
+
+const LINK_ICON: Record<MenuLink['id'], IconName> = { changes: 'diff', pr: 'pr', artifacts: 'layers' };
 
 const TITLES = { menu: 'Thread', move: 'Move to folder', machine: 'Runs on', takeover: 'Take over' } as const;
 

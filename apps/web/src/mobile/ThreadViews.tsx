@@ -34,7 +34,7 @@ import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { connectorAction, connectorOf } from '@omni/shared/connectors.ts';
 import { ConnectorMark } from '../components/ConnectorMark.tsx';
-import { CrewFileList } from './CrewFiles.tsx';
+import { CrewFileList, ThreadFileList } from './CrewFiles.tsx';
 import { CrewPRList } from './CrewPRs.tsx';
 import { MoAutoMerge } from './MoAutoMerge.tsx';
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
@@ -479,7 +479,7 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, history, crew } = useThread();
+  const { thread, history, files, shots, crew } = useThread();
   const { channel, crew: roles } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
@@ -530,6 +530,7 @@ export function DetailsScreen() {
       <MoHeader onBack={shell.back} title="Details" sub={thread.title} />
       <Body className="gap-4">
         <AgentsGroup open={(id) => shell.open(href.thread(id))} />
+        <ThreadFileList files={files} shots={shots} onOpen={(a) => shell.open(href.thread(thread.id, a.id))} />
         <CrewFileList files={crew.files} shots={crew.shots} onOpen={(a) => shell.open(href.thread(thread.id, a.id))} />
         <MoGroup>
           {rows.map(([k, v], i) => (

@@ -71,4 +71,9 @@ describe('menuLinks', () => {
     expect(menuLinks(false, true).map((l) => l.id)).toEqual(['pr']);
     expect(menuLinks(false, false)).toEqual([]);
   });
+
+  it('puts Artifacts after them, where the screen can open it', () => {
+    expect(menuLinks(true, true, true).map((l) => l.id)).toEqual(['changes', 'pr', 'artifacts']);
+    expect(menuLinks(false, false, true)).toEqual([{ id: 'artifacts', label: 'Artifacts', sub: 'Screenshots and files this thread made' }]);
+  });
 });
