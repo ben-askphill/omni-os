@@ -253,10 +253,12 @@ function conductorSeatLines(name: string, role: CrewRole | undefined, command: b
 /**
  * The `## Reply` block. A thread that has html_render (crates/omni-mcp render.rs) shows an answer as a page when the
  * answer's shape suits one, whatever words the user asked with. Remote harnesses (Hermes, Cursor cloud, custom ones)
- * get no local MCP servers, so no html_render, and a quick ask's answer shows in place as text (QuickAnswer.tsx):
- * both keep the text-only block.
+ * get no local MCP servers, so no html_render, and a thread that only reads (a quick ask, whose answer shows in place
+ * as text, or one kept from it) gets none either (sandbox.ts buildMcpConfig): both keep the text-only block.
+ * `reports`: the final message goes to another agent as text (reportsUp), which reads none of the pages.
+ * Cursor sends this block again when it resumes a chat (harness/resume-rules.ts), so it stays one section.
  */
-function replyLines(name: string, renders: boolean): string[] {
+function replyLines(name: string, renders: boolean, reports: boolean): string[] {
   const head = 'Your final message is what gets shown and reported.';
   const markdown = 'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings';
   const override = 'This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.';
@@ -278,19 +280,27 @@ function replyLines(name: string, renders: boolean): string[] {
     '- dates, schedules or release history: a timeline',
     '- a comparison, a before and after, or options with a recommendation: side by side, the recommendation marked',
     '- a flow, an architecture or routing: a diagram',
-    `"Show me", "list out" or "visualize" from ${name}, or passed on in a brief, always gets a page.`,
-    `Keep plain text, with no page, for a yes or no, a single fact, a question for ${name}, code and commands, and any answer with none of those shapes.`,
+    `"Show me", "list out" or "visualize" from ${name}, or passed on in a brief, always gets a page, except when what is asked for is code or a command.`,
+    `Keep plain text, with no page, for a yes or no, a single fact, a question for ${name}, and any answer with none of those shapes.`,
+    `Code and commands always stay text in a code block, even when ${name} says "show me": "show me the command to run" gets the command, not a page.`,
     'Under a page, say what it means in a line or two. Do not repeat its rows.',
+    ...(reports
+      ? [`Your final message also goes as text to the agent that handed you this work, which reads none of your pages. When your results take one of those shapes, show them with html_render before it, for ${name} to see in this thread, and still put the outcome and the results that matter in the final message as short bullets.`]
+      : []),
     `${markdown}, links are [label](url). Use bullets over prose. A pipe table is only for 2 or 3 rows, with short cells and the reasons in bullets under it. Start every numbered item on its own line. ${override}`,
   ];
 }
 
 /**
- * A delegated or team thread's final message goes to its parent as text (runner/queue.ts reportToParent). A page it
- * shows stays in its own transcript, so the text still carries the results.
+ * Whether a thread's final message goes to another agent as text: a delegated thread's report (runner/queue.ts
+ * reportToParent), a legacy team member's, and the reply of a member seated in a team, which its lead reads
+ * (runner/team.ts). A member seated in a group thread that is no team talks with the user there, so it reports to no one.
  */
-const reportRenderLine = (name: string) =>
-  `Your report follows the Reply rules too: when it holds several results in one of those shapes, also show them with html_render in this thread before your final message, for ${name} to see here. Your parent reads only the final message's text, not the page, so the outcome and the results that matter still go in that message, as short bullets.`;
+function reportsUp(thread: Thread): boolean {
+  if (!thread.parent_id) return false;
+  if (thread.source === 'member') return events.teamOf(thread.parent_id) !== null;
+  return true;
+}
 
 /** A team thread's lead (runner/team.ts): plan, give out the parts with message_members, then report once woken. */
 function teamLeadLines(name: string): string[] {
@@ -313,8 +323,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   const remote = isProviderHarness(thread.harness);
   const remoteAgent = isRemoteAgentHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
-  // Pages with html_render: every local thread but a quick ask, whose answer shows in place as text.
-  const renders = !remote && !thread.quick;
+  // Pages with html_render: every local thread but one that only reads (replyLines).
+  const renders = !remote && !readsOnly(thread);
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
   // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
@@ -382,7 +392,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? 'Omni does not copy Keychain secrets onto this server. Never print, echo or write secret values anywhere.'
       : 'Channel and global secrets are already in your environment as variables. Never print, echo or write their values anywhere.',
     '',
-    ...replyLines(name, renders),
+    ...replyLines(name, renders, reportsUp(thread)),
     // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which remote harnesses do not get.
     ...(remote
       ? []
@@ -402,7 +412,6 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       '',
       '## Team task',
       `You are one member of a team${thread.task_id ? `, on task ${thread.task_id}` : ''}. Your final message is automatically reported to the team lead, who combines it with the other members' replies. Stick to your own task. Report outcomes and blockers, even if the answer is "nothing found".`,
-      renders ? reportRenderLine(name) : '',
     );
   } else if (thread.source === 'member') {
     // A seated member (ADR 0019): the lead commits, and several agents edit one worktree at once (Q24). A remote agent
@@ -432,7 +441,6 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       `The conductor handed you this task${thread.task_id ? ` as ${thread.task_id}` : ''}. Your final message is automatically reported back to it. Report outcomes and blockers, even if the answer is "nothing found".`,
       // The report card (packages/shared/report-shape.ts) leads with what comes before the first heading and folds each heading.
       'That final message is the whole report; what you said while working is not part of it. Put the outcome in its first one to three lines, then the details under ## headings (such as Checks, Changes, Open items), as bullet lists rather than tables.',
-      renders ? reportRenderLine(name) : '',
     );
   }
   if (events.teamOf(thread.id) !== null) lines.push(...teamLeadLines(name));

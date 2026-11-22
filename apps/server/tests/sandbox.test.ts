@@ -192,6 +192,15 @@ describe('buildMcpConfig: omni-render', () => {
       });
     }
   });
+
+  it('leaves it out of a thread that only reads, whose prompt answers in text', () => {
+    // `quick` is readsOnly: a quick ask, and a thread kept from one (runner/prompts.ts replyLines).
+    for (const r of [undefined, role(['omni'])]) {
+      const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL, quick: true });
+      expect(cfg.mcpServers['omni-render']).toBeUndefined();
+      expect(cfg.mcpServers['omni-ask']).toBeDefined();
+    }
+  });
 });
 
 describe('buildMcpConfig: omni-steps', () => {

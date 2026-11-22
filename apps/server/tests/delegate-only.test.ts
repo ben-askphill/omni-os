@@ -125,38 +125,84 @@ describe('a delegate-only role', () => {
       '- dates, schedules or release history: a timeline',
       '- a comparison, a before and after, or options with a recommendation: side by side, the recommendation marked',
       '- a flow, an architecture or routing: a diagram',
-      `"Show me", "list out" or "visualize" from ${name}, or passed on in a brief, always gets a page.`,
-      `Keep plain text, with no page, for a yes or no, a single fact, a question for ${name}, code and commands, and any answer with none of those shapes.`,
+      `"Show me", "list out" or "visualize" from ${name}, or passed on in a brief, always gets a page, except when what is asked for is code or a command.`,
+      `Keep plain text, with no page, for a yes or no, a single fact, a question for ${name}, and any answer with none of those shapes.`,
     ].join('\n');
+    // "Show me the command to run" is both a "show me" and a command: the command wins, and the prompt says so.
+    const precedence = `Code and commands always stay text in a code block, even when ${name} says "show me": "show me the command to run" gets the command, not a page.`;
     // The old rule rendered only on those words, and the text rules it sat under said bullets and pipe tables for everything.
     const phraseOnly = `When ${name} asks you to "show me", "list out" or "visualize" something`;
     const textOnly = ['keep it short, bullets over prose.', 'tables are pipe tables', 'Keep table cells short.'];
     for (const role of ['conductor', 'builder', 'researcher', 'inbox']) {
       const reply = section(buildSystemPrompt(thread, channel, getCrew(role)), 'Reply');
       expect(reply).toContain(rule);
+      expect(reply).toContain(precedence);
       expect(reply).toContain('A pipe table is only for 2 or 3 rows');
       expect(reply).not.toContain(phraseOnly);
       for (const line of textOnly) expect(reply).not.toContain(line);
     }
+  });
 
-    // A delegated thread's report and a team member's reply follow it too, and still carry the results as text.
-    const report = 'Your report follows the Reply rules too: when it holds several results in one of those shapes, also show them with html_render in this thread';
-    expect(section(buildSystemPrompt({ ...thread, parent_id: 'parent' }, channel, getCrew('researcher')), 'Delegated task')).toContain(report);
-    expect(section(buildSystemPrompt({ ...thread, parent_id: 'parent', source: 'team' }, channel, getCrew('builder')), 'Team task')).toContain(report);
-    expect(buildSystemPrompt(thread, channel, getCrew('builder'))).not.toContain(report);
+  it('has every thread whose final message goes to another agent keep its results in the text, members of a team included', async () => {
+    const t = await r.start('THINK:1');
+    await r.untilResults(t.id, 1);
+    const thread = r.thread(t.id);
+    const channel = r.db.channels.get('scratch')!;
+    const report = 'Your final message also goes as text to the agent that handed you this work, which reads none of your pages. When your results take one of those shapes, show them with html_render before it';
+    const reply = (th: typeof thread, role: string) => section(buildSystemPrompt(th, channel, getCrew(role)), 'Reply');
 
-    // No html_render on a remote harness, and a quick ask's answer shows in place as text: the text-only block, as it was.
+    // A delegated thread and a legacy team member, whose threads report to their parent (runner/queue.ts reportToParent).
+    expect(reply({ ...thread, parent_id: t.id }, 'researcher')).toContain(report);
+    expect(reply({ ...thread, parent_id: t.id, source: 'team' }, 'builder')).toContain(report);
+    // A thread that answers the user directly does not.
+    expect(reply(thread, 'builder')).not.toContain(report);
+
+    // A team as createTeam makes it: the lead is delegated, and each member is seated as `member`, its replies read by the lead.
+    const { thread: team } = await r.runner.createTeam({
+      channel: 'scratch',
+      title: 'Compare mics',
+      prompt: 'THINK:1 compare the mics',
+      role: 'researcher',
+      parent_id: t.id,
+      task_id: 'T-REPORT',
+      tasks: [{ title: 'Reviews', prompt: 'find reviews', role: 'writer' }],
+    });
+    await r.untilResults(team.id, 1);
+    const member = r.thread(r.db.members.of(team.id, 'writer')!.session_thread);
+    expect(member.source).toBe('member');
+    expect(reply(member, 'writer')).toContain(report);
+    expect(reply(r.thread(team.id), 'researcher')).toContain(report);
+
+    // A member seated in a group thread that is no team talks with the user there, and reports to no one.
+    const group = await r.start('THINK:1');
+    await r.untilResults(group.id, 1);
+    const { seat } = await import('../runner/members.ts');
+    seat(group.id, 'writer');
+    const guest = r.thread(r.db.members.of(group.id, 'writer')!.session_thread);
+    expect(guest.source).toBe('member');
+    expect(reply(guest, 'writer')).not.toContain(report);
+  });
+
+  it('keeps the text-only Reply block, and no html_render, where a page cannot show', async () => {
+    const t = await r.start('THINK:1');
+    await r.untilResults(t.id, 1);
+    const thread = r.thread(t.id);
+    const channel = r.db.channels.get('scratch')!;
     const asBefore = [
       '## Reply',
       'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
       'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
       'Keep table cells short. Put reasons and explanations in bullets under the table.',
     ].join('\n');
-    for (const plain of [{ quick: 1 }, { harness: 'hermes' }, { harness: 'cursor-cloud' }, { harness: 'custom:box' }]) {
-      const prompt = buildSystemPrompt({ ...thread, ...plain, parent_id: 'parent' }, channel, getCrew('builder'));
-      expect(section(prompt, 'Reply')).toBe(asBefore);
-      expect(prompt).not.toContain('html_render first');
-      expect(prompt).not.toContain(report);
+    // Remote harnesses get no local MCP servers. A quick ask answers in place as text, and a thread kept from one
+    // (quick cleared, workspace still read-only) keeps its quick-ask rule that a page needs a task: neither has the tool.
+    const noPages: Partial<typeof thread>[] = [{ harness: 'hermes' }, { harness: 'cursor-cloud' }, { harness: 'custom:box' }, { quick: 1 }, { quick: 0, workspace: 'read' }, { quick: 0, workspace: 'none' }];
+    for (const plain of noPages) {
+      const prompt = buildSystemPrompt({ ...thread, ...plain, parent_id: t.id }, channel, getCrew('builder'));
+      expect(section(prompt, 'Reply'), JSON.stringify(plain)).toBe(asBefore);
+      expect(prompt, JSON.stringify(plain)).not.toContain('html_render');
     }
+    const kept = buildSystemPrompt({ ...thread, quick: 0, workspace: 'read' }, channel, getCrew('builder'));
+    expect(section(kept, 'Quick ask')).toContain('making a file or a page');
   });
 });

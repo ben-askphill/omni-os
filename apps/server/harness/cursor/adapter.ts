@@ -7,7 +7,7 @@
 import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
-import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
+import { resumeRules } from '../resume-rules.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { CURSOR_NO_EDITS_DENY, writeCursorDenyConfig, writeCursorPlugin } from '../../sandbox.ts';
@@ -98,7 +98,8 @@ export const cursorAdapter: HarnessAdapter = {
       let prompt = m.text;
       if (m.attachments.length) prompt += `\n\n${describeAttachments(m.attachments)}`;
       if (addContext) prompt = `${ctx.systemPrompt}\n\n---\n\n${prompt}`;
-      else if (addPolicy) prompt = `${TOOL_FAILURE_POLICY}\n\n---\n\n${prompt}`;
+      // A resumed chat had Omni's context in an earlier session: it gets again the rules that change (resume-rules.ts).
+      else if (addPolicy) prompt = `${resumeRules(ctx.systemPrompt)}\n\n---\n\n${prompt}`;
 
       const args = ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);

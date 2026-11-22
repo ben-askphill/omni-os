@@ -3,6 +3,7 @@ import { startRunner, type Ev } from './runner-boot.ts';
 import { turnSteps } from '@omni/shared/steps.ts';
 import { buildItems } from '@omni/shared/transcript-fold.ts';
 import { FAKE_CURSOR } from './support.ts';
+import { RESENT_REPLY } from '../harness/resume-rules.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
 const cursor = { harness: 'cursor', model: 'gpt-5.6-sol', effort: 'high' };
@@ -98,6 +99,27 @@ describe('cursor tracer', () => {
     expect(ts[0].prompt).toContain('Omni OS'); // context on the first turn
     expect(ts[1].prompt).not.toContain('Omni OS'); // not on the follow-up
     expect(ts.every((r: any) => r.resume === chatId)).toBe(true); // every turn resumes the chat
+  });
+
+  it('sends a resumed chat the current reply rules and tool-failure policy once, since its context came in an earlier session', async () => {
+    const t = await H.start('HANG forever', cursor);
+    await H.until('chat id', () => H.thread(t.id).session_id.startsWith('chat_'));
+    await H.until('turn running', () => turns(t.id).length >= 1);
+    H.runner.interruptThread(t.id);
+    await H.untilStatus(t.id, 'stopped');
+    H.runner.sendMessage(t.id, 'CMD carry on');
+    await H.untilResults(t.id, 1, 12000);
+    H.runner.sendMessage(t.id, 'and then this', { mode: 'queue' });
+    await H.untilResults(t.id, 2);
+    const [first, resumed, next] = turns(t.id).map((r: any) => r.prompt as string);
+    expect(first).toContain('# Omni OS context');
+    // A chat made before a rule changed still gets the new one: the policy and the Reply block, said to replace the old copy.
+    expect(resumed).not.toContain('# Omni OS context');
+    expect(resumed.startsWith('## Tool failures\n')).toBe(true);
+    expect(resumed).toContain(`## Reply\n${RESENT_REPLY}\nYour final message is what gets shown and reported.`);
+    expect(resumed).toContain('Pick the form by what the answer holds');
+    expect(resumed.endsWith('\n\n---\n\nCMD carry on')).toBe(true);
+    expect(next).toBe('and then this');
   });
 
   it('queues a steer instead of rejecting it, running it as the next turn', async () => {
