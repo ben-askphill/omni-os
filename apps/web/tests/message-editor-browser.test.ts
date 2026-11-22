@@ -101,7 +101,8 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     await until(async () => (await state()).text === '');
     expect((await state()).records).toEqual([]);
     expect(await chips()).toEqual([]);
-    await page.keyboard.press('Control+z');
+    // Cmd+Z on a Mac, Ctrl+Z elsewhere, as the Token Input reads it.
+    await page.keyboard.press('ControlOrMeta+z');
     await until(async () => (await state()).text === '@omarchy');
     expect((await state()).records).toHaveLength(1);
     expect(await chips()).toEqual(['omarchy']);
@@ -120,6 +121,32 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     await page.keyboard.press('Enter');
     await until(async () => (await state()).text === 'ask @Reviewer to look at @apps/web/src/main.tsx ');
     expect((await state()).records).toHaveLength(1);
+  });
+
+  it('stays open while the search for the typed word runs, after a search that found no files', async () => {
+    // Picking an agent leaves the last search (`rev`) with no file rows. A word no agent matches then had nothing to
+    // show until its own search answered, so the menu closed and opened again on every key, and stayed shut when the
+    // word ended on a closing key: typed quickly or on a busy machine, `@main` never offered the file.
+    await load('?slow=400');
+    await page.keyboard.type('ask @rev');
+    await until(async () => (await options()).length === 1);
+    // The search for `rev` answers, with no files.
+    await page.waitForTimeout(600);
+    await page.keyboard.press('Enter');
+    await until(async () => (await state()).text === 'ask @Reviewer ');
+    await page.keyboard.type('to look at @');
+    await until(menuOpen);
+    // Each key lands before the search for the word so far answers.
+    const open: boolean[] = [];
+    for (const key of 'main') {
+      await page.keyboard.type(key);
+      await page.waitForTimeout(120);
+      open.push(await menuOpen());
+    }
+    expect(open).toEqual([true, true, true, true]);
+    await until(async () => (await options()).map((o) => o.text).join() === 'main.tsxapps/web/src');
+    await page.keyboard.press('Enter');
+    await until(async () => (await state()).text === 'ask @Reviewer to look at @apps/web/src/main.tsx ');
   });
 
   // A chip stacked on each of three lines, the tightest case: in the reply box, and at the phone composer's 16px on a

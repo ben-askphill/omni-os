@@ -14,6 +14,7 @@
 // - A Cursor Cloud member works on its own branch, never in the worktree: it raises none.
 // In memory: a restart ends every turn, and with it the busy period.
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { collisionsIn, editedPath, openCollisions, worktreePath, type Collision, type CollisionClearedP, type CollisionP } from '@omni/shared/collisions.ts';
 import { events, members, threads, type EventRow } from '../db.ts';
 import { gitOr } from '../changes.ts';
@@ -45,6 +46,21 @@ const atWork = (sessionThread: string) => {
   const s = threads.get(sessionThread);
   return !!lives.get(sessionThread)?.turn || waiting.includes(sessionThread) || s?.status === 'running' || s?.status === 'queued';
 };
+
+/**
+ * An edited file relative to the thread's folder. A harness names the file from its working directory as the OS
+ * resolves it, past any symlink in the folder's path (macOS keeps temp folders under /var, a link to /private/var),
+ * so a path outside the folder as stored is tried against where the folder really is.
+ */
+function inFolder(raw: string, cwd: string | null | undefined): string {
+  const path = worktreePath(raw, cwd);
+  if (!cwd || !path.startsWith('/')) return path;
+  try {
+    return worktreePath(raw, realpathSync(cwd));
+  } catch {
+    return path;
+  }
+}
 
 /** A path relative to the worktree, inside it, with no control characters or backticks, and not too long. */
 const plainPath = (p: string) =>
@@ -101,7 +117,7 @@ function onToolUse(sessionThread: string, row: EventRow, payload: unknown) {
   if (!raw) return;
   const session = threads.get(sessionThread);
   if (!session || isProviderHarness(session.harness)) return;
-  const path = worktreePath(raw, threads.get(threadId)?.cwd);
+  const path = inFolder(raw, threads.get(threadId)?.cwd);
   // A path is the agent's own input, and goes to the other agent in Omni's words: only a plain path inside the worktree.
   if (!plainPath(path)) return;
   let b = busy.get(threadId);

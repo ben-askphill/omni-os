@@ -166,7 +166,9 @@ export function MessageEditor(props: MessageEditorProps) {
   const all = [...agentList, ...files];
   const tabs = mentionTabs(all, tab);
   const rows = tabs.open ? all.filter((r) => tabOf(r) === tabs.open) : all;
-  const rowsLoading = atKey !== null && got?.key !== atKey && !got;
+  // Loading while the search for the typed text runs and there is nothing to show: idle with no rows, the Trigger Menu
+  // closes, and a closed menu makes no search for the text typed after.
+  const rowsLoading = atKey !== null && got?.key !== atKey && !rows.length;
 
   // `/`: a fresh list each time the menu opens, or gets another list while open. The server only probes a list older
   // than 30 seconds.
