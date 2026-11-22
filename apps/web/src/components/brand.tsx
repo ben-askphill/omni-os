@@ -2,7 +2,6 @@ import { MARK_TRANSFORM, HARNESS_LOGOS as LOGO, HARNESS } from '@omni/shared/bra
 import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
 import { angDiff, c01, easeWeights, MARK_DROPLETS, MARK_R, MARK_START, MARK_TARGETS, MARK_W, markFrame, type MarkDrop, type MarkState } from '@omni/shared/mark.ts';
 import { useEffect, useId, useRef } from 'react';
-import type { HarnessId } from '../api.ts';
 import { useReducedMotion } from '../motion.ts';
 
 // ---------- the Omni mark ----------
@@ -154,16 +153,7 @@ export { Loader } from './ui/status.tsx';
 /** A custom harness (custom:<slug>) without its catalog row at hand reads as its slug. */
 export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? customHarnessSlug(harness) ?? harness;
 
-/** Each harness with the short name usage rows give it, in the order they list. */
-export const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
-  { id: 'claude-code', name: 'Claude' },
-  { id: 'codex', name: 'Codex' },
-  { id: 'cursor', name: 'Cursor' },
-  { id: 'hermes', name: 'Hermes' },
-];
-
-/** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud, which reports no usage of its own. */
-export const SLOT_ROWS: { id: HarnessId; name: string }[] = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }];
+export { HARNESS_ROWS, SLOT_ROWS } from '@omni/shared/account-usage.ts';
 
 /** The bare logo. Harnesses without one (Hermes, a custom harness) get two letters of their id. */
 export function HarnessLogo({ harness, size = 14, title }: { harness: string; size?: number; title?: string }) {

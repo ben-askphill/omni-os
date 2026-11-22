@@ -4,6 +4,7 @@ import { OmniMark } from '../components/brand.tsx';
 import { UpdateNotice } from '../components/UpdateNotice.tsx';
 import { DiskNotice } from '../components/DiskNotice.tsx';
 import { AccountNotice } from '../components/AccountNotice.tsx';
+import { UsageCard } from '../components/sidebar/UsageCard.tsx';
 import { MachineTile } from '../components/dashboard/MachineTiles.tsx';
 import { useMachines } from '../app/useMachines.ts';
 import { href } from '../router.ts';
@@ -58,6 +59,7 @@ export function ActivityScreen() {
               ))}
             </section>
           )}
+          <div className="mx-4 mb-3"><UsageCard phone /></div>
         </div>
         <div className="flex flex-col px-4">
           {waiting.map((t, i) => (

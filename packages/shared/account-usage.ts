@@ -2,6 +2,7 @@
 // the Usage card shows. A reading belongs to the account that ran it, never to the harness, so two machines signed in
 // to two Claude plans each keep their own numbers (apps/server/harness-accounts.ts writes them). Rows come from
 // GET /api/accounts: one per signed-in account, any machine, with that account's last reading or none.
+import { formatCents } from './context-meter.ts';
 import { identityKey, type AccountsView } from './harness-accounts.ts';
 
 /** A 5-hour or weekly window, or a monthly cycle. Utilization is 0 to 1 (older readings say 0 to 100). Epoch seconds. */
@@ -163,4 +164,85 @@ export function parsePlanUsage(v: unknown): PlanUsage | null {
   if (typeof u.status === 'string') out.status = u.status.slice(0, 40);
   if (typeof u.updated_at === 'string') out.updated_at = u.updated_at.slice(0, 40);
   return out;
+}
+
+/** Each harness with the short name usage rows give it, in the order they list. */
+export const HARNESS_ROWS = [
+  { id: 'claude-code', name: 'Claude' },
+  { id: 'codex', name: 'Codex' },
+  { id: 'cursor', name: 'Cursor' },
+  { id: 'hermes', name: 'Hermes' },
+] as const;
+
+/** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud, which reports no usage of its own. */
+export const SLOT_ROWS = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }] as const;
+
+/** How full a usage window is, whether the harness reports a fraction or a percent. */
+export function windowPct(w?: { utilization: number }): number | null {
+  if (!w) return null;
+  const raw = w.utilization > 1.5 ? w.utilization / 100 : w.utilization;
+  return Math.max(0, Math.min(1, raw));
+}
+
+export function peakUsage(rows: readonly UsageRow[]): number | null {
+  let peak: number | null = null;
+  for (const { usage } of rows) {
+    for (const window of [usage?.five_hour, usage?.seven_day, usage?.monthly]) {
+      const pct = windowPct(window);
+      if (pct !== null && (peak === null || pct > peak)) peak = pct;
+    }
+  }
+  return peak;
+}
+
+export function slotSummary(slots: Partial<Record<string, { running: number; cap: number }>> = {}): string {
+  return SLOT_ROWS.flatMap(({ id, name }) => {
+    const slot = slots[id];
+    return slot ? [`${name} ${slot.running}/${slot.cap}`] : [];
+  }).join(' · ');
+}
+
+/** The full account identity, including the machines that reported it. */
+export function accountTitle(a: NonNullable<UsageRow['account']>): string {
+  const machines = a.machines.length ? `, on ${a.machines.join(' and ')}` : '';
+  return `${[a.label, a.plan, a.org && !a.org.toLowerCase().includes(a.label.toLowerCase()) ? a.org : null].filter(Boolean).join(' · ')}${machines}`;
+}
+
+/** Why an account row has no numbers yet, and what fills it in. */
+export function waitingTitle(harness: string, name: string, a: NonNullable<UsageRow['account']>): string {
+  const on = a.machines.length ? ` on ${a.machines.join(' or ')}` : '';
+  const when =
+    harness === 'claude-code'
+      ? 'after the next Claude Code turn signed in as this account'
+      : `the next time ${name} reads this account's limits (at startup, every 15 minutes, or during a run)`;
+  return `No reading for ${a.label} yet. It fills in ${when}${on}.`;
+}
+
+function monthlyDetails(m: MonthlyPlanUsage): string {
+  const pct = (f: number) => `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`;
+  return [
+    m.auto !== undefined && `Auto ${pct(m.auto)}`,
+    m.api !== undefined && `API ${pct(m.api)}`,
+    m.spendCents !== undefined && `${formatCents(m.spendCents)} spent`,
+    m.includedCents !== undefined && `${formatCents(m.includedCents)} included`,
+  ].filter(Boolean).join(' · ');
+}
+
+interface PlanWindowView {
+  label: string;
+  fraction: number;
+  resetsAt: number;
+  detail?: string;
+}
+
+/** The desktop card uses short windows when present, and the monthly cycle otherwise. */
+export function planWindows(usage: PlanUsage | null): PlanWindowView[] {
+  const windows = [
+    { label: '5-hour window', window: usage?.five_hour },
+    { label: 'Weekly window', window: usage?.seven_day },
+  ];
+  if (usage?.monthly && !usage.five_hour && !usage.seven_day) {
+    return [{ label: 'Monthly cycle', fraction: windowPct(usage.monthly)!, resetsAt: usage.monthly.resetsAt, detail: monthlyDetails(usage.monthly) }];
+  }
+  return windows.flatMap(({ label, window }) => window ? [{ label, fraction: windowPct(window)!, resetsAt: window.resetsAt }] : []);
 }
