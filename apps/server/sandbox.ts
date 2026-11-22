@@ -212,7 +212,10 @@ export interface McpInput {
    * access here, so nothing would stop a click or a form (access.ts browserHeld). Claude Code asks per call, so it keeps it.
    */
   noBrowser?: boolean;
-  /** A quick ask: no browser. Browsing is what turns it into a task. */
+  /**
+   * A thread that only reads (readsOnly): a quick ask, or one kept as a thread from it. No browser, since browsing is
+   * what turns it into a task, and no html_render, since its prompt answers in text (runner/prompts.ts replyLines).
+   */
   quick?: boolean;
   /** The lead of a team thread (runner/team.ts): it gets message_members. */
   leadsTeam?: boolean;
@@ -284,7 +287,8 @@ export function buildMcpConfig(input: McpInput) {
   };
 
   helper(ASK_SERVER, 'ask');
-  helper(RENDER_SERVER, 'render');
+  // html_render: a quick ask's answer shows in place as text, and a thread kept from one answers in text too.
+  if (!input.quick) helper(RENDER_SERVER, 'render');
   // set_steps: the plain step list the thread shows as its progress (@omni/shared/steps.ts).
   helper(STEPS_SERVER, 'steps');
   // message_members: a team thread's lead gives its members their parts. A member's session is a thread of its own, with no team row.

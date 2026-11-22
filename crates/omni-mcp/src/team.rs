@@ -29,6 +29,7 @@ pub fn tool() -> Tool {
         ],
         // The message is posted once the request lands, whether or not the call is still wanted.
         stops_when_cancelled: false,
+        always_load: false,
     }
 }
 

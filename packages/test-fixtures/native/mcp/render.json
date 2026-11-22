@@ -152,7 +152,7 @@
               "tools": [
                 {
                   "name": "html_render",
-                  "description": "Show a finished HTML page inline in this thread, above your reply: a chart, diagram, table, mockup or before/after that Ben should see rather than read about. Pass a complete, self-contained document (inline <style> and <script>, no local files). It runs sandboxed, sized to its content, and can be interactive. Do not announce or restate the page in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
+                  "description": "Show Ben a table, cards, a chart, a timeline, a diagram or a side by side inline in this thread, above your reply, instead of typing it out. It is cheap: a simple table or a row of cards is enough, and it does not have to be a full page. Pass a self-contained HTML document (inline <style> and <script>, no local files): <!doctype html>, a few lines of <style> and the markup will do. It runs sandboxed, sized to its content, and can be interactive. Do not announce the page or repeat its rows in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
                   "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -177,6 +177,9 @@
                   },
                   "execution": {
                     "taskSupport": "forbidden"
+                  },
+                  "_meta": {
+                    "anthropic/alwaysLoad": true
                   }
                 }
               ]
@@ -210,7 +213,7 @@
               "tools": [
                 {
                   "name": "html_render",
-                  "description": "Show a finished HTML page inline in this thread, above your reply: a chart, diagram, table, mockup or before/after that Ben should see rather than read about. Pass a complete, self-contained document (inline <style> and <script>, no local files). It runs sandboxed, sized to its content, and can be interactive. Do not announce or restate the page in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
+                  "description": "Show Ben a table, cards, a chart, a timeline, a diagram or a side by side inline in this thread, above your reply, instead of typing it out. It is cheap: a simple table or a row of cards is enough, and it does not have to be a full page. Pass a self-contained HTML document (inline <style> and <script>, no local files): <!doctype html>, a few lines of <style> and the markup will do. It runs sandboxed, sized to its content, and can be interactive. Do not announce the page or repeat its rows in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
                   "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -235,6 +238,9 @@
                   },
                   "execution": {
                     "taskSupport": "forbidden"
+                  },
+                  "_meta": {
+                    "anthropic/alwaysLoad": true
                   }
                 }
               ]
@@ -1004,7 +1010,7 @@
               "tools": [
                 {
                   "name": "html_render",
-                  "description": "Show a finished HTML page inline in this thread, above your reply: a chart, diagram, table, mockup or before/after that Ben should see rather than read about. Pass a complete, self-contained document (inline <style> and <script>, no local files). It runs sandboxed, sized to its content, and can be interactive. Do not announce or restate the page in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
+                  "description": "Show Ben a table, cards, a chart, a timeline, a diagram or a side by side inline in this thread, above your reply, instead of typing it out. It is cheap: a simple table or a row of cards is enough, and it does not have to be a full page. Pass a self-contained HTML document (inline <style> and <script>, no local files): <!doctype html>, a few lines of <style> and the markup will do. It runs sandboxed, sized to its content, and can be interactive. Do not announce the page or repeat its rows in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
                   "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -1029,6 +1035,9 @@
                   },
                   "execution": {
                     "taskSupport": "forbidden"
+                  },
+                  "_meta": {
+                    "anthropic/alwaysLoad": true
                   }
                 }
               ]
@@ -1274,7 +1283,7 @@
               "tools": [
                 {
                   "name": "html_render",
-                  "description": "Show a finished HTML page inline in this thread, above your reply: a chart, diagram, table, mockup or before/after that the user should see rather than read about. Pass a complete, self-contained document (inline <style> and <script>, no local files). It runs sandboxed, sized to its content, and can be interactive. Do not announce or restate the page in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
+                  "description": "Show the user a table, cards, a chart, a timeline, a diagram or a side by side inline in this thread, above your reply, instead of typing it out. It is cheap: a simple table or a row of cards is enough, and it does not have to be a full page. Pass a self-contained HTML document (inline <style> and <script>, no local files): <!doctype html>, a few lines of <style> and the markup will do. It runs sandboxed, sized to its content, and can be interactive. Do not announce the page or repeat its rows in your reply. A report or document to keep goes into the artifacts folder as a file instead. Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, --accent, --accent-foreground, --destructive, --warning, --success, --code-background, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background. Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font. A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width. Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. Let the content set the height: no vh units and no height:100% on html or body.",
                   "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -1299,6 +1308,9 @@
                   },
                   "execution": {
                     "taskSupport": "forbidden"
+                  },
+                  "_meta": {
+                    "anthropic/alwaysLoad": true
                   }
                 }
               ]

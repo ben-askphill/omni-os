@@ -30,9 +30,11 @@ pub fn tool() -> Tool {
     Tool {
         name: "html_render",
         description: format!(
-            "Show a finished HTML page inline in this thread, above your reply: a chart, diagram, table, mockup or before/after that {user} should see rather than read about. \
-             Pass a complete, self-contained document (inline <style> and <script>, no local files). It runs sandboxed, sized to its content, and can be interactive. \
-             Do not announce or restate the page in your reply. A report or document to keep goes into the artifacts folder as a file instead. \
+            "Show {user} a table, cards, a chart, a timeline, a diagram or a side by side inline in this thread, above your reply, instead of typing it out. \
+             It is cheap: a simple table or a row of cards is enough, and it does not have to be a full page. \
+             Pass a self-contained HTML document (inline <style> and <script>, no local files): <!doctype html>, a few lines of <style> and the markup will do. \
+             It runs sandboxed, sized to its content, and can be interactive. \
+             Do not announce the page or repeat its rows in your reply. A report or document to keep goes into the artifacts folder as a file instead. \
              {GUIDE}"
         ),
         input: vec![
@@ -40,6 +42,8 @@ pub fn tool() -> Tool {
             Field::new("html", Schema::string().min(1).max(MAX_HTML)).describe("A complete, self-contained HTML document."),
         ],
         stops_when_cancelled: true,
+        // Prompts ask for a page whenever an answer suits one, so Claude Code keeps it loaded rather than behind a ToolSearch.
+        always_load: true,
     }
 }
 
@@ -72,4 +76,15 @@ pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
     text.push_js(&id);
     text.push_str("). Do not restate or describe the page: say what it means, or nothing.");
     Outcome::Text(text)
+}
+
+#[cfg(test)]
+mod tests {
+    /// Claude Code cuts the description of a tool it loads up front at 4,096 characters (https://code.claude.com/docs/en/mcp).
+    #[test]
+    fn loads_up_front_with_a_description_claude_code_keeps_whole() {
+        let tool = super::tool();
+        assert!(tool.always_load);
+        assert!(tool.description.chars().count() <= 4096, "{} characters", tool.description.chars().count());
+    }
 }
