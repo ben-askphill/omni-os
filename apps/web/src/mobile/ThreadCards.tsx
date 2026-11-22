@@ -27,7 +27,7 @@ import type { NowDoing, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
 import { actionsLabel, stepsHeader, stepsLabel, type StepsView } from '@omni/shared/steps.ts';
 import { threadMark } from '@omni/shared/status.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
-import { Folded } from '../components/Folded.tsx';
+import { ReportBody } from '../components/thread/ReportBody.tsx';
 import { ConnectorMark, NowWithConnector } from '../components/ConnectorMark.tsx';
 import { StepRail } from '../components/thread/StepRail.tsx';
 import { progressReach } from '@omni/shared/progress-panel.ts';
@@ -263,10 +263,8 @@ export function Delegation({ kids, answers, asked }: { kids: Thread[]; answers?:
               </div>
             )}
             {answers?.[k.id] && k.status !== 'running' && k.status !== 'queued' && (
-              <div className="px-3 pb-3 text-[15px]">
-                <Folded>
-                  <MoProse text={answers[k.id].text || '(no reply)'} />
-                </Folded>
+              <div className="px-3 pb-3">
+                <ReportBody r={answers[k.id]} phone />
               </div>
             )}
           </div>
@@ -277,7 +275,8 @@ export function Delegation({ kids, answers, asked }: { kids: Thread[]; answers?:
 }
 
 /** `remote`: the server the child ran on, outside Omni, when it did. */
-export function Report({ role, taskId, text, dropped, undelivered, remote }: { role?: string | null; taskId?: string | null; text: string; dropped?: boolean; undelivered?: string; remote?: string }) {
+export function Report({ r, remote }: { r: ReportP; remote?: string }) {
+  const { role, task_id: taskId, dropped, undelivered } = r;
   return (
     <div className={`flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5 ${dropped ? 'opacity-60' : ''}`}>
       <div className="flex items-center gap-2 text-[13px] leading-none font-medium">
@@ -292,7 +291,7 @@ export function Report({ role, taskId, text, dropped, undelivered, remote }: { r
         <span className="flex-1" />
         {taskId && <span className="font-mono text-[11.5px] font-normal text-fg-3">{taskId}</span>}
       </div>
-      <MoProse text={text} />
+      <ReportBody r={r} phone />
     </div>
   );
 }

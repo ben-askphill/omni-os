@@ -293,7 +293,7 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
     });
     // A turn cut short by Omni's own shutdown is not news to Ben; the thread simply resumes on the next start.
     if (!live.shutdown && thread.source !== 'member') notifyEnded(id, status, events.lastRunReply(id));
-    if (thread.parent_id && !isShuttingDown()) reportToParent(id, status, runText);
+    if (thread.parent_id && !isShuttingDown()) reportToParent(id, status, events.lastRunReport(id));
   } else if (thread && live.resultSeen && !thread.has_run) {
     threads.update(id, { has_run: 1, updated_at: thread.updated_at });
   }

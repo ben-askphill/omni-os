@@ -60,17 +60,36 @@ function scopeOf(threadId: string): { thread: string; sql: string; args: (string
  * `after`. In a thread with members, only the rows of the session `threadId` runs (scopeOf): a message to members only
  * (one with `to`) is not one its lead saw.
  */
-function runTexts(threadId: string, after: number): string[] {
+function runRows(threadId: string, after: number, kinds: string): { kind: string; payload: string }[] {
   const s = scopeOf(threadId);
   const seen = s.member ? '' : `AND (kind != 'user' OR json_extract(payload, '$.to') IS NULL)`;
-  const rows = db
+  return db
     .prepare(
-      `SELECT payload FROM events WHERE thread_id = ? AND kind = 'assistant_text' ${s.sql}
+      `SELECT kind, payload FROM events WHERE thread_id = ? AND kind IN (${kinds}) ${s.sql}
        AND id > MAX(COALESCE((SELECT MAX(id) FROM events WHERE thread_id = ? AND kind IN ('user', 'crew_report', 'routed') ${s.sql} ${seen}
          AND json_extract(payload, '$.dropped') IS NOT 1), 0), ?) ORDER BY id`,
     )
-    .all(s.thread, ...s.args, s.thread, ...s.args, after) as { payload: string }[];
-  return rows.map((r) => JSON.parse(r.payload).text as string);
+    .all(s.thread, ...s.args, s.thread, ...s.args, after) as { kind: string; payload: string }[];
+}
+
+function runTexts(threadId: string, after: number): string[] {
+  return runRows(threadId, after, `'assistant_text'`).map((r) => JSON.parse(r.payload).text as string);
+}
+
+/**
+ * The most recent run as a crew report: its final message, the text it wrote after its last tool call (else its last
+ * text), and what it said before that while it worked.
+ */
+function runReport(threadId: string, after: number): { text: string; notes: string[] } {
+  const rows = runRows(threadId, after, `'assistant_text', 'tool_use'`);
+  const texts: string[] = [];
+  let reply = 0;
+  for (const r of rows) {
+    if (r.kind === 'tool_use') reply = texts.length;
+    else texts.push(JSON.parse(r.payload).text as string);
+  }
+  if (reply === texts.length) reply = Math.max(0, texts.length - 1);
+  return { text: texts.slice(reply).join('\n\n'), notes: texts.slice(0, reply) };
 }
 
 export const events = {
@@ -167,6 +186,10 @@ export const events = {
   /** All assistant text produced by the most recent run (after the last message the agent actually saw, and after `after`). */
   lastRunText(threadId: string, after = 0): string {
     return runTexts(threadId, after).join('\n\n');
+  },
+  /** The most recent run's final message and the messages before it (runReport), for its crew report. */
+  lastRunReport(threadId: string, after = 0): { text: string; notes: string[] } {
+    return runReport(threadId, after);
   },
   /** The last assistant text of the most recent run, the reply a push alert previews. Empty when the run wrote none. */
   lastRunReply(threadId: string, after = 0): string {

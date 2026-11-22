@@ -9,9 +9,12 @@ import { fontSize, lineHeight, radius, space, type ColorTokens, useOmniTheme, we
 
 const MONO = 'Menlo';
 const BODY = 15;
+/** The quiet size: a crew report's progress notes. */
+const QUIET = 13.5;
 
-function styleFor(c: ColorTokens): MarkdownStyle {
-  const block = { color: c.fg, fontSize: BODY, lineHeight: Math.round(BODY * 1.6) };
+function styleFor(c: ColorTokens, quiet = false): MarkdownStyle {
+  const size = quiet ? QUIET : BODY;
+  const block = { color: quiet ? c.fg2 : c.fg, fontSize: size, lineHeight: Math.round(size * (quiet ? 1.5 : 1.6)) };
   const heading = (size: number) => ({ color: c.fg, fontSize: size, fontWeight: weight.semibold, lineHeight: Math.round(size * 1.3), marginTop: space.s6, marginBottom: space.s3 });
   return {
     paragraph: { ...block, marginTop: 0, marginBottom: space.s4 },
@@ -58,9 +61,10 @@ function styleFor(c: ColorTokens): MarkdownStyle {
   } as MarkdownStyle;
 }
 
-export const Markdown = memo(function Markdown({ text, onOpenThread }: { text: string; onOpenThread: (id: string) => void }) {
+/** `quiet`: smaller, dimmer text, for what sits under something else. */
+export const Markdown = memo(function Markdown({ text, onOpenThread, quiet = false }: { text: string; onOpenThread: (id: string) => void; quiet?: boolean }) {
   const { colors } = useOmniTheme();
-  const style = useMemo(() => styleFor(colors), [colors]);
+  const style = useMemo(() => styleFor(colors, quiet), [colors, quiet]);
   const origin = usePairing().activeServer?.origin ?? 'http://localhost';
   const source = useMemo(() => linkThreads(gateReplyImages(text, origin)), [text, origin]);
   return (

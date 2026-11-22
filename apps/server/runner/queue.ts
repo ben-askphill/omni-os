@@ -199,9 +199,11 @@ export function wake(r: MessageRequest) {
  * A child's turn ended: report to its parent. The report is saved for the parent first, keyed by the child and
  * where its transcript stood (`completion`), so a restart before the parent reads it keeps it for Resume, and a
  * second call for the same completion reports nothing more. A parent Ben stopped keeps the report for Resume
- * instead of being woken by it.
+ * instead of being woken by it. `said`: the run's final message and its messages before it (events.lastRunReport),
+ * or a message Omni writes itself.
  */
-export function reportToParent(childId: string, status: string, text: string, completion = events.lastId(childId)) {
+export function reportToParent(childId: string, status: string, said: string | { text: string; notes: string[] }, completion = events.lastId(childId)) {
+  const { text, notes } = typeof said === 'string' ? { text: said, notes: [] } : said;
   const child = threads.get(childId)!;
   // A member's session reports to no one: its replies are in the group thread already (runner/members.ts).
   if (child.source === 'member') return;
@@ -215,6 +217,8 @@ export function reportToParent(childId: string, status: string, text: string, co
   const remote = isRemoteHarnessId(child.harness);
   const report = {
     text: text || '(no reply)',
+    // The run's earlier messages, folded on the card (packages/shared/report-shape.ts); the parent's harness reads only `text`.
+    notes,
     task_id: child.task_id,
     thread_id: child.id,
     title: child.title,
@@ -239,9 +243,15 @@ export function reportToParent(childId: string, status: string, text: string, co
 /** Whether a finished turn's report waits for a later turn of the same thread (runner/team.ts holdsReport). */
 export const reportHeld: ((threadId: string) => boolean)[] = [];
 
-/** A report as its parent's harness reads it. A remote child's names the server it ran on. */
-const reportText = (r: Record<string, unknown>) =>
-  `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'}${r.remote ? ` on ${r.harness_name ?? r.harness} (remote)` : ''} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${r.text}`;
+/**
+ * A report as its parent's harness reads it. A remote child's names the server it ran on. A finished run's earlier
+ * messages stay out: its final message is the report. A run that failed or stopped has no final message, so they go in.
+ */
+const reportText = (r: Record<string, unknown>) => {
+  const notes = r.status !== 'done' && Array.isArray(r.notes) ? (r.notes as string[]) : [];
+  const before = notes.length ? `\n\nWhat it said before that:\n\n${notes.join('\n\n')}` : '';
+  return `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'}${r.remote ? ` on ${r.harness_name ?? r.harness} (remote)` : ''} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${r.text}${before}`;
+};
 
 /**
  * What a report asks of the parent it wakes. The Conductor relays it to Ben. Any other thread uses it in its own work:

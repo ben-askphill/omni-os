@@ -6,6 +6,7 @@ import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { DelegationCard } from './Delegation.tsx';
 import { AskItem } from './AskCard.tsx';
+import { ReportBody } from './thread/ReportBody.tsx';
 import { RemoteMark } from './ConnectAgent.tsx';
 import { Folded } from './Folded.tsx';
 import { HtmlRender } from './HtmlRender.tsx';
@@ -339,7 +340,7 @@ function ReportCard({ p, event }: { p: ReportP; event: number }) {
       </div>
       {p.title && <div className="px-4 pt-3 font-display text-[15px] text-fg">{p.title}</div>}
       <div className="px-4 pt-2 pb-4">
-        <Markdown text={p.text || '(no reply)'} />
+        <ReportBody r={p} event={event} />
       </div>
     </div>
   );

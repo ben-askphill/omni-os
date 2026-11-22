@@ -156,7 +156,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   finishTurnSnapshot(live);
   emitThread(id);
   // Even while Omni shuts down: the report is saved and parked for Resume (queue.ts), not lost.
-  if (t?.parent_id && !more) reportToParent(id, status, runText);
+  if (t?.parent_id && !more) reportToParent(id, status, events.lastRunReport(id, turnFrom));
   if (t?.quick && status === 'done' && !more && runText) void runnerPorts().reporting.quickTurn(id, events.lastRunReply(id, turnFrom));
   if (status === 'done' && !more && !t?.parent_id && !t?.quick && runText && !isShuttingDown()) {
     suggestReply(id, runText);
