@@ -120,6 +120,20 @@ describe('the editor', () => {
     expect(crewSaveBody({ ...crewDraftOf(detail(auto, null)), memoryWrites: 'review' }, detail(auto, null)).fields).toEqual({ memory_writes: '' });
   });
 
+  it('sends the skills ticked as a list, null when back to the built-in, and an empty list on an agent of its own', () => {
+    const builtIn = role();
+    const shipped = detail(builtIn, builtIn);
+    expect(crewDraftOf(shipped).skills).toEqual([]);
+    expect(crewSaveBody({ ...crewDraftOf(shipped), skills: ['tdd', 'pr-writer'] }, shipped).fields).toEqual({ skills: ['tdd', 'pr-writer'] });
+    const edited = role({ kind: 'edited', skills: ['tdd'], charterMode: 'append' });
+    expect(crewSaveBody({ ...crewDraftOf(detail(edited, builtIn)), skills: [] }, detail(edited, builtIn)).fields).toEqual({ skills: null });
+    // Unchanged, they are not sent at all.
+    expect(crewSaveBody({ ...crewDraftOf(detail(edited, builtIn)), name: 'Builder 2' }, detail(edited, builtIn)).fields).toEqual({ name: 'Builder 2' });
+    const own = role({ id: 'checker', kind: 'own', skills: ['tdd'] });
+    expect(crewSaveBody({ ...crewDraftOf(detail(own, null)), skills: [] }, detail(own, null)).fields).toEqual({ skills: [] });
+    expect(blankCrewDraft().skills).toEqual([]);
+  });
+
   it('says on the row how many lessons wait, and where a lesson applies', () => {
     expect(crewChips(role({ memoryWaiting: 2 })).map((c) => [c.label, c.tone])).toEqual([
       ['Built-in', 'outline'],
@@ -144,7 +158,7 @@ describe('the editor', () => {
     const d = { ...blankCrewDraft(), name: 'Store ops', charter: 'Dry run first.' };
     const body = crewSaveBody(d, null);
     expect(body).toEqual({
-      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, tools: '', delegatable: null, mcp: [], review: null, memory: '', memory_writes: '' },
+      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, tools: '', delegatable: null, mcp: [], review: null, memory: '', memory_writes: '', skills: [] },
       charter: 'Dry run first.',
     });
   });

@@ -11,6 +11,7 @@ import { showsBubble } from '../../../context/labels';
 import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
 import { STEP_GLYPH } from '@omni/shared/steps.ts';
+import { BranchProgress } from '../BranchProgress';
 import { markOf } from '@omni/shared/status.ts';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { AgentAvatar } from '../../AgentAvatar';
@@ -202,6 +203,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
             <Text numberOfLines={1} style={[styles.caption, { color: colors.fg3 }]}>
               {[k.role, k.task_id, k.status].filter(Boolean).join(' · ')}
             </Text>
+            {k.progress ? <BranchProgress p={k.progress} /> : null}
           </View>
         </Pressable>
         {row.answers[k.id] && k.status !== 'running' && k.status !== 'queued' ? (

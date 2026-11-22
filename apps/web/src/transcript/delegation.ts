@@ -1,6 +1,7 @@
 // Delegation cards: the threads the Conductor's delegate and delegate_team calls started, and the sub-agents
 // any thread's own run launched with the harness's Agent tool.
 import type { BackgroundTask, Thread } from '../api.ts';
+import type { StepProgress } from '@omni/shared/steps.ts';
 import { str, type Item, type ReportP, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
 
 /** One delegated thread as a card row. Live fields come from the thread itself once it is known. */
@@ -13,6 +14,8 @@ export interface Branch {
   task_id: string | null;
   status: string;
   updated_at?: string;
+  /** Its step list in brief, once the thread is known and has one. */
+  progress?: StepProgress;
 }
 
 export interface Delegation {
@@ -92,11 +95,11 @@ const fromResult = (r: any, fallback: { title?: string; role?: string; channel?:
 /** Fresh state for a row from the thread it started, when the client has it. */
 export function withLive(b: Branch, known: Map<string, Thread>): Branch {
   const t = known.get(b.id);
-  return t ? { ...b, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at } : b;
+  return t ? { ...b, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at, progress: t.progress } : b;
 }
 
 export const branchOf = (t: Thread): Branch => ({
-  id: t.id, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at,
+  id: t.id, title: t.title, role: t.role, channel: t.channel_id, harness: t.harness, task_id: t.task_id, status: t.status, updated_at: t.updated_at, progress: t.progress,
 });
 
 /** The delegations among a group of tool calls, consecutive delegate calls folded into one card. Failed calls are left out. */

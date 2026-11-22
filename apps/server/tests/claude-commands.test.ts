@@ -42,6 +42,9 @@ describe('normalizeClaudeCommands', () => {
     expect(byName('document-skills:pdf')!.description).not.toMatch(/^\(/);
     expect(byName('slack:create-slack-app')).toMatchObject({ source: 'plugin', plugin: 'slack', argumentHint: '[bolt-js | bolt-python]' });
     expect(byName('vercel:deploy')!.description).toMatch(/^Deploy the current project to Vercel\./);
+    // Claude Code tags a plugin by its display name, capitalised or not (claude 2.1.316).
+    const [brainstorming] = normalizeClaudeCommands([{ name: 'superpowers:brainstorming', description: '(Superpowers) You MUST use this before any creative work.', argumentHint: '', aliases: ['brainstorming'] }]);
+    expect(brainstorming).toMatchObject({ source: 'plugin', plugin: 'superpowers', description: 'You MUST use this before any creative work.', mentionable: true });
   });
 
   it('tags built-ins, which cannot be Mentions', () => {

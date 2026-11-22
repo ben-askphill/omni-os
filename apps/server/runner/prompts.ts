@@ -5,6 +5,7 @@ import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '..
 import { artifacts, events, memories, threads, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import { doesOwnWork, getCrew, type CrewRole } from '../crew.ts';
+import { skillLines, type ThreadSkills } from '../skills.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { writtenCharter } from '../remote-agents.ts';
@@ -262,8 +263,11 @@ function teamLeadLines(name: string): string[] {
   ];
 }
 
-/** `secretNames` are the names of the secrets in the thread's environment, never their values. */
-export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false, secretNames: readonly string[] = []) {
+/**
+ * `secretNames` are the names of the secrets in the thread's environment, never their values. `skills`: what the
+ * thread's harness loads of its agent's skills (skills.ts), resolved when it starts.
+ */
+export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false, secretNames: readonly string[] = [], skills: ThreadSkills | null = null) {
   const remote = isProviderHarness(thread.harness);
   const remoteAgent = isRemoteAgentHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
@@ -402,5 +406,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   // A remote agent gets a charter only when Ben wrote one in its file; otherwise its server's own instructions lead (Q28).
   const charter = role ? (remoteAgent ? writtenCharter(role) : role.charter) : '';
   if (role && charter) lines.push('', `## Your agent: ${role.name}`, charter);
+  // The skills its agent loads in every thread, after the charter they belong with.
+  if (role && skills) lines.push(...skillLines(skills, role.name));
   return lines.filter((l) => l !== '').join('\n').replace(/\n## /g, '\n\n## ');
 }

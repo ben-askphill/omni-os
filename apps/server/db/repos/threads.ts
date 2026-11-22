@@ -303,17 +303,22 @@ export const threads = {
     }
     return live ?? root;
   },
-  /** Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. */
+  /**
+   * Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel, with `job_id`:
+   * the #conductor thread they nest under. Work a seated agent opened has its hidden session as parent (crew reports go
+   * there, runner/members.ts), so it nests under the thread that agent is seated in, as its delegation card does.
+   */
   conductorHandoffChildren: () =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `child.${c}`).join(', ')}
+        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `child.${c}`).join(', ')}, job.id AS job_id
          FROM threads child JOIN threads parent ON parent.id = child.parent_id
-         WHERE parent.channel_id = 'conductor' AND parent.archived = 0
+         JOIN threads job ON job.id = CASE WHEN parent.source = 'member' THEN parent.parent_id ELSE parent.id END
+         WHERE parent.channel_id = 'conductor' AND job.channel_id = 'conductor' AND job.source != 'member' AND job.archived = 0
            AND child.source = 'conductor' AND child.archived = 0
-         ORDER BY parent.updated_at DESC, child.created_at ASC`,
+         ORDER BY job.updated_at DESC, child.created_at ASC`,
       )
-      .all() as unknown as Thread[],
+      .all() as unknown as (Thread & { job_id: string })[],
   /** Every live team member whose lead is live too, by lead, in the order they were handed out. */
   teamMembers: () =>
     db

@@ -3,6 +3,7 @@ import { setupWait } from '@omni/shared/setup-wait.ts';
 import { api, errorText, type Artifact, type PendingMsg, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { branchShows } from '../components/Delegation.tsx';
+import { BranchProgress } from '../components/BranchProgress.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { useSending } from '../sending.ts';
 import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
@@ -252,6 +253,7 @@ export function Delegation({ kids, answers, asked }: { kids: Thread[]; answers?:
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[14px] leading-[1.3]">{k.title || 'Untitled'}</span>
                 <span className="truncate text-[12px] leading-[1.3] text-fg-3">{[k.role, k.task_id, `#${channel(k.channel_id)?.name ?? k.channel_id}`].filter(Boolean).join(' · ')}</span>
+                {k.progress && <BranchProgress p={k.progress} stacked className="mt-1.5" />}
               </span>
               <KidPill k={k} />
             </button>

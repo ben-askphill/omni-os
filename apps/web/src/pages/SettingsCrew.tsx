@@ -19,6 +19,7 @@ import { avatarStyleOf, iconFor, imageChangeOf, stashOf } from '@omni/shared/age
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { AgentIdentity, type IdentityValue } from '../components/AgentIdentity.tsx';
+import { AgentSkills } from '../components/AgentSkills.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
 import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
@@ -36,7 +37,7 @@ import { Advanced, Card, LockNote } from './settings-parts.tsx';
 // Settings > Agents: every agent this machine has, hidden ones included. Each opens as a page of its own
 // (`#/settings/crew/<id>`, group threads slice 1): the Identity block on top (its name, description and the one avatar
 // it shows, AgentIdentity.tsx), then the editor's groups (plan slice S3, docs/plans/2026-11-18-user-defined-crew.md):
-// Instructions, Run defaults, Permissions and Memory, then Advanced, the one group folded shut: the tool switches, Edit
+// Instructions, Skills (components/AgentSkills.tsx), Run defaults, Permissions and Memory, then Advanced, the one group folded shut: the tool switches, Edit
 // as Markdown, Duplicate and Compare. Hide, Reset and Delete close the page. New agent opens the same editor in a
 // dialog. Saves go
 // to /api/crew (apps/server/crew-api.ts): a role of your own is its whole file in data/crew/, an edit of a built-in is
@@ -581,6 +582,13 @@ function EditorBody({
                 </details>
               )}
             </Group>
+
+            {/* A remote agent runs on its own server, where this machine's skills are not. */}
+            {!remoteAgent && (
+              <Group page={page} title="Skills" entry="agent-skills" subtitle={`Loaded at the start of every thread ${draft.name || 'it'} runs, so a brief or charter need not name them.`}>
+                <AgentSkills value={draft.skills} onChange={(v) => set('skills', v)} channel={draft.channel || undefined} harness={draft.harness || undefined} />
+              </Group>
+            )}
 
             <Group page={page} title="Run defaults" subtitle="What a thread started as it gets when the thread or delegation does not pick.">
               {!remoteAgent && (

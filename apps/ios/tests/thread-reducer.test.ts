@@ -190,3 +190,29 @@ describe('opening message', () => {
     expect(next.pending).toBe(view.pending);
   });
 });
+
+describe('reduceThread: crew artifacts', () => {
+  const crew = (id: number, at: string, over: Partial<Artifact> = {}) => ({ ...artifact(id, { thread_id: 'k1', updated_at: at, ...over }), thread_title: 'Old title', channel_id: 'c' });
+
+  it('keeps the detail\'s crew artifacts, and an empty list from a server that sends none', () => {
+    expect(opened({ crew_artifacts: [crew(5, '2026-11-14T11:00:00Z')] }).crewArtifacts.map((a) => a.id)).toEqual([5]);
+    expect(opened().crewArtifacts).toEqual([]);
+  });
+
+  it('merges a crew_artifact from the stream newest first, replacing the same row', () => {
+    let view = opened({ crew_artifacts: [crew(5, '2026-11-14T11:00:00Z')] });
+    view = reduceThread(view, { kind: 'crew_artifact', artifact: crew(6, '2026-11-14T12:00:00Z') });
+    view = reduceThread(view, { kind: 'crew_artifact', artifact: crew(5, '2026-11-14T13:00:00Z', { name: 'renamed.png' }) });
+    expect(view.crewArtifacts.map((a) => [a.id, a.name])).toEqual([
+      [5, 'renamed.png'],
+      [6, 'a6.html'],
+    ]);
+    // The thread's own list is left alone.
+    expect(view.artifacts.map((a) => a.id)).toEqual([1]);
+  });
+
+  it('ignores a crew_artifact without a row', () => {
+    const view = opened();
+    expect(reduceThread(view, { kind: 'crew_artifact', artifact: { name: 'x' } })).toBe(view);
+  });
+});

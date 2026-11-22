@@ -7,7 +7,7 @@ import { config } from './config.ts';
 import { diskView, refreshDisk } from './disk-space.ts';
 import { completions, needsYou, resultReads, search, threads, type Thread } from './db.ts';
 import { allWithDelegating, withDelegating } from './delegating.ts';
-import { stepField } from './step-line.ts';
+import { progressField, stepField } from './step-line.ts';
 import { handoffView } from './handoff/records.ts';
 import { grokBotConfigured } from './grokbot.ts';
 import { fromThisMac } from './request-guard.ts';
@@ -22,7 +22,8 @@ export const feedApi = new Hono();
 
 feedApi.get('/feed', (c) =>
   sessionSSE(c, async (stream) => {
-    // A thread carries its handoff and `delegating` on every update, as its own stream and GET do.
+    // A thread carries its handoff and `delegating` on every update, as its own stream and GET do, and a delegated
+    // thread its list in brief for the delegation card on its parent (step-line.ts progressField).
     const onFeed = (e: FeedEvent) => {
       if (e.type !== 'thread') {
         void stream.writeSSE({ data: JSON.stringify(e) });
@@ -31,7 +32,7 @@ feedApi.get('/feed', (c) =>
       const t = e.thread as Thread;
       const seated_delegation = threads.seatedDelegationOf(t);
       void stream.writeSSE({
-        data: JSON.stringify({ ...e, thread: { ...withDelegating(t), ...(seated_delegation && { seated_delegation }) }, handoff: handoffView(t) }),
+        data: JSON.stringify({ ...e, thread: { ...withDelegating(t), ...progressField(t), ...(seated_delegation && { seated_delegation }) }, handoff: handoffView(t) }),
       });
     };
     bus.on('feed', onFeed);

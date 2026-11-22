@@ -14,7 +14,7 @@ import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { AccountUsage } from '@omni/shared/account-usage.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
-import type { StepField } from '@omni/shared/steps.ts';
+import type { ProgressField, StepField } from '@omni/shared/steps.ts';
 import type { Opening } from '@omni/shared/opening.ts';
 import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
@@ -51,7 +51,7 @@ export type Thread = ThreadRow & {
   seated_delegation?: SeatedDelegation;
   /** Why it takes no new messages: its lead agent was deleted or is hidden (apps/server/member-view.ts). */
   read_only?: string;
-} & RanOnFields & StepField;
+} & RanOnFields & StepField & ProgressField;
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &
@@ -233,6 +233,8 @@ export interface CrewRole {
   memoryWrites?: 'review' | 'auto';
   /** How many lessons its threads proposed wait for the user, when any do. */
   memoryWaiting?: number;
+  /** The skills its threads load when they start (GET /api/skills names them). A server from before skills sends none. */
+  skills?: string[];
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';

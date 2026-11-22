@@ -30,6 +30,17 @@ let host: HTMLDivElement;
 
 const lesson = { id: 'm1', role: 'builder', channel_id: 'acme', text: 'Run the check script before you report.', status: 'proposed', proposed_by: 'agent', created_at: 1, approved_at: null, source_thread_id: 't1' };
 
+/** GET /api/skills: the skills this machine's harnesses list. */
+const SKILLS = {
+  listed: ['claude-code', 'codex'],
+  loading: [],
+  skills: [
+    { name: 'pr-writer', description: 'Write the PR body', source: 'personal', harnesses: ['claude-code', 'codex'] },
+    { name: 'superpowers:brainstorming', description: 'Before any creative work', source: 'plugin', plugin: 'superpowers', harnesses: ['claude-code'] },
+    { name: 'tdd', description: 'Red, green, refactor', source: 'personal', harnesses: ['claude-code', 'codex'] },
+  ],
+};
+
 const bodyOf = (text: string) => text.split('---\n').slice(2).join('---\n').trim();
 
 /** POST /api/crew/draft as the server answers it: the file a save would write over `own`, and the role it makes. */
@@ -80,6 +91,7 @@ beforeEach(async () => {
       }
       if (url === '/api/crew/builder') return Response.json(detail);
       if (url.startsWith('/api/harnesses')) return Response.json([]);
+      if (url.startsWith('/api/skills')) return Response.json(SKILLS);
       return Response.json({});
     }),
   );
@@ -249,4 +261,37 @@ it('takes an uploaded photo away when another source is saved, so the preview is
   expect(host.querySelector('[role="radiogroup"][aria-label="Icon"] [aria-checked="true"]')?.getAttribute('aria-label')).toBe('zap');
   await click(button('Save'));
   expect(calls.filter((c) => c.method === 'PUT' && c.url === '/api/crew/builder/avatar').map((c) => c.body)).toEqual([{ image: null }]);
+});
+
+it('lists the skills to tick in a Skills group, and Save sends the ticked ones in the order ticked', async () => {
+  const box = (name: string) => [...host.querySelectorAll<HTMLElement>('[data-skill-list] [role="checkbox"]')].find((c) => c.getAttribute('aria-labelledby') && host.querySelector(`[id="${c.getAttribute('aria-labelledby')}"]`)?.textContent === name)!;
+  const names = () => [...host.querySelectorAll('[data-skill-list] [role="checkbox"]')].map((c) => host.querySelector(`[id="${c.getAttribute('aria-labelledby')}"]`)?.textContent);
+  expect(names()).toEqual(['pr-writer', 'superpowers:brainstorming', 'tdd']);
+  expect(host.textContent).toContain('Plugin superpowers · Claude Code only');
+
+  await click(box('tdd'));
+  await click(box('pr-writer'));
+  // Ticked ones lead, in the order ticked.
+  expect(names()).toEqual(['tdd', 'pr-writer', 'superpowers:brainstorming']);
+  expect(box('tdd').getAttribute('aria-checked')).toBe('true');
+  expect(saves()).toHaveLength(0);
+  expect(host.textContent).toContain('2 ticked of 3');
+
+  await click(button('Save'));
+  expect(saves().map((c) => c.body.fields)).toEqual([{ skills: ['tdd', 'pr-writer'] }]);
+});
+
+it("keeps a ticked skill this machine no longer lists, so it can be unticked", async () => {
+  detail = { ...detail, role: { ...detail.role, kind: 'edited', skills: ['old-deploy', 'tdd'] } };
+  state.crew = [detail.role as unknown as CrewRole];
+  act(() => root.unmount());
+  root = createRoot(host);
+  await act(async () => root.render(createElement(CrewSection, { agent: 'builder' })));
+  await flush();
+  expect(host.textContent).toContain('Not on this machine, so its threads skip it.');
+  const gone = [...host.querySelectorAll<HTMLElement>('[data-skill-list] [role="checkbox"]')][0];
+  expect(gone.getAttribute('aria-checked')).toBe('true');
+  await click(gone);
+  await click(button('Save'));
+  expect(saves().map((c) => c.body.fields)).toEqual([{ skills: ['tdd'] }]);
 });

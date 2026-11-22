@@ -331,9 +331,17 @@ describe('seating in the Conductor\'s own thread', () => {
     const told = buildSystemPrompt(H.thread(session), H.db.channels.get('conductor')!, getCrew('designer')!);
     expect(told).toMatch(/This is a #conductor thread: you were seated to take this work on/);
     expect(told).not.toMatch(/Edit files only/);
-    const opened = await call('POST', '/threads', { channel: 'scratch', prompt: 'THINK:900 build the page', title: 'Build the launch page', role: 'designer', source: 'conductor' }, mint(session).token);
+    const opened = await call('POST', '/threads', { channel: 'scratch', prompt: 'THINK:900 build the page', title: 'Build the launch page', role: 'designer', source: 'conductor', folder: 'Features' }, mint(session).token);
     expect(opened.status).toBe(200);
     expect(opened.json.parent_id).toBe(session);
+    expect(opened.json.folder_id).toBeTruthy();
+    // The lists nest it under the #conductor thread, not the hidden session, and its folder keeps the parent link.
+    const listing = (await call('GET', '/channels')).json as { id: string; handoffs?: { parent: { id: string }; children: { id: string; parent_id: string; folder_id: string }[] }[] }[];
+    const handoffs = listing.find((ch) => ch.id === 'conductor')?.handoffs ?? [];
+    expect(handoffs.find((g) => g.parent.id === session)).toBeUndefined();
+    expect(handoffs.find((g) => g.parent.id === c.id)?.children).toEqual([
+      expect.objectContaining({ id: opened.json.id, parent_id: session, folder_id: opened.json.folder_id }),
+    ]);
     const card = async () => {
       const { json: detail } = await call('GET', `/threads/${c.id}?history=recent`);
       expect(detail.children).toHaveLength(1); // The hidden session is never a card.

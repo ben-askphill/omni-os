@@ -122,6 +122,60 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     expect((await state()).records).toHaveLength(1);
   });
 
+  // A chip stacked on each of three lines, the tightest case: in the reply box, and at the phone composer's 16px on a
+  // 1.35 line.
+  for (const [box, query] of [
+    ['the reply box', ''],
+    ["the phone composer's tight lines", '?tight'],
+  ] as const) {
+    it(`chips sit on the words' baseline, keep a gap to the chips above and below, and keep the line height, in ${box}`, async () => {
+      await load(query);
+      // The records a pick from the `@` menu adds, then the text with a chip at the start of each line. The menu is not
+      // what this checks, and under load it can close again while a query is typed.
+      await page.evaluate(() => {
+        window.mention('agent', 'reviewer', 'Reviewer');
+        window.mention('machine', 'dev-omarchy', 'omarchy');
+        window.mention('machine', 'dev-mbp', 'MacBook-Pro');
+      });
+      await until(async () => (await state()).records.length === 3);
+      await page.evaluate(() => window.setText('@Reviewer reviews it\n@omarchy runs it\n@MacBook-Pro ships it'));
+      await until(async () => (await chips()).length === 3 && (await state()).text.endsWith('ships it'));
+      const m = await page.evaluate(() => {
+        const box = document.querySelector('[data-slot="token-input-editor"]')!;
+        const blank = (s: string) => !s.replace(/[\s\u200b]/g, '');
+        const letter = (node: Node, at: number) => {
+          const r = document.createRange();
+          r.setStart(node, at);
+          r.setEnd(node, at + 1);
+          return r.getBoundingClientRect();
+        };
+        const words: Text[] = [];
+        const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+        for (let n; (n = walk.nextNode() as Text | null); ) if (!blank(n.data) && !n.parentElement!.closest('.mention-pill') && getComputedStyle(n.parentElement!).position !== 'absolute') words.push(n);
+        const pills = [...box.querySelectorAll('.mention-pill')];
+        const boxes = pills.map((p) => p.getBoundingClientRect());
+        const style = getComputedStyle(box);
+        const line = parseFloat(style.lineHeight);
+        return {
+          // The name's first letter against the first plain letter after the chip, on its line: the same font puts
+          // every letter's box the same distance under the baseline.
+          baselines: pills.map((p) => {
+            const name = [...p.childNodes].reverse().find((n) => n.nodeType === Node.TEXT_NODE && !blank(n.textContent!))!;
+            const after = words.find((n) => p.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)!;
+            return Math.round(letter(name, 0).bottom - letter(after, after.data.search(/[^\s\u200b]/)).bottom) || 0;
+          }),
+          gaps: boxes.slice(1).map((b, i) => +(b.top - boxes[i].bottom).toFixed(2)),
+          // How far three lines with a chip each outgrow three plain lines.
+          growth: Math.round(box.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - 3 * line) || 0,
+        };
+      });
+      expect(m.baselines).toEqual([0, 0, 0]);
+      expect(m.gaps).toHaveLength(2);
+      for (const gap of m.gaps) expect(gap).toBeGreaterThan(1.5);
+      expect(m.growth).toBe(0);
+    }, 30_000);
+  }
+
   it('/ at the start lists the commands and picks one', async () => {
     await load();
     await page.keyboard.type('/de');
@@ -149,7 +203,8 @@ describe.skipIf(!executablePath)('MessageEditor in Chromium', () => {
     await page.keyboard.press('Enter');
     await until(async () => (await state()).text === '@omarchy ');
     await page.evaluate(() => window.setText('then @omarchy deploys'));
-    await until(async () => (await chips()).length === 1);
+    // The chip from the pick already counts as one, so wait for the box itself to show the new text.
+    await until(async () => (await chips()).length === 1 && (await page.evaluate(() => !!document.querySelector('[data-slot="token-input-editor"]')!.textContent?.startsWith('then'))));
     await page.evaluate(() => window.editor!.focus('end'));
     await page.keyboard.type('!');
     expect((await state()).text).toBe('then @omarchy deploys!');

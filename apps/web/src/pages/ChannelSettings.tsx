@@ -9,7 +9,10 @@ import { apiUrl } from '../api-base.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { Avatar, Button, ErrorNote, fieldDescribedBy, fieldHintId, FolderInput, Icon, IDENTIFIER, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle, useFieldErrors } from '../components/ui.tsx';
-import { CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
+import {
+  CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon, sameIcon, scaleSvgIcon, SVG_PREFIX, SVG_SCALE_DEFAULT, SVG_SCALE_MAX, SVG_SCALE_MIN, SVG_SCALE_STEP,
+  svgIconScalable, svgIconScale,
+} from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { lastGrapheme } from '../format.ts';
@@ -114,6 +117,7 @@ function IconPicker({ value, name, avatarBg, omni, onChange, describedBy }: { av
         )}
       </div>
       {svgError && <ErrorNote>{svgError}</ErrorNote>}
+      {mark?.kind === 'svg' && svgIconScalable(mark.markup) && <SvgSizeControl markup={mark.markup} onChange={(markup) => change(`${SVG_PREFIX}${markup}`)} />}
       <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-1">
         {CHANNEL_GLYPHS.map((g) => {
           const on = mark?.kind === 'glyph' && mark.name === g;
@@ -133,6 +137,37 @@ function IconPicker({ value, name, avatarBg, omni, onChange, describedBy }: { av
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** How big an uploaded SVG sits in its avatar. The Avatar beside it previews each step; Save keeps it. */
+function SvgSizeControl({ markup, onChange }: { markup: string; onChange: (markup: string) => void }) {
+  const scale = svgIconScale(markup);
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <label htmlFor="ch-icon-size" className="text-fg-2">
+        Size
+      </label>
+      <input
+        id="ch-icon-size"
+        type="range"
+        min={SVG_SCALE_MIN}
+        max={SVG_SCALE_MAX}
+        step={SVG_SCALE_STEP}
+        value={scale}
+        aria-valuetext={`${scale}%`}
+        onChange={(e) => onChange(scaleSvgIcon(markup, Number(e.target.value)))}
+        className="focus-ring w-44 rounded-full accent-fg"
+      />
+      <output htmlFor="ch-icon-size" className="w-10 tabular-nums text-fg-3">
+        {scale}%
+      </output>
+      {scale !== SVG_SCALE_DEFAULT && (
+        <Button type="button" onClick={() => onChange(scaleSvgIcon(markup, SVG_SCALE_DEFAULT))}>
+          Reset size
+        </Button>
+      )}
     </div>
   );
 }
@@ -322,8 +357,8 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="Name" htmlFor="ch-name" error={fieldError('name')}>
           <input id="ch-name" required {...check('name')} className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
         </Field>
-        <Field label="Icon" htmlFor="ch-icon" hint={`Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses ${isConductor ? 'the Omni mark' : 'the first letter'}.`}>
-          <IconPicker describedBy={fieldHintId('ch-icon')} avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
+        <Field label="Icon" htmlFor="ch-icon" hint={`Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG (then set its size) or pick an icon. Empty uses ${isConductor ? 'the Omni mark' : 'the first letter'}.`}>
+          <IconPicker describedBy={fieldHintId('ch-icon')} avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual && !sameIcon(v, prev.icon) ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
         </Field>
         <Field label="Avatar background" hint="Automatic follows the avatar. A custom color stays when you change the icon.">
           <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={isConductor} value={f.avatar_bg} manual={!!f.avatar_bg_manual} swatches={CHANNEL_SWATCHES}

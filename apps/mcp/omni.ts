@@ -204,6 +204,8 @@ const crewRoleView = (d: any) => {
     model: r.model ?? null,
     effort: r.effort ?? null,
     default_channel: r.channel ?? null,
+    // The skills its threads load when they start, by name (list_skills).
+    skills: r.skills ?? [],
     ...(r.charterMode && { charter_mode: r.charterMode }),
     ...(r.builtInChanged && { built_in_changed: true }),
     powers: {
@@ -278,6 +280,11 @@ server.registerTool(
               `Its crew character: the shape and its color, which get_crew_role's avatar reports. An empty string removes one, so the shape its id picks or its shape's own color comes back. ` +
                 `An icon, emoji or photo shows instead of the character, and only ${USER} sets those, in Settings > Agents.`,
             ),
+          skills: z
+            .array(z.string().max(120))
+            .max(50)
+            .optional()
+            .describe('The skills every thread of the agent loads when it starts, by name, the whole list. Use list_skills. An empty list loads none.'),
         })
         .optional(),
       charter: z.string().max(100_000).optional(),
@@ -291,6 +298,24 @@ server.registerTool(
     if (create) return text(crewRoleView(await call('/crew', { method: 'POST', body: JSON.stringify({ id, ...save }) })));
     if (!Object.keys(save).length) throw new Error('Pass the fields, charter or charter_mode to change.');
     return text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(save) })));
+  },
+);
+
+server.registerTool(
+  'list_skills',
+  {
+    description:
+      "The skills this machine's harnesses list (Claude Code, Codex, Cursor Agent), to pick an agent's skills for save_crew_role: each one's name, what it does, where it comes from and the harnesses that have it. " +
+      'An agent loads the skills it names in every thread, on those harnesses. Hermes, Cursor Cloud and remote agents run elsewhere and load none. ' +
+      "channel: list that channel's project skills too.",
+    inputSchema: { channel: z.string().max(100).optional().describe('A channel id, for its repo skills. Use list_channels.') },
+  },
+  async ({ channel }) => {
+    const r = await call(`/skills${channel ? `?channel=${encodeURIComponent(channel)}` : ''}`);
+    return text({
+      skills: r.skills.map((s: any) => ({ name: s.name, description: s.description, source: s.plugin ? `plugin ${s.plugin}` : s.source, harnesses: s.harnesses })),
+      ...(r.loading.length && { still_loading: r.loading }),
+    });
   },
 );
 

@@ -79,6 +79,68 @@ export interface StepField {
   step?: string;
 }
 
+/**
+ * A delegated thread's step list in brief, for the delegation card on its parent (desktop web, phone web, the desktop
+ * app and iOS): how far along the list it made (set_steps, or its harness's plan) is, the step it is on and what it does
+ * now. From its newest turn, so a finished thread keeps how its list ended. Grouped phases are left out: a thread with
+ * no list of its own shows none.
+ */
+export interface StepProgress {
+  /** The list's length: the bar's segments. */
+  count: number;
+  done: number;
+  /** The step it is on, or the one its turn ended on (failed, stopped), from 1. 0 with none. */
+  at: number;
+  /** That step's state. Null with none. */
+  state: StepState | null;
+  /** That step's title. Null with none. */
+  title: string | null;
+  /** What it does now, while the step runs. */
+  now: string | null;
+  /** The turn still runs. */
+  live: boolean;
+}
+
+/** The field the server adds to a delegated thread on its parent's detail and the feed (apps/server/step-line.ts). */
+export interface ProgressField {
+  progress?: StepProgress;
+}
+
+/** A turn's list in brief (StepProgress), or null for grouped phases or no list. */
+export function stepProgress(v: StepsView | null): StepProgress | null {
+  if (!v || v.source === 'phases' || !v.steps.length) return null;
+  const k = v.steps.findIndex((s) => s.state === 'active' || s.state === 'needs' || s.state === 'failed' || s.state === 'stopped');
+  const on = k >= 0 ? v.steps[k] : null;
+  return {
+    count: v.steps.length,
+    done: v.done,
+    at: k + 1,
+    state: on?.state ?? null,
+    title: on?.title ?? null,
+    now: v.live && on ? on.now : null,
+    live: v.live,
+  };
+}
+
+/**
+ * The brief in one line: "Step 2 of 5 · Design the card" while on a step, "Failed on step 3 of 5 · Run the tests" for
+ * a turn that ended on one, else the count ("All 5 steps done", "3 of 5 steps done", "Wrapping up").
+ */
+export function progressLine(p: StepProgress): string {
+  const of = `${p.at} of ${p.count}`;
+  if (p.at && p.title) {
+    if (p.state === 'failed') return `Failed on step ${of} · ${p.title}`;
+    if (p.state === 'stopped') return `Stopped on step ${of} · ${p.title}`;
+    return `Step ${of} · ${p.title}`;
+  }
+  if (p.done === p.count) return p.live ? 'Wrapping up' : p.count === 1 ? 'The step is done' : `All ${p.count} steps done`;
+  return `${p.done} of ${stepsLabel(p.count)} done`;
+}
+
+/** The bar's ink: amber while a question waits on Ben, muted for a list that ended on a failed or stopped step. */
+export const progressInk = (p: StepProgress): 'needs' | 'muted' | null =>
+  p.state === 'needs' ? 'needs' : p.state === 'failed' || p.state === 'stopped' ? 'muted' : null;
+
 /** How a turn ended, as the fold's result and error items say. Null: it did not say (it runs, or a newer turn began). */
 export type TurnEnd = 'done' | 'failed' | 'stopped' | null;
 

@@ -50,6 +50,82 @@ export function readSvgIcon(text: string): string {
   return `${SVG_PREFIX}${markup}`;
 }
 
+// An uploaded SVG's size in its avatar. The size lives in the markup itself: the root's viewBox is widened (smaller) or
+// narrowed (bigger) around its centre, and the file's own viewBox and the percent ride along as data attributes so
+// the size can change again. Every client already draws the stored markup, so the size reaches all of them, older
+// versions included, with nothing else to store or sync. 100 puts the file back exactly as uploaded.
+
+export const SVG_SCALE_DEFAULT = 100;
+export const SVG_SCALE_MIN = 50;
+export const SVG_SCALE_MAX = 150;
+export const SVG_SCALE_STEP = 5;
+
+const ROOT_TAG = /^<svg\b[^>]*>/i;
+const attrRe = (name: string) => new RegExp(`\\s${name}\\s*=\\s*(["'])(.*?)\\1`, 'i');
+const readAttr = (tag: string, name: string) => tag.match(attrRe(name))?.[2] ?? null;
+const dropAttr = (tag: string, name: string) => tag.replace(attrRe(name), '');
+const setAttr = (tag: string, name: string, value: string) =>
+  attrRe(name).test(tag) ? tag.replace(attrRe(name), ` ${name}="${value}"`) : tag.replace(/^<svg\b/i, `<svg ${name}="${value}"`);
+
+/** A root width or height that gives a box: a plain number or px, not a percent or another unit. */
+const plainLength = (v: string | null) => (v && /^\s*[\d.]+\s*(px)?\s*$/i.test(v) ? Number.parseFloat(v) : Number.NaN);
+
+/** The box the file was drawn in, as uploaded: its viewBox, else its width and height. Null when it has neither. */
+function baseBox(tag: string): [number, number, number, number] | null {
+  const raw = readAttr(tag, 'data-omni-viewbox') ?? readAttr(tag, 'viewBox');
+  if (raw) {
+    const n = raw.trim().split(/[\s,]+/).map(Number);
+    return n.length === 4 && n.every(Number.isFinite) && n[2] > 0 && n[3] > 0 ? (n as [number, number, number, number]) : null;
+  }
+  const w = plainLength(readAttr(tag, 'width'));
+  const h = plainLength(readAttr(tag, 'height'));
+  return w > 0 && h > 0 ? [0, 0, w, h] : null;
+}
+
+/** Whether an SVG has a box to size within. One without a viewBox, width or height cannot be sized. */
+export const svgIconScalable = (markup: string) => !!baseBox(markup.match(ROOT_TAG)?.[0] ?? '');
+
+/** An uploaded SVG's saved size, in percent of the file as uploaded. */
+export function svgIconScale(markup: string): number {
+  const tag = markup.match(ROOT_TAG)?.[0] ?? '';
+  const n = Number(readAttr(tag, 'data-omni-scale'));
+  return Number.isFinite(n) && n >= SVG_SCALE_MIN && n <= SVG_SCALE_MAX && baseBox(tag) ? n : SVG_SCALE_DEFAULT;
+}
+
+const round = (n: number) => Number(n.toFixed(3)).toString();
+
+/** The SVG drawn at `percent` of its uploaded size, clamped to the range. Markup it cannot size comes back unchanged. */
+export function scaleSvgIcon(markup: string, percent: number): string {
+  const tag = markup.match(ROOT_TAG)?.[0];
+  const box = tag && baseBox(tag);
+  if (!tag || !box) return markup;
+  const p = Math.min(SVG_SCALE_MAX, Math.max(SVG_SCALE_MIN, Math.round(percent)));
+  const uploaded = readAttr(tag, 'data-omni-viewbox');
+  let next = dropAttr(dropAttr(tag, 'data-omni-scale'), 'data-omni-viewbox');
+  if (p === SVG_SCALE_DEFAULT) {
+    // Back to the file as it came: its own viewBox, or none when it had only a width and height.
+    next = uploaded === '' ? dropAttr(next, 'viewBox') : uploaded ? setAttr(next, 'viewBox', uploaded) : next;
+  } else {
+    const [x, y, w, h] = box;
+    const f = SVG_SCALE_DEFAULT / p;
+    const vb = [x + (w - w * f) / 2, y + (h - h * f) / 2, w * f, h * f].map(round).join(' ');
+    next = setAttr(setAttr(setAttr(next, 'viewBox', vb), 'data-omni-viewbox', uploaded ?? readAttr(tag, 'viewBox') ?? ''), 'data-omni-scale', String(p));
+  }
+  return next + markup.slice(tag.length);
+}
+
+/**
+ * Whether two stored icons are the same icon, a size apart at most. A resized SVG is not a new icon: it keeps its
+ * automatic background instead of rolling a new one.
+ */
+export function sameIcon(a: string | null | undefined, b: string | null | undefined): boolean {
+  const unsized = (v: string | null | undefined) => {
+    const t = v?.trim() ?? '';
+    return t.startsWith(SVG_PREFIX) ? scaleSvgIcon(t.slice(SVG_PREFIX.length), SVG_SCALE_DEFAULT) : t;
+  };
+  return unsized(a) === unsized(b);
+}
+
 /** An SVG icon as an image URL, for <img src>. */
 export const svgDataUrl = (markup: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
 

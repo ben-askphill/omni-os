@@ -1,6 +1,7 @@
-import type { Artifact, Channel, HistoryEvent, PendingMsg, SSEState, Thread, ThreadOpen } from '@omni/client-core';
+import type { Artifact, ArtifactWithThread, Channel, HistoryEvent, PendingMsg, SSEState, Thread, ThreadOpen } from '@omni/client-core';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { Span } from '@omni/shared/history.ts';
+import { withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
 import { isDelegatedTo } from '@omni/shared/members.ts';
 import { withOpening, type Opening } from '@omni/shared/opening.ts';
 
@@ -13,6 +14,11 @@ export interface ThreadView {
   parent: Thread | null;
   children: Thread[];
   artifacts: Artifact[];
+  /**
+   * The newest files and screenshots of the threads it delegated to, at any depth, newest first, as the server sends them
+   * (packages/shared/crew-artifacts.ts). Its Artifacts screen lists them under its own.
+   */
+  crewArtifacts: ArtifactWithThread[];
   /** The messages the agent has not read yet, less the one drawn as the turn's opening message. */
   pending: PendingMsg[];
   live: boolean;
@@ -56,6 +62,7 @@ export function emptyThreadView(threadId: string): ThreadView {
     parent: null,
     children: [],
     artifacts: [],
+    crewArtifacts: [],
     pending: [],
     live: false,
     blocked: null,
@@ -88,6 +95,7 @@ export function withDetail(view: ThreadView, detail: Partial<ThreadDetail>): Thr
     parent: detail.parent ?? null,
     children: detail.children ?? view.children,
     artifacts: detail.artifacts ?? view.artifacts,
+    crewArtifacts: detail.crew_artifacts ?? view.crewArtifacts,
     pending: detail.pending ?? [],
     opening: detail.opening ?? null,
     live: detail.live ?? false,
@@ -108,10 +116,12 @@ export function withDetail(view: ThreadView, detail: Partial<ThreadDetail>): Thr
  *   delegation row follows it and one created after the thread was opened appears.
  * - A `thread` message for this thread's parent: replaces `parent`.
  * - `{ kind: 'artifact' }`: upserted into `artifacts` by id.
+ * - `{ kind: 'crew_artifact' }`: a file a thread below this one made, merged into `crewArtifacts`.
  */
 export function reduceThread(view: ThreadView, message: unknown): ThreadView {
   if (!isRecord(message)) return view;
   if (message.kind === 'artifact') return isArtifact(message.artifact, view.threadId) ? withArtifact(view, message.artifact) : view;
+  if (message.kind === 'crew_artifact') return isCrewArtifact(message.artifact) ? { ...view, crewArtifacts: withCrewArtifact(view.crewArtifacts, message.artifact) } : view;
 
   const fromStream = message.kind === 'thread';
   if (!fromStream && message.type !== 'thread') return view;
@@ -164,6 +174,10 @@ function joined(prev: ThreadView, next: ThreadView): ThreadView {
 
 function isArtifact(v: unknown, threadId: string): v is Artifact {
   return isRecord(v) && typeof v.id === 'number' && (v.thread_id === undefined || v.thread_id === threadId);
+}
+
+function isCrewArtifact(v: unknown): v is ArtifactWithThread {
+  return isRecord(v) && typeof v.id === 'number' && typeof v.thread_id === 'string' && typeof v.updated_at === 'string';
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
