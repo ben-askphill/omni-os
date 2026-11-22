@@ -153,6 +153,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const openActions = useCallback(() => leaveMenuFor(() => navigation.navigate('Actions', { threadId: id })), [leaveMenuFor, navigation, id]);
   const openChanges = useCallback(() => leaveMenuFor(() => navigation.navigate('Changes', { id })), [leaveMenuFor, navigation, id]);
   const openPR = useCallback(() => leaveMenuFor(() => navigation.navigate('PullRequest', { id })), [leaveMenuFor, navigation, id]);
+  const openArtifacts = useCallback(() => leaveMenuFor(() => navigation.navigate('ThreadArtifacts', { id })), [leaveMenuFor, navigation, id]);
   const addAgent = useCallback(() => leaveMenuFor(() => setMembersOpen(true)), [leaveMenuFor]);
 
   const say = useCallback((message: string) => {
@@ -201,6 +202,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
         onActions={openActions}
         onChanges={openChanges}
         onPR={openPR}
+        onArtifacts={openArtifacts}
         onAddAgent={view.thread && !view.thread.read_only ? addAgent : undefined}
       />
       {view.thread ? <MemberSheet thread={view.thread} visible={membersOpen} onClose={() => setMembersOpen(false)} /> : null}

@@ -2,6 +2,7 @@ import type { ContinueLink } from '@omni/shared/continue.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { historyQuery, type HistoryCursor, type HistoryHead, type HistoryPage } from '@omni/shared/history.ts';
 import { apiPath, type HttpClient } from '../http.ts';
+import type { ArtifactWithThread } from './artifacts.ts';
 import type { Channel } from './channels.ts';
 import type { Artifact, EventRow, HistoryEvent, ModStatus } from './events.ts';
 import type { PendingMsg } from './messages.ts';
@@ -15,6 +16,8 @@ export interface ThreadOpen {
   events: HistoryEvent[];
   history?: HistoryHead;
   artifacts: Artifact[];
+  /** The newest files and screenshots of the threads it delegated to, at any depth (packages/shared/crew-artifacts.ts). Older servers leave it out. */
+  crew_artifacts?: ArtifactWithThread[];
   children: Thread[];
   team?: Thread[];
   parent: Thread | null;
