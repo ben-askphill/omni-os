@@ -11,6 +11,7 @@ import { STEPS_SERVER } from '@omni/shared/steps.ts';
 import { config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
+import { CURSOR_PLUGIN_FOLDER } from './harness/cursor/normalize.ts';
 import type { Channel, ThreadWorkspace } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
@@ -260,6 +261,8 @@ export const MEMORY_SERVER = 'omni-memory';
 export const TEAM_SERVER = 'omni-team';
 /** How long a harness lets an ask_user_question call wait for the user: a day. */
 export const ASK_TIMEOUT_SEC = 86_400;
+/** How long ask_user_question waits on Cursor Agent, inside the 60 seconds its print mode allows any MCP call. */
+export const CURSOR_ASK_WAIT_SEC = 45;
 
 /** One server entry. `timeout` (ms) is Claude Code's, written only into its own config file (writeMcpConfig). */
 interface McpServer {
@@ -338,10 +341,15 @@ export function writeMcpConfig(input: McpInput): string {
  * Cursor loads Omni's MCP servers from a per-thread plugin folder in the thread's data dir:
  * `.cursor-plugin/plugin.json` with a name, plus `.mcp.json` in Claude's MCP config shape.
  * Nothing is written to the repo or `~/.cursor`, and no secret value goes into the folder.
+ * Cursor puts the folder's name in front of each server's (cursorMcpServer takes it off again), so it stays fixed.
+ * Cursor's print mode gives up on any MCP call after 60 seconds and has no setting for it, so ask_user_question waits
+ * CURSOR_ASK_WAIT_SEC there, then hands the question back: the user's answer reaches the thread as a message (runner/questions.ts).
  */
 export function writeCursorPlugin(input: McpInput): string {
   const cfg = buildMcpConfig(input);
-  const dir = join(threadDir(input.threadId), 'cursor-plugin');
+  const ask = cfg.mcpServers[ASK_SERVER];
+  if (ask) cfg.mcpServers[ASK_SERVER] = { ...ask, env: { ...ask.env, OMNI_ASK_WAIT_SEC: String(CURSOR_ASK_WAIT_SEC) } };
+  const dir = join(threadDir(input.threadId), CURSOR_PLUGIN_FOLDER);
   mkdirSync(join(dir, '.cursor-plugin'), { recursive: true });
   writeFileSync(join(dir, '.cursor-plugin', 'plugin.json'), JSON.stringify({ name: 'omni-os', version: '0.1.0' }, null, 2));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify(cfg, null, 2));

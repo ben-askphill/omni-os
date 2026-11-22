@@ -24,10 +24,13 @@ questionsApi.post('/:id/questions', async (c) => {
 /** What the threads delegated from this one, at any depth, wait on Ben to answer: `{ items: CrewQuestion[] }`. */
 questionsApi.get('/:id/crew-questions', (c) => c.json({ items: crewQuestions(c.req.param('id')) }));
 
-/** Long poll, `?wait=<seconds>` up to 30: `{ state, text }`, with `text` what the agent reads. */
+/**
+ * Long poll, `?wait=<seconds>` up to 30: `{ state, text }`, with `text` what the agent reads. `?release=1` answers at
+ * once and stops the call waiting, so an answer after it reaches the thread as a message.
+ */
 questionsApi.get('/:id/questions/:qid', async (c) => {
   const wait = Math.min(Math.max(Number(c.req.query('wait')) || 0, 0), WAIT_MAX_SEC);
-  return c.json(await awaitAnswer(c.req.param('id'), c.req.param('qid'), wait, c.req.raw.signal));
+  return c.json(await awaitAnswer(c.req.param('id'), c.req.param('qid'), wait, c.req.raw.signal, c.req.query('release') === '1'));
 });
 
 /** Answer: `{ answers }` in, one per question (null skips it), `{ state, via }` out. A 409 when it was answered already, a 403 from an agent thread. */

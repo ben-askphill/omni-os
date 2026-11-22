@@ -99,10 +99,16 @@ export function crewQuestions(threadId: string): CrewQuestion[] {
 
 /**
  * A waiting call's poll: the question's state, at once when Ben already acted, else as soon as he does (here or, by
- * sync, on the other Mac), else still pending after `waitSec`. Each poll marks the call as still waiting.
+ * sync, on the other Mac), else still pending after `waitSec`. Each poll marks the call as still waiting, except a
+ * `release`: the call stops waiting there (on Cursor, whose MCP calls end after a minute), so a later answer goes to
+ * the thread as a message.
  */
-export async function awaitAnswer(threadId: string, id: string, waitSec: number, signal?: AbortSignal) {
+export async function awaitAnswer(threadId: string, id: string, waitSec: number, signal?: AbortSignal, release = false) {
   const q = find(threadId, id);
+  if (release) {
+    polled.delete(id);
+    return reply(q);
+  }
   polled.set(id, Date.now());
   if (q.state !== 'pending' || waitSec <= 0) return reply(q);
   await new Promise<void>((resolve) => {

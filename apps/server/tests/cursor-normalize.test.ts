@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { contextApprox, contextSummary, fromCursorTurn } from '@omni/shared/context-meter.ts';
-import { CursorCallCounter, normalizeCursor } from '../harness/cursor/normalize.ts';
+import { turnSteps } from '@omni/shared/steps.ts';
+import { buildItems, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
+import { CursorCallCounter, CursorReplyText, cursorMcpServer, normalizeCursor, readCursorEvent } from '../harness/cursor/normalize.ts';
 
 describe('cursor normalizer', () => {
   it('turns system init into an init record and reads the chat id', () => {
@@ -197,5 +199,103 @@ describe('Cursor nested stream tools', () => {
       .toMatchObject([{ kind: 'tool_result', payload: { text: 'x'.repeat(16_000), truncated: true, is_error: false } }]);
     expect(normalizeCursor(event('globToolCall', {}, 'completed')).records)
       .toMatchObject([{ kind: 'tool_result', payload: { text: '', is_error: false } }]);
+  });
+});
+
+// What CLI 2026.11 sent in a live turn with Omni's plugin folder (fixtures/cursor-live-steps.jsonl, captured with the
+// flags the adapter passes, cwd and name scrubbed, the folder renamed to Omni's `cursor-plugin` as a second live run
+// named it): Omni's MCP servers under `plugin-<folder>-<server>`, results in
+// `{text: {text}}` blocks, a schema lookup before each MCP tool's first call, and every progress message streamed in
+// chunks and then sent again whole with a timestamp and a model call id.
+describe('cursor parity with the Omni tools', () => {
+  const live = readFileSync(join(import.meta.dirname, 'fixtures', 'cursor-live-steps.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const stored = () => {
+    const reply = new CursorReplyText();
+    return live.flatMap((e) => readCursorEvent(e, reply)?.records ?? []);
+  };
+
+  it("names Omni's MCP servers as Claude Code and Codex do", () => {
+    expect(cursorMcpServer('plugin-cursor-plugin-omni-steps')).toBe('omni-steps');
+    expect(cursorMcpServer('plugin-cursor-plugin-omni')).toBe('omni');
+    // The user's own servers, and another plugin's, keep their names.
+    expect(cursorMcpServer('linear')).toBe('linear');
+    expect(cursorMcpServer('plugin-shopify-plugin-shopify')).toBe('plugin-shopify-plugin-shopify');
+    const event = (key: string, args: object, result?: object) =>
+      normalizeCursor({ type: 'tool_call', subtype: result ? 'completed' : 'started', call_id: 'c1\nfc1', tool_call: { [key]: { args, ...(result && { result }) } } });
+    const ask = { name: 'plugin-cursor-plugin-omni-ask-ask_user_question', args: { questions: [] }, providerIdentifier: 'plugin-cursor-plugin-omni-ask', toolName: 'ask_user_question' };
+    expect(event('mcpToolCall', ask).records).toEqual([{ kind: 'tool_use', payload: { id: 'c1', name: 'mcp__omni-ask__ask_user_question', input: { questions: [] }, parent: null } }]);
+    expect(event('mcpToolCall', ask, { success: { content: [{ text: { text: 'Ben answered A.' } }], isError: false } }).records)
+      .toMatchObject([{ kind: 'tool_result', payload: { tool_use_id: 'c1', text: 'Ben answered A.', is_error: false } }]);
+    expect(event('getMcpToolsToolCall', { server: 'plugin-cursor-plugin-omni-render', toolName: 'html_render' }).records)
+      .toEqual([{ kind: 'tool_use', payload: { id: 'c1', name: 'ToolSearch', input: { query: 'select:mcp__omni-render__html_render' }, parent: null } }]);
+  });
+
+  it('stores each set_steps call under its Omni name, with its list and its answer as text', () => {
+    const records = stored();
+    const uses = records.filter((r) => r.kind === 'tool_use').map((r) => r.payload as { name: string; input: any });
+    expect(uses.map((u) => u.name)).toEqual(['ToolSearch', 'mcp__omni-steps__set_steps', 'Bash', 'mcp__omni-steps__set_steps', 'mcp__omni-steps__set_steps']);
+    expect(uses.filter((u) => u.name.endsWith('set_steps')).map((u) => u.input.current)).toEqual([0, 1, 3]);
+    const results = records.filter((r) => r.kind === 'tool_result').map((r) => (r.payload as { text: string }).text);
+    expect(results).toContain('Showing step 1 of 3, "Look around". Call set_steps again when it changes.');
+    expect(results).toContain('Showing all 3 steps as done.');
+  });
+
+  it('keeps one copy of each progress message, its spaces included', () => {
+    // Messages as the transcript folds them: assistant text runs between tool calls.
+    const messages: string[] = [];
+    let open = false;
+    for (const r of stored()) {
+      if (r.kind === 'assistant_text') {
+        if (open) messages[messages.length - 1] += r.payload.text;
+        else messages.push(r.payload.text);
+        open = true;
+      } else if (r.kind === 'tool_use') open = false;
+    }
+    expect(messages).toEqual([
+      "I'll start by inspecting `set_steps`, then run the sequence in order.",
+      'Calling `set_steps` with the plan at step 0.',
+      "I'm about to look around.",
+      'Updating the steps marker to “Count files,” then I’ll report the count.',
+      'There are 0 files.',
+      'done.',
+    ]);
+  });
+
+  it('shows the step rail from those calls, as for a Claude Code thread', () => {
+    let id = 0;
+    const events: TranscriptEvent[] = [
+      { id: ++id, kind: 'user', payload: JSON.stringify({ text: 'count the files' }), created_at: '2026-11-22T07:00:00.000Z' },
+      ...stored().map((r) => ({ id: ++id, kind: r.kind, payload: JSON.stringify(r.payload), created_at: '2026-11-22T07:00:01.000Z' })),
+    ];
+    const view = turnSteps(buildItems(events).items, { live: false });
+    expect(view?.source).toBe('agent');
+    expect(view?.steps.map((s) => [s.title, s.state])).toEqual([['Look around', 'done'], ['Count files', 'done'], ['Wrap up', 'done']]);
+  });
+});
+
+describe('CursorReplyText', () => {
+  const chunk = (text: string) => ({ type: 'assistant', message: { content: [{ type: 'text', text }] }, timestamp_ms: 1 });
+  const copy = (text: string, stamped = true) => ({ type: 'assistant', message: { content: [{ type: 'text', text }] }, ...(stamped && { timestamp_ms: 2, model_call_id: 'm1' }) });
+  const shown = (events: object[]) => {
+    const reply = new CursorReplyText();
+    return events.map((e) => reply.take(e));
+  };
+
+  it('keeps the chunks and drops the copy before a tool call (stamped) and at the end (not stamped)', () => {
+    expect(shown([chunk('Looking'), chunk(' around.'), copy('Looking around.'), chunk('Done'), chunk('.'), copy('Done.', false)]))
+      .toEqual(['Looking', ' around.', '', 'Done', '.', '']);
+  });
+
+  it('keeps a space between two words, but none before the first', () => {
+    expect(shown([chunk(' '), chunk('There'), chunk(' are'), chunk(' '), chunk('0'), copy('There are 0')])).toEqual(['', 'There', ' are', ' ', '0', '']);
+  });
+
+  it('keeps a message that arrived whole, and the tail of a copy the chunks missed', () => {
+    expect(shown([copy('All done.', false)])).toEqual(['All done.']);
+    expect(shown([chunk('All'), copy('All done.', false)])).toEqual(['All', ' done.']);
+  });
+
+  it('keeps a stamped message with a model call id that repeats nothing', () => {
+    expect(shown([copy('Starting.')])).toEqual(['Starting.']);
   });
 });

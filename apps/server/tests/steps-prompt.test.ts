@@ -15,11 +15,14 @@ describe('the step line in the system prompt', () => {
     await r.untilResults(t.id, 1);
     const thread = r.thread(t.id);
     const channel = r.db.channels.get('scratch')!;
-    for (const prompt of [buildSystemPrompt(thread, channel), buildSystemPrompt(thread, channel, getCrew('builder')), buildSystemPrompt({ ...thread, harness: 'codex' }, channel)]) {
+    const harnesses = [{}, { harness: 'codex' }, { harness: 'cursor' }];
+    for (const prompt of [buildSystemPrompt(thread, channel, getCrew('builder')), ...harnesses.map((h) => buildSystemPrompt({ ...thread, ...h }, channel))]) {
       expect(prompt).toContain(SECTION);
       expect(prompt).toContain('call set_steps before you start, with 3 to 6 steps');
       // The argument shape, for a harness whose model calls the tool before it has loaded its schema.
       expect(prompt).toContain('set_steps takes `steps`, the list as plain strings, and `current`');
+      // A Cursor model posted its progress sentences to its own thread with `omni send`, which queued them as turns.
+      expect(prompt).toContain('a progress update is plain text in your reply. Never post one to this thread with `omni send`');
     }
   });
 

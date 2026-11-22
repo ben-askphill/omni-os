@@ -22,7 +22,7 @@ import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, 
 import { cursorBin } from './bin.ts';
 import { fromCursorTurn, type ContextUsage } from '@omni/shared/context-meter.ts';
 import { cursorModelId, cursorWindow } from './models.ts';
-import { CursorCallCounter, normalizeCursor } from './normalize.ts';
+import { CursorCallCounter, CursorReplyText, readCursorEvent } from './normalize.ts';
 
 /** Create a Cursor chat up front and return its id. */
 function createChat(bin: string, cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
@@ -116,6 +116,7 @@ export const cursorAdapter: HarnessAdapter = {
       let accepted = false;
       let stderr = '';
       const calls = new CursorCallCounter();
+      const reply = new CursorReplyText();
       const opened = new Set<string>();
 
       const splitter = new LineSplitter();
@@ -127,13 +128,13 @@ export const cursorAdapter: HarnessAdapter = {
           return;
         }
         if (!evt || typeof evt !== 'object') return;
+        // With partial output on, Cursor streams each message in chunks, then sends it again whole. Keep the chunks,
+        // so the live transcript does not wait, and drop the copy, so a progress update shows once.
+        const parsed = readCursorEvent(evt, reply);
+        if (!parsed) return;
         // Starting a process or opening its session does not mean it accepted the
         // prompt. Cursor echoes the input once read; model output is also evidence.
         const event = evt as { type?: string; subtype?: string; is_error?: boolean };
-        // With partial output enabled, Cursor sends timestamped text chunks as they
-        // arrive, then repeats buffered copies before tool calls and at the end.
-        // Persist only the chunks so the live transcript neither waits nor duplicates text.
-        if (event.type === 'assistant' && typeof (evt as { timestamp_ms?: unknown }).timestamp_ms !== 'number') return;
         const read = event.type === 'user' || event.type === 'assistant' || event.type === 'tool_call'
           || (event.type === 'result' && event.subtype === 'success' && !event.is_error);
         if (!accepted && read) {
@@ -141,7 +142,6 @@ export const cursorAdapter: HarnessAdapter = {
           firstTurn = false;
           cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
         }
-        const parsed = normalizeCursor(evt);
         calls.note(parsed);
         const init = parsed.records.find((r) => r.kind === 'init');
         if (init && typeof (init.payload as { model?: unknown }).model === 'string') modelName = (init.payload as { model: string }).model || modelName;
