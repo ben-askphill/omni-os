@@ -3,8 +3,11 @@
 import { StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MessageEditor, type MessageEditorHandle } from '../../../src/components/composer/MessageEditor.tsx';
-import { useDraftContext } from '../../../src/message-context/draft.ts';
+import { addDraftContext, useDraftContext } from '../../../src/message-context/draft.ts';
 import type { FileMention } from '@omni/shared/mention-menu.ts';
+import { agentMention, agentMentionBody } from '@omni/shared/message-context-agent.ts';
+import { machineMention, mentionBody } from '@omni/shared/message-context-machine.ts';
+import { newContext } from '@omni/shared/message-context.ts';
 import type { CommandList } from '../../../src/api.ts';
 import './page.css';
 
@@ -13,10 +16,18 @@ declare global {
     state: { text: string; records: unknown[]; keys: string[]; errors: string[]; menu: boolean };
     editor: MessageEditorHandle | null;
     setText: (t: string) => void;
+    mention: (kind: 'agent' | 'machine', id: string, name: string) => void;
   }
 }
 
 const DRAFT = 'fixture';
+// The record a pick from the `@` menu adds, without the menu: then text set with `@<name>` shows that chip.
+window.mention = (kind, id, name) => {
+  addDraftContext(
+    DRAFT,
+    kind === 'agent' ? newContext(agentMention, agentMentionBody({ id, name }), '') : newContext(machineMention, mentionBody({ id, name, reachability: 'online', lastSeen: null }, new Date()), ''),
+  );
+};
 const rows: FileMention[] = [
   { insert: 'omarchy', name: 'omarchy', detail: 'Online', kind: 'machine', machine: { id: 'dev-omarchy', here: false, reachability: 'online', lastSeen: null } },
   { insert: 'MacBook-Pro', name: 'MacBook-Pro', detail: 'Asleep', kind: 'machine', machine: { id: 'dev-mbp', here: false, reachability: 'offline', lastSeen: '2026-11-20T08:00:00.000Z' } },
@@ -54,6 +65,8 @@ function Page() {
   window.state.text = text;
   window.state.records = [...records];
   const below = new URLSearchParams(location.search).has('below');
+  // The phone composer's type (mobile/MoComposer.tsx), the tightest line a chip sits in.
+  const tight = new URLSearchParams(location.search).has('tight');
   return (
     <div style={{ padding: below ? '16px' : '360px 16px 16px', maxWidth: 640 }}>
       <div
@@ -85,7 +98,7 @@ function Page() {
           }}
           label="Message"
           placeholder="Reply · / commands, @ files"
-          className="max-h-[220px] min-h-[60px] w-full overflow-y-auto px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none"
+          className={`max-h-[220px] min-h-[60px] w-full overflow-y-auto px-4 pt-3 pb-1 outline-none ${tight ? 'text-[16px] leading-[1.35]' : 'text-[14.5px] leading-[1.8]'}`}
         />
       </div>
     </div>
