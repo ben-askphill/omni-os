@@ -165,7 +165,7 @@ const delegateOnlyRule = (name: string) =>
  * with seat_agents in its own #conductor thread, and delegate or delegate_team only for the charter's exceptions.
  */
 const conductorRule = (name: string) =>
-  `${QUICK_ASKS} For real work your first action is seat_agents, not delegate: when ${REAL_WORK}, seat the agent for it in this thread, where ${name} talks with it, and it opens its own thread in the client channel once the work needs one. Use delegate or delegate_team directly, instead of seating, only for a review, a team ${name} asked for, tasks on machines ${name} @mentioned, or when ${name} asks you to delegate. ${NO_HANDS} hand it to an agent instead of working around that. ${plainAnswers(name)}`;
+  `${QUICK_ASKS} For real work your first action is seat_agents, not delegate: when ${REAL_WORK}, seat the agent for it in this thread, where ${name} talks with it, and it opens its own thread in the client channel once the work needs one. Use delegate or delegate_team directly, instead of seating, only for a review, research that a build depends on and the build after it, a team ${name} asked for, tasks on machines ${name} @mentioned, or when ${name} asks you to delegate. ${NO_HANDS} hand it to an agent instead of working around that. ${plainAnswers(name)}`;
 
 const CONDUCTOR = 'conductor';
 
