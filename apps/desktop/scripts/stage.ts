@@ -14,7 +14,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rm
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
 import { NATIVE_MODES, type NativeMode, stageNative } from './native.ts';
-import { PERSONAL_TERMS, personalTermProblems } from './personal-terms.ts';
+import { PERSONAL_TERMS, personalTermIn, personalTermProblems } from './personal-terms.ts';
 
 export { PERSONAL_TERMS };
 
@@ -32,17 +32,16 @@ export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
  */
 export const SHIPPED_DIRS = ['crew', 'templates', 'mods', 'prototypes/activity-monitor'] as const;
 
-/** Each shipped charter line that names one of PERSONAL_TERMS, as `crew/<file>:<line>: <term>`. */
+/** Each shipped charter line that names one of the personal terms, as `crew/<file>:<line>: <term>`. */
 export function personalCrewProblems(crewDir: string): string[] {
-  const term = new RegExp(`\\b(${PERSONAL_TERMS.join('|')})\\b`);
   return readdirSync(crewDir)
     .filter((f) => f.endsWith('.md'))
     .flatMap((f) =>
       readFileSync(join(crewDir, f), 'utf8')
         .split('\n')
         .flatMap((line, i) => {
-          const hit = line.match(term);
-          return hit ? [`crew/${f}:${i + 1}: ${hit[1]}`] : [];
+          const hit = personalTermIn(line);
+          return hit ? [`crew/${f}:${i + 1}: ${hit}`] : [];
         }),
     );
 }

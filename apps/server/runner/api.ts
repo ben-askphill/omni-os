@@ -25,6 +25,7 @@ import { offMachineHarness } from '../thread-files.ts';
 import { capabilitiesOf, providerWhere } from '../harness/registry.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
+import { autoNeedOptions } from '../display.ts';
 import { usageByHarness } from '../usage.ts';
 import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun, reviewerEffort, setsRun } from '../harness/resolve.ts';
@@ -261,7 +262,7 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   if (!run.ok) run = resolve(getCatalog(), false);
   if (!run.ok) throw new Error(run.error);
   const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
-  const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
+  const auto = 'auto' in run ? routeTask(profileTask(input.prompt, autoNeedOptions()), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const picked = auto ?? (run as Resolved);
   const { harness, model } = picked;
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));

@@ -1,5 +1,5 @@
 // Dates from SQLite are ISO strings in UTC. Display uses the browser's locale timezone,
-// except automations, which use their own timezone (Europe/Amsterdam by default).
+// except automations, which use their own timezone (the user's by default).
 
 import { isDeliveryAhead, type DeliveryView, type TriggerSource } from '@omni/shared/automation-triggers.ts';
 import { formatCents } from '@omni/shared/context-meter.ts';

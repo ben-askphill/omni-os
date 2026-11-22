@@ -695,7 +695,7 @@ export function browserTimezone() {
 }
 
 /** An IANA timezone, typed or picked from the browser's list. */
-export function TimezoneInput({ id, value, onChange, describedBy, placeholder = 'Europe/Amsterdam' }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string; placeholder?: string }) {
+export function TimezoneInput({ id, value, onChange, describedBy, placeholder = browserTimezone() || 'UTC' }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string; placeholder?: string }) {
   const zones = useMemo(() => {
     try {
       return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];

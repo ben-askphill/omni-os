@@ -21,7 +21,7 @@ export const isClaudeArtifactsFeedEvent = (m: unknown): m is ClaudeArtifactsFeed
 
 export function claudeArtifactsApi(http: HttpClient) {
   return {
-    /** Ben's claude.ai Artifacts as the server's last good listing left them, and the state of its refreshes. */
+    /** The user's claude.ai Artifacts as the server's last good listing left them, and the state of its refreshes. */
     claudeArtifacts: () => http.request<ClaudeArtifactsResponse>('GET', apiPath`/claude-artifacts`),
     /**
      * Starts a listing on the server. Without `force` the server skips it when the last attempt is under ten minutes

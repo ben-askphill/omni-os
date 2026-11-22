@@ -25,6 +25,12 @@ export function displayPrefs(): DisplayPrefs {
   return first;
 }
 
+/**
+ * The words Auto reads as a connector need on top of its own (harness/auto.ts NeedOptions). With the Shopify add-on on,
+ * channels carry a client portal slug, so "portal" names that portal's connector.
+ */
+export const autoNeedOptions = () => ({ connectors: displayPrefs().shopify ? ['portal'] : [] });
+
 export function setDisplayPrefs(patch: Partial<DisplayPrefs>): DisplayPrefs {
   const next = { ...displayPrefs(), ...patch };
   kv.set(DISPLAY_KEY, next);
