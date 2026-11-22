@@ -78,6 +78,7 @@ pub fn tool() -> Tool {
         ),
         input: vec![Field::new("questions", Schema::array(question).min(1).max(QUESTIONS_MAX))],
         stops_when_cancelled: true,
+        always_load: false,
     }
 }
 

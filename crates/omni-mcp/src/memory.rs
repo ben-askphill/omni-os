@@ -31,6 +31,7 @@ pub fn tool() -> Tool {
         ],
         // The proposal is saved once the request lands, whether or not the call is still wanted.
         stops_when_cancelled: false,
+        always_load: false,
     }
 }
 

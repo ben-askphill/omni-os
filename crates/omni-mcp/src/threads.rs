@@ -26,6 +26,7 @@ pub fn tool() -> Tool {
         ],
         // The Node server never passed the cancel signal to its request, so the request runs on.
         stops_when_cancelled: false,
+        always_load: false,
     }
 }
 

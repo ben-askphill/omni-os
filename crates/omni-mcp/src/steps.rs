@@ -28,6 +28,7 @@ pub fn tool() -> Tool {
             ),
         ],
         stops_when_cancelled: true,
+        always_load: false,
     }
 }
 

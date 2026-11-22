@@ -110,15 +110,53 @@ describe('a delegate-only role', () => {
     );
   });
 
-  it('tells the Conductor and every crew role to render a "show me" answer, except where html_render is missing', async () => {
+  it('tells the Conductor and every crew role to render by the shape of the answer, where html_render is there', async () => {
     const t = await r.start('THINK:1');
     await r.untilResults(t.id, 1);
     const thread = r.thread(t.id);
     const channel = r.db.channels.get('scratch')!;
-    const rule = 'show the result with html_render';
+    const name = userName();
+    // The shapes that get a page whatever the words, the explicit asks that always do, and what stays text.
+    const rule = [
+      `Pick the form by what the answer holds, not by how ${name} asked. When it has one of these shapes, call html_render first, so a page shows above your reply. A simple table or a row of cards is enough:`,
+      '- 3 or more items with 2 or more attributes each (threads, PRs, machines, options): a table or cards',
+      '- the status or an overview of running work: status cards',
+      '- numbers, usage, counts or trends: a chart or stat tiles',
+      '- dates, schedules or release history: a timeline',
+      '- a comparison, a before and after, or options with a recommendation: side by side, the recommendation marked',
+      '- a flow, an architecture or routing: a diagram',
+      `"Show me", "list out" or "visualize" from ${name}, or passed on in a brief, always gets a page.`,
+      `Keep plain text, with no page, for a yes or no, a single fact, a question for ${name}, code and commands, and any answer with none of those shapes.`,
+    ].join('\n');
+    // The old rule rendered only on those words, and the text rules it sat under said bullets and pipe tables for everything.
+    const phraseOnly = `When ${name} asks you to "show me", "list out" or "visualize" something`;
+    const textOnly = ['keep it short, bullets over prose.', 'tables are pipe tables', 'Keep table cells short.'];
     for (const role of ['conductor', 'builder', 'researcher', 'inbox']) {
-      expect(buildSystemPrompt(thread, channel, getCrew(role))).toContain(rule);
+      const reply = section(buildSystemPrompt(thread, channel, getCrew(role)), 'Reply');
+      expect(reply).toContain(rule);
+      expect(reply).toContain('A pipe table is only for 2 or 3 rows');
+      expect(reply).not.toContain(phraseOnly);
+      for (const line of textOnly) expect(reply).not.toContain(line);
     }
-    expect(buildSystemPrompt({ ...thread, harness: 'hermes' }, channel)).not.toContain(rule);
+
+    // A delegated thread's report and a team member's reply follow it too, and still carry the results as text.
+    const report = 'Your report follows the Reply rules too: when it holds several results in one of those shapes, also show them with html_render in this thread';
+    expect(section(buildSystemPrompt({ ...thread, parent_id: 'parent' }, channel, getCrew('researcher')), 'Delegated task')).toContain(report);
+    expect(section(buildSystemPrompt({ ...thread, parent_id: 'parent', source: 'team' }, channel, getCrew('builder')), 'Team task')).toContain(report);
+    expect(buildSystemPrompt(thread, channel, getCrew('builder'))).not.toContain(report);
+
+    // No html_render on a remote harness, and a quick ask's answer shows in place as text: the text-only block, as it was.
+    const asBefore = [
+      '## Reply',
+      'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
+      'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
+      'Keep table cells short. Put reasons and explanations in bullets under the table.',
+    ].join('\n');
+    for (const plain of [{ quick: 1 }, { harness: 'hermes' }, { harness: 'cursor-cloud' }, { harness: 'custom:box' }]) {
+      const prompt = buildSystemPrompt({ ...thread, ...plain, parent_id: 'parent' }, channel, getCrew('builder'));
+      expect(section(prompt, 'Reply')).toBe(asBefore);
+      expect(prompt).not.toContain('html_render first');
+      expect(prompt).not.toContain(report);
+    }
   });
 });

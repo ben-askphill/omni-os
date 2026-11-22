@@ -39,6 +39,10 @@ pub struct Tool {
     pub input: Vec<Field>,
     /// Whether cancelling a call stops its work. Where it does not, the work runs on and only the answer is dropped.
     pub stops_when_cancelled: bool,
+    /// Whether Claude Code loads the tool with the thread instead of deferring it behind its tool search, so the model
+    /// calls it without a ToolSearch step first (`_meta` `anthropic/alwaysLoad`, https://code.claude.com/docs/en/mcp).
+    /// Claude Code cuts the description of such a tool at 4,096 characters. Other harnesses ignore the key.
+    pub always_load: bool,
 }
 
 /// Who the tool descriptions say the agent is working for.
@@ -87,12 +91,16 @@ impl Server {
     }
 
     fn tools(&self) -> JsValue {
-        let tool = JsValue::object([
+        let mut tool = vec![
             ("name", JsValue::str(self.tool.name)),
             ("description", JsValue::str(&self.tool.description)),
             ("inputSchema", zod::input_schema(self.fields())),
             ("execution", JsValue::object([("taskSupport", JsValue::str("forbidden"))])),
-        ]);
+        ];
+        if self.tool.always_load {
+            tool.push(("_meta", JsValue::object([("anthropic/alwaysLoad", JsValue::Bool(true))])));
+        }
+        let tool = JsValue::object(tool);
         JsValue::object([("tools", JsValue::Array(vec![tool]))])
     }
 
