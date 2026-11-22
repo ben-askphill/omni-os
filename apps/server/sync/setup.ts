@@ -5,10 +5,10 @@ import { db, kv, outbox } from '../db.ts';
 import { pollFlow, SignInError, startFlow, type FlowDeps, type FlowOutcome, type FlowStart, type PollResult } from '../google-auth.ts';
 import { deleteSecret, globalSecret, LEGACY_SYNC_SECRETS, setSecret, SYNC_SECRETS } from '../secrets.ts';
 import { backfill } from './backfill.ts';
-import { computerName } from './devices.ts';
+import { announceSyncPaused, computerName } from './devices.ts';
 import type { PathMap } from './paths.ts';
 import { relayAuth, RelayRefusedError, type RelayAuth } from './transport.ts';
-import { setActiveWorker, startSync, syncConfigured, type SyncWorker } from './worker.ts';
+import { activeWorker, flushSync, setActiveWorker, startSync, syncConfigured, type SyncWorker } from './worker.ts';
 
 // Turning sync on and off from Settings. Sign-in is Google through Clerk, the same device grant that signs in a new
 // device (google-auth.ts): Omni shows a code, the person approves it on Clerk's page, and Omni hands the ID token it
@@ -116,8 +116,13 @@ async function finishRelaySignIn(url: string, idToken: string, machine: string, 
 
 /** Stop syncing. With forget, also end this machine's token on the relay and remove the credentials, so it takes a new sign-in. */
 export async function disableSync(opts: { forget?: boolean }, deps: SetupDeps) {
-  await setActiveWorker(null);
   kv.set('sync.enabled', false);
+  const worker = activeWorker();
+  if (worker) {
+    announceSyncPaused(worker.machineId);
+    await flushSync(2_000);
+  }
+  await setActiveWorker(null);
   if (!opts.forget) return;
   const [url, token] = await Promise.all([deps.readSecret(SYNC_SECRETS.url), deps.readSecret(SYNC_SECRETS.token)]);
   // Offline, or the relay is gone: the token stays valid there until it is taken off ALLOWED_USERS, but this machine forgets it.

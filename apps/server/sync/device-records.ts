@@ -22,7 +22,7 @@ function parse(key: string, v: unknown): DeviceRecord | null {
   const sealKey = typeof r.sealKey === 'string' && r.sealKey ? { sealKey: r.sealKey } : {};
   const signKey = typeof r.signKey === 'string' && r.signKey ? { signKey: r.signKey } : {};
   const caps = parseCaps(r.caps);
-  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, ...signKey, ...(caps && { caps }), at: r.at };
+  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, ...signKey, ...(caps && { caps }), ...(r.syncPaused === true && { syncPaused: true }), at: r.at };
 }
 
 export const deviceRecords = (): DeviceRecord[] =>

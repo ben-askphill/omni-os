@@ -352,8 +352,21 @@ export function routeNamed(
   threadId: string,
   named: string[],
   m: { request: { id: string; request_id: string }; prompt: string; source: string; attachments?: Attachment[]; context?: MessageContext[] },
+  device?: string | null,
 ): void {
-  for (const a of named) seat(threadId, a, m.prompt);
+  if (device !== undefined) {
+    const pending = pendingAgents(threadId);
+    for (const a of named) {
+      const current = members.of(threadId, a);
+      if (current && !current.removed_at && current.device !== device && (pending.has(a) || memberWorking(current))) {
+        throw refusal(`${agentName(a)} is still working in this thread. Wait until the agent is idle to change its machine.`, 409);
+      }
+    }
+  }
+  for (const a of named) {
+    const member = seat(threadId, a, m.prompt);
+    if (device !== undefined && !member.lead) members.setDevice(member.id, device);
+  }
   const row = addEvent(threadId, 'user', {
     text: m.prompt,
     source: m.source,
@@ -444,7 +457,10 @@ async function handTo(threadId: string, round: Round, step: Step) {
     round.pending.delete(step.agent);
     return;
   }
-  const text = (await preamble(threadId, step.agent, step.row.id + 1, stillSending)) + step.prompt;
+  const pin = m.device
+    ? 'This seat has a machine pin. Start the work with omni new in the client channel. Omni routes that thread to the pinned machine. Do machine-specific work in that thread. If it cannot start there, report the error here.\n\n'
+    : '';
+  const text = (await preamble(threadId, step.agent, step.row.id + 1, stillSending)) + pin + step.prompt;
   if (!stillSending()) {
     round.pending.delete(step.agent);
     return;

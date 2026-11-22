@@ -174,7 +174,7 @@ describe('a new thread whose first message @mentions other machines', () => {
     const { first, read } = await start(prompt, 'box-a', [mention(await row('Studio B'))], macs.boxA);
     expect(idsOf(first.context)).toEqual([['machine_mention', '@Studio B', 'studio-b']]);
     expect(read).toContain('wrote @Studio B for the machine "Studio B" (device id studio-b).');
-    expect(read).toContain('pass device "studio-b" to delegate or continue_thread');
+    expect(read).toContain('pass device "studio-b" to seat_agents');
   });
 
   it('starts on the chip\'s machine with two mentions, each with its own device id', T, async () => {
@@ -269,6 +269,6 @@ describe("a new thread the chip's machine could not take", () => {
     const first = (await waitFor(() => macs.air.byKind(id, 'user').find((e) => e.p.text === prompt)?.p, 'its first message', 15_000)) as { context?: MessageContext[] };
     expect(idsOf(first.context)).toEqual([['machine_mention', '@Studio B', 'studio-b']]);
     const read = await waitFor(() => all().flatMap((m) => m.claudeTexts(id)).find((t) => t.includes(prompt)), 'the text its Claude read', 15_000);
-    expect(read).toContain('pass device "studio-b" to delegate or continue_thread');
+    expect(read).toContain('pass device "studio-b" to seat_agents');
   });
 });

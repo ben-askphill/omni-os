@@ -53,7 +53,7 @@ export const projectMachineMention: Projector<MachineMention> = (b) => {
     title:
       `Machine mention: ${userName()} wrote @${name} for the machine "${name}" (device id ${defang(b.machine)})` +
       `${self ? ', the machine you run on' : ''}. When ${userName()} sent this message at ${b.captured_at}, ${state(b)}. ` +
-      `Run the task ${userName()} wrote next to @${name} there: pass device "${defang(b.machine)}" to delegate or continue_thread for it. ` +
+      `Run the task ${userName()} wrote next to @${name} there: pass device "${defang(b.machine)}" to seat_agents in your own #conductor thread, or to delegate or continue_thread when using those tools. ` +
       `If that machine cannot take it (offline, or sync is off), say so to ${userName()} and leave the task; never run it on another machine instead`,
   };
 };

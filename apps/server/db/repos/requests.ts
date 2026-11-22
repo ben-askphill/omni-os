@@ -71,6 +71,8 @@ export interface MessageRequest {
   payload: Record<string, unknown> | null;
   /** The records Ben attached, normalized at the route (packages/shared/message-context.ts). Never edited. */
   context: MessageContext[] | null;
+  /** The machine the Conductor picked for the named agents' work, if any. */
+  seat_device: string | null;
   /** What was sent, hashed: a retry must match it. */
   fingerprint: string;
   state: DeliveryState;
@@ -101,11 +103,11 @@ export interface FileDigest {
 }
 
 /** The same message, mode, sender, files and context hash the same, whatever order the JSON keys came in. */
-export function requestFingerprint(m: { prompt: string; mode: string; source: string; files: FileDigest[]; context?: MessageContext[] }): string {
+export function requestFingerprint(m: { prompt: string; mode: string; source: string; files: FileDigest[]; context?: MessageContext[]; seatDevice?: string }): string {
   const files = m.files.map((f) => [f.name, f.size, f.sha256]);
   // Context only when there is some, so a fingerprint saved before it existed still matches its retry.
   const context = m.context?.length ? [contextDigest(m.context)] : [];
-  return createHash('sha256').update(JSON.stringify([m.prompt, m.mode, m.source, files, ...context])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([m.prompt, m.mode, m.source, files, ...context, ...(m.seatDevice ? [{ device: m.seatDevice }] : [])])).digest('hex');
 }
 
 export async function fileDigests(files: File[]): Promise<FileDigest[]> {
@@ -136,7 +138,7 @@ export const messageRequests = {
    */
   accept(
     r: Pick<MessageRequest, 'thread_id' | 'request_id' | 'prompt' | 'mode' | 'source' | 'attachments' | 'fingerprint' | 'machine_id'> &
-      Partial<Pick<MessageRequest, 'kind' | 'payload' | 'context'>>,
+      Partial<Pick<MessageRequest, 'kind' | 'payload' | 'context' | 'seat_device'>>,
   ) {
     return tx(() => {
       const had = messageRequests.byRequestId(r.thread_id, r.request_id);
@@ -144,11 +146,11 @@ export const messageRequests = {
       const id = randomUUID();
       const ts = now();
       db.prepare(
-        `INSERT INTO message_requests (id, thread_id, request_id, prompt, mode, source, attachments, kind, payload, context, fingerprint, state, machine_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?)`,
+        `INSERT INTO message_requests (id, thread_id, request_id, prompt, mode, source, attachments, kind, payload, context, seat_device, fingerprint, state, machine_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?)`,
       ).run(
         id, r.thread_id, r.request_id, r.prompt, r.mode, r.source, r.attachments?.length ? JSON.stringify(r.attachments) : null,
-        r.kind ?? 'user', r.payload ? JSON.stringify(r.payload) : null, r.context?.length ? JSON.stringify(r.context) : null, r.fingerprint, r.machine_id, ts, ts,
+        r.kind ?? 'user', r.payload ? JSON.stringify(r.payload) : null, r.context?.length ? JSON.stringify(r.context) : null, r.seat_device ?? null, r.fingerprint, r.machine_id, ts, ts,
       );
       db.prepare('UPDATE message_requests SET pos = seq WHERE id = ?').run(id);
       return { row: messageRequests.get(id)!, fresh: true };

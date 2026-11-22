@@ -467,7 +467,7 @@ server.registerTool(
       'The thread\'s first message is your brief to the lead, with every part under the agent that has it. The lead plans first, then gives each member its part, ' +
       'and the members work at the same time in the thread\'s one worktree; only the lead commits. An agent with two parts gets one seat, and the lead gives it both. ' +
       'Once every member has finished, Omni wakes the lead with their replies, and the lead\'s answer comes back to you as one [crew report] on the team\'s task id. Do not poll for it. ' +
-      `A part with no \`role\` is the lead's own. A team runs on this machine, never in #conductor. When ${USER} @mentions machines for the parts, use delegate with each part's device instead.`,
+      `A part with no \`role\` is the lead's own. A team runs on this machine, never in #conductor. When ${USER} @mentions machines for the parts, pass each part's device to seat_agents in your own #conductor thread, or to delegate if you are delegating directly.`,
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "inbox". Use list_channels. Never "conductor".'),
       title: z.string().describe('Short title for the team thread, e.g. "Shure MV7+ research".'),
@@ -656,16 +656,19 @@ server.registerTool(
     inputSchema: {
       agents: z.array(z.string()).min(1).max(12).describe('Agent ids to seat and send the message to. One already seated just gets the message.'),
       message: z.string().describe('The brief: Goal, Done when, Proof back, plus the channel and folder its thread goes in.'),
+      device: z.string().trim().min(1).max(100).optional().describe(
+        `Where the client-channel thread runs: ${DEVICE_ASK} The agent still talks in this #conductor thread. Omit for normal seating.`,
+      ),
     },
   },
-  async ({ agents, message }) => {
+  async ({ agents, message, device }) => {
     if (!SELF) throw new ApiError('seat_agents runs only inside a thread.', 400);
     const crew = await call('/crew');
     const context = agents.map((id) => {
       const name = crewRoleName(id, crew);
       return { id: randomUUID().slice(0, 12), kind: 'agent_mention', v: 1, label: `@${name}`, body: { agent: id, name } };
     });
-    const t = await call(`/threads/${SELF}/messages`, { method: 'POST', body: JSON.stringify({ prompt: message, from: 'conductor', mode: 'steer', context }) });
+    const t = await call(`/threads/${SELF}/messages`, { method: 'POST', body: JSON.stringify({ prompt: message, from: 'conductor', mode: 'steer', context, device }) });
     const seated = (t.members ?? []).filter((m: any) => !m.lead).map((m: any) => ({ agent: m.agent, name: m.name }));
     return text({ thread_id: t.id, members: seated });
   },

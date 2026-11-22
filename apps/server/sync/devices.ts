@@ -78,19 +78,25 @@ async function ownSignKey(): Promise<string | undefined> {
 /** Write this Mac's record when its name, node, keys or slot caps changed. A no-op while sync is off. */
 export async function announceDevice(now = Date.now()): Promise<void> {
   const self = outbox.machineId();
-  if (!self || now - announcedAt < ANNOUNCE_EVERY_MS) return;
+  const had = self ? deviceRecord(self) : null;
+  if (!self || kv.get<boolean>('sync.enabled') === false || (!had?.syncPaused && now - announcedAt < ANNOUNCE_EVERY_MS)) return;
   announcedAt = now;
   const [name, net, sealKey, signKey] = await Promise.all([computerName(), tailnet(), ownSealKey(), ownSignKey()]);
+  if (kv.get<boolean>('sync.enabled') === false) return;
   const tailscale = net ? net.self : null;
-  const had = deviceRecord(self);
   const same = had && had.name === name && had.tailscale?.nodeId === tailscale?.nodeId && had.tailscale?.dnsName === tailscale?.dnsName;
   const caps = (await import('../runner/state.ts')).slotCaps();
-  if (same && had.sealKey === (sealKey ?? had.sealKey) && had.signKey === (signKey ?? had.signKey) && sameCaps(had.caps, caps)) return;
+  if (same && !had.syncPaused && had.sealKey === (sealKey ?? had.sealKey) && had.signKey === (signKey ?? had.signKey) && sameCaps(had.caps, caps)) return;
   const seal = sealKey ?? had?.sealKey;
   const sign = signKey ?? had?.signKey;
   kv.set(PREFIX + self, { id: self, name, tailscale, ...(seal && { sealKey: seal }), ...(sign && { signKey: sign }), caps, at: new Date(now).toISOString() } satisfies DeviceRecord);
 }
 
+/** Tell peers before stopping sync so they can refuse new work for this machine. */
+export function announceSyncPaused(machine: string) {
+  const had = deviceRecord(machine);
+  if (had) kv.set(PREFIX + machine, { ...had, syncPaused: true, at: new Date().toISOString() } satisfies DeviceRecord);
+}
 
 /** The other synced Macs, never this one, with whether this Mac's Tailscale sees each up. Empty while sync is off. */
 export async function listDevices(): Promise<Device[]> {

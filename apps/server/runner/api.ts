@@ -597,7 +597,9 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
     if (named) {
       const blocked = turnBlocked(thread, runsHere(r.thread_id));
       if (blocked) throw refusal(blocked, 409);
-      routeNamed(r.thread_id, named, { request: r, prompt: r.prompt, source: r.source, attachments: r.attachments ?? undefined, context: r.context ?? undefined });
+      // A new brief from the Conductor replaces the seat's pin. Ben's follow-ups keep it.
+      const device = r.source === 'conductor' && thread.channel_id === 'conductor' ? r.seat_device : undefined;
+      routeNamed(r.thread_id, named, { request: r, prompt: r.prompt, source: r.source, attachments: r.attachments ?? undefined, context: r.context ?? undefined }, device);
       return;
     }
     await warmCommands(ready.harness, ready.cwd, r.prompt, r.thread_id);
@@ -635,6 +637,7 @@ export async function postMessage(
     ifAway?: 'ask' | 'send';
     /** The route checked that this sender may seat the agents the message mentions (thread-routes-api.ts seatingRefusal). */
     seats?: boolean;
+    seatDevice?: string;
   } = {},
 ): Promise<PostedThread> {
   const thread = threads.get(threadId);
@@ -650,7 +653,7 @@ export async function postMessage(
   const mode = goal ? 'queue' : (opts.mode ?? 'steer');
   const source = opts.from ?? 'ben';
   const files = (opts.attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' }));
-  const fingerprint = opts.fingerprint ?? requestFingerprint({ prompt, mode, source, files, context: opts.context });
+  const fingerprint = opts.fingerprint ?? requestFingerprint({ prompt, mode, source, files, context: opts.context, seatDevice: opts.seatDevice });
   if (opts.requestId) {
     const again = acceptedAgain(threadId, opts.requestId, fingerprint);
     if (again) return again;
@@ -687,6 +690,7 @@ export async function postMessage(
     attachments: opts.attachments ?? null,
     context: opts.context ?? null,
     fingerprint,
+    seat_device: opts.seatDevice,
     machine_id: outbox.machineId(),
   });
   // The same id posted twice at once: the second waits for nothing.

@@ -35,6 +35,7 @@ let server: Server;
 let omni: McpClient;
 /** A Conductor turn starting: its spawn's token, which the MCP reads from the file. A turn that ended revoked its own. */
 let newTurn: () => void;
+let memberToken: (id: string) => string;
 let harnessText: typeof import('../message-context/project.ts').harnessText;
 
 /** Just enough of an MCP client over stdio (newline-delimited JSON-RPC) to call a tool. */
@@ -99,7 +100,7 @@ beforeAll(async () => {
   a.db.channels.create({ id: 'shop', name: 'Shop', kind: 'client', use_worktree: 0, base_dir: shared, notes: '' });
   // Made the way sync records it, so Box B gets the parent of the thread it runs.
   a.db.threads.create({
-    id: CONDUCTOR, channel_id: 'scratch', title: 'Conductor', status: 'done', role: 'conductor', model: null, session_id: CONDUCTOR,
+    id: CONDUCTOR, channel_id: 'conductor', title: 'Conductor', status: 'done', role: 'conductor', model: null, session_id: CONDUCTOR,
     cwd: a.tmp, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null,
   });
   a.db.threads.create({
@@ -107,7 +108,8 @@ beforeAll(async () => {
     cwd: a.tmp, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null,
   });
   // The token file, as a harness gets it: each Conductor turn mints its own token into it.
-  newTurn = () => void mintThreadToken(CONDUCTOR);
+  memberToken = (id) => mintThreadToken(id).token;
+  newTurn = () => void memberToken(CONDUCTOR);
   newTurn();
   server = serve({ fetch: a.app.fetch, port: 0, hostname: '127.0.0.1' }) as Server;
   await once(server, 'listening');
@@ -174,7 +176,7 @@ describe('a Conductor message that @mentions two machines', () => {
     const text = harnessText(prompt, records, a.thread(CONDUCTOR));
     expect(text).toContain('wrote @Box B for the machine "Box B" (device id box-b).');
     expect(text).toContain('wrote @Mac A for the machine "Mac A" (device id mac-a), the machine you run on.');
-    expect(text).toContain('pass device "box-b" to delegate or continue_thread');
+    expect(text).toContain('pass device "box-b" to seat_agents');
     expect(text).toContain('never run it on another machine instead');
   });
 
@@ -221,7 +223,7 @@ describe('the new-thread composer', () => {
     const first = (await waitFor(() => a.byKind(id, 'user').find((e) => e.p.text === prompt)?.p, 'the first message', 15_000)) as { context: MessageContext[] };
     expect(first.context.map((r) => [r.kind, r.label, (r.body as any).machine])).toEqual([['machine_mention', '@Box B', 'box-b']]);
     expect((first.context[0].body as any).captured_at).not.toBe(AT.toISOString());
-    expect(harnessText(prompt, first.context, a.thread(id))).toContain('pass device "box-b" to delegate or continue_thread');
+    expect(harnessText(prompt, first.context, a.thread(id))).toContain('pass device "box-b" to seat_agents');
     await a.json(`/threads/${id}/stop`, { body: {} });
   });
 
@@ -265,5 +267,90 @@ describe('a mentioned machine that cannot take the task', () => {
   it("resolves this machine's own name to here", T, async () => {
     expect((await a.json('/devices/pick?device=mac%20a')).body).toEqual({ device: 'here', id: 'mac-a', name: 'Mac A', here: true, via: 'here' });
     expect((await a.json('/devices/pick?device=studio')).status).toBe(404);
+  });
+});
+
+
+describe('seating a machine-pinned agent in #conductor', () => {
+  const seatBuilder = (prompt: string, device?: string) => {
+    newTurn();
+    return tool('seat_agents', { agents: ['builder'], message: prompt, device });
+  };
+  const builder = () => a.db.members.of(CONDUCTOR, 'builder')!;
+  const childFromSeat = async (parent: string, prompt: string) => {
+    const res = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${memberToken(parent)}` },
+      // The same authenticated creation request as omni new, with the QA harness set explicitly.
+      body: JSON.stringify({ parent_id: parent, channel: 'shop', role: 'builder', harness: 'claude-code', source: 'conductor', prompt }),
+    });
+    return { status: res.status, body: await res.json() };
+  };
+
+  it('refuses offline, unknown and paused devices before seating anyone', T, async () => {
+    const before = threadCount(a);
+    a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: false }]));
+    try {
+      const offline = await seatBuilder('do work there', 'box-b');
+      expect(offline.isError).toBe(true);
+      expect(offline.raw).toContain('Box B is offline on Tailscale');
+    } finally {
+      a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: true }]));
+    }
+    const unknown = await seatBuilder('do work there', 'unknown-device');
+    expect(unknown.isError).toBe(true);
+    expect(unknown.raw).toContain('No synced machine has the id or name "unknown-device"');
+    a.db.kv.set('sync.enabled', false);
+    try {
+      const paused = await seatBuilder('do work there', 'box-b');
+      expect(paused.isError).toBe(true);
+      expect(paused.raw).toContain('Sync is paused on this machine');
+    } finally {
+      a.db.kv.set('sync.enabled', true);
+    }
+    expect(builder()).toBeUndefined();
+    expect(threadCount(a)).toBe(before);
+  });
+
+  it('seats Builder in the Conductor and runs the thread it opens on the selected device', T, async () => {
+    const result = await seatBuilder('THINK:300 build in #shop', 'box-b');
+    expect(result.isError, result.raw).toBe(false);
+    expect(result.body).toMatchObject({ thread_id: CONDUCTOR, members: [{ agent: 'builder' }] });
+    const member = builder();
+    await waitFor(() => a.runner.isLive(member.session_thread), 'the seated Builder to start');
+    expect(member.device).toBe('box-b');
+    const child = await childFromSeat(member.session_thread, 'THINK:1000 Build on Box B');
+    expect(child.status, JSON.stringify(child.body)).toBe(200);
+    const id = child.body.id;
+    expect(a.db.assignments.get(id)).toMatchObject({ machine: 'box-b', routed: true });
+    expect(a.runner.isLive(id)).toBe(false);
+    await both();
+    await waitFor(() => b.byKind(id, 'user').length, 'the client thread to run on Box B');
+    expect(b.thread(id).parent_id).toBe(member.session_thread);
+    await waitFor(() => b.thread(id).status === 'done', 'the client thread to finish');
+    await both();
+    await waitFor(() => a.byKind(CONDUCTOR, 'crew_report').some((e) => e.p.thread_id === id), 'the report to reach Builder in the Conductor');
+    await waitFor(() => a.thread(member.session_thread).status === 'done', 'the seated Builder to finish its report');
+  });
+
+  it('uses the existing seat and sends locally when the next brief leaves device out', T, async () => {
+    const previous = builder().session_thread;
+    const result = await seatBuilder('TOOL:60000 work in #shop');
+    expect(result.isError, result.raw).toBe(false);
+    expect(builder()).toMatchObject({ session_thread: previous, device: null });
+    await waitFor(() => a.runner.isLive(previous), 'the unpinned Builder to start');
+    const child = await childFromSeat(previous, 'THINK:1000 Build on Mac A');
+    expect(child.status, JSON.stringify(child.body)).toBe(200);
+    await waitFor(() => a.byKind(child.body.id, 'user').length, 'the client thread to run on Mac A');
+    expect(a.db.assignments.get(child.body.id)?.machine).toBe('mac-a');
+  });
+
+  it('refuses a remote machine that announced it paused sync', T, async () => {
+    expect((await b.json('/sync/disable', { body: {} })).status).toBe(200);
+    await a.sync();
+    const result = await seatBuilder('work on Box B', 'box-b');
+    expect(result.isError).toBe(true);
+    expect(result.raw).toContain('Sync is paused on Box B');
+    expect(builder().device).toBeNull();
   });
 });
