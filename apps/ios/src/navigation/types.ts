@@ -16,6 +16,8 @@ export type RootStackParamList = {
   Thread: { id: string };
   Changes: { id: string };
   PullRequest: { id: string };
+  /** A thread's files and screenshots, and those of the threads it delegated to. Pushed from the thread menu. */
+  ThreadArtifacts: { id: string };
   /** Starts a thread. Opens on the channel it was asked from, else the Conductor. `prompt` fills the box to start, as an open item's + does. */
   NewThread: { channel?: string; prompt?: string } | undefined;
   /** A file the crew made. Any tab can push it, through `openArtifact`. */

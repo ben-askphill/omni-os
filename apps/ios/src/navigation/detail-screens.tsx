@@ -22,6 +22,7 @@ import { SecretsScreen } from '../screens/SecretsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { SettingsSectionScreen } from '../screens/SettingsSectionScreen';
 import { ServersScreen } from '../screens/ServersScreen';
+import { ThreadArtifactsScreen } from '../screens/ThreadArtifactsScreen';
 import { ThreadScreen } from '../screens/ThreadScreen';
 import { space, type ColorTokens } from '../theme';
 import type { RootStackParamList } from './types';
@@ -87,6 +88,7 @@ export function detailScreens({ backTitle }: { backTitle: string }) {
       <Stack.Screen name="Automations" component={AutomationsScreen} options={{ title: 'Automations', headerBackTitle: 'Settings' }} />
       <Stack.Screen name="Changes" component={ChangesScreen} options={{ title: 'Changes', headerBackTitle: 'Thread' }} />
       <Stack.Screen name="PullRequest" component={PullRequestScreen} options={{ title: 'Pull request', headerBackTitle: 'Thread', gestureEnabled: false }} />
+      <Stack.Screen name="ThreadArtifacts" component={ThreadArtifactsScreen} options={{ title: 'Artifacts', headerBackTitle: 'Thread' }} />
       <Stack.Screen name="Actions" component={ActionsScreen} options={{ title: 'Actions', headerBackTitle: 'Thread' }} />
       <Stack.Screen name="Servers" component={ServersScreen} options={{ title: 'Servers', headerBackTitle: 'Settings' }} />
       <Stack.Screen name="AddServer" component={ConnectScreen} options={{ title: 'Add server', headerBackTitle: 'Back' }} />

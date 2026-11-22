@@ -33,18 +33,19 @@ export function menuExtras(target: ThreadTarget, machine: ThreadMachine | null, 
 
 /** A row of the open thread's first menu group: a screen about the thread's work. */
 export interface MenuLink {
-  id: 'changes' | 'pr';
+  id: 'changes' | 'pr' | 'artifacts';
   label: string;
   sub: string;
 }
 
 /**
- * View changes and Pull request, first in the open thread's menu, each only where the screen can open it. They replace
- * the chips that sat under the thread's title.
+ * View changes, Pull request and Artifacts, first in the open thread's menu, each only where the screen can open it.
+ * Artifacts lists the files and screenshots the thread and the threads it delegated to made, as desktop's Files tab does.
  */
-export function menuLinks(canChanges: boolean, canPR: boolean): MenuLink[] {
+export function menuLinks(canChanges: boolean, canPR: boolean, canArtifacts = false): MenuLink[] {
   const links: MenuLink[] = [];
   if (canChanges) links.push({ id: 'changes', label: 'View changes', sub: 'What this thread changed in its checkout' });
   if (canPR) links.push({ id: 'pr', label: 'Pull request', sub: "Review and merge this thread's PR" });
+  if (canArtifacts) links.push({ id: 'artifacts', label: 'Artifacts', sub: 'Screenshots and files this thread made' });
   return links;
 }

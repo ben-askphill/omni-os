@@ -1,12 +1,9 @@
-import type { ArtifactWithThread } from '@omni/client-core';
 import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@omni/shared/artifacts.ts';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '../ui/Text';
-import { Icon } from '../ui/Icon';
 
-import { useArtifactFile } from '../artifacts/use-artifact-file';
-import { extensionOf, hasThumbnail } from '../artifacts/viewer-kind';
+import { ArtifactCard } from '../components/artifact/ArtifactCard';
 import { ClaudeArtifactsSection } from '../components/claude-artifacts/ClaudeArtifactsSection';
 import { StatusLine } from '../components/StatusLine';
 import { shortAgo } from '../live/channel-model';
@@ -14,7 +11,7 @@ import { useChannels, useClaudeArtifacts, useLibrary, useLiveHub, usePullRefresh
 import { useMinuteClock } from '../live/use-minute-clock';
 import { openArtifact } from '../navigation/open-artifact';
 import type { RootScreenProps } from '../navigation/types';
-import { fontSize, radius, space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme } from '../theme';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 const GAP = space.s4 + space.s2 / 2;
@@ -75,13 +72,12 @@ export function LibraryScreen({ navigation }: RootScreenProps<'Library'>) {
           {list.map((a, i) => {
             const wide = i === 0 && filter === 'all';
             return (
-              <Card
+              <ArtifactCard
                 key={a.id}
                 artifact={a}
                 width={wide ? inner : half}
                 tall={wide}
-                channel={names.get(a.channel_id) ?? a.channel_id}
-                time={shortAgo(a.updated_at, now)}
+                where={`#${names.get(a.channel_id) ?? a.channel_id} · ${shortAgo(a.updated_at, now)}`}
                 onOpen={() => openArtifact(navigation, a)}
               />
             );
@@ -101,62 +97,6 @@ export function LibraryScreen({ navigation }: RootScreenProps<'Library'>) {
   );
 }
 
-function Card({
-  artifact,
-  width,
-  tall,
-  channel,
-  time,
-  onOpen,
-}: {
-  artifact: ArtifactWithThread;
-  width: number;
-  tall: boolean;
-  channel: string;
-  time: string;
-  onOpen: () => void;
-}) {
-  const { colors } = useOmniTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${artifact.name}, ${artifact.kind}, in ${channel}, ${time}`}
-      onPress={onOpen}
-      style={({ pressed }) => [styles.card, { width, backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 }]}
-    >
-      <View style={[styles.thumb, { height: tall ? 170 : 110, backgroundColor: colors.surface3 }]}>
-        {hasThumbnail(artifact.kind) ? <Thumbnail artifact={artifact} /> : <Label artifact={artifact} />}
-      </View>
-      <View style={styles.meta}>
-        <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
-          {artifact.name}
-        </Text>
-        <Text numberOfLines={1} style={[styles.where, { color: colors.fg3 }]}>
-          {`#${channel} · ${time}`}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function Thumbnail({ artifact }: { artifact: ArtifactWithThread }) {
-  const load = useArtifactFile(artifact);
-  if (load.status !== 'ready') return <Label artifact={artifact} />;
-  return <Image source={{ uri: load.file.uri }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />;
-}
-
-/** The shared kind drawing and extension when a file has no thumbnail. */
-function Label({ artifact }: { artifact: ArtifactWithThread }) {
-  const { colors } = useOmniTheme();
-  return (
-    <View style={styles.label}>
-      <Icon name={artifact.kind === 'image' || artifact.kind === 'screenshot' ? 'image' : artifact.kind === 'html' || artifact.kind === 'svg' ? 'globe' : 'file'} size={24} color={colors.fg3} />
-      <Text style={[styles.ext, { color: colors.fg3 }]}>{extensionOf(artifact.name)}</Text>
-    </View>
-  );
-}
-
-/** The time the relative times count from, a minute fresh. */
 const styles = StyleSheet.create({
   content: {
     paddingBottom: space.s11,
@@ -178,38 +118,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: GAP,
     paddingHorizontal: space.s8,
-  },
-  card: {
-    borderRadius: radius.lg,
-    padding: space.s2 + 2,
-    gap: space.s4,
-  },
-  thumb: {
-    borderRadius: radius.md - 1,
-    overflow: 'hidden',
-  },
-  meta: {
-    paddingHorizontal: space.s2 + 2,
-    paddingBottom: space.s2 + 2,
-    gap: space.s1,
-  },
-  name: {
-    fontSize: fontSize.small,
-    fontFamily: 'Menlo',
-  },
-  where: {
-    fontSize: fontSize.caption,
-  },
-  label: {
-    flex: 1,
-    gap: space.s4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ext: {
-    fontSize: fontSize.body,
-    fontFamily: 'Menlo',
-    textTransform: 'uppercase',
   },
   empty: {
     fontSize: fontSize.body,
