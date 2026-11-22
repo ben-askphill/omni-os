@@ -5,5 +5,8 @@ import { publishFeed } from '../bus.ts';
 /** When a tool call last polled each question, by question id. */
 export const polled = new Map<string, number>();
 
+/** Questions whose call stopped waiting on this machine before an answer came (a release, on Cursor): the thread that asked, by question id. */
+export const released = new Map<string, string>();
+
 /** Needs you recounts the thread's blockers. */
 export const settled = (threadId: string) => publishFeed({ type: 'needs_you', thread_id: threadId });

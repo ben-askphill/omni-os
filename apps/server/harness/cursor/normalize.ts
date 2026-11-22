@@ -77,11 +77,77 @@ export class CursorCallCounter {
   }
 }
 
+/** A text block's words: `{type: 'text', text}` in a message, `{text: {text}}` in an MCP call's result. */
+const blockText = (b: unknown): string => {
+  const block = obj(b);
+  return block.type === 'text' ? (str(block.text) ?? '') : (str(obj(block.text).text) ?? '');
+};
+
 const textOf = (content: unknown): string => {
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) return content.filter((b) => obj(b).type === 'text').map((b) => obj(b).text ?? '').join('');
+  if (Array.isArray(content)) return content.map(blockText).join('');
   return '';
 };
+
+/** The folder Omni loads its MCP servers from (sandbox.ts writeCursorPlugin). */
+export const CURSOR_PLUGIN_FOLDER = 'cursor-plugin';
+
+/**
+ * The MCP server's name as Omni wrote it. Cursor names a server it loads from a plugin folder
+ * `plugin-<folder>-<server>` (`plugin-cursor-plugin-omni-steps`), where Claude Code and Codex keep the name
+ * (`omni-steps`). Omni finds its own tools by that name (steps, html_render, questions, delegation), so the prefix goes.
+ */
+export const cursorMcpServer = (id: string): string => {
+  const prefix = `plugin-${CURSOR_PLUGIN_FOLDER}-`;
+  return id.startsWith(prefix) ? id.slice(prefix.length) : id;
+};
+
+/**
+ * Keeps one copy of each message Cursor writes. With partial output on, it streams a message as timestamped chunks,
+ * then sends the whole message again before its next tool call and at the end of the turn. The copy at the end has no
+ * timestamp; since CLI 2026.11 the copy before a tool call has one, with its model call's id, which no chunk carries
+ * (tests/fixtures/cursor-live-steps.jsonl). A copy shows only what its chunks missed at the end, and a message that
+ * never streamed is kept whole. One per turn.
+ */
+export class CursorReplyText {
+  private streamed = '';
+
+  /** The text of this assistant event to show: all of a chunk, none of a copy of text already shown. */
+  take(raw: unknown): string {
+    const evt = obj(raw);
+    const text = textOf(obj(evt.message).content);
+    const seen = this.streamed;
+    const copy = typeof evt.timestamp_ms !== 'number' || !!evt.model_call_id;
+    if (!copy) {
+      this.streamed += text;
+      if (seen.trim()) return text;
+      // Before the message's first word: whitespace waits for that word and shows with it, so a lone space adds no
+      // message of its own and an indented code block keeps its indent.
+      return this.streamed.trim() ? this.streamed : '';
+    }
+    this.streamed = '';
+    if (!seen.trim()) return text;
+    // The chunks missed the end: show that part. Missed elsewhere, the message already shows as streamed.
+    const head = seen.trimStart();
+    const whole = text.trimStart();
+    return whole.startsWith(head) ? whole.slice(head.length) : '';
+  }
+}
+
+/**
+ * One event of a turn as the adapter stores it: normalizeCursor's records, with each message shown once
+ * (CursorReplyText). Null for an untimestamped copy of a message already shown, which the adapter skips entirely.
+ */
+export function readCursorEvent(raw: unknown, reply: CursorReplyText): CursorParsed | null {
+  const parsed = normalizeCursor(raw);
+  const evt = obj(raw);
+  if (evt.type !== 'assistant') return parsed;
+  const shown = reply.take(raw);
+  if (!shown && typeof evt.timestamp_ms !== 'number') return null;
+  parsed.records = parsed.records.filter((r) => r.kind !== 'assistant_text');
+  if (shown) parsed.records.push({ kind: 'assistant_text', payload: { text: shown } });
+  return parsed;
+}
 
 /** One Cursor stream event to Omni records (plus session id and terminal result when present). */
 export function normalizeCursor(raw: unknown): CursorParsed {
@@ -175,7 +241,7 @@ function toolCall(evt: CursorEvent): StreamRecord[] {
       return [toolUse(id, 'TodoWrite', { todos })];
     }
     case 'mcp': {
-      const name = `mcp__${String(input.server ?? '')}__${String(input.tool ?? input.name ?? '')}`;
+      const name = `mcp__${cursorMcpServer(String(input.server ?? ''))}__${String(input.tool ?? input.name ?? '')}`;
       const recs: StreamRecord[] = [toolUse(id, name, input.arguments ?? input.args ?? {})];
       const err = result.error || undefined;
       const res = result.result ?? result.output;
@@ -205,6 +271,12 @@ function nestedToolUse(evt: CursorEvent): StreamRecord | null {
   const { key, value, id } = entry;
   const input = obj(value.args);
   const kind = key.slice(0, -'ToolCall'.length);
+  // Cursor loads an MCP tool's schema before its first call, as Claude Code's ToolSearch does: a getting-ready row.
+  if (kind === 'getMcpTools') {
+    const server = cursorMcpServer(String(input.server ?? input.providerIdentifier ?? ''));
+    const tool = str(input.toolName) ?? str(input.tool);
+    return toolUse(id, 'ToolSearch', { query: tool ? `select:mcp__${server}__${tool}` : server });
+  }
   const aliases: Record<string, string> = { updateTodos: 'todos' };
   const tool = aliases[kind] ?? kind;
   // Reuse the flat adapter's Claude names without emitting any of its completion records.

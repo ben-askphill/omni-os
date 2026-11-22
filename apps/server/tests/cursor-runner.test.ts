@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { startRunner, type Ev } from './runner-boot.ts';
+import { turnSteps } from '@omni/shared/steps.ts';
+import { buildItems } from '@omni/shared/transcript-fold.ts';
 import { FAKE_CURSOR } from './support.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
@@ -45,6 +47,23 @@ describe('cursor tracer', () => {
     expect(H.byKind(t.id, 'tool_use')).toHaveLength(1);
     expect(H.byKind(t.id, 'tool_result')).toHaveLength(1);
     expect(H.byKind(t.id, 'tool_result')[0].p).toMatchObject({ tool_use_id: 'tc_1', text: 'a\nb\n', is_error: false });
+  });
+
+  it("shows a turn's set_steps as its step rail and each progress message once, as for Claude Code and Codex", async () => {
+    const t = await H.start('STEPS count the files', cursor);
+    await H.untilResults(t.id, 1);
+    // Cursor names the servers after Omni's plugin folder; the transcript keeps the names the clients look for.
+    expect(H.byKind(t.id, 'tool_use').map((e: Ev) => e.p.name))
+      .toEqual(['ToolSearch', 'mcp__omni-steps__set_steps', 'mcp__omni-steps__set_steps', 'mcp__omni-steps__set_steps']);
+    expect(H.byKind(t.id, 'tool_result').map((e: Ev) => e.p.text)).toContain('Showing step 1 of 2, "Look around". Call set_steps again when it changes.');
+    // Each progress message once, with the space chunk between "are" and "2", then the reply.
+    const text = H.texts(t.id, 'assistant_text').join('');
+    expect(text.startsWith('Setting up the plan.There are 2 files.ack: ')).toBe(true);
+    expect(text.match(/Setting up the plan\./g)).toHaveLength(1);
+    const events = H.db.events.since(t.id).map((r: { id: number; kind: string; payload: string; created_at: string }) => r);
+    const view = turnSteps(buildItems(events).items, { live: false });
+    expect(view?.source).toBe('agent');
+    expect(view?.steps.map((s) => [s.title, s.state])).toEqual([['Look around', 'done'], ['Wrap up', 'done']]);
   });
 
   it('names a call Cursor rejects before it starts, so its failure is not an orphan result', async () => {

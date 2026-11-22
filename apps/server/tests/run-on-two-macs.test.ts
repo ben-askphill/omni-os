@@ -484,6 +484,27 @@ describe('a question from a thread that runs on the other machine without being 
     expect(a.byKind(id, 'user').at(-1)?.p.text).toContain('"Port the relay?"="No"');
     expect(a.db.assignments.holder(id)).toBe('mac-a');
   }, T.timeout);
+
+  it("sends the hub's answer as a message on that machine once its call released the question (Cursor)", async () => {
+    const { id, qid } = await asking('Port the CLI?');
+    // Cursor's call hands the question back after its wait budget; the turn on B still runs while the agent wraps up.
+    const released = await b.json(`/threads/${id}/questions/${qid}?wait=0&release=1`);
+    expect(released.body).toMatchObject({ state: 'pending' });
+    await both();
+    const res = await a.json(`/threads/${id}/questions/${qid}/answer`, { body: { answers: [{ selected: ['Yes'], other: null }] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    // A still sees the turn running on B, so it hands the answer to B; B, where no call waits any more, sends it on.
+    expect(res.body).toEqual({ state: 'answered', via: 'tool' });
+    const sent = () => b.db.messageRequests.byRequestId(id, `question:${qid}`);
+    for (let n = 0; n < 5 && !sent(); n++) await both();
+    expect(sent(), 'the answer saved as a message on B').toMatchObject({ source: 'ben', kind: 'user', prompt: expect.stringContaining('"Port the CLI?"="Yes"') });
+    // Handed to the turn still running on B (the fake CLI takes it in after its tool; Cursor runs it as the next turn).
+    await waitFor(() => ['sent', 'delivered'].includes(sent()?.state ?? ''), () => `the answer to go to the turn on B, not ${sent()?.state}`);
+    expect(a.runner.isLive(id)).toBe(false);
+    // Once: syncing again does not send it a second time.
+    await both();
+    expect(b.db.messageRequests.forThread(id).filter((m) => m.prompt.includes('"Port the CLI?"="Yes"'))).toHaveLength(1);
+  }, T.timeout);
 });
 
 describe('remote preparation and takeover', () => {

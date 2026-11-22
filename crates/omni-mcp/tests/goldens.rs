@@ -387,7 +387,8 @@ fn fixture(server: &str) -> Vec<JsValue> {
 #[test]
 fn ask_matches_the_record_of_the_node_server() {
     let scenarios = fixture("ask");
-    assert_eq!(scenarios.len(), 32);
+    // 32 from the Node server, and 6 for the wait budget Cursor Agent threads get, written here.
+    assert_eq!(scenarios.len(), 38);
     check(&scenarios);
 }
 

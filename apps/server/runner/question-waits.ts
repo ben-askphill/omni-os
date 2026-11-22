@@ -2,10 +2,10 @@
 // questions.ts so that postMessage (api.ts) can dismiss them while questions.ts delivers an answer through api.ts.
 import { ANSWER_EVENT, questionsIn, type AnswerPayload } from '@omni/shared/question.ts';
 import { events, threads } from '../db.ts';
-import { polled, settled } from './question-polls.ts';
+import { polled, released, settled } from './question-polls.ts';
 import { addEvent } from './state.ts';
 
-export { polled, settled };
+export { polled, released, settled };
 
 /** A reply dismisses the questions asked by the agents receiving it. Legacy rows with no author belong to the lead. */
 export function dismissQuestions(threadId: string, recipients?: readonly string[] | null) {
@@ -17,6 +17,7 @@ export function dismissQuestions(threadId: string, recipients?: readonly string[
   for (const q of open) {
     addEvent(threadId, ANSWER_EVENT, { id: q.id, state: 'dismissed', answers: null, via: 'tool' } satisfies AnswerPayload);
     polled.delete(q.id);
+    released.delete(q.id);
   }
   if (open.length) settled(threadId);
 }

@@ -19,6 +19,9 @@
 //   WRITE:<path>  a write tool_call that writes "written by fake-cursor" to that path (relative to the cwd), then
 //           the TOOL:<ms> delay, as a turn that edits a file and keeps working
 //   CRASH   exit(1) once the prompt is echoed, like the process dying mid-turn
+//   STEPS   a turn as CLI 2026.11 sent it live: two progress messages, each streamed in word chunks (one chunk only a
+//           space) and then repeated whole with a timestamp and a model call id, the MCP schema lookup, and set_steps
+//           calls named after the --plugin-dir folder (`plugin-<folder>-omni-steps`), with Cursor's MCP result blocks
 //   HANG    emit init + assistant but no result, and stay alive until killed
 //   ORPHAN  first leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //           daemon started without redirecting its output: once we exit, our stdout never closes. The child
@@ -35,7 +38,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, resolve as resolvePath } from 'node:path';
+import { basename, join, resolve as resolvePath } from 'node:path';
 import { createInterface } from 'node:readline';
 
 const argv = process.argv.slice(2);
@@ -158,6 +161,7 @@ async function runTurn() {
     const args = { globPattern: '**/*', targetDirectory: '/w' };
     write({ type: 'tool_call', subtype: 'completed', call_id: 'tc_2\nfc_2', tool_call: { globToolCall: { args, result: { error: { errorMessage: 'Glob pattern matches every file and is not allowed.' } } } }, model_call_id: 'req_1-0-abcd' });
   }
+  if (prompt.includes('STEPS')) await stepsTurn(sessionId);
   const reply = `ack: ${prompt}`;
   // Cursor emits live chunks when --stream-partial-output is enabled, then a buffered
   // full-text copy without timestamp_ms. Omni should show the chunks and drop the copy.
@@ -176,6 +180,35 @@ async function runTurn() {
   write({ type: 'result', subtype: 'success', is_error: false, result: reply, session_id: sessionId, request_id: 'req_1', usage: { inputTokens: 24000, outputTokens: 120, cacheReadTokens: 6000, cacheWriteTokens: 0 } });
   // Exit once stdout has drained: a long reply is still queued for the pipe when the last write returns.
   process.stdout.write('', () => process.exit(0));
+}
+
+/** STEPS: the events of a live Cursor turn that calls Omni's set_steps (see the directive above). */
+async function stepsTurn(session_id) {
+  const server = `plugin-${basename(flagVal('--plugin-dir') ?? 'cursor-plugin')}-omni-steps`;
+  const model_call_id = 'req_2-0-steps';
+  const steps = ['Look around', 'Wrap up'];
+  const say = (chunks) => {
+    for (const text of chunks) write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }] }, session_id, timestamp_ms: Date.now() });
+    write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: chunks.join('') }] }, session_id, model_call_id, timestamp_ms: Date.now() });
+  };
+  const call = (n, key, args, result) => {
+    const call_id = `call-steps-${n}\nfc_steps_${n}`;
+    write({ type: 'tool_call', subtype: 'started', call_id, tool_call: { [key]: { args: { ...args, toolCallId: call_id } } }, model_call_id, session_id, timestamp_ms: Date.now() });
+    write({ type: 'tool_call', subtype: 'completed', call_id, tool_call: { [key]: { args: { ...args, toolCallId: call_id }, result } }, model_call_id, session_id, timestamp_ms: Date.now() });
+  };
+  const setSteps = (n, current) => {
+    const shown = current === steps.length ? `Showing all ${steps.length} steps as done.` : `Showing step ${current + 1} of ${steps.length}, "${steps[current]}". Call set_steps again when it changes.`;
+    call(n, 'mcpToolCall', { name: `${server}-set_steps`, args: { steps, current }, providerIdentifier: server, toolName: 'set_steps', serverIdentifier: server },
+      { success: { content: [{ text: { text: shown } }], isError: false, systemReminders: [] } });
+  };
+  say(['Setting', ' up', ' the', ' plan.']);
+  call(0, 'getMcpToolsToolCall', { server, toolName: 'set_steps' }, { success: { content: JSON.stringify({ tool: 'set_steps', description: 'Show the plan' }) } });
+  setSteps(1, 0);
+  await delay(3);
+  say(['There', ' are', ' ', '2', ' files.']);
+  setSteps(2, 1);
+  await delay(3);
+  setSteps(3, steps.length);
 }
 
 /** ORPHAN: this script again, as a child that inherits our stdout and idles until killed (two minutes at most). */

@@ -18,7 +18,7 @@ import {
   type QuestionState,
   type ThreadQuestion,
 } from '@omni/shared/question.ts';
-import { bus } from '../bus.ts';
+import { bus, EVENT_ADDED } from '../bus.ts';
 import { events, members, threads } from '../db.ts';
 import { transcriptOf } from '../db/repos/events.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
@@ -27,7 +27,7 @@ import { runningElsewhere, turnBlocked } from '../sync/guard.ts';
 import { runnerPorts } from './ports.ts';
 import { agentName } from '../member-view.ts';
 import { wakePrepared } from './api.ts';
-import { polled, settled } from './question-waits.ts';
+import { polled, released, settled } from './question-waits.ts';
 import { saveOwn } from './queue.ts';
 import { addEvent, lives, refusal, runsHere } from './state.ts';
 
@@ -99,10 +99,20 @@ export function crewQuestions(threadId: string): CrewQuestion[] {
 
 /**
  * A waiting call's poll: the question's state, at once when Ben already acted, else as soon as he does (here or, by
- * sync, on the other Mac), else still pending after `waitSec`. Each poll marks the call as still waiting.
+ * sync, on the other Mac), else still pending after `waitSec`. Each poll marks the call as still waiting, except a
+ * `release`: the call stops waiting there (on Cursor, whose MCP calls end after a minute), so a later answer goes to
+ * the thread as a message, whichever machine it is given on (sendReleased).
  */
-export async function awaitAnswer(threadId: string, id: string, waitSec: number, signal?: AbortSignal) {
+export async function awaitAnswer(threadId: string, id: string, waitSec: number, signal?: AbortSignal, release = false) {
   const q = find(threadId, id);
+  if (release) {
+    polled.delete(id);
+    if (q.state === 'pending') {
+      released.set(id, threadId);
+      watchReleased();
+    }
+    return reply(q);
+  }
   polled.set(id, Date.now());
   if (q.state !== 'pending' || waitSec <= 0) return reply(q);
   await new Promise<void>((resolve) => {
@@ -130,6 +140,52 @@ function askedIn(threadId: string, q: ThreadQuestion): string {
   return m && !m.lead ? m.session_thread : threadId;
 }
 
+/** What the agent reads when the answer comes as a message. */
+function answerMessage(q: ThreadQuestion, state: QuestionState, answers: AnswerPayload['answers']): string {
+  // An approval whose call ended before the answer (a restart): the call was refused then, so the message says what
+  // the user decided and that the call may be made again.
+  return q.approval ? approvalResultText(q.approval, answers) : resultText(q.questions, state, answers);
+}
+
+/** Ben's reply, delivered as one (run-on.ts does the same with a forwarded one), once per question. */
+function sendAnswer(threadId: string, id: string, prompt: string) {
+  const row = saveOwn(threadId, `question:${id}`, { prompt, kind: 'user', source: 'ben', payload: null });
+  if (row) void wakePrepared(row).catch((err) => console.error(`[questions] ${id}:`, (err as Error).message));
+}
+
+/**
+ * An answer to a question this machine released. Given on another machine while the turn still ran here, it came for
+ * the call (`via: 'tool'`) and synced here after that call had ended, so it goes to the thread as a message from here,
+ * where the turn runs. An answer given as a message was sent already, and a dismissal is Ben's own reply.
+ */
+function sendReleased(threadId: string, id: string) {
+  let q: ThreadQuestion;
+  try {
+    q = find(threadId, id);
+  } catch {
+    released.delete(id);
+    return;
+  }
+  if (q.state === 'pending') return;
+  released.delete(id);
+  const answer = events.questions(threadId, id).find((e) => e.kind === ANSWER_EVENT);
+  const via = answer ? (JSON.parse(answer.payload) as AnswerPayload).via : null;
+  if (q.state === 'dismissed' || via !== 'tool') return;
+  sendAnswer(threadId, id, answerMessage(q, q.state, q.answers));
+  settled(threadId);
+}
+
+let watching = false;
+/** Hear every answer added here, by sync or not, while a released question waits for one. */
+function watchReleased() {
+  if (watching) return;
+  watching = true;
+  bus.on(EVENT_ADDED, (eventThread: string, kind: string) => {
+    if (kind !== ANSWER_EVENT) return;
+    for (const [id, threadId] of [...released]) if (threadId === eventThread || transcriptOf(threadId) === eventThread) sendReleased(threadId, id);
+  });
+}
+
 /** A tool call still waits on the question: its thread's turn runs here and the call polled lately. */
 const waitedOn = (threadId: string, id: string) => !!lives.get(threadId)?.turn && Date.now() - (polled.get(id) ?? 0) < WAITER_FRESH_MS;
 
@@ -140,8 +196,9 @@ export type Answered = { state: QuestionState; via: AnswerPayload['via'] } | { c
  * returns them; when no call waits any more (a restart, Stop, the harness's own timeout) they reach the thread as a
  * message instead, saved before it is woken, once. A thread whose turn runs on another machine has its call there,
  * however it got there (sent there, delegated, a reply or Take over there): the answer event syncs to it and that call
- * returns. Between turns, the answer goes as a forwarded message to a machine that keeps the thread (remoteHolder), and
- * otherwise runs the thread here, as Ben's reply would.
+ * returns, or, when that call released the question, the answer goes on there as a message (sendReleased). Between
+ * turns, the answer goes as a forwarded message to a machine that keeps the thread (remoteHolder), and otherwise runs
+ * the thread here, as Ben's reply would.
  */
 export async function answerQuestion(cardThread: string, id: string, raw: unknown): Promise<Answered> {
   const q = find(cardThread, id);
@@ -155,9 +212,7 @@ export async function answerQuestion(cardThread: string, id: string, raw: unknow
   const via = waitedOn(threadId, id) || runningElsewhere(thread) ? 'tool' : 'message';
   const answers = parsed.value;
   const state = stateOf(answers) as AnswerPayload['state'];
-  // An approval whose call ended before the answer (a restart): the call was refused then, so the message says what
-  // the user decided and that the call may be made again.
-  const asMessage = q.approval ? approvalResultText(q.approval, answers) : resultText(q.questions, state, answers);
+  const asMessage = answerMessage(q, state, answers);
   if (via === 'message' && holder) {
     await runnerPorts().routing.forwardMessage(thread, asMessage, { mode: 'steer', from: 'ben' });
   } else if (via === 'message') {
@@ -167,12 +222,8 @@ export async function answerQuestion(cardThread: string, id: string, raw: unknow
   // Ben's answer, in the transcript the card shows in, as his row rather than the agent's.
   addEvent(transcriptOf(threadId), ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload);
   polled.delete(id);
-  if (via === 'message' && !holder) {
-    // Ben's reply, delivered as one (run-on.ts does the same with a forwarded one): it runs the thread here even when
-    // another machine ran it last, which a wake of Omni's own never does.
-    const row = saveOwn(threadId, `question:${id}`, { prompt: asMessage, kind: 'user', source: 'ben', payload: null });
-    if (row) void wakePrepared(row).catch((err) => console.error(`[questions] ${id}:`, (err as Error).message));
-  }
+  // It runs the thread here even when another machine ran it last, which a wake of Omni's own never does.
+  if (via === 'message' && !holder) sendAnswer(threadId, id, asMessage);
   settled(threadId);
   return { state, via };
 }

@@ -152,6 +152,18 @@ describe('answering', () => {
     });
   });
 
+  it('sends the answers as a message once the call releases the question, even while its turn still runs (Cursor)', T, async () => {
+    const id = await busy();
+    const qid = await ask(id, [Q4]);
+    await poll(id, qid);
+    // Cursor ends any MCP call after a minute, so its ask call releases the question before then and the turn ends.
+    expect(await ok('GET', `/threads/${id}/questions/${qid}?wait=0&release=1`)).toEqual({ state: 'pending', text: 'The user has not answered yet.' });
+    expect((await answer(id, qid, [{ selected: ['Acne POC'], other: null }])).body).toEqual({ state: 'answered', via: 'message' });
+    // The thread reads it as Ben's message: this harness takes it into the running turn, Cursor as the next one.
+    await h.until('the answer as a message', () => h.texts(id, 'user').at(-1)?.includes('"Which Q4 goal should get the most of your time?"="Acne POC"'));
+    await h.untilResults(id, 1);
+  });
+
   it('sends the answers as a message when no call waits for them, and the thread runs on them', T, async () => {
     const id = await idle();
     const qid = await ask(id, [Q4]);

@@ -356,6 +356,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           // Spelled out because a harness that defers MCP tools (Claude Code) has the model call it before it has
           // seen the schema, and it guessed step objects or left out current.
           'set_steps takes `steps`, the list as plain strings, and `current`, the index (from 0) of the step you are on: `{"steps": ["Find candidate apps", "Compare prices"], "current": 0}`. Pass the number of steps as `current` once all are done.',
+          // A Cursor model sent its progress sentences to its own thread with `omni send`, which queued them as turns.
+          `Text you write between tool calls shows in the thread as you work, so a progress update is plain text in your reply. Never post one to this thread with \`omni send\` or another tool.`,
         ]),
   ];
   if (thread.source === 'team') {

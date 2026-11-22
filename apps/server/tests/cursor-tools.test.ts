@@ -3,7 +3,7 @@ import { lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
-import { FAKE_CURSOR } from './support.ts';
+import { FAKE_CURSOR, hasMcpBuild } from './support.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
 const cursor = { harness: 'cursor', model: 'gpt-5.6-sol', effort: 'high' };
@@ -35,6 +35,10 @@ describe('cursor tools, secrets, attachments and crew reports', () => {
     expect(Object.keys(mcp.mcpServers)).toContain('omni');
     // The conductor is delegate-only: browser work goes to a crewmate, so it gets no browser.
     expect(Object.keys(mcp.mcpServers)).not.toContain('omni-browser');
+    // Cursor ends any MCP call after a minute, so its ask_user_question waits less and then hands the question back.
+    if (hasMcpBuild) expect(mcp.mcpServers['omni-ask'].env).toMatchObject({ OMNI_ASK_WAIT_SEC: '45' });
+    // Cursor names each server after this folder (`plugin-cursor-plugin-omni-steps`), and the normalizer reads it back.
+    expect(dir.endsWith('/cursor-plugin')).toBe(true);
     const plugin = JSON.parse(readFileSync(join(dir, '.cursor-plugin', 'plugin.json'), 'utf8'));
     expect(plugin.name).toBe('omni-os');
     const raw = readFileSync(join(dir, '.mcp.json'), 'utf8') + readFileSync(join(dir, '.cursor-plugin', 'plugin.json'), 'utf8');
