@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
+import { ActivityUsage } from '../components/activity/ActivityUsage';
 import { DoneRowView, InboxRowView, ShelfHeader, ShowMore, type RowAction, type RowTree } from '../components/activity/InboxRows';
 import { StatusLine } from '../components/StatusLine';
 import { activityInbox, DONE_INITIAL, DONE_PAGE, type ActivityInbox, type InboxRow } from '../live/activity-model';
@@ -33,6 +34,7 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
   const { activeServer, statusById, notice, clearNotice } = usePairing();
   const incompatible = activeServer !== null && statusById[activeServer.id] === 'incompatible';
   const now = useMinuteClock();
+  const [usageOpen, setUsageOpen] = useState(false);
   const [workingOpen, toggleWorking] = useShelfOpen('working');
   const [doneOpen, toggleDone] = useShelfOpen('done');
   const [doneLimit, setDoneLimit] = useState(DONE_INITIAL);
@@ -100,6 +102,7 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
         )}
         {incompatible && <Callout message="This server speaks an API this app doesn't support. Update the app or the server." />}
         <StatusLine />
+        <ActivityUsage open={usageOpen} onToggle={() => setUsageOpen((open) => !open)} />
         {activity.recent && activity.error ? <Text style={[styles.note, { color: colors.fg3 }]}>Last refresh failed. Pull down to try again.</Text> : null}
       </View>
 

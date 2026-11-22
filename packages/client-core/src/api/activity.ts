@@ -1,30 +1,11 @@
+import type { MonthlyPlanUsage, PlanUsage, PlanWindow } from '@omni/shared/account-usage.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { HarnessId } from './harnesses.ts';
 import type { Thread, ThreadStub } from './threads.ts';
 
-/** A plan usage window. `utilization` is a 0 to 1 fraction from some harnesses and a 0 to 100 percent from others. */
-export interface UsageWindow {
-  utilization: number;
-  resetsAt: number;
-}
-
-/** A monthly billing cycle (Cursor's). Fractions are 0 to 1, money in cents. */
-export interface MonthlyUsage extends UsageWindow {
-  startsAt?: number;
-  auto?: number;
-  api?: number;
-  spendCents?: number;
-  includedCents?: number;
-  bonusCents?: number;
-}
-
-export interface Usage {
-  five_hour?: UsageWindow;
-  seven_day?: UsageWindow;
-  monthly?: MonthlyUsage;
-  status?: string;
-  updated_at?: string;
-}
+export type UsageWindow = PlanWindow;
+export type MonthlyUsage = MonthlyPlanUsage;
+export type Usage = PlanUsage;
 
 export type HarnessUsage = Partial<Record<HarnessId, Usage | null>>;
 
@@ -34,6 +15,7 @@ export type PinnedThread = ThreadStub & { pinned_at: string | null };
 /** The part of GET /status the phone reads: plan usage for Activity, and the machine the server runs on for the machine picker. */
 export interface ServerStatus {
   usage: HarnessUsage;
+  slots?: Partial<Record<HarnessId, { running: number; cap: number }>>;
   /** The machine the server runs on, under its own name. `here`: the client reaches it directly, not through another device. Older servers leave it out. */
   device?: { name: string; here: boolean };
   /** The largest file the server accepts, in megabytes. Older servers leave it out. */

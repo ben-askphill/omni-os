@@ -18,7 +18,7 @@ vi.mock('../src/store.tsx', () => ({
   useApp: () => ({ usage: state.usage, status: null, feedLive: true }),
   useFeed: () => {},
   useNow: () => NOW,
-  readPref: (key: string, fallback: unknown) => (key === 'usage.open' ? true : fallback),
+  readPref: (key: string, fallback: unknown) => (key === 'usage.open' || key === 'usage.phone.open' ? true : fallback),
   writePref: () => {},
 }));
 vi.mock('../src/accounts.ts', () => ({ useAccounts: () => ({ data: state.accounts }) }));
@@ -131,5 +131,24 @@ describe('dashboard plan pill reset times', () => {
     expect(markup).toContain('data-testid="plan-pill"');
     expect(markup).not.toContain('data-testid="usage-reset"');
     expect(markup).toContain('title="Claude plan: 18% of this week used."');
+  });
+});
+
+describe('Phone Usage card', () => {
+  it('shows account identity, window labels and local reset times in the open card', () => {
+    state.accounts = view(
+      [signedIn('claude-code', 'qa-one@example.com'), signedIn('claude-code', 'qa-two@example.com'), signedIn('cursor', 'qa-cursor@example.com')],
+      [
+        reading('claude-code', 'qa-one@example.com', { five_hour: { utilization: 0.3, resetsAt: at(13) }, seven_day: { utilization: 42, resetsAt: 0 } }),
+        reading('cursor', 'qa-cursor@example.com', { monthly: { utilization: 0.65, resetsAt: at(9, 0, 26), api: 0.5, includedCents: 2000 } }),
+      ],
+    );
+    const markup = html(createElement(UsageCard, { phone: true }));
+    for (const text of [
+      'qa-one@example.com · Max, on omarchy', '5-hour window', '30% used', 'Resets in 1h, today 13:00.',
+      'Weekly window', '42% used', 'No reading for qa-two@example.com yet.', 'qa-cursor@example.com',
+      'Monthly cycle', '65% used', 'API 50% · $20.00 included', 'No data',
+    ]) expect(markup).toContain(text);
+    expect(markup).not.toContain('data-testid="usage-reset"');
   });
 });

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { accountUsageKey, usageRows, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
+import { accountTitle, accountUsageKey, HARNESS_ROWS, peakUsage, planWindows, slotSummary, usageRows, waitingTitle, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
 import { type MonthlyUsage, type UsageWindow } from '../../api.ts';
 import { useAccounts } from '../../accounts.ts';
 import { resetAt, resetAtShort, resetIn, resetSentence } from '@omni/shared/usage-reset.ts';
 import { monthlyTitle, windowPct } from '../../format.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../../store.tsx';
-import { HARNESS_ROWS, HarnessLogo, SLOT_ROWS } from '../brand.tsx';
+import { HarnessLogo } from '../brand.tsx';
 import { Icon, Ticks } from '../ui.tsx';
 
 const HARNESS_IDS = HARNESS_ROWS.map((r) => r.id);
@@ -78,22 +78,6 @@ function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
   );
 }
 
-/** Who a row's account is, in full: "ben@askphill.com · Max · Acme, on omarchy and Ben's MacBook Air". */
-function accountTitle(a: NonNullable<UsageRow['account']>): string {
-  const machines = a.machines.length ? `, on ${a.machines.join(' and ')}` : '';
-  return `${[a.label, a.plan, a.org && !a.org.toLowerCase().includes(a.label.toLowerCase()) ? a.org : null].filter(Boolean).join(' · ')}${machines}`;
-}
-
-/** Why an account row has no numbers yet, and what fills it in. */
-function waitingTitle(harness: string, name: string, a: NonNullable<UsageRow['account']>): string {
-  const on = a.machines.length ? ` on ${a.machines.join(' or ')}` : '';
-  const when =
-    harness === 'claude-code'
-      ? 'after the next Claude Code turn signed in as this account'
-      : `the next time ${name} reads this account's limits (at startup, every 15 minutes, or during a run)`;
-  return `No reading for ${a.label} yet. It fills in ${when}${on}.`;
-}
-
 /**
  * One account's row: the 5-hour and weekly windows, a monthly cycle (Cursor), "no reading yet" when that account has
  * none of its own yet, or "no data" when its reading went stale. A harness with several accounts names each under its
@@ -157,25 +141,21 @@ export function useUsageRows(): UsageRow[] {
 }
 
 /** Plan usage per harness. Collapsed by default to one row with the live dot and the busiest window; click to open. */
-export function UsageCard() {
+export function UsageCard({ phone = false }: { phone?: boolean }) {
   const { status, feedLive } = useApp();
   const rows = useUsageRows();
-  const [open, setOpen] = useState(() => readPref('usage.open', false));
-  const toggle = () => setOpen((o) => { writePref('usage.open', !o); return !o; });
-  const slots = status?.slots ?? {};
-  const footer = SLOT_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
-  const peak = rows.reduce<number | null>((max, r) => {
-    const u = r.usage;
-    for (const p of [windowPct(u?.five_hour), windowPct(u?.seven_day), windowPct(u?.monthly)]) if (p !== null && (max === null || p > max)) max = p;
-    return max;
-  }, null);
+  const pref = phone ? 'usage.phone.open' : 'usage.open';
+  const [open, setOpen] = useState(() => readPref(pref, false));
+  const toggle = () => setOpen((o) => { writePref(pref, !o); return !o; });
+  const footer = slotSummary(status?.slots);
+  const peak = peakUsage(rows);
   return (
     <div className="rounded-[20px] bg-bg/70 shadow-[var(--shadow-card)]">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 rounded-[20px] px-3 py-2.5 text-[11px] text-fg-3 hover:text-fg"
+        className={`flex w-full items-center gap-2 rounded-[20px] px-3 py-2.5 text-fg-3 hover:text-fg ${phone ? 'min-h-11 text-[14px]' : 'text-[11px]'}`}
       >
         <span className="relative inline-block h-1.5 w-1.5 shrink-0" title={feedLive ? 'Live' : 'Reconnecting'}>
           {feedLive && <span className="ping absolute inset-0 rounded-full bg-done" />}
@@ -194,14 +174,18 @@ export function UsageCard() {
       </button>
       {open && (
         <div className="space-y-2 px-3 pb-3">
-          <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-3">
-            <span className="w-[66px] shrink-0" />
-            <span className="flex-1">5h</span>
-            <span className="flex-1">Week</span>
-          </div>
-          {rows.map((r) => (
-            <UsageRowView key={r.key} row={r} />
-          ))}
+          {phone ? (
+            <PhoneUsageRows rows={rows} />
+          ) : (
+            <>
+              <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-3">
+                <span className="w-[66px] shrink-0" />
+                <span className="flex-1">5h</span>
+                <span className="flex-1">Week</span>
+              </div>
+              {rows.map((r) => <UsageRowView key={r.key} row={r} />)}
+            </>
+          )}
           <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11px] text-fg-3">
             {footer ? (
               <span className="font-num tabular-nums">{footer}</span>
@@ -212,5 +196,45 @@ export function UsageCard() {
         </div>
       )}
     </div>
+  );
+}
+
+/** At phone width each account gets the full line, with labels and reset details visible without hover. */
+function PhoneUsageRows({ rows }: { rows: UsageRow[] }) {
+  const now = useNow(60_000);
+  if (!rows.length) return <p className="text-[13px] text-fg-3">No usage data.</p>;
+  return (
+    <ul role="list" className="divide-y divide-line">
+      {rows.map((row) => {
+        const name = NAMES[row.harness] ?? row.harness;
+        const meterName = row.account ? `${name} (${row.account.label})` : name;
+        const windows = planWindows(row.usage);
+        return (
+          <li key={row.key} className="space-y-2 py-2.5">
+            <div>
+              <div className="flex items-center gap-2 text-[14px] font-medium"><HarnessLogo harness={row.harness} />{name}</div>
+              {row.account && <p className="mt-1 text-[13px] text-fg-2 [overflow-wrap:anywhere]">{accountTitle(row.account)}</p>}
+            </div>
+            {windows.map(({ label, fraction, resetsAt, detail }) => {
+              const reset = resetSentence(resetsAt, now);
+              return (
+                <div key={label}>
+                  <div className="flex flex-wrap justify-between gap-x-2 text-[13px]">
+                    <span>{label}</span>
+                    <span className="font-num tabular-nums">{Math.round(fraction * 100)}% used</span>
+                  </div>
+                  <Ticks responsive value={fraction} tone={fraction >= 0.9 ? 'needs' : undefined} label={`${meterName} ${label} usage`} className="my-1" />
+                  {detail && <p className="text-[13px] text-fg-3">{detail}</p>}
+                  {reset && <p className="text-[13px] text-fg-3">{reset}</p>}
+                </div>
+              );
+            })}
+            {!windows.length && <p className="text-[13px] text-fg-3 [overflow-wrap:anywhere]">
+              {row.waiting && row.account ? waitingTitle(row.harness, name, row.account) : 'No data'}
+            </p>}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
