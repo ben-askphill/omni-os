@@ -1,4 +1,4 @@
-import { parseChannelIcon } from './channel-icon.ts';
+import { parseChannelIcon, sameIcon } from './channel-icon.ts';
 
 /** Opaque sRGB colors only, so stored values work on web and native clients. */
 export function hexColor(value: string): string | null {
@@ -127,7 +127,7 @@ export interface AvatarColorState { icon?: string | null; avatar_bg?: string | n
 export function resolveAvatarColor(patch: AvatarColorState, current?: AvatarColorState): AvatarColorState {
   const icon = patch.icon === undefined ? current?.icon : patch.icon;
   const manual = patch.avatar_bg_manual ?? (patch.avatar_bg != null ? 1 : current?.avatar_bg_manual ?? 0);
-  const iconChanged = icon !== current?.icon;
+  const iconChanged = !sameIcon(icon, current?.icon);
   if (patch.avatar_bg_manual === 0 || (!manual && iconChanged)) {
     const reset = patch.avatar_bg_manual === 0 && patch.avatar_bg === undefined;
     const regenerate = iconChanged || !!current?.avatar_bg_manual || reset;
