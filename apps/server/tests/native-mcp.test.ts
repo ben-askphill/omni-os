@@ -33,7 +33,7 @@ const script = (name: string, body: string, mode = 0o755) => {
 };
 const GOOD = script('good', 'echo "omni-mcp 9.9.9"');
 const channel = { id: 'c', name: 'C', browser_headless: 1 } as Channel;
-const conductor: CrewRole = { id: 'r', name: 'R', description: '', mcp: ['omni'], tools: 'full', delegateOnly: false, delegatable: true, review: false, memory: 'read-write', memoryWrites: 'review', kind: 'own', hidden: false, charter: 'x' };
+const conductor: CrewRole = { id: 'r', name: 'R', description: '', mcp: ['omni'], tools: 'full', delegateOnly: false, delegatable: true, review: false, memory: 'read-write', memoryWrites: 'review', skills: [], kind: 'own', hidden: false, charter: 'x' };
 const URL = 'http://127.0.0.1:4747';
 const servers = (role?: CrewRole) => buildMcpConfig({ threadId: 't', channel, role, browserBusy: false, omniUrl: URL }).mcpServers;
 

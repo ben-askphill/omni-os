@@ -233,6 +233,8 @@ export interface CrewRole {
   memoryWrites?: 'review' | 'auto';
   /** How many lessons its threads proposed wait for the user, when any do. */
   memoryWaiting?: number;
+  /** The skills its threads load when they start (GET /api/skills names them). A server from before skills sends none. */
+  skills?: string[];
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';

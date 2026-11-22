@@ -409,7 +409,11 @@
         "emoji",
         "icon",
         "svg",
-        "agent color"
+        "agent color",
+        "skill",
+        "agent skills",
+        "load skills",
+        "default skills"
       ]
     },
     {

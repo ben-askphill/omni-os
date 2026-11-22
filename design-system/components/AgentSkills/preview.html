@@ -1,0 +1,49 @@
+<!-- @dsCard group="13 Panels" name="AgentSkills — an agent's Skills group" subtitle="Search, ticked skills first, where each comes from and which harnesses have it; light and dark" width=1120 height=560 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+body{margin:0;padding:20px 24px;background:var(--canvas);color:var(--fg);font:var(--type-body)}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pane{min-width:0;padding:14px 16px;border-radius:var(--r-2xl);background:var(--bg);color:var(--fg);box-shadow:0 0 0 1px var(--line)}
+.pane h3{margin:2px 0 10px;font:500 12px/1.2 var(--font-sans);color:var(--fg-3)}
+.card{display:grid;gap:12px;padding:18px;border-radius:20px;background:var(--surface)}
+.title{margin:0;font:500 15px/1.3 var(--font-display,var(--font-sans))}.sub{margin:2px 0 0;font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.search{display:flex;align-items:center;gap:10px;height:40px;flex:1 1 220px;max-width:360px;padding:0 14px;border-radius:999px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);font:400 14px/1 var(--font-sans);color:var(--fg-3)}
+.count{font:400 12.5px/1 var(--font-sans);color:var(--fg-3)}
+ul{margin:0;padding:0;list-style:none}
+li{display:flex;gap:12px;align-items:flex-start;padding:10px 0}
+li+li{border-top:1px solid var(--line)}
+.box{display:grid;place-items:center;flex:none;width:18px;height:18px;margin-top:1px;border-radius:5px;box-shadow:inset 0 0 0 1.5px var(--line-strong)}
+.box.on{background:var(--fg);box-shadow:none;color:var(--on-ink)}
+.box svg{width:12px;height:12px}
+.name{font:400 12.5px/1.3 var(--font-mono);color:var(--fg)}
+.meta{margin-left:8px;font:400 12px/1.3 var(--font-sans);color:var(--fg-3)}
+.about{margin:2px 0 0;font:400 12.5px/18px var(--font-sans);color:var(--fg-3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gone{display:inline-flex;align-items:center;gap:6px;color:var(--fg-2)}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--needs)}
+.foot{margin:0;font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+</style>
+</head><body>
+<template id="card">
+  <div class="card">
+    <div><p class="title">Skills</p><p class="sub">Loaded at the start of every thread Builder runs, so a brief or charter need not name them.</p></div>
+    <div class="bar"><span class="search">Search skills</span><span class="count">3 ticked of 312</span></div>
+    <ul>
+      <li><span class="box on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><span class="name">tdd</span><span class="meta">Personal</span><p class="about">Test-driven development with red-green-refactor loop.</p></span></li>
+      <li><span class="box on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><span class="name">superpowers:brainstorming</span><span class="meta">Plugin superpowers · Claude Code only</span><p class="about">Use before any creative work: features, components, new behaviour.</p></span></li>
+      <li><span class="box on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><span class="name">old-deploy</span><p class="about"><span class="gone"><span class="dot"></span>Not on this machine, so its threads skip it. Untick it, or install it here.</span></p></span></li>
+      <li><span class="box"></span><span><span class="name">pr-writer</span><span class="meta">Personal</span><p class="about">Use when creating, opening or editing a pull request in any repo.</p></span></li>
+    </ul>
+    <p class="foot">From Claude Code, Codex and Cursor Agent on this machine. Hermes, Cursor Cloud and remote agents run elsewhere and load none. A project skill loads only in a repo that has it.</p>
+  </div>
+</template>
+<div class="pair">
+  <div class="pane" data-theme="light"><h3>Light</h3><div class="slot"></div></div>
+  <div class="pane" data-theme="dark"><h3>Dark</h3><div class="slot"></div></div>
+</div>
+<script>
+for (const slot of document.querySelectorAll('.slot')) slot.appendChild(document.getElementById('card').content.cloneNode(true));
+</script>
+</body></html>
