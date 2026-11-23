@@ -29,7 +29,7 @@ export function OutboxRow({ live, threadId }: { live: ThreadLive; threadId: stri
   if (item.phase === 'sending') {
     const uploading = item.files.length > 0;
     return (
-      <UserBubble text={text} caption={uploading ? uploadCaption(progress) : 'Sending…'} busy>
+      <UserBubble text={text} records={item.context} caption={uploading ? uploadCaption(progress) : 'Sending…'} busy>
         {uploading ? (
           <>
             <AttachmentChips files={item.files} />
@@ -48,7 +48,7 @@ export function OutboxRow({ live, threadId }: { live: ThreadLive; threadId: stri
   };
 
   return (
-    <UserBubble text={text} caption={item.failure.message} dimmed>
+    <UserBubble text={text} records={item.context} caption={item.failure.message} dimmed>
       <AttachmentChips files={item.files} dimmed />
       <View style={styles.actions}>
         {item.failure.kind === 'signed-out' ? null : (

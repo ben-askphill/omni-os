@@ -19,6 +19,7 @@ import { mentionSections, menuSections, SOURCE_TAG, type MenuSection } from '@om
 import { menuCommands } from '@omni/shared/composer-slash.ts';
 import { machineMention, mentionBody, mentionsMachine } from '@omni/shared/message-context-machine.ts';
 import { newContext, type MessageContext } from '@omni/shared/message-context.ts';
+import { MENTION_PILL } from '@omni/shared/mention-pill.ts';
 import type { SlashCommand } from '@omni/shared/slash.ts';
 import { api, type CommandList } from '../../api.ts';
 import { useTechnical } from '../../display.ts';
@@ -303,7 +304,7 @@ function MachineChip({ token }: { token: Token }) {
   const title = reach === 'online' || reach === 'offline' || reach === 'unknown' ? `${token.label}: ${reachLine(reach, typeof seen === 'string' ? seen : null)}` : token.label;
   return (
     <TokenInputToken className="mention-pill" title={title}>
-      <Icon name="monitor" size={12} strokeWidth={2} className="mention-icon" />
+      <Icon name="monitor" size={12} strokeWidth={MENTION_PILL.iconStroke} className="mention-icon" />
       {token.label}
     </TokenInputToken>
   );
@@ -314,7 +315,7 @@ function AgentChip({ token }: { token: Token }) {
   const agent = useAgent(token.value) ?? { id: token.value, name: token.label };
   return (
     <TokenInputToken className="mention-pill mention-pill-agent" title={`${token.label}: the message goes to this agent`} style={agentPillStyle(agent)}>
-      <AgentAvatar agent={agent} size={16} />
+      <AgentAvatar agent={agent} size={MENTION_PILL.avatar} />
       {token.label}
     </TokenInputToken>
   );

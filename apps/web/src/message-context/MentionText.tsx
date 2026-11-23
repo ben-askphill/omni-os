@@ -4,6 +4,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { mentionPieces, type MentionSpan } from '@omni/shared/message-context-machine.ts';
 import { readContexts } from '@omni/shared/message-context-kinds.ts';
+import { MENTION_PILL, mentionPillName } from '@omni/shared/mention-pill.ts';
 import { Icon } from '../components/ui.tsx';
 import { ContextInspector } from './ContextChips.tsx';
 import { reachLine } from './machine-mention.tsx';
@@ -19,7 +20,7 @@ function SentPill({ name, span, open, onToggle }: { name: string; span: MentionS
   const m = span.mention;
   return (
     <button type="button" onClick={onToggle} aria-expanded={open} title={`${m.name}: ${reachLine(m.reachability, m.last_seen)} when sent`} className="mention-pill mention-pill-sent">
-      <Icon name="monitor" size={12} strokeWidth={2} className="mention-icon" />
+      <Icon name="monitor" size={12} strokeWidth={MENTION_PILL.iconStroke} className="mention-icon" />
       {name}
     </button>
   );
@@ -29,7 +30,7 @@ function AgentPill({ name, agentId, open, onToggle }: { name: string; agentId: s
   const agent = useAgent(agentId) ?? { id: agentId, name };
   return (
     <button type="button" onClick={onToggle} aria-expanded={open} title={`Sent to ${name}`} className="mention-pill mention-pill-agent mention-pill-sent" style={agentPillStyle(agent)}>
-      <AgentAvatar agent={agent} size={16} />
+      <AgentAvatar agent={agent} size={MENTION_PILL.avatar} />
       {name}
     </button>
   );
@@ -44,7 +45,7 @@ export function MentionText({ text, records }: { text: string; records: unknown 
     <>
       {pieces.map((p, i) =>
         p.span ? (
-          <SentPill key={i} name={p.text.slice(1)} span={p.span} open={open === p.span.id} onToggle={() => setOpen((o) => (o === p.span!.id ? null : p.span!.id))} />
+          <SentPill key={i} name={mentionPillName(p.text)} span={p.span} open={open === p.span.id} onToggle={() => setOpen((o) => (o === p.span!.id ? null : p.span!.id))} />
         ) : (
           <Fragment key={i}>{p.text}</Fragment>
         ),

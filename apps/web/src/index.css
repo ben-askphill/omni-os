@@ -1343,7 +1343,9 @@
      which lifted the name and made the line taller. The icon or avatar stays centered in the pill.
      The pill is 1.2em tall, shorter than any line it sits in (1.35 or more), so pills on lines next to each other keep
      a gap and the line keeps its height. A pill as tall as the line touched the one above it. The margin keeps a
-     sliver of gap at a line height under 1.3, where it makes that line a little taller instead. */
+     sliver of gap at a line height under 1.3, where it makes that line a little taller instead.
+     The gap, inset, corners and tints are MENTION_PILL's (packages/shared/mention-pill.ts), which the iOS pill draws
+     from; tests/mention-pill-css.test.ts holds them. */
   .mention-pill {
     display: inline-flex;
     align-items: baseline;

@@ -14,11 +14,9 @@ import { fontSize, minTarget, mono, radius, space, useOmniTheme, weight } from '
 import { HarnessLogo } from '../../../ui/Brand';
 import { Icon } from '../../../ui/Icon';
 import { Text } from '../../../ui/Text';
-import { AGENT_PILL_TINT } from '@omni/shared/avatar-color.ts';
-import { mentionPieces } from '@omni/shared/message-context-machine.ts';
 import type { Collision } from '@omni/shared/collisions.ts';
 import { eyesFor } from '@omni/shared/crew-eyes.ts';
-import { agentColor, agentName } from '../../agent-face';
+import { agentName } from '../../agent-face';
 import { AgentAvatar } from '../../AgentAvatar';
 import { ChannelAvatar } from '../../ChannelAvatar';
 import { useRowActions } from './actions';
@@ -28,9 +26,6 @@ type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
 /** The avatar's gutter and its gap: how far a reply's rows sit in from the author line (web: REPLY_INDENT). */
 export const AVATAR = 24;
 export const REPLY_INSET = AVATAR + space.s6;
-
-/** A #rrggbb color at `alpha` over whatever sits under it, as the web's color-mix with transparent draws it. */
-const tint = (hex: string, alpha: number) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')}, ${alpha})`;
 
 const list = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
@@ -219,34 +214,9 @@ export function SentTo({ agents: to }: { agents: readonly { agent: string; name:
   );
 }
 
-/** A message's text with each agent or machine it mentions as a pill: an agent's in its own color, a machine's in the live blue. */
-export function MentionText({ text, records, style }: { text: string; records: unknown; style: object }) {
-  const { colors, scheme } = useOmniTheme();
-  const agents = useAgents();
-  const pieces = mentionPieces(text, records);
-  return (
-    <Text selectable style={style}>
-      {pieces.map((piece, i) => {
-        const span = piece.span;
-        if (!span) return piece.text;
-        // An agent's pill tints its color as the Web UI's does (AGENT_PILL_TINT), so the name in the text color reads at
-        // 4.5:1 on every agent color in both themes; a machine's takes the live blue.
-        const agent = span.kind === 'agent';
-        const bg = agent ? tint(agentColor(span.agent.agent, agents), AGENT_PILL_TINT[scheme]) : colors.live;
-        return (
-          <Text key={i} style={[styles.pill, { backgroundColor: bg, color: agent ? colors.fg : colors.onInk }]}>
-            {piece.text}
-          </Text>
-        );
-      })}
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
   sentTo: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s3 },
   sentAgent: { flexDirection: 'row', alignItems: 'center', gap: space.s2, maxWidth: 160 },
-  pill: { fontWeight: weight.semibold, borderRadius: radius.xs },
   author: { flexDirection: 'row', alignItems: 'center', gap: space.s6, minHeight: AVATAR },
   name: { flexShrink: 0, fontSize: 13.5, fontWeight: weight.semibold },
   run: { flexDirection: 'row', alignItems: 'center', gap: space.s2, flexShrink: 1 },
