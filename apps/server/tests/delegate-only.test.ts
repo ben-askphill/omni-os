@@ -38,8 +38,9 @@ describe('a delegate-only role', () => {
     const thread = r.thread(t.id);
     const channel = r.db.channels.get('scratch')!;
     const conductor = buildSystemPrompt(thread, channel, getCrew('conductor'));
-    expect(conductor).toContain('Answer quick asks yourself, in this thread, and start no thread for them');
-    expect(conductor).toContain('no brief, no folder question');
+    // From its charter, the only place its rules are written (crew/conductor.md).
+    expect(conductor).toContain('Answer quick asks yourself, in this thread.');
+    expect(conductor).toContain('Never interview the user to answer a plain question.');
     // A report shows in place and wakes it only with follow_up.
     expect(conductor).toContain('a report wakes you only when you passed follow_up: true');
     expect(conductor).not.toContain('however small');
@@ -60,7 +61,7 @@ describe('a delegate-only role', () => {
     expect(scan).not.toContain('## Browser');
   });
 
-  it('seats an agent first for real work, as the Conductor charter says, and delegates only for its exceptions', async () => {
+  it('seats an agent first for real work, by its charter alone, and delegates only for its exceptions', async () => {
     const t = await r.start('THINK:1');
     await r.untilResults(t.id, 1);
     const thread = r.thread(t.id);
@@ -70,15 +71,13 @@ describe('a delegate-only role', () => {
     const conductor = buildSystemPrompt(thread, channel, conductorRole);
     const delegation = section(conductor, 'Thread delegation');
 
+    // No rule of Omni's own beside the charter's, which could drift from it: the section starts with the ids.
     expect(delegation).not.toContain("Delegate with Omni's delegate tool, before anything else");
-    expect(delegation).toContain(
-      'For real work your first action is seat_agents, not delegate: when the work writes or edits files, runs commands, browses at length, changes code, a store, an inbox, a calendar or Notion, or will clearly grow past a few lookups, seat the agent for it in this thread',
-    );
-    expect(delegation).toContain(
-      `Use delegate or delegate_team directly, instead of seating, only for a review, research that a build depends on and the build after it, a team ${name} asked for, tasks on machines ${name} @mentioned, or when ${name} asks you to delegate.`,
-    );
-    // The same exceptions, in the same order, as the charter's own line.
-    expect(conductorRole.charter).toContain(
+    expect(delegation).not.toMatch(/first action|instead of seating/);
+    expect(delegation.split('\n')[1]).toMatch(/^First call list_crew and list_channels/);
+    // The charter says it once, and the prompt carries the charter.
+    expect(conductor.match(/first action is/g)).toHaveLength(1);
+    expect(conductor).toContain(
       'Use `delegate` or `delegate_team` directly, instead of seating, only for a review (below), research that a build depends on and the build after it (above), a team the user asked for, tasks on machines the user @mentioned, or when the user asks you to delegate.',
     );
     expect(conductorRole.charter).toContain('Your first action is `seat_agents`');
@@ -88,7 +87,7 @@ describe('a delegate-only role', () => {
     await r.untilResults(started.id, 1);
     const args: string[] = r.spawns(started.id)[0].args;
     const sent = args[args.indexOf('--append-system-prompt') + 1];
-    expect(sent).toContain('For real work your first action is seat_agents, not delegate');
+    expect(sent).toContain('Your first action is `seat_agents`');
     expect(sent).not.toContain("Delegate with Omni's delegate tool, before anything else");
 
     // Another delegate-only agent keeps the delegate-first rule, word for word.

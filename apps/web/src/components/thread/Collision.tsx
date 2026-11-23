@@ -14,7 +14,7 @@ const list = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? '')
 /** The agents a flag names, by their names now. */
 export function useAgentNames(ids: readonly string[]) {
   const crew = useCrewRoles();
-  return ids.map((id) => crew.find((r) => r.id === id)?.name ?? crewRoleName(id) ?? id);
+  return ids.map((id) => crewRoleName(id, crew));
 }
 
 /** Take a flag down. Resolves with the flags still up, or throws with why. */

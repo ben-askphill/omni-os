@@ -9,6 +9,7 @@ import { bus } from '../bus.ts';
 import { threadDir } from '../config.ts';
 import { events, kv, threads, type Channel, type Thread } from '../db.ts';
 import { getCrew, type CrewRole } from '../crew.ts';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
 import { channelAccess, grantKey, judge, unrestricted, type ChannelAccess } from '../access.ts';
 import { polled, settled } from './question-polls.ts';
@@ -50,7 +51,7 @@ export function roleGrants(channelId: string): { role: string; name: string; too
     .list<string[] | null>(prefix)
     .map(([k, tools]) => {
       const role = k.slice(prefix.length);
-      return { role, name: getCrew(role)?.name || role, tools: tools ?? [] };
+      return { role, name: crewRoleName(role, getCrew), tools: tools ?? [] };
     })
     .filter((g) => g.tools.length);
 }
@@ -69,7 +70,7 @@ export function gateFor(thread: Thread, channel: Channel, role: CrewRole | undef
   const access = channelAccess(channel, role?.access);
   if (unrestricted(access)) return null;
   const waiting = new Map<string, (p: Permit) => void>();
-  const roleName = role ? role.name || role.id : null;
+  const roleName = role?.name ?? null;
 
   const ask = (request: ApprovalRequest): Promise<Permit> => {
     const id = randomUUID();

@@ -1,5 +1,7 @@
 // The run a new-thread draft opens with, for every client that starts threads. The slash rules are in composer-slash.ts.
 import { AUTO, AUTO_CHOICE, asksAuto } from './thread-run.ts';
+import { CONDUCTOR_CHANNEL } from './channel-icon.ts';
+import { isConductor } from './crew-role.ts';
 
 export interface RunDefaults {
   harness?: string | null;
@@ -37,7 +39,7 @@ export const channelRun = (c: ChannelRunRow | undefined): RunDefaults | undefine
 
 /** The Conductor is attached automatically in its channel. Its charter must not hide a saved channel run. */
 export const roleRun = <R extends RoleRunRow>(role: R | undefined, channel: ChannelRunRow | undefined): R | undefined =>
-  role?.id === 'conductor' && channel?.id === 'conductor' && setsRun(channelRun(channel)) ? undefined : role;
+  isConductor(role?.id) && channel?.id === CONDUCTOR_CHANNEL && setsRun(channelRun(channel)) ? undefined : role;
 
 /** Only deliberate draft choices go in the request. The server resolves inherited defaults and retired-model fallbacks. */
 export function draftRunRequest(picked: DraftRun | null) {

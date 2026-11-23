@@ -4,6 +4,8 @@
 // the user's path. A router that is missing or fails logs its error and the other carries on. On only with
 // OMNI_SHADOW_ROUTER=1. agreement.sql next to this file scores the log.
 import { config } from '../config.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import { isConductor } from '@omni/shared/crew-role.ts';
 import { listCrew } from '../crew.ts';
 import { db, members, threads, type Thread, type ThreadStatus } from '../db.ts';
 import { now } from '../db/connection.ts';
@@ -47,7 +49,7 @@ export const liveDeps: ShadowDeps = {
 
 /** A thread whose first message the Conductor routes: a new #conductor thread the user started, not a quick ask. */
 export const routesFirstMessage = (t: Thread) =>
-  t.channel_id === 'conductor' && t.role === 'conductor' && !t.parent_id && !t.quick && (t.source === 'manual' || t.source === 'capture');
+  t.channel_id === CONDUCTOR_CHANNEL && isConductor(t.role) && !t.parent_id && !t.quick && (t.source === 'manual' || t.source === 'capture');
 
 const json = (v: unknown) => (v === undefined ? null : JSON.stringify(v));
 

@@ -16,6 +16,7 @@ import { publishFeed } from './bus.ts';
 import { channels, memories, threads } from './db.ts';
 import { secretValues } from './secrets.ts';
 import { maskSecrets } from './usage-scan/mask.ts';
+import { isConductor } from '@omni/shared/crew-role.ts';
 
 export const memoryApi = new Hono();
 
@@ -41,7 +42,7 @@ memoryApi.post('/', async (c) => {
   const caller = callerOf(c);
   const from = caller ? threads.get(caller) : undefined;
   if (caller && !from) return c.json({ error: 'unknown thread' }, 403);
-  if (from && from.role !== 'conductor' && from.channel_id !== channel.id) {
+  if (from && !isConductor(from.role) && from.channel_id !== channel.id) {
     return c.json({ error: `A thread proposes learnings for its own channel (#${from.channel_id}) only.` }, 403);
   }
   const text = maskSecrets(parsed.value, await secretValues()).text;
@@ -83,8 +84,6 @@ memoryApi.delete('/:id', (c) => {
 /** A crew role's memory: GET and POST /crew/:id/memory. Mounted beside /api/crew (app.ts). */
 export const crewMemoryApi = new Hono();
 
-const CONDUCTOR = 'conductor';
-
 crewMemoryApi.get('/crew/:id/memory', (c) => {
   const role = getCrew(c.req.param('id'));
   if (!role) return c.json({ error: 'No agent with this id.' }, 404);
@@ -121,7 +120,7 @@ crewMemoryApi.post('/crew/:id/memory', async (c) => {
     if (role.memory !== 'read-write') {
       return c.json({ error: `${role.name}'s memory is ${role.memory === 'off' ? 'off' : 'read only'}: only ${who} adds to it, in Settings > Agents.` }, 403);
     }
-    const conductor = from.role === CONDUCTOR;
+    const conductor = isConductor(from.role);
     if (!conductor && from.role !== role.id) {
       return c.json({ error: from.role ? `A thread proposes lessons for its own role (${from.role}) only.` : 'This thread runs as no agent, so it has no agent memory to add to.' }, 403);
     }

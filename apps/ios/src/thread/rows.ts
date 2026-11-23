@@ -174,7 +174,7 @@ function conductorLook(c: RowsInput['conductorChannel']): ConductorLook | null {
 }
 
 function promptRow(p: Prompt, k: number, first: boolean, input: RowsInput): ThreadRow {
-  const nameOf = (id: string) => crewRoleName(id, input.agents) ?? id;
+  const nameOf = (id: string) => crewRoleName(id, input.agents);
   const sent = sentContext(p.text ?? '', p.context);
   const lead = leadMessage(p, input.thread.role, nameOf);
   // A lead's message names its members in `to`, not as agent mentions, and they show the same way.

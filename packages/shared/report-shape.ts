@@ -3,6 +3,38 @@
 // while it worked (`notes`) folded last. Tables become stacked rows, so nothing squeezes into columns on a phone.
 // It reads the report's Markdown, so it works the same for every harness and for reports saved before notes existed.
 
+/**
+ * A crew report as the server saves it: the `crew_report` event's payload, and the request row that carries it to the
+ * parent (apps/server/runner/queue.ts reportToParent). A type, not an interface, so it passes as a JSON record.
+ */
+export type CrewReport = {
+  /** The run's final message, or what Omni wrote in its place. */
+  text: string;
+  /** What the run said before its final message, oldest first. A report saved before notes existed has none. */
+  notes?: string[];
+  task_id: string | null;
+  /** The thread that reported. */
+  thread_id: string;
+  title: string;
+  /** The agent it ran as. */
+  role: string | null;
+  channel: string;
+  status: string;
+  /** A child that ran on a remote harness: which one, by id and by name. */
+  harness?: string;
+  harness_name?: string;
+  remote?: true;
+  /** The answer to a question asked from the parent (ask.ts); `quiet` when it was asked only to be shown. */
+  ask?: true;
+  quiet?: true;
+  /** Shown on the parent's delegation card with no turn of its own (queue.ts showsInPlace). */
+  shown?: true;
+};
+
+/** A report another machine sent (apps/server/run-on.ts) or a saved row, when it has what a parent reads. */
+export const isCrewReport = (v: unknown): v is CrewReport =>
+  !!v && typeof v === 'object' && typeof (v as CrewReport).text === 'string' && typeof (v as CrewReport).thread_id === 'string';
+
 export interface ReportSection {
   /** A stable key for the section within its report, for folding state. */
   key: string;

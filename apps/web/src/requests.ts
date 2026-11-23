@@ -1,5 +1,6 @@
 // Durable sends (apps/server/db/repos/requests.ts) from the Web UI's side: what makes two sends the same message, and what a
-// restart left waiting on Ben. The request id itself is packages/shared/request-id.ts.
+// restart left waiting on Ben. The request id itself is packages/shared/request-id.ts, the parked rows' labels
+// packages/shared/parked.ts.
 import type { PendingMsg } from './api.ts';
 
 /** What makes two sends the same message: its text, mode, files and context records. A send without context keys as it always did. */
@@ -7,57 +8,12 @@ export function sendKey(prompt: string, mode: string | undefined, files: readonl
   return JSON.stringify([prompt, mode ?? '', files.map((f) => [f.name, f.size, f.lastModified ?? 0]), ...(contextIds.length ? [contextIds] : [])]);
 }
 
-/** Accepted before a restart and waiting on Ben: `recovered` never reached a harness, `uncertain` may have. */
-export const isParked = (m: PendingMsg) => m.delivery === 'recovered' || m.delivery === 'uncertain';
-
 /** A thread's parked messages, split by the decision each needs. */
 export function parkedOf(items: readonly PendingMsg[]) {
   return {
     recovered: items.filter((m) => m.delivery === 'recovered'),
     uncertain: items.filter((m) => m.delivery === 'uncertain'),
   };
-}
-
-/** Omni wrote it, not Ben: a crew report, the go a team's lead gets once its members have reported, or a PR watch's wake. */
-export const isOmnis = (m: PendingMsg) => m.kind === 'crew_report' || m.source === 'team' || m.source === 'crew' || m.source === 'pr-watch';
-
-/** "Crew report T-1 from coder": who a crew report is from. */
-export function reportName(m: PendingMsg): string {
-  let s = 'Crew report';
-  if (m.task_id) s += ` ${m.task_id}`;
-  if (m.role) s += ` from ${m.role}`;
-  return s;
-}
-
-/**
- * The line over a parked message. Null for one the runner has. A held crew report waits for Resume whether a
- * restart or Ben's Stop kept it from the agent.
- */
-export function parkedLabel(m: PendingMsg, blocked = false): string | null {
-  if (m.kind === 'crew_report') {
-    if (m.delivery === 'recovered') return `${reportName(m)}, held for Resume`;
-    if (m.delivery === 'uncertain') return `${reportName(m)}, may have reached the agent before the restart`;
-    return null;
-  }
-  if (m.source === 'pr-watch' && m.delivery === 'recovered') return 'PR watch, held for Resume';
-  if (m.delivery === 'recovered' && blocked) return 'Waiting for a session that is up to date';
-  if (m.delivery === 'recovered') return 'Held after a restart, waiting for Resume';
-  if (m.delivery === 'uncertain') return 'May have reached the agent before the restart';
-  return null;
-}
-
-/** The line over the parked list. Crew reports also wait there when Ben stopped the thread, not only after a restart. */
-export function parkedHeading(items: readonly PendingMsg[], blocked = false): string {
-  const n = items.length;
-  // The thread's session is not up to date (StaleSessionCard): what waits goes once Ben picks a way forward, whatever a restart did.
-  if (blocked) return `${n === 1 ? '1 message is' : `${n} messages are`} waiting for a session that is up to date`;
-  const reports = items.filter((m) => m.kind === 'crew_report').length;
-  // A PR watch's wake also waits for Resume when the thread cannot run here, with no restart behind it.
-  const watches = items.filter((m) => m.source === 'pr-watch').length;
-  if (!reports && watches) return `${n === 1 ? '1 message is' : `${n} messages are`} waiting for Resume`;
-  if (!reports) return `${n === 1 ? '1 message was' : `${n} messages were`} waiting when Omni restarted`;
-  if (reports === n) return `${n === 1 ? '1 crew report is' : `${n} crew reports are`} waiting for Resume`;
-  return `${n} messages and crew reports are waiting for Resume`;
 }
 
 /**

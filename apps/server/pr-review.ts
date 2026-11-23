@@ -1,3 +1,5 @@
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import { isConductor } from '@omni/shared/crew-role.ts';
 import { getCrew } from './crew.ts';
 import { threads, type Thread } from './db.ts';
 import { getPR } from './github.ts';
@@ -15,7 +17,7 @@ function reviewParent(origin: Thread): Thread {
     seen.add(id);
     const parent = threads.get(id);
     if (!parent) break;
-    if (parent.role === 'conductor' || parent.channel_id === 'conductor') return parent;
+    if (isConductor(parent.role) || parent.channel_id === CONDUCTOR_CHANNEL) return parent;
     id = parent.parent_id;
   }
   return origin;

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { accessLevelOf, accessSummary, connectorAccessOf } from '@omni/shared/access.ts';
 import { agentColor, agentFace, agentShape, type FaceAgent } from '@omni/shared/agent-avatar.ts';
 import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { CREW_SHAPE_IDS } from '@omni/shared/crew-shapes.ts';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -634,7 +635,7 @@ server.registerTool(
     thread_id = await threadId(thread_id);
     const crew = agents?.length ? await call('/crew') : [];
     const context = (agents ?? []).map((id) => {
-      const name = (crew.find((r: any) => r.id === id)?.name as string | undefined) ?? id;
+      const name = crewRoleName(id, crew);
       return { id: randomUUID().slice(0, 12), kind: 'agent_mention', v: 1, label: `@${name}`, body: { agent: id, name } };
     });
     const t = await call(`/threads/${thread_id}/messages`, {
@@ -661,7 +662,7 @@ server.registerTool(
     if (!SELF) throw new ApiError('seat_agents runs only inside a thread.', 400);
     const crew = await call('/crew');
     const context = agents.map((id) => {
-      const name = (crew.find((r: any) => r.id === id)?.name as string | undefined) ?? id;
+      const name = crewRoleName(id, crew);
       return { id: randomUUID().slice(0, 12), kind: 'agent_mention', v: 1, label: `@${name}`, body: { agent: id, name } };
     });
     const t = await call(`/threads/${SELF}/messages`, { method: 'POST', body: JSON.stringify({ prompt: message, from: 'conductor', mode: 'steer', context }) });

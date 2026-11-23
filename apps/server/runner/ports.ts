@@ -4,6 +4,7 @@
 // each port throws naming compose.ts, so a boot that skipped the root fails at once rather than running local-only.
 // The state these ports move is drawn in docs/internals/execution-state.md.
 import type { MessageContext } from '@omni/shared/message-context.ts';
+import type { CrewReport } from '@omni/shared/report-shape.ts';
 import type { Thread } from '../db.ts';
 import type { Attachment } from '../uploads.ts';
 import type { UploadRef } from '../sync/files.ts';
@@ -24,7 +25,7 @@ export interface RunnerPorts {
       prompt: string,
       opts: { mode: 'steer' | 'queue' | 'interrupt'; from: 'ben' | 'conductor'; requestId?: string; attachments?: Attachment[]; context?: MessageContext[]; ifAway?: 'ask' | 'send' },
     ): Promise<unknown>;
-    forwardReport(parentId: string, key: string, prompt: string, payload: Record<string, unknown>): void;
+    forwardReport(parentId: string, key: string, prompt: string, payload: CrewReport): void;
   };
   /** Sending a thread made here to run on another machine (handoff.ts). */
   handoff: {

@@ -14,7 +14,7 @@ import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { GoalLine } from '../components/thread/GoalLine.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
 import { historyEdges } from '@omni/shared/history.ts';
-import { crewRoleName } from '@omni/shared/crew-role.ts';
+import { crewRoleName, isConductor } from '@omni/shared/crew-role.ts';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
@@ -138,7 +138,7 @@ export function ThreadScreen() {
   const ch = channel(thread.channel_id);
   // Show technical details, or a channel with a repo: PR and change chips, branch and session in the quick card.
   const code = showsCode(display, ch);
-  const conductor = thread.channel_id === 'conductor' || thread.role === 'conductor';
+  const conductor = thread.channel_id === CONDUCTOR_CHANNEL || isConductor(thread.role);
   const crew = children.filter((c) => c.source !== 'team');
   const item = needsYou?.items.find((i) => i.thread.id === thread.id);
   const card = item && item.blockers.length ? needsCard(item, ch, harnessLabel, now) : null;

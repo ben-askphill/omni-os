@@ -272,7 +272,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const isNew = !existing;
   const isSystem = existing?.kind === 'system';
-  const isConductor = existing?.id === CONDUCTOR_CHANNEL;
+  const conductorChannel = existing?.id === CONDUCTOR_CHANNEL;
 
   const set = <K extends keyof ChannelForm>(k: K, v: ChannelForm[K]) => {
     setSaved(false);
@@ -357,11 +357,11 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="Name" htmlFor="ch-name" error={fieldError('name')}>
           <input id="ch-name" required {...check('name')} className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
         </Field>
-        <Field label="Icon" htmlFor="ch-icon" hint={`Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG (then set its size) or pick an icon. Empty uses ${isConductor ? 'the Omni mark' : 'the first letter'}.`}>
-          <IconPicker describedBy={fieldHintId('ch-icon')} avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual && !sameIcon(v, prev.icon) ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
+        <Field label="Icon" htmlFor="ch-icon" hint={`Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG (then set its size) or pick an icon. Empty uses ${conductorChannel ? 'the Omni mark' : 'the first letter'}.`}>
+          <IconPicker describedBy={fieldHintId('ch-icon')} avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={conductorChannel} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual && !sameIcon(v, prev.icon) ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
         </Field>
         <Field label="Avatar background" hint="Automatic follows the avatar. A custom color stays when you change the icon.">
-          <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={isConductor} value={f.avatar_bg} manual={!!f.avatar_bg_manual} swatches={CHANNEL_SWATCHES}
+          <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={conductorChannel} value={f.avatar_bg} manual={!!f.avatar_bg_manual} swatches={CHANNEL_SWATCHES}
             onChange={(color) => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: color, avatar_bg_manual: 1 })); }}
             onAuto={() => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: autoAvatarColor(prev.icon) ?? '', avatar_bg_manual: 0 })); }} />
         </Field>

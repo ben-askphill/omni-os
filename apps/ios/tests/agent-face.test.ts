@@ -3,7 +3,8 @@ import crewJson from '@omni/test-fixtures/wire/crew.json';
 import { agentFace as sharedFace } from '@omni/shared/agent-avatar.ts';
 import { describe, expect, it } from 'vitest';
 
-import { agentColor, agentFace, agentName } from '../src/components/agent-face';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
+import { agentColor, agentFace } from '../src/components/agent-face';
 
 // The server's recorded GET /api/crew (apps/server/tests/wire-fixtures.test.ts), as the phone reads it.
 const crew = crewJson as unknown as CrewRole[];
@@ -49,9 +50,9 @@ describe('agentFace', () => {
   });
 
   it('names an agent this machine does not list by its built-in name, else its id, and draws its default character', () => {
-    expect(agentName('fixture-agent', crew)).toBe('Fixture agent');
-    expect(agentName('builder', [])).toBe('Builder');
-    expect(agentName('gone', [])).toBe('gone');
+    expect(crewRoleName('fixture-agent', crew)).toBe('Fixture agent');
+    expect(crewRoleName('builder', [])).toBe('Builder');
+    expect(crewRoleName('gone', [])).toBe('gone');
     expect(agentFace('gone', [], 24)).toEqual(sharedFace({ id: 'gone' }, { size: 24 }));
   });
 });

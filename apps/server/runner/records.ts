@@ -279,7 +279,8 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
   const thread = threads.get(id);
   if (thread && wasTurn) {
     const status: ThreadStatus = live.hardStop ? 'stopped' : 'failed';
-    const runText = events.lastRunText(id);
+    const run = events.lastRun(id);
+    const runText = run.text;
     if (live.shutdown) addEvent(id, 'error', { text: 'Omni shut down while this turn was running.' });
     else if (!live.hardStop && !live.spawnFailed) {
       const how = code === null ? `signal ${signal}` : `code ${code}`;
@@ -293,8 +294,8 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
       last_text: runText ? runText.slice(0, 600) : thread.last_text,
     });
     // A turn cut short by Omni's own shutdown is not news to Ben; the thread simply resumes on the next start.
-    if (!live.shutdown && thread.source !== 'member') notifyEnded(id, status, events.lastRunReply(id));
-    if (thread.parent_id && !isShuttingDown()) reportToParent(id, status, events.lastRunReport(id));
+    if (!live.shutdown && thread.source !== 'member') notifyEnded(id, status, run.reply);
+    if (thread.parent_id && !isShuttingDown()) reportToParent(id, status, run.report);
   } else if (thread && live.resultSeen && !thread.has_run) {
     threads.update(id, { has_run: 1, updated_at: thread.updated_at });
   }

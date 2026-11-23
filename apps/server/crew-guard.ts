@@ -20,6 +20,7 @@
 // token from disk, which only the OS sandbox closes.
 import { benAnswered, lineage } from './automation-guard.ts';
 import { crewTexts, getCrew, parseCrewFile, type CrewRole } from './crew.ts';
+import { crewRoleName, isConductor } from '@omni/shared/crew-role.ts';
 import type { CrewSave } from './crew-store.ts';
 import { threads } from './db.ts';
 import { userName } from './profile.ts';
@@ -28,9 +29,6 @@ export type CrewWrite = 'save' | 'reset' | 'duplicate' | 'delete' | 'hide' | 'av
 
 /** The writes that stay Ben's: no tool an agent has makes them. A duplicate copies a role's powers with it. */
 const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', delete: 'deletes', hide: 'hides or shows', avatar: 'sets the avatar of' };
-
-/** The crew role whose threads may change roles, once Ben agrees. */
-const EDITOR_ROLE = 'conductor';
 
 /** Frontmatter keys that give a role its powers. Only Ben sets them. */
 const POWERS = ['mcp', 'delegate_only', 'tools', 'delegatable', 'review', 'memory', 'memory_writes'] as const;
@@ -75,12 +73,13 @@ export function crewRefusal(caller: string | null | undefined, write: CrewWrite,
   const l = lineage(caller);
   if (l.automation) return `This thread runs under the automation "${l.automation}", and threads an automation started cannot change agents. Ask ${who} to do it.`;
   if (l.scan) return 'A usage scan cannot change agents.';
-  if (thread.role !== EDITOR_ROLE) return settings;
+  // Only the Conductor's threads change agents, once Ben agrees.
+  if (!isConductor(thread.role)) return settings;
   if (save && 'markdown' in save) return `Send the fields and charter to change, not the whole file: an agent's powers are ${who}'s to set, in Settings.`;
   const powers = POWERS.filter((k) => save && 'fields' in save && save.fields?.[k] !== undefined);
   if (powers.length) return `${listed(powers)} ${who}'s to set, in Settings. Leave ${powers.length === 1 ? 'it' : 'them'} out of the save.`;
   const reset = write === 'reset' && id ? resetPowers(id) : [];
-  if (reset.length) return `Resetting ${getCrew(id)?.name ?? id} would change its ${reset.join(', ')}, which ${reset.length === 1 ? 'is' : 'are'} ${who}'s to set. Ask ${who} to reset it in Settings.`;
+  if (reset.length) return `Resetting ${crewRoleName(id, getCrew)} would change its ${reset.join(', ')}, which ${reset.length === 1 ? 'is' : 'are'} ${who}'s to set. Ask ${who} to reset it in Settings.`;
   if (!benAnswered(caller)) return `Not yet: propose the change to ${who} in this thread, and save it once they agree.`;
   return null;
 }

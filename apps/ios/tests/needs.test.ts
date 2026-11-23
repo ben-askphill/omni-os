@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runNeedsAction, type RecoveryApi } from '../src/needs/actions';
 import { shownResult, withoutResult } from '../src/needs/inbox';
 import { limitView, resetLabel } from '../src/needs/limit';
-import { parkedHeading, parkedLabel } from '../src/needs/parked';
+import { parkedHeading, parkedLabel } from '@omni/shared/parked.ts';
 import { liveMessages, threadCards } from '../src/needs/thread-cards';
 
 const NOW = new Date(2026, 10, 2, 12, 0, 0).getTime();

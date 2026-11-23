@@ -3,7 +3,7 @@
 // the lead is seated; without it the lead is the thread's own agent.
 import { useMemo } from 'react';
 import type { MentionAgent } from '@omni/shared/mention-menu.ts';
-import { crewRoleName } from '@omni/shared/crew-role.ts';
+import { crewRoleName, isConductor } from '@omni/shared/crew-role.ts';
 import type { Thread } from './api.ts';
 import { useCrewRoles } from './store.tsx';
 
@@ -19,11 +19,10 @@ export interface ThreadAgents {
 export function useThreadAgents(thread: Pick<Thread, 'role' | 'members'>): ThreadAgents {
   const crew = useCrewRoles();
   return useMemo(() => {
-    const nameOf = (id: string) => crew.find((r) => r.id === id)?.name ?? crewRoleName(id) ?? id;
-    const lead = { id: thread.role ?? '', name: thread.role ? nameOf(thread.role) : 'the agent' };
+    const lead = { id: thread.role ?? '', name: thread.role ? crewRoleName(thread.role, crew) : 'the agent' };
     const members = thread.members?.length ? thread.members.map((m) => ({ id: m.agent, name: m.name })) : thread.role ? [lead] : [];
     const seated = new Set(members.map((m) => m.id));
-    const others = crew.filter((r) => !r.hidden && r.id !== 'conductor' && !seated.has(r.id)).map((r) => ({ id: r.id, name: r.name }));
+    const others = crew.filter((r) => !r.hidden && !isConductor(r.id) && !seated.has(r.id)).map((r) => ({ id: r.id, name: r.name }));
     return { lead, members, others };
   }, [crew, thread.role, thread.members]);
 }

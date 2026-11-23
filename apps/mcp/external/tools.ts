@@ -9,6 +9,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { prList, prListInput, PR_LIST_DESCRIPTION } from '../pull-requests.ts';
+import { isConductor } from '@omni/shared/crew-role.ts';
 
 /** One /api request: `path` without the /api prefix. Resolves to the JSON body, throws with the API's error otherwise. */
 export type Call = (path: string, init?: RequestInit) => Promise<any>;
@@ -89,7 +90,7 @@ export function registerExternalTools(server: McpServer, call: Call) {
     'list_crew',
     { description: 'List the agents a thread can run as (conductor, builder, researcher and so on), with what each is for.', annotations: { readOnlyHint: true } },
     // Hidden roles are left out by the API. The Conductor stays: a client may start a thread as it. usage-scan, which only Omni starts, does not.
-    async () => text((await call('/crew')).filter((r: any) => r.delegatable || r.id === 'conductor').map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+    async () => text((await call('/crew')).filter((r: any) => r.delegatable || isConductor(r.id)).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
   );
 
   server.registerTool(

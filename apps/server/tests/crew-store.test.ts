@@ -303,6 +303,28 @@ describe('a new thread role', () => {
     expect(crewForNewThread(null, true)).toEqual({ role: null });
   });
 
+  it('holds an agent thread to delegatable agents, whatever source it posts', async () => {
+    const { mintThreadToken } = await import('../thread-tokens.ts');
+    const { db } = await import('../db.ts');
+    db.prepare(`INSERT INTO threads (id, channel_id, title, status, session_id, cwd, source, role) VALUES ('gate-caller', 'inbox', 'Caller', 'done', 'gate-caller', ?, 'manual', 'conductor')`).run(home);
+    const asThread = { authorization: `Bearer ${mintThreadToken('gate-caller').token}` };
+    const refused = 'The agent "usage-scan" cannot be delegated to. Agents: builder, reviewer.';
+    // No source, which the schema reads as manual, or a source a client sends: the caller is an agent thread either way.
+    for (const extra of [{}, { source: 'manual' }, { source: 'capture' }]) {
+      const res = await send('POST', '/threads', { channel: 'inbox', role: 'usage-scan', prompt: 'scan', ...extra }, asThread);
+      expect(res.status).toBe(409);
+      expect((await json(res)).error).toBe(refused);
+    }
+    // A call with the install token that names its thread is held the same way.
+    const named = await send('POST', '/threads', { channel: 'inbox', role: 'usage-scan', prompt: 'scan' }, { 'x-omni-thread': 'gate-caller' });
+    expect(named.status).toBe(409);
+    // A team's lead too.
+    const team = await send('POST', '/threads/team', { channel: 'inbox', role: 'usage-scan', prompt: 'scan', source: 'manual', tasks: [{ prompt: 'build', role: 'builder' }] }, asThread);
+    expect(team.status).toBe(409);
+    expect((await json(team)).error).toBe(refused);
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM threads WHERE role = 'usage-scan'`).get()).toEqual({ n: 0 });
+  });
+
   it('lists delegatable roles only to the Conductor', async () => {
     const crew = await json(await send('GET', '/crew'));
     expect(crew.filter((r: any) => r.delegatable).map((r: any) => r.id)).toEqual(['builder', 'reviewer']);

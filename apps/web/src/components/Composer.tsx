@@ -49,6 +49,8 @@ import { LivesOnNote, sendRefusal, type SendRefusal } from './thread/LivesOn.tsx
 import { TakeoverConfirm } from './thread/Takeover.tsx';
 import { TemplateChips, useTemplates } from '../templates.tsx';
 import { templateDraft, type Template } from '@omni/shared/templates.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_ROLE, isConductor } from '@omni/shared/crew-role.ts';
 
 export { AttachmentStrip, useAttachments };
 
@@ -123,7 +125,7 @@ export function NewThreadComposer({
 
   // Default the role once crew loads, if the conductor channel is selected. A preset keeps its own.
   useEffect(() => {
-    if (!preset && !role && channel === 'conductor' && crew.some((r) => r.id === 'conductor')) setRole('conductor');
+    if (!preset && !role && channel === CONDUCTOR_CHANNEL && crew.some((r) => isConductor(r.id))) setRole(CONDUCTOR_ROLE);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crew]);
 
@@ -143,8 +145,8 @@ export function NewThreadComposer({
   const onChannel = (c: string) => {
     setChannel(c);
     let r = role;
-    if (c === 'conductor' && !role && crew.some((x) => x.id === 'conductor')) r = 'conductor';
-    if (c !== 'conductor' && role === 'conductor') r = '';
+    if (c === CONDUCTOR_CHANNEL && !role && crew.some((x) => isConductor(x.id))) r = CONDUCTOR_ROLE;
+    if (c !== CONDUCTOR_CHANNEL && isConductor(role)) r = '';
     setRole(r);
     setPicked(null);
   };

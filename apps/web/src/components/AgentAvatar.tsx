@@ -14,7 +14,7 @@ import { useCrewMotion } from './use-crew-motion.ts';
 export type AgentLook = Pick<CrewRole, 'id' | 'name' | 'avatar'>;
 
 /** An agent by id among `agents`; one not listed (a deleted agent, or the list still loading) by its built-in name or id. */
-export const agentLook = (id: string, agents: readonly AgentLook[]): AgentLook => agents.find((r) => r.id === id) ?? { id, name: crewRoleName(id) ?? id };
+export const agentLook = (id: string, agents: readonly AgentLook[]): AgentLook => agents.find((r) => r.id === id) ?? { id, name: crewRoleName(id) };
 
 /** An agent by id, from the agents this machine lists (agentLook). */
 export function useAgent(id: string | null | undefined): AgentLook | null {

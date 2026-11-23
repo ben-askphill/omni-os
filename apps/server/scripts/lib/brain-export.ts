@@ -5,6 +5,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { matchChannel } from './claude-session.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import { isConductor } from '@omni/shared/crew-role.ts';
 
 /** kv key holding what was exported per thread. Synced, so the cursor follows whichever Mac owns the export. */
 export const CURSOR_KEY = 'brain_export.cursor';
@@ -540,7 +542,7 @@ export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
       continue;
     }
     // A Conductor thread that handed work out: the crew threads carry the substance, so it gets a stub.
-    const stub = (t.role === 'conductor' || t.channel_id === 'conductor') && kids.has(t.id);
+    const stub = (isConductor(t.role) || t.channel_id === CONDUCTOR_CHANNEL) && kids.has(t.id);
 
     const prev = opts.cursor.threads[t.id];
     let after = 0;

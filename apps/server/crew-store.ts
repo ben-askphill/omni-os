@@ -14,7 +14,7 @@ import { publishFeed } from './bus.ts';
 import { parseChannelIcon, SVG_MAX, SVG_PREFIX } from '@omni/shared/channel-icon.ts';
 import { CREW_SHAPE_IDS } from '@omni/shared/crew-shapes.ts';
 import { parseAvatarImage } from './agent-avatar.ts';
-import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, isCrewShape, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, SKILLS_MAX, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, frontmatterOf, getCrew, isCrewShape, listCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, SKILLS_MAX, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import { isCommandName } from '@omni/shared/slash.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { ROLE_MEMORY_MODES } from '@omni/shared/memory.ts';
@@ -177,15 +177,13 @@ function writeOwn(id: string, text: string) {
   publishFeed({ type: 'crew' });
 }
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
-
 /** The user's file as a YAML document and a body, so a save changes only the keys it names. */
 function openOwn(text: string | null): { doc: Document; body: string } {
-  const m = text?.match(FRONTMATTER);
-  const doc = m?.[1].trim() ? YAML.parseDocument(m[1]) : new Document({});
+  const parts = text === null ? null : frontmatterOf(text);
+  const doc = parts?.yaml.trim() ? YAML.parseDocument(parts.yaml) : new Document({});
   if (doc.errors.length) throw refused(`The file's frontmatter is not valid YAML: ${doc.errors[0].message}. Fix it in the markdown first.`);
   if (!isMap(doc.contents)) throw refused('The frontmatter must be a list of keys. Fix it in the markdown first.');
-  return { doc, body: m ? m[2].trim() : (text ?? '').trim() };
+  return { doc, body: (parts ? parts.body : (text ?? '')).trim() };
 }
 
 const serialize = (doc: Document, body: string) => {

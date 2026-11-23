@@ -136,9 +136,9 @@ describe('a turn ends', () => {
     r.db.events.add(id, 'assistant_text', { text: 'Let me look at the sender.' });
     r.db.events.add(id, 'tool_use', { id: 'tu1', name: 'Read', input: {} });
     r.db.events.add(id, 'assistant_text', { text: 'Fixed: alerts now show a preview.' });
-    expect(r.db.events.lastRunReply(id)).toBe('Fixed: alerts now show a preview.');
+    expect(r.db.events.lastRun(id).reply).toBe('Fixed: alerts now show a preview.');
     r.db.events.add(id, 'user', { text: 'Thanks' });
-    expect(r.db.events.lastRunReply(id)).toBe('');
+    expect(r.db.events.lastRun(id).reply).toBe('');
   });
 
   it('stays quiet for a thread Ben stopped or one that is queued', () => {

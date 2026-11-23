@@ -14,7 +14,7 @@ import { SentTo } from '../message-context/agent-mention.tsx';
 import { Attachments } from '../components/Transcript.tsx';
 import { Button, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { duration, plural } from '../format.ts';
-import { isOmnis, parkedLabel } from '../requests.ts';
+import { isOmnis, parkedLabel } from '@omni/shared/parked.ts';
 import { useApp, useNeedOf, useNow } from '../store.tsx';
 import { href } from '../router.ts';
 import { needsCard } from './activity.ts';

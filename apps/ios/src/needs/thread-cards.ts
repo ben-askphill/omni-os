@@ -2,7 +2,7 @@ import type { PendingMsg, Thread } from '@omni/client-core';
 
 import type { NeedsAction } from './actions';
 import { harnessLabel, LIMIT_LABEL, limitView } from './limit';
-import { isOmnis, isParked, parkedHeading, parkedLabel } from './parked';
+import { isOmnis, isParked, parkedHeading, parkedLabel } from '@omni/shared/parked.ts';
 import { setupWait } from '@omni/shared/setup-wait.ts';
 
 export interface CardButton {
