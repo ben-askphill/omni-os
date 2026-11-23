@@ -155,7 +155,6 @@ export function ThreadComposer({
   };
 
   const send = async () => {
-    if (omni) return runOmni();
     if (empty || slotTaken || routing.readOnly) return;
     tap();
     const text = draft;
