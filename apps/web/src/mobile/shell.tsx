@@ -2,13 +2,15 @@
 // thread's screens share.
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { type ContinueSource } from '@omni/shared/continue-flow.ts';
+import type { DraftRun } from '@omni/shared/draft-run.ts';
 import { useThreadSession } from '../pages/useThreadSession.ts';
 import { shownResult } from '../needs-you.ts';
 import { useApp } from '../store.tsx';
 import { usePageVisible } from '../visible.ts';
 import { useSeenUnlisted } from '../app/useSeenUnlisted.ts';
 
-export type ShellSheet = { name: 'new'; channel?: string; prompt?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
+/** `run`: the run a new thread starts on, from `/clear` or `/new` in a thread's composer. */
+export type ShellSheet = { name: 'new'; channel?: string; prompt?: string; run?: DraftRun } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
 
 export interface MobileShellApi {
   /** Back to the screen under this one: the previous history entry when it is the app's, else the parent route. */

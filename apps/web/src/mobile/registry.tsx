@@ -68,7 +68,7 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
 export function SheetView({ sheet }: { sheet: ShellSheet }) {
   switch (sheet.name) {
     case 'new':
-      return <NewSheet channel={sheet.channel} prompt={sheet.prompt} />;
+      return <NewSheet channel={sheet.channel} prompt={sheet.prompt} run={sheet.run} />;
     case 'search':
       return <SearchSheet />;
     case 'continue':

@@ -8,6 +8,7 @@ import { artifactsApi } from './artifacts.ts';
 import { automationsApi } from './automations.ts';
 import { changesApi } from './changes.ts';
 import { claudeArtifactsApi } from './claude-artifacts.ts';
+import { commandsApi } from './commands.ts';
 import { channelsApi } from './channels.ts';
 import { continueApi } from './continue.ts';
 import { crewApi } from './crew.ts';
@@ -34,6 +35,7 @@ export * from './artifacts.ts';
 export * from './automations.ts';
 export * from './changes.ts';
 export * from './claude-artifacts.ts';
+export * from './commands.ts';
 export * from './channels.ts';
 export * from './continue.ts';
 export * from './crew.ts';
@@ -82,6 +84,7 @@ export function createOmniApi(http: HttpClient) {
     ...pullsApi(http),
     ...tasksApi(http),
     ...templatesApi(http),
+    ...commandsApi(http),
     ...memoryApi(http),
   };
 }

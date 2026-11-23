@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { SlashCommand } from '@omni/shared/slash.ts';
 import type { CommandList, Thread } from '../src/api.ts';
-import { menuCommands, newThreadHint, replySlash } from '@omni/shared/composer-slash.ts';
-import { newThreadBody, sameSettings } from '../src/new-thread-preset.ts';
+import { menuCommands, newThreadBody, newThreadHint, replySlash } from '@omni/shared/composer-slash.ts';
+import { sameSettings } from '../src/new-thread-preset.ts';
 import { menuSections } from '@omni/shared/slash-menu.ts';
 
 // What the reply composer does with a `/`: the Omni commands it adds to every thread's menu, what

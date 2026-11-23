@@ -1,5 +1,6 @@
 import type { Artifact, ChannelAction } from '@omni/client-core';
 import type { SettingsSectionId } from '@omni/shared/settings-catalog.ts';
+import type { DraftRun } from '@omni/shared/draft-run.ts';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 /** Every tab's stack takes these routes: its own root, and the detail routes any tab can push. */
@@ -18,8 +19,11 @@ export type RootStackParamList = {
   PullRequest: { id: string };
   /** A thread's files and screenshots, and those of the threads it delegated to. Pushed from the thread menu. */
   ThreadArtifacts: { id: string };
-  /** Starts a thread. Opens on the channel it was asked from, else the Conductor. `prompt` fills the box to start, as an open item's + does. */
-  NewThread: { channel?: string; prompt?: string } | undefined;
+  /**
+   * Starts a thread. Opens on the channel it was asked from, else the Conductor. `prompt` fills the box to start, as an
+   * open item's + does. `run`: the run to start on, from `/clear` or `/new` in a thread's composer.
+   */
+  NewThread: { channel?: string; prompt?: string; run?: DraftRun } | undefined;
   /** A file the crew made. Any tab can push it, through `openArtifact`. */
   Artifact: { artifact: Artifact };
   /** Forks a thread onto another harness: a new, linked thread that picks up from it. Presented as a modal over the thread. */

@@ -4,11 +4,13 @@
 // how a mention looks, not what the message carries.
 import type { MentionSpan } from '@omni/shared/message-context-machine.ts';
 import { MENTION_PILL, mentionPillLook } from '@omni/shared/mention-pill.ts';
+import { slashPieces } from '@omni/shared/slash-pills.ts';
+import type { SlashRecord } from '@omni/shared/slash.ts';
 import { Fragment } from 'react';
 import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { useAgents } from '../live/react';
-import { useOmniTheme, weight } from '../theme';
+import { mono, radius, useOmniTheme, weight } from '../theme';
 import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 import { agentColor } from './agent-face';
@@ -56,12 +58,28 @@ function Pill({ span, name, fontSize, lineHeight }: { span: MentionSpan; name: s
 }
 
 /**
- * A message's text with each agent or machine it mentions as a pill. A message with none is plain text. VoiceOver reads
- * the text as written, `@` names and all, since a pill is a view in the line and not its words.
+ * A message's text with each agent or machine it mentions as a pill, and each command it names (`slash`, as the server
+ * resolved it when sent) in mono on a quiet fill, as the Web UI's command pill. A message with neither is plain text.
+ * VoiceOver reads the text as written, `@` names and all, since a pill is a view in the line and not its words.
  */
-export function MentionText({ text, records, style, numberOfLines, selectable = true }: { text: string; records: unknown; style: StyleProp<TextStyle>; numberOfLines?: number; selectable?: boolean }) {
-  const runs = mentionRuns(text, records);
-  if (!runs)
+export function MentionText({
+  text,
+  records,
+  slash,
+  style,
+  numberOfLines,
+  selectable = true,
+}: {
+  text: string;
+  records: unknown;
+  slash?: SlashRecord;
+  style: StyleProp<TextStyle>;
+  numberOfLines?: number;
+  selectable?: boolean;
+}) {
+  const { colors } = useOmniTheme();
+  const parts = slashPieces(text, slash).map((p) => ({ ...p, runs: p.hit ? null : mentionRuns(p.text, records) }));
+  if (parts.every((p) => !p.hit && !p.runs))
     return (
       <Text selectable={selectable} style={style} numberOfLines={numberOfLines}>
         {text}
@@ -72,14 +90,24 @@ export function MentionText({ text, records, style, numberOfLines, selectable = 
   const lineHeight = flat.lineHeight ?? Math.round(fontSize * 1.19);
   return (
     <Text selectable={selectable} accessibilityLabel={text} style={style} numberOfLines={numberOfLines}>
-      {runs.map((r, i) =>
-        r.kind === 'text' ? (
-          r.text
+      {parts.map((p, j) =>
+        p.hit ? (
+          <Text key={j} accessibilityHint={p.hit.description || undefined} style={[styles.command, { backgroundColor: colors.surface3, color: colors.fg }]}>
+            {p.text}
+          </Text>
+        ) : !p.runs ? (
+          p.text
         ) : (
-          <Fragment key={i}>
-            {r.opens ? ZWSP : null}
-            <Pill span={r.span} name={r.name} fontSize={fontSize} lineHeight={lineHeight} />
-          </Fragment>
+          p.runs.map((r, i) =>
+            r.kind === 'text' ? (
+              r.text
+            ) : (
+              <Fragment key={`${j}.${i}`}>
+                {r.opens ? ZWSP : null}
+                <Pill span={r.span} name={r.name} fontSize={fontSize} lineHeight={lineHeight} />
+              </Fragment>
+            ),
+          )
         ),
       )}
     </Text>
@@ -88,4 +116,5 @@ export function MentionText({ text, records, style, numberOfLines, selectable = 
 
 const styles = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center' },
+  command: { fontFamily: mono, fontWeight: weight.medium, borderRadius: radius.xs },
 });

@@ -1,4 +1,4 @@
-import type { HarnessInfo, OmniApi } from '@omni/client-core';
+import type { CommandList, CommandsFor, HarnessInfo, OmniApi } from '@omni/client-core';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
@@ -116,4 +116,42 @@ export function useRunSwitch(threadId: string, thread: RunThread | null, harness
 
   const dismiss = useCallback(() => dispatch({ type: 'dismiss' }), []);
   return { state, pick, dismiss };
+}
+
+/**
+ * The command list for a composer's `/` menu (GET /commands), kept as phone web's use-commands.ts keeps it: `load` sets
+ * the cached list at once, then the fresh one when a refresh was running. The server probes at most every 30 seconds, so
+ * calling it often is cheap. Null until a load for `of` answers.
+ */
+export function useCommands(of: CommandsFor): { list: CommandList | null; load: () => void } {
+  const hub = useLiveHub();
+  const key = 'thread' in of ? `thread:${of.thread}` : `new:${of.harness}:${of.channel}`;
+  // The list with the menu it answers, so another thread's never shows.
+  const [got, setGot] = useState<{ key: string; list: CommandList } | null>(null);
+  const current = useRef(key);
+  const target = useRef(of);
+  useEffect(() => {
+    current.current = key;
+    target.current = of;
+  });
+  const load = useCallback(() => {
+    const ask = target.current;
+    const mine = (prev: typeof got) => (prev?.key === key ? prev.list : null);
+    // Never swap a list for an older one when two loads overlap.
+    const take = (next: CommandList) =>
+      current.current === key &&
+      setGot((prev) => {
+        const had = mine(prev);
+        return had?.fetchedAt && (next.fetchedAt ?? 0) < had.fetchedAt ? prev : { key, list: next };
+      });
+    void (async () => {
+      try {
+        take(await hub.request((api) => api.commands(ask)));
+        take(await hub.request((api) => api.commands(ask, true)));
+      } catch {
+        if (current.current === key) setGot((prev) => (mine(prev) ? prev : { key, list: { status: 'unavailable', commands: [], fetchedAt: null } }));
+      }
+    })();
+  }, [hub, key]);
+  return { list: got?.key === key ? got.list : null, load };
 }

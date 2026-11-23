@@ -5,7 +5,7 @@ import { eyesForMark } from '@omni/shared/crew-eyes.ts';
 import { agentShows } from '@omni/shared/crew-eyes.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
-import { Attachments, MemberLine, SwitchLine } from '../components/Transcript.tsx';
+import { Attachments, MemberLine, SwitchLine, UserText } from '../components/Transcript.tsx';
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { QuestionCard } from '../components/thread/QuestionCard.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
@@ -23,7 +23,6 @@ import { CollisionFlag, CollisionMark } from '../components/thread/Collision.tsx
 import { collisionLabel } from '@omni/shared/collisions.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { MentionText } from '../message-context/MentionText.tsx';
 import { sentContext } from '@omni/shared/message-context-machine.ts';
 import { SentTo } from '../message-context/agent-mention.tsx';
 import { changesView } from '@omni/shared/changes-view.ts';
@@ -304,7 +303,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
             </>
           }
         >
-          {p.text || !hasContext(p.context) ? <MentionText text={p.text ?? ''} records={p.context} /> : null}
+          {p.text || !hasContext(p.context) ? <UserText text={p.text ?? ''} slash={p.slash} records={p.context} /> : null}
           {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
         </MoBubble>
         <ClippedNote event={p.key} clipped={p.clipped} className="-mt-2.5 justify-end" />

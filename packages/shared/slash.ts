@@ -212,4 +212,6 @@ export interface CommandList {
   commands: SlashCommand[];
   /** When the list was read from the harness (epoch ms). */
   fetchedAt: number | null;
+  /** GET /api/commands only: the names Ben used last on the harness, newest first, which the menu lists first. */
+  recent?: string[];
 }

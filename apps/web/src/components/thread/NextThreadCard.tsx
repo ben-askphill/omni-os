@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, errorText, type Thread } from '../../api.ts';
-import { newThreadBody, sameSettings } from '../../new-thread-preset.ts';
+import { sameSettings } from '../../new-thread-preset.ts';
+import { newThreadBody } from '@omni/shared/composer-slash.ts';
 import { navigate, openNewThread } from '../../router.ts';
 import { Button, ErrorNote, IconButton } from '../ui.tsx';
 
