@@ -12,7 +12,7 @@ function Crumb({ to, title, children }: { to: ContinueLink; title?: string; chil
   return (
     <>
       <span className="shrink-0 text-fg-3">·</span>
-      <a href={href.thread(to.id)} title={title} className="min-w-0 truncate hover:text-fg">
+      <a href={href.thread(to.id)} title={title} className="min-w-8 truncate hover:text-fg">
         {children}
       </a>
     </>
