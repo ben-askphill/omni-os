@@ -30,13 +30,21 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
+/**
+ * The channel's and the agent's share of the crumbs: at most 30% each while the parent's title sits between them, which
+ * takes what is left, and once the parent is gone both shrink only when the two of them do not fit.
+ */
+const CRUMB_SHARE = 'max-w-[30%] @max-[15rem]/crumbs:max-w-none @max-[15rem]/crumbs:shrink';
+
 /** The agent the thread runs as, its lead, beside the crumbs: its avatar, showing what it does, and its name. */
 function RoleChip({ role, name, shows }: { role: string; name: string; shows: FaceShows | undefined }) {
   const look = useAgent(role);
   return (
-    <Chip className="ml-1 gap-1 font-normal" title={`Runs as ${name}`}>
-      {look && <AgentAvatar agent={{ ...look, name }} size={16} shows={shows} placement="focus" />}
-      <span data-role={role}>{name}</span>
+    <Chip className={`ml-1 min-w-12 gap-1 font-normal ${CRUMB_SHARE}`} title={`Runs as ${name}`}>
+      {look && <AgentAvatar agent={{ ...look, name }} size={16} shows={shows} placement="focus" className="shrink-0" />}
+      <span data-role={role} className="min-w-0 truncate">
+        {name}
+      </span>
     </Chip>
   );
 }
@@ -45,7 +53,7 @@ function RoleChip({ role, name, shows }: { role: string; name: string; shows: Fa
 function AccountChip({ ran }: { ran: ThreadAccount | null | undefined }) {
   if (!ran) return null;
   return (
-    <span className="ml-1 inline-flex min-w-0 items-center gap-1 text-fg-3" title={`${harnessLabel(ran.harness)} runs as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>
+    <span className="ml-1 inline-flex min-w-14 items-center gap-1 text-fg-3 @max-[36rem]/crumbs:hidden" title={`${harnessLabel(ran.harness)} runs as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>
       <Icon name="user" size={12} className="shrink-0" />
       <span className="min-w-0 truncate">{threadAccountLabel(ran)}</span>
     </span>
@@ -90,14 +98,17 @@ export function ThreadHeader({
         <Avatar name={channel?.name ?? thread.channel_id} channelIcon={channel?.icon} avatarBg={channel?.avatar_bg} omni={thread.channel_id === 'conductor'} size={34} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1 text-[12px] text-fg-3">
-          <a href={href.channel(thread.channel_id)} className="shrink-0 hover:text-fg">
+        {/* The crumbs keep to one line and never run into the header's buttons. The parent's title, the account and the
+            continued threads truncate but keep a few letters. As the line narrows the account, the continued threads, the
+            task id and then the parent drop out whole, so no bare chevron, separator or icon is left. */}
+        <div className="@container/crumbs flex min-w-0 items-center gap-1 text-[12px] text-fg-3">
+          <a href={href.channel(thread.channel_id)} className={`min-w-8 shrink-0 truncate hover:text-fg ${CRUMB_SHARE}`}>
             #{channel?.name ?? thread.channel_id}
           </a>
           {parent && (
             <>
-              <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3" />
-              <a href={href.thread(parent.id)} className="min-w-0 truncate hover:text-fg" title={`Delegated from ${parent.title}`}>
+              <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3 @max-[15rem]/crumbs:hidden" />
+              <a href={href.thread(parent.id)} className="min-w-8 truncate hover:text-fg @max-[15rem]/crumbs:hidden" title={`Delegated from ${parent.title}`}>
                 {parent.title}
               </a>
             </>
@@ -109,9 +120,9 @@ export function ThreadHeader({
               · {TALKS_ONLY}
             </span>
           )}
-          {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3">{thread.task_id}</span>}
+          {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3 @max-[24rem]/crumbs:hidden">{thread.task_id}</span>}
           <AccountChip ran={account} />
-          <ContinueCrumbs links={links} />
+          <ContinueCrumbs links={links} className="@max-[30rem]/crumbs:hidden" />
         </div>
         <h1 className="mt-0.5 line-clamp-2 font-display text-[length:var(--fs-heading)] leading-snug text-balance" title={thread.title}>
           {thread.title}

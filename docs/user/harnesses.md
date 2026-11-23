@@ -47,7 +47,7 @@ Settings > Accounts lists every synced machine, each harness on it, and the acco
 - Only the email or name, org and plan leave a check. A field shaped like a token or key is dropped before it reaches a response, a log or the synced record (`apps/server/harness/accounts-parse.ts`).
 - A machine reads again when the list is opened after a minute, on Check again, and after a sync once ten minutes have passed.
 - When a harness signs in as another account than the last one it had, Omni shows the switch: in the sidebar (Activity on a phone), at the top of Settings > Accounts, and under the new-thread composer when that harness is picked for that machine. Got it clears it on every client and machine. Signing out and back in to the same account is not a switch. Neither is a new plan on the same account.
-- A thread keeps the account its harness ran as when its process last started. The thread header shows it (beside the crumbs on desktop, after the harness on a phone, beside the machine on iOS), and the quick-actions card shows it with the machine when it ran on another one. Cursor Cloud on a channel's own key is not stamped, since that key is not the machine's.
+- A thread keeps the account its harness ran as when its process last started. The thread header shows it (beside the crumbs on desktop, after the harness on a phone, beside the machine on iOS) when its line has room, and leaves it out on a narrow header, and the quick-actions card shows it with the machine when it ran on another one. Cursor Cloud on a channel's own key is not stamped, since that key is not the machine's.
 - The Conductor reads the same list with `harness_accounts`.
 
 ## Switching mid-thread

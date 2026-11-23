@@ -8,11 +8,11 @@ import { Icon, StatusDot } from './ui.tsx';
 /** "Fix the flaky test · Claude Code": a linked thread by its title and the harness it runs on. */
 export const linkName = (l: ContinueLink) => `${l.title || 'Untitled'} · ${harnessLabel(l.harness)}`;
 
-function Crumb({ to, title, children }: { to: ContinueLink; title?: string; children: ReactNode }) {
+function Crumb({ to, title, className, children }: { to: ContinueLink; title?: string; className: string; children: ReactNode }) {
   return (
     <>
-      <span className="shrink-0 text-fg-3">·</span>
-      <a href={href.thread(to.id)} title={title} className="min-w-0 truncate hover:text-fg">
+      <span className={`shrink-0 text-fg-3 ${className}`}>·</span>
+      <a href={href.thread(to.id)} title={title} className={`min-w-8 truncate hover:text-fg ${className}`}>
         {children}
       </a>
     </>
@@ -20,18 +20,18 @@ function Crumb({ to, title, children }: { to: ContinueLink; title?: string; chil
 }
 
 /** In the desktop thread header's breadcrumb: the thread this one continues, and the newest that continues it. */
-export function ContinueCrumbs({ links }: { links: ThreadLinks }) {
+export function ContinueCrumbs({ links, className = '' }: { links: ThreadLinks; className?: string }) {
   const next = newestLink(links.into);
   const more = links.into.length - 1;
   return (
     <>
       {links.from && (
-        <Crumb to={links.from} title={links.from.carried ? carriedText(links.from.carried) : undefined}>
+        <Crumb to={links.from} title={links.from.carried ? carriedText(links.from.carried) : undefined} className={className}>
           Continued from {linkName(links.from)}
         </Crumb>
       )}
       {next && (
-        <Crumb to={next} title={more > 0 ? `${more} more in Details` : undefined}>
+        <Crumb to={next} title={more > 0 ? `${more} more in Details` : undefined} className={className}>
           Continued in {linkName(next)}
           {more > 0 && ` +${more}`}
         </Crumb>
