@@ -28,3 +28,18 @@ export function fitLabel(label: string, lines: readonly MeasuredLine[], room: nu
   const kept = lines[0].text.split(BREAK).join('').trimEnd();
   return kept ? kept + ELLIPSIS : ELLIPSIS;
 }
+
+/** The hidden copy's last layout: the label it held and its lines. */
+export interface Measured {
+  label: string;
+  lines: readonly MeasuredLine[];
+}
+
+/**
+ * The text the sweep draws in `room` points, or null until the hidden copy of this label has been laid out. Fabric
+ * sends onTextLayout only when the lines change, so the last lines still hold when the room moves without changing
+ * them, as when the thinking card slides under its agent's author line and its width moves by a fraction of a point.
+ */
+export function sweepText(label: string, room: number, measured: Measured | null): string | null {
+  return measured?.label === label ? fitLabel(label, measured.lines, room) : null;
+}
