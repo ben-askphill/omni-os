@@ -10,6 +10,7 @@ import type { ThreadSkills } from '../skills.ts';
 import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
 import type { Attachment } from '../uploads.ts';
+import type { HarnessProfile } from './profile.ts';
 import type { AnyHarnessId, HarnessCapabilities } from './types.ts';
 
 /** Everything an adapter needs to start a thread's process. */
@@ -20,12 +21,15 @@ export interface AdapterContext {
   /** Omni's context (channel facts, role charter, artifacts, secrets note). */
   systemPrompt: string;
   /**
+   * The system prompt's `## Reply` block, heading first (runner/prompts.ts replyBlock), for a harness that sends it again
+   * when it resumes a chat (resume-rules.ts). Unset: it sends the tool-failure policy alone.
+   */
+  replyRules?: string[];
+  /**
    * What this harness loads of the role's skills (skills.ts): the system prompt already says it, and Codex also sends
    * each skill it lists with the session's first turn. Unset when the role loads none here.
    */
   skills?: ThreadSkills | null;
-  /** Per-thread MCP config file, when one was written. */
-  mcpFile: string | null;
   /** Channel and global secret values. Empty for a Runs API harness, which gets none of them (ADR 0017). */
   secretEnv: Record<string, string>;
   /**
@@ -146,6 +150,8 @@ export interface HarnessSession {
 export interface HarnessAdapter {
   readonly id: AnyHarnessId;
   readonly capabilities: HarnessCapabilities;
+  /** What else it does: compact, the context meter, skills, session files (profile.ts). Its id is never checked elsewhere. */
+  readonly profile: HarnessProfile;
   spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession;
   /** Whether a resume is warranted from on-disk session state, given the thread has not "run" in this process yet. */
   resumeOnDisk?(thread: Thread): boolean;

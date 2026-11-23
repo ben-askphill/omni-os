@@ -11,6 +11,7 @@ import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { writtenCharter } from '../remote-agents.ts';
 import { READ_TOOL } from '../harness/read-tool.ts';
 import { harnessName } from '../harness/registry.ts';
+import { profileOf } from '../harness/profile.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { userConfig } from '../user-config.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
@@ -113,7 +114,7 @@ function workspaceLines(thread: Thread, channel: Channel) {
         ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
         : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni lists files there in the thread. To show a chart, diagram, table or mockup in the thread itself, above your reply, call html_render instead. Write a page, report, dashboard or diagram as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap). A guide, how-to or note can be .md: Omni renders it like a reply. Mention the filename in your reply.`,
       ...designSystemLines(thread, channel),
-      ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
+      ...(profileOf(thread.harness).claudeAi ? publishedLines(channel.id) : []),
       ...(remote
         ? []
         : [
@@ -256,7 +257,7 @@ function conductorSeatLines(name: string, role: CrewRole | undefined, command: b
  * get no local MCP servers, so no html_render, and a thread that only reads (a quick ask, whose answer shows in place
  * as text, or one kept from it) gets none either (sandbox.ts buildMcpConfig): both keep the text-only block.
  * `reports`: the final message goes to another agent as text (reportsUp), which reads none of the pages.
- * Cursor sends this block again when it resumes a chat (harness/resume-rules.ts), so it stays one section.
+ * Cursor sends this block again when it resumes a chat (replyBlock, harness/resume-rules.ts), so it stays one section.
  */
 function replyLines(name: string, renders: boolean, reports: boolean): string[] {
   const head = 'Your final message is what gets shown and reported.';
@@ -315,6 +316,17 @@ function teamLeadLines(name: string): string[] {
   ];
 }
 
+/** Pages with html_render: every local thread but one that only reads (replyLines). */
+const rendersPages = (thread: Thread) => !isProviderHarness(thread.harness) && !readsOnly(thread);
+
+/**
+ * The thread's `## Reply` block, as its system prompt has it. A harness that takes the system prompt only with a new
+ * chat sends it again when it resumes one (AdapterContext.replyRules, harness/resume-rules.ts).
+ */
+export function replyBlock(thread: Thread): string[] {
+  return replyLines(userName(), rendersPages(thread), reportsUp(thread));
+}
+
 /**
  * `secretNames` are the names of the secrets in the thread's environment, never their values. `skills`: what the
  * thread's harness loads of its agent's skills (skills.ts), resolved when it starts.
@@ -322,9 +334,7 @@ function teamLeadLines(name: string): string[] {
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false, secretNames: readonly string[] = [], skills: ThreadSkills | null = null) {
   const remote = isProviderHarness(thread.harness);
   const remoteAgent = isRemoteAgentHarness(thread.harness);
-  const cloud = thread.harness === 'cursor-cloud';
-  // Pages with html_render: every local thread but one that only reads (replyLines).
-  const renders = !remote && !readsOnly(thread);
+  const own = profileOf(thread.harness).prompt;
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
   // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
@@ -333,8 +343,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
-    cloud
-      ? `You are a Cursor cloud agent that Omni OS, ${userPossessive()} agent workspace on their own machine, started through the Cursor API. You run on a Linux machine of Cursor's, on your own clone of the repo; Omni, its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you.`
+    own
+      ? own.intro(userPossessive())
       : remote
       ? `You are ${role?.name ?? harnessName(thread.harness)}, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
@@ -378,21 +388,14 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     ...(hands ? notionLines(thread, secretNames) : []),
     ...commandLineLines(thread, role),
     '',
-    ...(cloud
-      ? [
-          '',
-          '## Cursor cloud agent',
-          'Commit and push your work: Cursor opens the pull request from your branch when the run ends. Put the PR body in the shape the repo asks for (a PR template or a pr-writer skill).',
-          'This machine runs Linux. You cannot build or run macOS apps, run Swift or Xcode tests, or take screenshots of a Mac app or a browser. Do what you can, and list what you could not verify in your reply and in the PR body instead of claiming it.',
-        ]
-      : []),
+    ...(own?.lines ?? []),
     '',
     '## Secrets',
     remote
       ? 'Omni does not copy Keychain secrets onto this server. Never print, echo or write secret values anywhere.'
       : 'Channel and global secrets are already in your environment as variables. Never print, echo or write their values anywhere.',
     '',
-    ...replyLines(name, renders, reportsUp(thread)),
+    ...replyBlock(thread),
     // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which remote harnesses do not get.
     ...(remote
       ? []

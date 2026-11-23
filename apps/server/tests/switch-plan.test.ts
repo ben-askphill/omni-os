@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { RunName } from '@omni/shared/run-switch.ts';
-import { CURSOR_CLOUD_REFUSAL, HERMES_REFUSAL, planSwitch, type RunState } from '../runner/switch-plan.ts';
+import { profileOf, RUNS_API_PROFILE } from '../harness/profile.ts';
+import { CAPABILITIES } from '../harness/types.ts';
+import { planSwitch, type RunState } from '../runner/switch-plan.ts';
+
+const HERMES_REFUSAL = profileOf('hermes').switchRefusal;
+const CURSOR_CLOUD_REFUSAL = profileOf('cursor-cloud').switchRefusal;
 
 const opus: RunName = { harness: 'claude-code', model: 'opus', effort: 'high', harnessName: 'Claude Code', modelLabel: 'Opus' };
 const gpt = { harness: 'codex', model: 'gpt-5.6-sol', effort: '' };
@@ -40,6 +45,23 @@ describe('planSwitch', () => {
     expect(planSwitch(ran(cloud), claude, opus, 10, content())).toEqual({ kind: 'reject', error: CURSOR_CLOUD_REFUSAL });
     expect(planSwitch(ran(cloud), { ...cloud, model: 'composer-2' }, opus, 10, content())).toEqual({ kind: 'reject', error: CURSOR_CLOUD_REFUSAL });
     expect(planSwitch(ran(cloud), cloud, opus, 10, content())).toEqual({ kind: 'none' });
+  });
+
+  it('refuses moving to or from a custom harness, registered here or not', () => {
+    const custom = { harness: 'custom:gone', model: '', effort: '' };
+    expect(planSwitch(ran(), custom, opus, 10, content())).toEqual({ kind: 'reject', error: RUNS_API_PROFILE.switchRefusal });
+    expect(planSwitch(ran(custom), claude, opus, 10, content())).toEqual({ kind: 'reject', error: RUNS_API_PROFILE.switchRefusal });
+  });
+
+  it("reads the harness's switchable capability, not its id", () => {
+    const was = CAPABILITIES.codex.switchable;
+    CAPABILITIES.codex.switchable = false;
+    try {
+      expect(planSwitch(ran(), gpt, opus, 10, content())).toMatchObject({ kind: 'reject' });
+      expect(planSwitch(ran({ ...gpt }), { ...gpt, model: 'gpt-6-astra' }, opus, 10, content())).toMatchObject({ kind: 'settings' });
+    } finally {
+      CAPABILITIES.codex.switchable = was;
+    }
   });
 
   it('hands a thread to a harness it never ran on with the whole thread, keeping the session it leaves', () => {

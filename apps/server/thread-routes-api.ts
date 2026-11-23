@@ -1,6 +1,7 @@
 // /api/threads: list, create, detail, messages, uploads, stop, and the live stream.
 // Split into two apps so app.ts can keep mounting threadsApi and terminalApi between them.
 // Hono keeps the first registered match, so that order is the one the handlers already won with.
+import { profileOf } from './harness/profile.ts';
 import { keepQuickAsk, QuickAskRefusal, startQuickAsk, taskFromQuickAsk } from './quick-ask.ts';
 import { RECENT_ASKS_DAYS } from '@omni/shared/quick-ask.ts';
 import { Hono, type Context } from 'hono';
@@ -659,7 +660,7 @@ threadActionsApi.post('/:id/compact', async (c) => {
   if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   const blocked = compactBlocked(t);
   if (blocked) return c.json({ error: blocked }, 409);
-  const extra = t.harness === 'claude-code' ? focus?.replace(/\s+/g, ' ').trim() : '';
+  const extra = profileOf(t.harness).compact?.focus ? focus?.replace(/\s+/g, ' ').trim() : '';
   return c.json(await postMessage(id, extra ? `/compact ${extra}` : '/compact', { mode: 'queue', from: sender(c) }));
 });
 

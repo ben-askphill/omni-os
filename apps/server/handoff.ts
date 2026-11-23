@@ -16,7 +16,8 @@ import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { assignments, channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
 import { holderOf, remoteHolder } from './ownership.ts';
-import { HARNESS_META, isHarnessId } from './harness/types.ts';
+import { profileOf } from './harness/profile.ts';
+import { harnessName } from './harness/registry.ts';
 import { offMachineHarness } from './thread-files.ts';
 import { needsWorktree, plannedWorktree } from './sandbox.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
@@ -64,8 +65,8 @@ class Cancelled extends Error {}
 
 /** Why the thread's harness could not resume it on another Mac, or null when it can. */
 function notResumable(t: Thread): string | null {
-  if ((t.harness !== 'codex' && t.harness !== 'cursor') || t.session_id !== t.id) return null;
-  const name = isHarnessId(t.harness) ? HARNESS_META[t.harness].name : t.harness;
+  if (!profileOf(t.harness).namesSessionLate || t.session_id !== t.id) return null;
+  const name = harnessName(t.harness);
   return `${name} has not reported this thread's session yet, so another machine could not resume it. Try again once it has replied.`;
 }
 

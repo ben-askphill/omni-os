@@ -14,6 +14,7 @@ import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, EndMode, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { CursorCloudClient, CursorCloudError, type CursorImage, type CursorRun } from './client.ts';
 import { TERMINAL, agentUrl, changed, endRecords, stateOf, statusText } from './normalize.ts';
+import { cursorCloudProfile } from './profile.ts';
 
 /** What the API takes as an image: up to five PNG, JPEG, GIF or WebP files of 15 MB or less. */
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -71,6 +72,7 @@ export const agentIdOf = (thread: { id: string; session_id: string }) => (thread
 export const cursorCloudAdapter: HarnessAdapter = {
   id: 'cursor-cloud',
   capabilities: CAPABILITIES['cursor-cloud'],
+  profile: cursorCloudProfile,
   // The thread id means no agent yet: agentIdOf makes it bc-<thread id>. A run switch never moves a thread here anyway.
   freshSessionId: (thread) => thread.id,
 

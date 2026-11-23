@@ -18,6 +18,7 @@ import { readsOnly } from '@omni/shared/quick-ask.ts';
 import type { CommandList, SlashCommand } from '@omni/shared/slash.ts';
 import { listCommands, peekCommands } from './commands.ts';
 import type { CrewRole } from './crew.ts';
+import { profileOf } from './harness/profile.ts';
 
 export { loadsSkills };
 
@@ -120,11 +121,12 @@ export async function threadSkills(role: Pick<CrewRole, 'skills'> | undefined, t
   const names = role?.skills ?? [];
   const harness = thread.harness;
   if (!names.length || !loadsSkills(harness) || readsOnly(thread)) return null;
-  const list = await listed(harness, harness === 'codex' ? thread.cwd : folder, LAUNCH_WAIT_MS);
+  const loading = profileOf(harness).skills;
+  const list = await listed(harness, loading?.listsThreadFolder ? thread.cwd : folder, LAUNCH_WAIT_MS);
   const out: ThreadSkills = { harness, native: [], files: [], missing: [] };
   for (const name of names) {
     const hit = list ? named(list.commands, name) : undefined;
-    const own = harness === 'claude-code' ? skillFile(hit?.name ?? name, thread.cwd) : null;
+    const own = loading?.userOnlyFromFile ? skillFile(hit?.name ?? name, thread.cwd) : null;
     if (own && userOnly(own)) {
       out.files.push({ name: hit?.name ?? name, path: own });
       continue;
@@ -146,14 +148,7 @@ const listOf = (names: string[]) => names.map((n) => `\`${n}\``).join(', ');
 export function skillLines(s: ThreadSkills, agent: string): string[] {
   const lines = ['', '## Skills'];
   const native = s.native.map((x) => x.name);
-  const attached = s.native.filter((x) => x.path).map((x) => x.name);
-  const unattached = s.native.filter((x) => !x.path).map((x) => x.name);
-  if (s.harness === 'claude-code' && native.length)
-    lines.push(`${agent} loads these skills in every thread. Before anything else, load each one with the Skill tool, one call per skill, even when the task looks like it does not need it: ${listOf(native)}. Load them once per thread, then follow them.`);
-  if (s.harness === 'codex' && attached.length) lines.push(`${agent} loads these skills in every thread. They came loaded with your first message: ${listOf(attached)}. Follow them.`);
-  if (s.harness === 'codex' && unattached.length) lines.push(`${agent} loads these skills in every thread. Before anything else, read each one's SKILL.md in full and follow it: ${listOf(unattached)}.`);
-  if (s.harness === 'cursor' && native.length)
-    lines.push(`${agent} loads these skills in every thread. Before anything else, load each one and follow it, even when the task looks like it does not need it: ${listOf(native)}.`);
+  lines.push(...(profileOf(s.harness).skills?.lines(s, agent, listOf) ?? []));
   if (s.files.length)
     lines.push(
       `${native.length ? 'These' : `${agent} loads these skills in every thread. These`} load from their files, since ${SKILL_HARNESS_NAMES[s.harness]} does not load them itself here: read each SKILL.md in full before anything else and follow it as a skill: ${s.files.map((f) => `\`${f.name}\` (${f.path})`).join(', ')}.`,
@@ -165,6 +160,6 @@ export function skillLines(s: ThreadSkills, agent: string): string[] {
 /** One line for the server log: what a thread's harness was asked to load. */
 export function skillsLogLine(threadId: string, s: ThreadSkills): string {
   const part = (label: string, names: string[]) => (names.length ? ` ${label}: ${names.join(', ')}` : '');
-  const how = s.harness === 'claude-code' ? 'Skill tool' : s.harness === 'codex' ? 'skill items' : 'prompt';
+  const how = profileOf(s.harness).skills?.how ?? 'prompt';
   return `[skills] ${threadId} ${s.harness}:${part(how, s.native.map((x) => x.name))}${part('read files', s.files.map((f) => f.name))}${part('missing', s.missing)}`;
 }

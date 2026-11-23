@@ -20,6 +20,8 @@ import { userName } from '../../profile.ts';
 import { applyHermesEvent, emptyHermesNorm, eventFromRun, type HermesNormState } from './normalize.ts';
 import { READ_TOOL, READ_TOOL_DEF } from '../read-tool.ts';
 import { answerRead, closeRead, openRead, readOffered } from '../../worktree-read.ts';
+import { hermesProfile } from './profile.ts';
+import { RUNS_API_PROFILE } from '../profile.ts';
 
 /** Hermes cannot read Mac paths, so attachments are described and explicitly not uploaded. */
 function composeInput(m: OutgoingMessage): string {
@@ -51,6 +53,7 @@ function failText(e: unknown, t: RunsApiTarget): string {
 export const hermesAdapter: HarnessAdapter = {
   id: 'hermes',
   capabilities: CAPABILITIES.hermes,
+  profile: hermesProfile,
   freshSessionId: () => `omni-${randomUUID()}`,
 
   spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession {
@@ -355,4 +358,4 @@ export const hermesAdapter: HarnessAdapter = {
 };
 
 /** The adapter a custom harness runs on: Hermes's, under its own id and with the capabilities its file leaves on. */
-export const runsApiAdapter = (id: AnyHarnessId, capabilities: HarnessCapabilities): HarnessAdapter => ({ ...hermesAdapter, id, capabilities });
+export const runsApiAdapter = (id: AnyHarnessId, capabilities: HarnessCapabilities): HarnessAdapter => ({ ...hermesAdapter, id, capabilities, profile: RUNS_API_PROFILE });

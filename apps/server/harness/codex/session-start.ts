@@ -4,6 +4,7 @@ import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { browserHeld, codexPolicy } from '../../access.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
+import { mcpInput } from '../mcp-input.ts';
 import { harnessEnv, threadTokenEnv } from '../env-guard.ts';
 import type { AdapterContext } from '../adapter.ts';
 import type { CodexClient } from './client.ts';
@@ -67,17 +68,7 @@ export const declinesPatches = (ctx: AdapterContext) => ctx.role?.tools === 'no-
 /** The parameters thread/start and thread/resume share. */
 export function sessionParams(ctx: AdapterContext) {
   const thread = ctx.thread;
-  const mcp = buildMcpConfig({
-    threadId: thread.id,
-    channel: ctx.channel,
-    role: ctx.role,
-    browserBusy: ctx.browserBusy,
-    cdpEndpoint: ctx.cdpEndpoint,
-    omniUrl: ctx.omniUrl,
-    noBrowser: browserHeld(ctx.permission?.access),
-    quick: readsOnly(thread),
-    leadsTeam: ctx.leadsTeam,
-  });
+  const mcp = buildMcpConfig(mcpInput(ctx, { noBrowser: browserHeld(ctx.permission?.access) }));
   const policy = ctx.permission ? codexPolicy(ctx.permission.access) : null;
   // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask
   // only reads too (apps/server/quick-ask.ts). Either lock holds whatever the channel's level.

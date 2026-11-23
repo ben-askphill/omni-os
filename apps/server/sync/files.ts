@@ -8,6 +8,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 import { threadDir, uploadsDir } from '../config.ts';
 import { bus, publishThread } from '../bus.ts';
 import { db, events, kv, threads, type Thread } from '../db.ts';
+import { profileOf } from '../harness/profile.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { safeName, uniqueName, type Attachment } from '../uploads.ts';
 import { planFiles, type FileVersion } from './file-plan.ts';
@@ -482,49 +483,32 @@ export async function receiveUploads(threadId: string, refs: unknown): Promise<A
 
 // ---------- harness session files ----------
 
-/** Claude Code names a project folder after its cwd: every character that is not a letter or digit becomes "-". */
-export const claudeProjectDir = (cwd: string) => cwd.replace(/[^a-zA-Z0-9]/g, '-');
+export { claudeProjectDir } from '../harness/claude/profile.ts';
 
-const codexHome = (home: string, env: NodeJS.ProcessEnv) => env.CODEX_HOME?.trim() || join(home, '.codex');
-/** Found the way Cursor Agent finds it, as in apps/server/harness/cursor/commands.ts. */
-const cursorDir = (home: string, env: NodeJS.ProcessEnv) =>
-  env.CURSOR_CONFIG_DIR?.trim() || (env.XDG_CONFIG_HOME?.trim() ? join(env.XDG_CONFIG_HOME, 'cursor') : join(home, '.cursor'));
+/** Where the thread's harness keeps its sessions on this machine (harness/<id>/profile.ts), or null when it keeps none. */
+const filesOf = (t: Thread) => profileOf(t.harness).sessionFiles;
 
 /**
- * Whether the thread has a session file to sync. Codex and Cursor threads keep their Omni id until the first turn.
- * The session id names a file or folder below, and a thread row may come from the relay: it must be a plain name.
+ * Whether the thread has a session file to sync. A harness that names its session after the first turn (Codex,
+ * Cursor) keeps the thread's Omni id until then. The session id names a file or folder below, and a thread row may come
+ * from the relay: it must be a plain name.
  */
-const hasSession = (t: Thread) =>
-  safeSegment(t.session_id) &&
-  (t.harness === 'claude-code' || ((t.harness === 'codex' || t.harness === 'cursor') && t.session_id !== t.id));
+const hasSession = (t: Thread) => safeSegment(t.session_id) && !!filesOf(t) && !(profileOf(t.harness).namesSessionLate && t.session_id === t.id);
 
 /** The folder a harness keeps all its sessions under, on this machine. It may be a link (a CODEX_HOME on another disk); nothing below it may. */
 function sessionBase(t: Thread, home: string, env: NodeJS.ProcessEnv): string {
-  if (t.harness === 'claude-code') return join(home, '.claude', 'projects');
-  if (t.harness === 'codex') return join(codexHome(home, env), 'sessions');
-  return join(cursorDir(home, env), 'chats');
+  return filesOf(t)!.base(home, env);
 }
 
-/**
- * The folder a harness keeps this thread's session in, on this machine:
- * - Claude Code: ~/.claude/projects/<cwd with non-alphanumerics as "-">, holding "<session>.jsonl".
- * - Codex: $CODEX_HOME/sessions, holding "<yyyy>/<mm>/<dd>/rollout-<time>-<session>.jsonl".
- * - Cursor Agent: ~/.cursor/chats/<md5 of cwd>/<session>, holding meta.json and store.db.
- */
+/** The folder a harness keeps this thread's session in, on this machine: each harness's profile says where. */
 export function sessionRoot(t: Thread, home = homedir(), env: NodeJS.ProcessEnv = process.env): string | null {
   if (!hasSession(t)) return null;
-  const base = sessionBase(t, home, env);
-  if (t.harness === 'claude-code') return join(base, claudeProjectDir(t.cwd));
-  if (t.harness === 'codex') return base;
-  return join(base, createHash('md5').update(t.cwd).digest('hex'), t.session_id);
+  return filesOf(t)!.root(sessionBase(t, home, env), t);
 }
 
 /** Whether a session file path from another machine is one this harness would write for this session. */
 function sessionRel(t: Thread, rel: string) {
-  if (!safeRel(rel)) return false;
-  if (t.harness === 'claude-code') return rel === `${t.session_id}.jsonl`;
-  if (t.harness === 'codex') return rel.endsWith(`-${t.session_id}.jsonl`) && rel.split('/').at(-1)!.startsWith('rollout-');
-  return !rel.includes('/') && !rel.endsWith('-shm');
+  return safeRel(rel) && !!filesOf(t)?.owns(t, rel);
 }
 
 /**
@@ -532,36 +516,7 @@ function sessionRel(t: Thread, rel: string) {
  * which any relay writer can fill. `synced` is what this machine recorded syncing before, a shortcut past the walk.
  */
 function localSessionFiles(t: Thread, root: string, synced: string[] = []): string[] {
-  if (t.harness === 'claude-code') return existsSync(join(root, `${t.session_id}.jsonl`)) ? [`${t.session_id}.jsonl`] : [];
-  if (t.harness === 'codex') {
-    const hint = synced.find((rel) => sessionRel(t, rel) && existsSync(join(root, rel)));
-    if (hint) return [hint];
-    const hit = findRollout(root, `-${t.session_id}.jsonl`);
-    return hit ? [hit] : [];
-  }
-  if (!existsSync(root)) return [];
-  return readdirSync(root, { withFileTypes: true })
-    .filter((e) => e.isFile() && !e.name.startsWith('.') && !e.name.endsWith('-shm'))
-    .map((e) => e.name)
-    .sort();
-}
-
-/**
- * The first Codex rollout under root whose name ends in suffix. A linked folder is not walked into. A folder it cannot
- * read throws, so a handoff fails rather than move the thread without its session.
- */
-function findRollout(root: string, suffix: string): string | null {
-  if (!existsSync(root)) return null;
-  const dirs = [''];
-  while (dirs.length) {
-    const dir = dirs.shift()!;
-    for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
-      const rel = dir ? `${dir}/${e.name}` : e.name;
-      if (e.isDirectory()) dirs.push(rel);
-      else if (e.isFile() && e.name.startsWith('rollout-') && e.name.endsWith(suffix)) return rel;
-    }
-  }
-  return null;
+  return filesOf(t)?.local(t, root, synced) ?? [];
 }
 
 /** The session files this machine recorded syncing, from its own state, never from the relay. */
@@ -629,7 +584,7 @@ function kernelPathIs(fd: number, want: string): boolean {
 
 /** Where a session file is kept in Storage: "sessions/<harness>/<session>.jsonl", or a folder for Cursor's chat. */
 export const sessionObject = (harness: string, sessionId: string, rel: string) =>
-  harness === 'cursor' ? `sessions/cursor/${sessionId}/${rel}` : `sessions/${harness}/${sessionId}.jsonl`;
+  profileOf(harness).sessionFiles?.object(sessionId, rel) ?? `sessions/${harness}/${sessionId}.jsonl`;
 
 const sessionKey = (t: Thread) => `${t.harness}:${t.session_id}`;
 
@@ -728,8 +683,8 @@ export async function pullSession(t: Thread, opts: FileSyncOptions): Promise<num
     let body = await opts.transport.getObject(sessionObject(t.harness, t.session_id, rel));
     if (!body) continue;
     const sha = sha256(body);
-    // Cursor records the cwd in the chat's meta.json; make it this machine's.
-    if (t.harness === 'cursor' && rel === 'meta.json') body = withCwd(body, t.cwd);
+    // A file that records the machine's own state (Cursor's cwd in meta.json) is made this machine's.
+    body = filesOf(t)?.adapt?.(rel, body, t) ?? body;
     fetched.push({ path, skey, before, sha, body, mtime: remote.mtime });
   }
   // Put the downloads in place together, with no await between the checks and the renames, or not at all: Cursor's
@@ -747,16 +702,6 @@ export async function pullSession(t: Thread, opts: FileSyncOptions): Promise<num
   }
   if (written || learned) kv.set(stateKey(t.id), state);
   return written;
-}
-
-function withCwd(body: Uint8Array, cwd: string): Uint8Array {
-  try {
-    const meta = JSON.parse(Buffer.from(body).toString('utf8'));
-    if (meta && typeof meta === 'object' && 'cwd' in meta) return Buffer.from(JSON.stringify({ ...meta, cwd }));
-  } catch {
-    // Not JSON: write it as it came.
-  }
-  return body;
 }
 
 // ---------- server hooks ----------

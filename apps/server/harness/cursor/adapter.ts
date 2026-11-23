@@ -8,6 +8,7 @@ import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { resumeRules } from '../resume-rules.ts';
+import { mcpInput } from '../mcp-input.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { CURSOR_NO_EDITS_DENY, writeCursorDenyConfig, writeCursorPlugin } from '../../sandbox.ts';
@@ -23,6 +24,7 @@ import { cursorBin } from './bin.ts';
 import { fromCursorTurn, type ContextUsage } from '@omni/shared/context-meter.ts';
 import { cursorModelId, cursorWindow } from './models.ts';
 import { CursorCallCounter, CursorReplyText, readCursorEvent } from './normalize.ts';
+import { cursorProfile } from './profile.ts';
 
 /** Create a Cursor chat up front and return its id. */
 function createChat(bin: string, cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
@@ -47,6 +49,7 @@ function createChat(bin: string, cwd: string, env: NodeJS.ProcessEnv): Promise<s
 export const cursorAdapter: HarnessAdapter = {
   id: 'cursor',
   capabilities: CAPABILITIES.cursor,
+  profile: cursorProfile,
   // The thread id means no session yet: the adapter starts one and reports its id.
   freshSessionId: (thread) => thread.id,
 
@@ -74,7 +77,7 @@ export const cursorAdapter: HarnessAdapter = {
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';
     // Omni's MCP servers load from a per-thread plugin folder; nothing touches the repo or ~/.cursor.
-    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl, noBrowser: browserHeld(ctx.permission?.access), quick: readsOnly(thread), leadsTeam: ctx.leadsTeam });
+    const pluginDir = writeCursorPlugin(mcpInput(ctx, { noBrowser: browserHeld(ctx.permission?.access) }));
 
     let ready = false;
     let firstTurn = true;
@@ -99,7 +102,7 @@ export const cursorAdapter: HarnessAdapter = {
       if (m.attachments.length) prompt += `\n\n${describeAttachments(m.attachments)}`;
       if (addContext) prompt = `${ctx.systemPrompt}\n\n---\n\n${prompt}`;
       // A resumed chat had Omni's context in an earlier session: it gets again the rules that change (resume-rules.ts).
-      else if (addPolicy) prompt = `${resumeRules(ctx.systemPrompt)}\n\n---\n\n${prompt}`;
+      else if (addPolicy) prompt = `${resumeRules(ctx.replyRules)}\n\n---\n\n${prompt}`;
 
       const args = ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);

@@ -74,7 +74,6 @@ function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt
       created_at: '',
     },
     systemPrompt: opts.prompt ?? 'SYS PROMPT',
-    mcpFile: null,
     secretEnv: {},
     ...(opts.key !== '' && { harnessKey: opts.key ?? 'test-key' }),
     browserBusy: false,
