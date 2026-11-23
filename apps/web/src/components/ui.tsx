@@ -2,7 +2,7 @@ export { Loader } from './brand.tsx';
 
 export { Icon, Wordmark, type IconName } from './ui/icons.tsx';
 export { Button, IconButton, IconLink, LinkButton, Chip, ChannelMark, Avatar, Monograms, useMonogram, type ChipTone } from './ui/primitives.tsx';
-export { STATUS, asksForYou, statusLabel, glyphFor, threadGlyph, StatusDot, ThreadDot, RowDot, rowShows, useRowMark, DoneMark, StatusPill, threadStatusText, type Glyph } from './ui/status.tsx';
+export { STATUS, asksForYou, statusLabel, glyphFor, threadGlyph, StatusDot, ThreadDot, RowDot, useRowMark, DoneMark, StatusPill, threadStatusText, type Glyph } from './ui/status.tsx';
 export { Segmented, Tabs, tabPanelProps, type SegKind, type SegOption } from './ui/segmented.tsx';
 export { ChipSet } from './ui/chip-set.tsx';
 export { Modal, ConfirmDialog, ModalFooter, useUnsavedChanges } from './ui/modal.tsx';

@@ -1,6 +1,6 @@
 import { avatarInk } from './avatar-color.ts';
 import { hasOwnLook } from './channel-icon.ts';
-import { BUILT_IN_AGENTS } from './crew-role.ts';
+import { BUILT_IN_AGENTS, crewRoleName } from './crew-role.ts';
 import {
   CREW_LAYOUTS,
   CREW_SHAPE_IDS,
@@ -56,6 +56,14 @@ export const AVATAR_PX = 256;
 export interface FaceAgent {
   id: string;
   avatar?: { image?: string | null; icon?: string | null; bg?: string | null; shape?: string | null } | null;
+}
+
+/**
+ * An agent by id among `agents`, as every client's avatar reads it; one not listed (a deleted agent, or the list still
+ * loading) by its built-in name, else its id.
+ */
+export function agentLook<A extends { id: string; name: string }>(id: string, agents: readonly A[]): A | { id: string; name: string } {
+  return agents.find((r) => r.id === id) ?? { id, name: crewRoleName(id) };
 }
 
 /** What the avatar shows (crew-eyes.ts). Nothing shows idle eyes. */
@@ -119,11 +127,20 @@ export interface CharacterFace {
   motion: CrewMotion;
 }
 
+/**
+ * The ring a photo or an icon wears for the eyes it has no room for (D8): Working while the agent thinks or works,
+ * Needs you when Ben has the ball, else none. A character shows them in its eyes.
+ */
+export type AvatarRing = 'working' | 'needs' | null;
+
+const RING: Partial<Record<EyeState, AvatarRing>> = { thinking: 'working', working: 'working', needs: 'needs' };
+
 /** An uploaded photo, drawn round. `image` is the path the crew file names. */
 export interface ImageFace {
   kind: 'image';
   size: number;
   image: string;
+  ring: AvatarRing;
 }
 
 /** A shared icon, an emoji or an SVG icon (`avatar.icon`, as channel-icon.ts reads it) on the agent's color. */
@@ -133,6 +150,7 @@ export interface IconFace {
   icon: string;
   bg: string;
   ink: string;
+  ring: AvatarRing;
 }
 
 export type AgentFace = ImageFace | IconFace | CharacterFace;
@@ -160,16 +178,51 @@ export function agentColor(agent: FaceAgent): string {
   return agent.avatar?.bg || CREW_SHAPES[agentShape(agent)].color;
 }
 
-/** What an agent's avatar draws (D1): its uploaded photo, else its icon or emoji on its color, else its crew character. */
+/**
+ * What an agent's avatar draws (D1): its uploaded photo, else its icon or emoji on its color, else its crew character,
+ * which shows in its eyes what the avatar shows. A photo or an icon shows it in its ring.
+ */
 export function agentFace(agent: FaceAgent, opts: FaceOptions): AgentFace {
   const { image, icon } = agent.avatar ?? {};
-  if (image) return { kind: 'image', size: opts.size, image };
+  const eyes = eyesFor(opts.shows, opts.placement === 'focus');
+  if (image) return { kind: 'image', size: opts.size, image, ring: RING[eyes] ?? null };
   if (icon) {
     const bg = agentColor(agent);
-    return { kind: 'icon', size: opts.size, icon, bg, ink: avatarInk(bg) };
+    return { kind: 'icon', size: opts.size, icon, bg, ink: avatarInk(bg), ring: RING[eyes] ?? null };
   }
-  const shape = agentShape(agent);
-  return crewCharacter(shape, agentColor(agent), opts.size, eyesFor(opts.shows, opts.placement === 'focus'), opts);
+  return crewCharacter(agentShape(agent), agentColor(agent), opts.size, eyes, opts);
+}
+
+/** A face that moves (ADR 0021, Motion), as each client's player keeps it (crewStep, crew-motion.ts). */
+export interface MovingFace {
+  /** What to draw now: while a change squeezes the eyes shut, the eyes drawn until now. */
+  face: AgentFace;
+  /** The face's own eyes, which the player draws once a squeeze hands over. Null for a photo or an icon. */
+  eyes: EyeState | null;
+  /** What plays from the eyes on screen: the state's loops, the change into the face's eyes, and the pop. */
+  motion: CrewMotion;
+  /** What plays restarts when it changes: another shape, size, placement or reduced motion. A new color or name restarts nothing. */
+  key: string;
+  /** The agent-switch pop plays when it changes in place (D17): another agent, shape or color. Never on first render. */
+  look: string;
+}
+
+/**
+ * The face of an avatar that moves, with `drawn` the eyes it has on screen (null before any): they follow the face's
+ * once a change has squeezed them shut, so until then it draws them and its motion holds the change into the new ones.
+ */
+export function movingFace(agent: FaceAgent, opts: Omit<FaceOptions, 'from'>, drawn: EyeState | null): MovingFace {
+  const peek = agentFace(agent, opts);
+  if (peek.kind !== 'character') return { face: peek, eyes: null, motion: CREW_STILL, key: '', look: '' };
+  const changing = drawn !== null && drawn !== peek.eyes;
+  const next = changing ? agentFace(agent, { ...opts, from: drawn }) : peek;
+  return {
+    face: changing ? agentFace(agent, { ...opts, shows: { eyes: drawn } }) : peek,
+    eyes: peek.eyes,
+    motion: next.kind === 'character' ? next.motion : CREW_STILL,
+    key: `${peek.shape} ${peek.size} ${opts.placement ?? 'still'} ${!!opts.reducedMotion}`,
+    look: `${agent.id} ${peek.shape} ${peek.body}`,
+  };
 }
 
 /**

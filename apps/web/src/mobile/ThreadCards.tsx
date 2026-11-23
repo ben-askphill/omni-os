@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { setupWait } from '@omni/shared/setup-wait.ts';
 import { api, errorText, type Artifact, type PendingMsg, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
-import { branchShows } from '../components/Delegation.tsx';
+import { branchShows } from '@omni/shared/crew-eyes.ts';
 import { BranchProgress } from '../components/BranchProgress.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { useSending } from '../sending.ts';

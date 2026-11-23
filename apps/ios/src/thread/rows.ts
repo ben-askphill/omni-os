@@ -12,7 +12,7 @@ import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { conductorChannelLook, type FaceAgent, type FaceShows } from '@omni/shared/agent-avatar.ts';
-import { agentShows, eyesFor } from '@omni/shared/crew-eyes.ts';
+import { agentShows, laneShows } from '@omni/shared/crew-eyes.ts';
 import { glyphFor, markOf, type Mark } from '@omni/shared/status.ts';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 
@@ -256,7 +256,7 @@ function* laneRows(t: IosTurn, lanes: NonNullable<IosTurn['lanes']>, input: Rows
   const label = lanes.latest[agent] ?? 'Working';
   // While any lane works, the lane's head shows its own lane's state, as its tab does; once all ended they are history.
   const anyLive = lanes.turns.some((l) => l.status === 'running' || l.status === 'queued');
-  const shows = anyLive ? { eyes: eyesFor({ mark: markOf(glyphFor(lane.status)) }) } : undefined;
+  const shows = anyLive ? laneShows(lane.status) : undefined;
   const rows: ThreadRow[] = [...authored(lane, replyRows(lane, { live, asking: live && lane.questions.length > 0, label }, input), input, shows)];
   const files = lanes.files[agent] ?? [];
   if (files.length) rows.push({ kind: 'files', key: 'fl', files: files.map((path) => ({ path, label: collisionLabel(path), flagged: flagged(path) })), inset: true });

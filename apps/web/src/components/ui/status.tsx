@@ -201,7 +201,7 @@ type RowMarkOptions = { state?: Glyph; busy?: boolean } & Pick<MarkContext, 'pr'
  * once Ben marked it done, else how it ended. `state`: the glyph the row settled on (the thread tree's needs you and
  * failed come before the thread's own), which a phase gives way to. `busy`: the row knows of work the thread's own
  * state does not say, as sub-agents a stopped turn left behind. `pr`: the pull request on its branch. The row's dot
- * (RowDot) draws it, and the avatar the row leads with shows it in its eyes (rowShows; ADR 0021, D23).
+ * (RowDot) draws it, and the avatar the row leads with shows it in its eyes (rowShows in @omni/shared/crew-eyes.ts; ADR 0021, D23).
  */
 export function useRowMark(t: Marked, { state, busy = false, pr, turn }: RowMarkOptions = {}): RowMark {
   const need = useNeedOf(t.id);
@@ -215,9 +215,6 @@ export function useRowMark(t: Marked, { state, busy = false, pr, turn }: RowMark
   if (busy || state === 'running') return row('delegating', true);
   return { mark, working: false, done: !!t.done_at };
 }
-
-/** What a row's avatar shows in its eyes: the row's mark, or done once Ben marked it done. */
-export const rowShows = (row: RowMark): { mark: Mark } => ({ mark: row.done ? 'done' : row.mark });
 
 /** A row's mark as its dot, or the check once Ben marked it done. */
 export function RowDot({ row, size = 7 }: { row: RowMark; size?: number }) {

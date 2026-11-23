@@ -5,10 +5,23 @@ import type { CharacterFace, CrewEye } from '@omni/shared/agent-avatar.ts';
  * A crew character as the agent face draws it (ADR 0021): inside the lean, the outline filled with the agent's color
  * and stroked in the theme's foreground, the Conductor's satellite, and the two eyes in the eye ink. No disc behind
  * it. It decides nothing: `face` is agentFace()'s. `data-grid` and `data-eyes` name the drawing for screenshots.
- * Its motion (use-crew-motion.ts) plays on `body`, the svg, and on `eyes`, a group around each eye that turns and
- * squashes about the eye's own centre.
+ * Its motion (use-crew-motion.ts) plays on `body`, the svg; on `pop`, a group around the drawing that the agent-switch
+ * pop scales about the drawing's centre, apart from the body's loops; and on `eyes`, a group around each eye that turns
+ * and squashes about the eye's own centre. The svg lets the pop's overshoot past its box, as the body's own moves do.
  */
-export function CrewCharacter({ face, className = '', body, eyes }: { face: CharacterFace; className?: string; body?: Ref<SVGSVGElement>; eyes?: readonly [Ref<SVGGElement>, Ref<SVGGElement>] }) {
+export function CrewCharacter({
+  face,
+  className = '',
+  body,
+  pop,
+  eyes,
+}: {
+  face: CharacterFace;
+  className?: string;
+  body?: Ref<SVGSVGElement>;
+  pop?: Ref<SVGGElement>;
+  eyes?: readonly [Ref<SVGGElement>, Ref<SVGGElement>];
+}) {
   const [left, right] = face.pair;
   return (
     <svg
@@ -21,7 +34,9 @@ export function CrewCharacter({ face, className = '', body, eyes }: { face: Char
       width={face.size}
       height={face.size}
       viewBox={face.viewBox}
+      overflow="visible"
     >
+      <g ref={pop}>
       <g transform={face.lean}>
         <path d={face.outline} fill={face.body} stroke="var(--fg)" strokeWidth={face.stroke} strokeLinejoin="round" />
         {face.satellite && <circle cx={face.satellite.cx} cy={face.satellite.cy} r={face.satellite.r} fill="var(--fg)" />}
@@ -31,6 +46,7 @@ export function CrewCharacter({ face, className = '', body, eyes }: { face: Char
         <g data-crew-eye className="origin-center transform-fill" ref={eyes?.[1]}>
           <Eye eye={right} ink={face.ink} />
         </g>
+      </g>
       </g>
     </svg>
   );

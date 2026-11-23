@@ -6,7 +6,8 @@ import { duration, plural } from '../../format.ts';
 import { href } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo } from '../brand.tsx';
-import { Icon, RowDot, StatusDot, rowShows, threadStatusText, useRowMark, type IconName } from '../ui.tsx';
+import { Icon, RowDot, StatusDot, threadStatusText, useRowMark, type IconName } from '../ui.tsx';
+import { rowShows } from '@omni/shared/crew-eyes.ts';
 import type { RowMark } from '../ui/status.tsx';
 import { ThreadAvatar } from '../ThreadAvatar.tsx';
 import { AvatarMark, drawsFaces } from '../thread/AvatarMark.tsx';
@@ -139,7 +140,7 @@ function RowLead({ t, row }: { t: ThreadStub; row: RowMark }) {
       {drawsFaces(t.members) ? (
         <AvatarMark members={t.members} size={ROW_AVATAR} facesOnly />
       ) : (
-        <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row)} size={ROW_AVATAR} />
+        <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row.mark, { done: row.done, members: t.members })} size={ROW_AVATAR} />
       )}
     </span>
   );

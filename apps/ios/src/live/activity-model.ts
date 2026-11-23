@@ -3,12 +3,13 @@
 // threads waiting on Ben, the latest back first; Working and Done fold away below them. Pure.
 import type { BackgroundTask, ChannelWithRunning, NeedsYou, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
 import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import { rowShows } from '@omni/shared/crew-eyes.ts';
 import { delegatedIds, isWorking } from '@omni/shared/delegate-count.ts';
 
-import { asksForYou, inboxStatus, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
+import { asksForYou, inboxStatus, markOf, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
 import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
 import { canMarkDone, targetOfStub, type ThreadTarget } from '../thread/target';
-import { leadEyes, shortAgo } from './channel-model';
+import { shortAgo } from './channel-model';
 import { agentsByThread, jobTree, treeSource, type JobTree } from './thread-tree';
 
 /** Any thread the inbox can list: a full row from the recent list, or the stub the pinned and channel lists send. */
@@ -28,7 +29,7 @@ export interface InboxRow {
   glyph: Glyph;
   /** The agent whose avatar leads the row (ADR 0021, D23); null for a thread with no agent, which leads with its channel's. */
   agent: string | null;
-  /** What that avatar's eyes show (leadEyes). */
+  /** What that avatar's eyes show (rowShows). */
   eyes: FaceShows;
   /** Null: nothing to say, so the right shows `time`. */
   status: InboxStatus | null;
@@ -141,7 +142,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
       channelId: t.channel_id,
       glyph,
       agent: t.role ?? null,
-      eyes: leadEyes(glyph, t.members),
+      eyes: rowShows(markOf(glyph), { done: !!t.done_at, members: t.members }),
       status,
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,

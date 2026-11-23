@@ -8,6 +8,7 @@ import { FindTargetCtx } from '../transcript/find-target.ts';
 import { Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
 import type { ThreadMember } from '@omni/shared/members.ts';
 import { glyphFor, markOf, type Mark, type Phase } from '@omni/shared/status.ts';
+import { rowShows } from '@omni/shared/crew-eyes.ts';
 import type { RowItem } from './rows.ts';
 import { LayerShownCtx, SheetHostCtx } from './sheet-stack.ts';
 import { drawsFaces, MarkLine } from '../components/thread/AvatarMark.tsx';
@@ -129,12 +130,19 @@ export function MoAvatar({ size = 36, ...who }: Omit<Parameters<typeof ThreadAva
 type RowState = { state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null };
 
 /**
- * A thread row's start: who works it, its eyes on the row's state (ADR 0021, D23). A group thread's lead shows its own
- * state, as the busy faces on the row's second line show theirs. The row's mark sits at its far end (MoRowMark).
+ * A thread row's start: who works it, its eyes on the row's state (rowShows; ADR 0021, D23), the done arcs once Ben
+ * marked it done. A group thread's lead shows its own state, as the busy faces on the row's second line show theirs.
+ * The row's mark sits at its far end (MoRowMark).
  */
-export function MoRowLead({ state, phase, mark, members, ...who }: Omit<Parameters<typeof MoAvatar>[0], 'shows' | 'size'> & RowState & { members?: readonly Pick<ThreadMember, 'lead' | 'state'>[] }) {
-  const lead = members?.find((m) => m.lead);
-  return <MoAvatar {...who} shows={lead ? { member: lead.state } : state ? { mark: mark ?? markOf(glyphFor(state), phase) } : undefined} />;
+export function MoRowLead({
+  state,
+  phase,
+  mark,
+  done,
+  members,
+  ...who
+}: Omit<Parameters<typeof MoAvatar>[0], 'shows' | 'size'> & RowState & { done?: boolean; members?: readonly Pick<ThreadMember, 'lead' | 'state'>[] }) {
+  return <MoAvatar {...who} shows={rowShows(state ? (mark ?? markOf(glyphFor(state), phase)) : null, { done, members })} />;
 }
 
 /** A thread row's status mark, at the far end of its title's line (ADR 0021, D23). Nothing without a state. */
@@ -160,7 +168,7 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () => void; last?: boolean; trailing?: ReactNode }) {
   return (
     <button type="button" onClick={onOpen} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-      <MoRowLead role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} phase={it.phase} members={it.members} />
+      <MoRowLead role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} phase={it.phase} done={it.done} members={it.members} />
       <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`}>
         <span className="flex items-baseline gap-2">
           <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${it.settled ? 'text-fg-2' : 'text-fg'}`}>{it.title}</span>

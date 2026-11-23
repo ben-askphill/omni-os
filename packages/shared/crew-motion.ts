@@ -195,3 +195,38 @@ export interface CrewMotion {
 
 /** Nothing plays: under reduced motion, and on a still avatar. */
 export const CREW_STILL: CrewMotion = { body: null, eyes: null, change: null, pop: null };
+
+// A moving avatar's player (ADR 0021, Motion). Each client keeps the eyes it has on screen and the change whose squeeze
+// has ended, asks crewStep() what to do whenever the face's eyes, its key (movingFace, agent-avatar.ts) or the eyes on
+// screen change, and plays the answer with its own engine: the Web UI with Web Animations
+// (apps/web/src/components/use-crew-motion.ts), the iOS app with Reanimated (apps/ios/src/components/use-crew-motion.ts).
+// The agent-switch pop plays apart from it, on its own wrapper, whenever the face's look changes.
+
+/** The open of a change whose squeeze handed over, and the hop with it. */
+export interface CrewOpen {
+  eyes: EyeMotion;
+  body: BodyMotion | null;
+  /** The one that ends last: the state's loops start when it does. */
+  last: 'eyes' | 'body';
+}
+
+export type CrewStep =
+  /** Draw `eyes` at once with nothing played between (nothing moves, or a photo or an icon), letting go of eyes a squeeze held shut. */
+  | { kind: 'swap'; eyes: EyeState | null }
+  /** Squeeze the eyes on screen shut and hold them there. Once it ends, keep `change` for the next step and draw `eyes`. */
+  | { kind: 'squeeze'; squeeze: EyeMotion; change: CrewChange; eyes: EyeState }
+  /** Play `open`, letting go of the eyes a squeeze held once it starts, then the state's loops once it ends; with no `open`, the loops at once. */
+  | { kind: 'play'; open: CrewOpen | null; body: BodyMotion | null; eyes: EyeMotion | null };
+
+/**
+ * What a moving avatar's player does next. `eyes` are the face's, `drawn` the eyes on screen, `motion` what plays from
+ * them (both from movingFace), and `handed` the change whose squeeze ended, which only the step after it opens.
+ */
+export function crewStep(eyes: EyeState | null, drawn: EyeState | null, motion: CrewMotion, handed: CrewChange | null): CrewStep {
+  if (eyes !== drawn) {
+    const change = drawn !== null ? motion.change : null;
+    return change && eyes !== null ? { kind: 'squeeze', squeeze: change.squeeze, change, eyes } : { kind: 'swap', eyes };
+  }
+  const open: CrewOpen | null = handed && { eyes: handed.open, body: handed.body, last: handed.body && handed.body.ms > handed.open.ms ? 'body' : 'eyes' };
+  return { kind: 'play', open, body: motion.body, eyes: motion.eyes };
+}

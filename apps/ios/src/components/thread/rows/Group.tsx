@@ -3,7 +3,6 @@
 // reply. The rows come from thread/rows.ts; phone web draws the same (apps/web/src/mobile/ThreadTurn.tsx).
 import { clock, toDate } from '@omni/shared/format.ts';
 import { remoteLockLine } from '@omni/shared/remote-agent.ts';
-import { glyphFor, markOf } from '@omni/shared/status.ts';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -15,7 +14,7 @@ import { HarnessLogo } from '../../../ui/Brand';
 import { Icon } from '../../../ui/Icon';
 import { Text } from '../../../ui/Text';
 import type { Collision } from '@omni/shared/collisions.ts';
-import { eyesFor } from '@omni/shared/crew-eyes.ts';
+import { laneShows } from '@omni/shared/crew-eyes.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { AgentAvatar } from '../../AgentAvatar';
 import { ChannelAvatar } from '../../ChannelAvatar';
@@ -85,8 +84,7 @@ export function LanesRow({ row }: Of<'lanes'>) {
             onPress={() => pickLane(row.turn, tab.agent)}
             style={[styles.tab, { backgroundColor: on ? colors.surface2 : 'transparent', borderColor: on ? colors.line : 'transparent' }]}
           >
-            {/* A lane's mark is not the open thread's: a running lane works, as in a row (D7), in focus too. */}
-            <AgentAvatar agent={tab.agent} size={18} shows={{ eyes: eyesFor({ mark: markOf(glyphFor(tab.status)) }) }} placement={live ? 'focus' : 'still'} />
+            <AgentAvatar agent={tab.agent} size={18} shows={laneShows(tab.status)} placement={live ? 'focus' : 'still'} />
             <Text numberOfLines={1} style={[styles.tabLabel, { color: on ? colors.fg : colors.fg2 }]}>
               {name}
             </Text>
