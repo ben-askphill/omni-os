@@ -21,7 +21,7 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 
 Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `apps/server/harness/` that turns its stream into the same events. Hermes is below. Cursor Cloud threads are Cursor cloud agents: `harness/cursor-cloud/` launches one through the Cloud Agents API and reads its run until it ends (docs/user/harnesses.md#cursor-cloud).
 
-The server stores every stream event in SQLite (`data/omni.db`) and pushes it to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
+The server stores every stream event in SQLite (`data/omni.db`) and pushes it to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, and Cursor's dashboard gives the monthly billing cycle. The account readings are shaped once in `packages/shared/account-usage.ts` for the desktop card, phone web and iOS.
 
 Both clients open a thread with `GET /api/threads/:id?history=recent`: its newest page of events, within a row and byte budget. Older pages come from `GET /api/threads/:id/history` as Ben scrolls up or opens a search hit. The stream then sends only rows after the newest one held. A `tool_result` travels as its first 1,024 characters and its size, and the open row loads the rest in chunks and follows a running command's tail. The budgets, cursors, compact tool output and the rows a page carries from outside it are in [Thread history](thread-history.md).
 
