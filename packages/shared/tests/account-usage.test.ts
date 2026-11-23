@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePlanUsage, usageRows, type AccountUsage, type PlanUsage } from '../account-usage.ts';
+import { EMPTY_USAGE_FEED, isAccountsMessage, mergeUsageMessage, nearlyFull, parsePlanUsage, usageRecords, usageRows, withAccountUsage, withHarnessUsage, type AccountUsage, type PlanUsage } from '../account-usage.ts';
 import type { AccountsView, HarnessAccountView, MachineAccounts } from '../harness-accounts.ts';
 
 const H = ['claude-code', 'codex', 'cursor', 'hermes'];
@@ -116,5 +116,43 @@ describe('parsePlanUsage', () => {
       monthly: { utilization: 0.4, resetsAt: 9, spendCents: 10 },
     });
     for (const bad of [null, 'x', 1, []]) expect(parsePlanUsage(bad)).toBeNull();
+  });
+});
+
+describe('nearlyFull', () => {
+  it('turns a window the Needs you colour from 90% on', () => {
+    expect([0, 0.5, 0.899, 0.9, 1].map(nearlyFull)).toEqual([false, false, false, true, true]);
+    expect(nearlyFull(null)).toBe(false);
+    expect(nearlyFull(undefined)).toBe(false);
+  });
+});
+
+describe('the Usage card on the feed', () => {
+  const a = rec('claude-code', 'one@example.com', week(0.2), '2026-11-16T10:00:00.000Z');
+  const newer = rec('claude-code', 'one@example.com', week(0.6), '2026-11-16T11:00:00.000Z');
+
+  it('replaces an account reading and the per-harness one, never another key', () => {
+    const live = withAccountUsage({}, a);
+    expect(Object.values(withAccountUsage(live, newer))).toEqual([newer]);
+    expect(Object.values(withAccountUsage(live, rec('codex', 'one@example.com', null)))).toHaveLength(2);
+    expect(withHarnessUsage({ codex: week(0.1) }, { usage: week(0.3) })).toEqual({ codex: week(0.1), 'claude-code': week(0.3) });
+    expect(withHarnessUsage({ codex: week(0.1) }, { harness: 'codex', usage: null })).toEqual({ codex: null });
+  });
+
+  it('reads the listed records, then the feed ones, and the newer wins', () => {
+    const v = view(machine('omarchy', [acct('claude-code', 'one@example.com')], true));
+    const records = usageRecords({ ...v, usage: [newer] }, withAccountUsage({}, a));
+    expect(records).toEqual([newer, a]);
+    expect(usageRows(H, v, records)[0].usage).toEqual(week(0.6));
+  });
+
+  it('merges usage and account_usage messages, and leaves every other message and a malformed record alone', () => {
+    let feed = mergeUsageMessage(EMPTY_USAGE_FEED, { type: 'usage', harness: 'codex', usage: { seven_day: { utilization: 0.5, resetsAt: 1 }, junk: 1 } });
+    expect(feed.harness).toEqual({ codex: { seven_day: { utilization: 0.5, resetsAt: 1 } } });
+    feed = mergeUsageMessage(feed, { type: 'account_usage', usage: { ...a, machineName: undefined, org: 7 } });
+    expect(Object.values(feed.live)).toEqual([{ ...a, machineName: 'omarchy', org: null }]);
+    for (const m of [null, 'usage', { type: 'thread' }, { type: 'account_usage', usage: { harness: 'codex' } }]) expect(mergeUsageMessage(feed, m)).toBe(feed);
+    expect(isAccountsMessage({ type: 'accounts' })).toBe(true);
+    expect(isAccountsMessage({ type: 'account_usage' })).toBe(false);
   });
 });

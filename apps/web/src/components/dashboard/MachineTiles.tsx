@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { machineStats, machineTile, type MachineLoad, type MachineStats, type MachinesView } from '@omni/shared/machines.ts';
+import { nearlyFull } from '@omni/shared/account-usage.ts';
 import { useFeed, useNow } from '../../store.tsx';
 import { Chip, Icon, StatusDot, Ticks } from '../ui.tsx';
 
@@ -31,7 +32,7 @@ function StatRows({ machine, view, now }: { machine: MachineLoad; view: Machines
         <span key={r.key} className="flex items-center gap-2" title={r.title}>
           <span className="w-[26px] shrink-0 font-num text-[10px] text-fg-3">{r.label}</span>
           <span aria-hidden="true" className="flex min-w-0 flex-1">
-            <Ticks responsive value={r.value ?? 0} count={32} height={10} tone={s.stale || r.value === null ? 'muted' : r.value >= 0.9 ? 'needs' : undefined} className="min-w-0 flex-1" />
+            <Ticks responsive value={r.value ?? 0} count={32} height={10} tone={s.stale || r.value === null ? 'muted' : nearlyFull(r.value) ? 'needs' : undefined} className="min-w-0 flex-1" />
           </span>
           <span className={`w-[76px] shrink-0 text-right font-num text-[10.5px] tabular-nums ${s.stale ? 'text-fg-3' : 'text-fg-2'}`}>{r.text}</span>
         </span>

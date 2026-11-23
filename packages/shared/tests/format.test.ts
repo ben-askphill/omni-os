@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bytes, relTime } from '../format.ts';
+import { bytes, duration, relTime } from '../format.ts';
 
 describe('relTime', () => {
   const now = Date.parse('2026-11-02T12:00:00Z');
@@ -39,5 +39,15 @@ describe('bytes', () => {
     expect(bytes(1536)).toBe('1.5 KB');
     expect(bytes(20 * 1024)).toBe('20 KB');
     expect(bytes(3 * 1024 * 1024)).toBe('3.0 MB');
+  });
+});
+
+describe('duration', () => {
+  it('reads seconds, then minutes and seconds, then hours and minutes', () => {
+    expect([0, 12_000, 59_400, 184_000, 3_900_000].map(duration)).toEqual(['0s', '12s', '59s', '3m 4s', '1h 5m']);
+  });
+
+  it('is empty with no time to read', () => {
+    expect([undefined, null, Number.NaN].map(duration)).toEqual(['', '', '']);
   });
 });

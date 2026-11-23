@@ -38,3 +38,13 @@ export function bytes(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** How long something took: "12s", "3m 4s", "1h 5m". Empty when no time was given. */
+export function duration(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return '';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}

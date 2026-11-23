@@ -1,23 +1,23 @@
 import type { Artifact, HistoryEvent, Thread } from '@omni/client-core';
 import type { Span } from '@omni/shared/history.ts';
 import { isReply, memberLine, replyAt, same, type CloudAgentP, type Item, type ModLine, type ReportP, type SwitchItem, type ToolCall } from '@omni/shared/transcript-fold.ts';
-import { leadMessage, seatRun } from '@omni/shared/members.ts';
-import { sentContext } from '@omni/shared/message-context-machine.ts';
+import { seatRun } from '@omni/shared/members.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
-import { threadView, type NowDoing, type Prompt, type ThreadView, type TurnStatus, type TurnView } from '@omni/shared/thread-view.ts';
-import { collisionLabel, type Collision } from '@omni/shared/collisions.ts';
+import { threadView, type NowDoing, type Prompt, type ThreadView, type TurnView } from '@omni/shared/thread-view.ts';
+import type { Collision } from '@omni/shared/collisions.ts';
 import type { MergeRiskP } from '@omni/shared/merge-risk.ts';
 import { showsSteps, stepsHeader, type StepState, type StepsView } from '@omni/shared/steps.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { conductorChannelLook, type FaceAgent, type FaceShows } from '@omni/shared/agent-avatar.ts';
-import { agentShows, laneShows } from '@omni/shared/crew-eyes.ts';
+import { laneShows } from '@omni/shared/crew-eyes.ts';
 import { glyphFor, markOf, type Mark } from '@omni/shared/status.ts';
-import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
+import { isBrief, lanePlan, lockedReply, outcomeLine, promptCaption, promptRecipients, replyShows, thinkingLabel, turnLive, type LaneFile, type LaneTab } from '@omni/shared/turn-plan.ts';
 
 import { harnessLabel } from './format';
 
+export type { LaneTab };
 export type IosTurn = TurnView<Artifact, Thread>;
 export type IosThreadView = ThreadView<Artifact, Thread>;
 
@@ -42,9 +42,10 @@ export type ThreadRow = RowOf & { inset?: true };
 type RowOf =
   /**
    * `to`: the agents it went to that its text does not name inline (an agent mention, or a team lead's members), on
-   * the line over the bubble with the caption. `chips`: its other context records, as chips over it.
+   * the line over the bubble with the caption. `chips`: its other context records, as chips over it. `late`: it went
+   * in while the turn ran, which the caption's mark shows.
    */
-  | { kind: 'prompt'; key: string; p: Prompt; caption: string | null; to: { agent: string; name: string }[]; chips: unknown[] }
+  | { kind: 'prompt'; key: string; p: Prompt; caption: string | null; late: boolean; to: { agent: string; name: string }[]; chips: unknown[] }
   /**
    * The line that opens an agent's reply: its avatar in the gutter, its name and the time. `run` is the harness and
    * model it ran on, shown with Show technical details. `look`: the Conductor channel's saved face, when the
@@ -76,7 +77,7 @@ type RowOf =
    */
   | { kind: 'lanes'; key: string; turn: number; tabs: LaneTab[]; picked: string }
   /** The files one lane's agent changed, under its reply: `flagged` while a collision flag on it is up. */
-  | { kind: 'files'; key: string; files: { path: string; label: string; flagged: boolean }[] }
+  | { kind: 'files'; key: string; files: LaneFile[] }
   /** A file two agents both edited, flagged where it was raised: above the lanes, or under the turn. */
   | { kind: 'collision'; key: string; c: Collision }
   /** A remote agent could not read the thread's files (ADR 0020): the line under its reply, linking `channel`'s settings. */
@@ -91,12 +92,6 @@ type RowOf =
   /** The running turn's plain steps (@omni/shared/steps.ts), as phone web's MoSteps shows them. */
   | { kind: 'progress'; key: string; header: string; done: number; listed: boolean; steps: ProgressStep[] };
 
-export interface LaneTab {
-  agent: string;
-  status: TurnStatus;
-  /** It edited a file a collision flag still up names. */
-  hit: boolean;
-}
 
 /** One step as the progress row draws it: no calls, so an unchanged list compares equal. */
 export interface ProgressStep {
@@ -174,21 +169,11 @@ function conductorLook(c: RowsInput['conductorChannel']): ConductorLook | null {
 }
 
 function promptRow(p: Prompt, k: number, first: boolean, input: RowsInput): ThreadRow {
-  const nameOf = (id: string) => crewRoleName(id, input.agents);
-  const sent = sentContext(p.text ?? '', p.context);
-  const lead = leadMessage(p, input.thread.role, nameOf);
-  // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
-  const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
-  return { kind: 'prompt', key: `p${p.key}`, p, caption: caption(input.thread, p, first, k, input.atStart, lead?.from ?? null), to, chips: sent.chips };
-}
-
-function caption(thread: Thread, p: Prompt, first: boolean, k: number, atStart: boolean, lead: string | null): string | null {
-  if (p.dropped) return p.undelivered ? `Not delivered · ${p.undelivered}` : 'Not sent';
-  if (lead) return lead;
-  if (p.source === 'pr-watch') return 'PR watch';
-  if (p.source === 'team') return 'Team';
-  if (first && k === 0 && thread.parent_id && atStart) return `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`;
-  return k > 0 ? 'Sent while it ran' : null;
+  const { thread } = input;
+  const { lead, to, chips } = promptRecipients(p, thread.role, (id) => crewRoleName(id, input.agents));
+  const brief = isBrief(thread, { first, index: k, atStart: input.atStart });
+  const caption = promptCaption(p, { index: k, brief, lead: lead?.from ?? null, taskId: thread.task_id });
+  return { kind: 'prompt', key: `p${p.key}`, p, caption: caption.text, late: caption.kind === 'late', to, chips };
 }
 
 function* callRows(calls: ToolCall[], depth: number, open: ReadonlySet<string>, running: boolean): Generator<ThreadRow> {
@@ -211,13 +196,13 @@ function* turnRows(t: IosTurn, i: number, input: RowsInput): Generator<ThreadRow
   const { thread } = input;
   for (const [k, p] of t.prompts.entries()) yield promptRow(p, k, i === 0, input);
   for (const [k, r] of t.reports.entries()) yield { kind: 'report', key: `r${t.key}.${k}`, r };
-  const live = t.status === 'running' || t.status === 'queued';
+  const live = turnLive(t);
   const asking = t.questions.some((q) => q.state === 'pending');
-  const label = t.author && t.author !== thread.role ? 'Thinking' : (statusLabel(input.events) ?? 'Thinking');
+  const label = thinkingLabel(t, thread.role, statusLabel(input.events));
   // A turn several agents answered is its lanes, as on phone web.
   if (t.lanes) yield* laneRows(t, t.lanes, input);
   // The reply being written shows live eyes, as the header's lead does; a past one's head stays idle (D11).
-  else yield* authored(t, replyRows(t, { live, asking, label }, input), input, live ? agentShows(thread.members, t.author, input.mark ?? markOf(glyphFor(thread.status))) : undefined);
+  else yield* authored(t, replyRows(t, { live, asking, label }, input), input, replyShows(t, thread.members, input.mark ?? markOf(glyphFor(thread.status))));
   for (const f of t.flags ?? []) yield { kind: 'collision', key: `x${f.key}`, c: f };
   for (const it of t.switches) yield { kind: 'switch', key: `w${it.key}`, it, running: thread.status === 'running' };
   for (const it of t.members) yield { kind: 'member', key: `j${it.key}`, text: memberLine(it.p), event: it.p.event };
@@ -242,24 +227,17 @@ function* authored(t: IosTurn, rows: Iterable<ThreadRow>, input: RowsInput, show
  * reply under its own author line and the files it changed. One lane at a time, as the phone shows them (ADR 0019).
  */
 function* laneRows(t: IosTurn, lanes: NonNullable<IosTurn['lanes']>, input: RowsInput): Generator<ThreadRow> {
-  const open = lanes.flags.filter((f) => !f.cleared);
-  const flagged = (path: string) => open.some((f) => f.path === path);
   for (const f of lanes.flags) yield { kind: 'collision', key: `x${f.key}`, c: f };
-  const tabs = lanes.turns.map((l) => ({ agent: l.author ?? '', status: l.status, hit: (lanes.files[l.author ?? ''] ?? []).some(flagged) }));
-  const want = input.disclosure?.lanes?.get(t.key);
-  const lane = lanes.turns.find((l) => l.author === want) ?? lanes.turns[0];
-  if (!lane) return;
-  const agent = lane.author ?? '';
-  yield { kind: 'lanes', key: `ln${t.key}`, turn: t.key, tabs, picked: agent };
-  const live = lane.status === 'running' || lane.status === 'queued';
+  const plan = lanePlan(lanes, input.disclosure?.lanes?.get(t.key));
+  if (!plan) return;
+  const { lane, agent, working: live } = plan;
+  yield { kind: 'lanes', key: `ln${t.key}`, turn: t.key, tabs: plan.tabs, picked: agent };
   // Its own latest line while it works, not the thread's status.
-  const label = lanes.latest[agent] ?? 'Working';
+  const label = plan.latest ?? 'Working';
   // While any lane works, the lane's head shows its own lane's state, as its tab does; once all ended they are history.
-  const anyLive = lanes.turns.some((l) => l.status === 'running' || l.status === 'queued');
-  const shows = anyLive ? laneShows(lane.status) : undefined;
+  const shows = plan.live ? laneShows(lane.status) : undefined;
   const rows: ThreadRow[] = [...authored(lane, replyRows(lane, { live, asking: live && lane.questions.length > 0, label }, input), input, shows)];
-  const files = lanes.files[agent] ?? [];
-  if (files.length) rows.push({ kind: 'files', key: 'fl', files: files.map((path) => ({ path, label: collisionLabel(path), flagged: flagged(path) })), inset: true });
+  if (plan.files.length) rows.push({ kind: 'files', key: 'fl', files: plan.files, inset: true });
   // A lane's rows are keyed under its turn: an empty lane has no event of its own to key on.
   for (const r of rows) yield { ...r, key: `L${t.key}.${agent}.${r.key}` };
 }
@@ -299,16 +277,13 @@ function* replyRows(t: IosTurn, { live, asking, label }: { live: boolean; asking
     if (t.error) yield { kind: 'error', key: `e${t.key}`, text: t.error };
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };
-    if (t.prose && locked(t.author, input)) yield { kind: 'lock', key: `lk${t.key}`, channel: input.channel?.name ?? input.thread.channel_id };
+    if (lockedReply(t, input.agents, input.channel)) yield { kind: 'lock', key: `lk${t.key}`, channel: input.channel?.name ?? input.thread.channel_id };
     if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children, answers: t.answers };
     for (const a of t.artifacts) yield { kind: 'artifact', key: `f${t.key}.${a.id}`, a };
     if (t.steps > 0) yield steps();
   }
   if (open) yield* stepRows(t, disclosure.calls, thread.status === 'running');
 }
-
-/** A remote agent wrote it, and the channel does not let remote agents see its work: it could not read the files. */
-const locked = (author: string | null, input: RowsInput) => !!author && !!input.agents?.find((a) => a.id === author)?.server && !remoteReadsOpen(input.channel);
 
 /** The thread as the list draws it, oldest first. Pass `prev` to keep every unchanged row the object it was, so memoized rows skip. */
 export function threadRows(input: RowsInput, prev: readonly ThreadRow[] = []): { rows: ThreadRow[]; view: IosThreadView } {
@@ -334,8 +309,5 @@ function keepRows(prev: readonly ThreadRow[], next: ThreadRow[]): ThreadRow[] {
 }
 
 export function outcomeText(r: Extract<ThreadRow, { kind: 'outcome' }>, took: string): string {
-  const [word, after] = ENDED[r.status] ?? ['Ended', 'Ended after'];
-  return [took ? `${after} ${took}` : word, r.steps ? `${r.steps} ${r.steps === 1 ? 'step' : 'steps'}` : null, r.harness && harnessLabel(r.harness)].filter(Boolean).join(' · ');
+  return outcomeLine({ status: r.status, took, steps: r.steps, harness: r.harness && harnessLabel(r.harness) });
 }
-
-const ENDED: Record<string, [string, string]> = { done: ['Done', 'Done in'], failed: ['Failed', 'Failed after'], stopped: ['Stopped', 'Stopped after'] };

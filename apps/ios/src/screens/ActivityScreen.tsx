@@ -1,3 +1,4 @@
+import { shelfView } from '@omni/shared/inbox-shelves.ts';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -79,8 +80,8 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
     if (row.canMarkDone) out.push({ icon: 'check', label: `Mark ${row.title} done`, run: () => act(row.target, { kind: 'done' }, 'Marked done') });
     return out;
   };
-  const doneRows = doneOpen ? inbox.done.slice(0, doneLimit) : [];
-  const moreDone = doneOpen ? Math.min(DONE_PAGE, Math.max(0, inbox.done.length - doneLimit)) : 0;
+  // The Done shelf pages as the web's does (@omni/shared/inbox-shelves.ts).
+  const { rows: doneRows, more: moreDone } = shelfView(inbox.done, { open: doneOpen, limit: doneLimit });
 
   return (
     <ScrollView

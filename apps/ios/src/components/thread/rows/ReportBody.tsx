@@ -1,4 +1,4 @@
-import { reportShape } from '@omni/shared/report-shape.ts';
+import { NOTES_FOLD, NOTES_TITLE, reportFolds, reportShape } from '@omni/shared/report-shape.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
@@ -9,8 +9,6 @@ import { Text } from '../../../ui/Text';
 import { Markdown } from '../Markdown';
 import { useRowActions } from './actions';
 
-const NOTES = 'progress-notes';
-
 /**
  * A crew report's body, as the web's ReportBody draws it: the outcome first, its pull requests as chips, each part the
  * agent wrote under a heading folded, and what it said while it worked folded last (report-shape.ts).
@@ -19,14 +17,14 @@ export function ReportBody({ r }: { r: ReportP }) {
   const { colors } = useOmniTheme();
   const { openThread } = useRowActions();
   const shape = useMemo(() => reportShape(r.text || '(no reply)', r.notes), [r.text, r.notes]);
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(shape.lead || !shape.sections.length ? [] : [shape.sections[0].key]));
+  const folds = reportFolds(shape);
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(folds.open));
   const toggle = (key: string) =>
     setOpen((was) => {
       const next = new Set(was);
       if (!next.delete(key)) next.add(key);
       return next;
     });
-  const folds = shape.sections.length > 0 || shape.notes.length > 0;
   return (
     <View style={styles.body}>
       {shape.lead ? <Markdown text={shape.lead} onOpenThread={openThread} /> : null}
@@ -48,7 +46,7 @@ export function ReportBody({ r }: { r: ReportP }) {
           ))}
         </View>
       ) : null}
-      {folds ? (
+      {folds.keys.length ? (
         <View style={[styles.sections, { borderColor: colors.line }]}>
           {shape.sections.map((s, i) => (
             <Section key={s.key} title={s.title} count={s.count} first={i === 0} open={open.has(s.key)} onToggle={() => toggle(s.key)}>
@@ -56,7 +54,7 @@ export function ReportBody({ r }: { r: ReportP }) {
             </Section>
           ))}
           {shape.notes.length ? (
-            <Section title="Progress notes" count={shape.notes.length} first={!shape.sections.length} open={open.has(NOTES)} onToggle={() => toggle(NOTES)}>
+            <Section title={NOTES_TITLE} count={shape.notes.length} first={!shape.sections.length} open={open.has(NOTES_FOLD)} onToggle={() => toggle(NOTES_FOLD)}>
               <View style={[styles.notes, { borderColor: colors.line }]}>
                 {shape.notes.map((n, i) => (
                   <Markdown key={i} text={n} onOpenThread={openThread} quiet />

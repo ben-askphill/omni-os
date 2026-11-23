@@ -62,7 +62,7 @@ export function PromptRow({ row }: Of<'prompt'>) {
         </View>
       ) : null}
       {caption || to.length ? <View style={[styles.line, styles.captionLine]}>
-        {p.dropped || caption === 'Sent while it ran' ? <Icon name={p.dropped ? 'x' : p.mode === 'interrupt' ? 'stop' : 'send'} size={11} color={colors.fg3} /> : null}
+        {p.dropped || row.late ? <Icon name={p.dropped ? 'x' : p.mode === 'interrupt' ? 'stop' : 'send'} size={11} color={colors.fg3} /> : null}
         {caption ? <Text style={[styles.caption, { color: colors.fg3 }]}>{caption}</Text> : null}
         <SentTo agents={to} />
       </View> : null}

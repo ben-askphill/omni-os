@@ -24,7 +24,8 @@ import { RemoteMark } from '../components/ConnectAgent.tsx';
 import { useShell } from './shell.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../forwarded.ts';
 import type { NowDoing, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
-import { actionsLabel, stepsHeader, stepsLabel, type StepsView } from '@omni/shared/steps.ts';
+import { actionsLabel, stepsHeader, type StepsView } from '@omni/shared/steps.ts';
+import { outcomeLine } from '@omni/shared/turn-plan.ts';
 import { threadMark } from '@omni/shared/status.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { ReportBody } from '../components/thread/ReportBody.tsx';
@@ -38,7 +39,6 @@ export type TurnView = TurnOf<Artifact, Thread>;
 
 const DRAWN = new Set(['html', 'image', 'svg']);
 const ext = (name: string) => (name.includes('.') ? name.split('.').pop()! : 'file');
-const ENDED: Record<string, [string, string]> = { done: ['Done', 'Done in'], failed: ['Failed', 'Failed after'], stopped: ['Stopped', 'Stopped after'] };
 
 /** `event`: the answer's row, for the find bar (thread-find-dom.ts). */
 export function MoProse({ text, event }: { text: string; event?: number | null }) {
@@ -52,12 +52,10 @@ export function MoProse({ text, event }: { text: string; event?: number | null }
 /** `limit`: the thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped. */
 /** `harness`: named at the end, for a turn no agent wrote. An agent's turn shows it on its author line, behind Show technical details. */
 export function Outcome({ t, harness, limit }: { t: TurnView; harness: string | null; limit?: string | null }) {
-  const took = duration(t.result?.duration_ms);
-  const [word, after] = ENDED[t.status] ?? ['Ended', 'Ended after'];
   return (
     <div className="flex items-center gap-2 text-[12.5px] leading-[1.3] text-fg-3 tabular-nums">
       <StatusDot status={limit ? 'limited' : t.status} size={8} />
-      {[limit ?? (took ? `${after} ${took}` : word), t.progress ? stepsLabel(t.progress.steps.length) : null, harness && harnessLabel(harness)].filter(Boolean).join(' · ')}
+      {outcomeLine({ status: t.status, took: duration(t.result?.duration_ms), steps: t.progress?.steps.length ?? 0, harness: harness && harnessLabel(harness), limit })}
     </div>
   );
 }

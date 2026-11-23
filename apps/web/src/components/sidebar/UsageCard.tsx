@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { accountTitle, accountUsageKey, HARNESS_ROWS, peakUsage, planWindows, slotSummary, usageRows, waitingTitle, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
+import { accountTitle, HARNESS_ROWS, nearlyFull, peakUsage, planWindows, slotSummary, usageRecords, usageRows, waitingTitle, withAccountUsage, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
 import { type MonthlyUsage, type UsageWindow } from '../../api.ts';
 import { useAccounts } from '../../accounts.ts';
 import { resetAt, resetAtShort, resetIn, resetSentence } from '@omni/shared/usage-reset.ts';
@@ -51,7 +51,7 @@ function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
   const now = useNow(60_000);
   const pct = windowPct(w);
   if (pct === null) return <span className="flex-1 text-center font-num text-[10px] text-fg-3">—</span>;
-  const tone = pct >= 0.9 ? 'needs' : undefined;
+  const tone = nearlyFull(pct) ? 'needs' : undefined;
   return (
     <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-center gap-1.5" title={windowTitle(label, pct, w!.resetsAt, now)}>
@@ -69,7 +69,7 @@ function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
   return (
     <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-center gap-1.5" title={monthlyTitle(name, m)}>
-        <Ticks responsive value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="min-w-0 flex-1" label={`${name} month usage`} />
+        <Ticks responsive value={pct} count={20} height={10} tone={nearlyFull(pct) ? 'needs' : undefined} className="min-w-0 flex-1" label={`${name} month usage`} />
         <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
         <span className="text-[10px] text-fg-3">mo</span>
       </div>
@@ -134,10 +134,10 @@ export function useUsageRows(): UsageRow[] {
   const accounts = useAccounts();
   const [live, setLive] = useState<Record<string, AccountUsage>>({});
   useFeed((e) => {
-    if (e.type === 'account_usage') setLive((prev) => ({ ...prev, [accountUsageKey(e.usage)]: e.usage }));
+    if (e.type === 'account_usage') setLive((prev) => withAccountUsage(prev, e.usage));
   });
   const view = accounts.data;
-  return useMemo(() => usageRows(HARNESS_IDS, view, [...(view?.usage ?? []), ...Object.values(live)], usage), [view, live, usage]);
+  return useMemo(() => usageRows(HARNESS_IDS, view, usageRecords(view, live), usage), [view, live, usage]);
 }
 
 /** Plan usage per harness. Collapsed by default to one row with the live dot and the busiest window; click to open. */
@@ -166,7 +166,7 @@ export function UsageCard({ phone = false }: { phone?: boolean }) {
           {open ? '' : footer || (feedLive ? 'Connected' : 'Connecting')}
         </span>
         {peak !== null && !open && (
-          <span className={`font-num text-[10px] tabular-nums ${peak >= 0.9 ? 'text-needs' : 'text-fg-2'}`} title="Highest window across plans">
+          <span className={`font-num text-[10px] tabular-nums ${nearlyFull(peak) ? 'text-needs' : 'text-fg-2'}`} title="Highest window across plans">
             {Math.round(peak * 100)}%
           </span>
         )}
@@ -223,7 +223,7 @@ function PhoneUsageRows({ rows }: { rows: UsageRow[] }) {
                     <span>{label}</span>
                     <span className="font-num tabular-nums">{Math.round(fraction * 100)}% used</span>
                   </div>
-                  <Ticks responsive value={fraction} tone={fraction >= 0.9 ? 'needs' : undefined} label={`${meterName} ${label} usage`} className="my-1" />
+                  <Ticks responsive value={fraction} tone={nearlyFull(fraction) ? 'needs' : undefined} label={`${meterName} ${label} usage`} className="my-1" />
                   {detail && <p className="text-[13px] text-fg-3">{detail}</p>}
                   {reset && <p className="text-[13px] text-fg-3">{reset}</p>}
                 </div>

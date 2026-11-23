@@ -10,6 +10,7 @@ import { useStatusAndProfile } from './app/useStatusAndProfile.ts';
 import { createSyncNudge } from './sync-nudge.ts';
 import { loadDisplay } from './display.ts';
 import { secretStoreLabel, type SecretStoreKind } from '@omni/shared/secret-store.ts';
+import { withHarnessUsage } from '@omni/shared/account-usage.ts';
 import { monograms } from '@omni/shared/monogram.ts';
 import { Monograms } from './components/ui/primitives.tsx';
 
@@ -134,7 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (d) => {
         const e = d as FeedEvent;
         if (e.type === 'usage') {
-          setUsage((prev) => ({ ...prev, [e.harness ?? 'claude-code']: e.usage }));
+          setUsage((prev) => withHarnessUsage(prev, e));
         } else if (e.type === 'thread' || e.type === 'channel') {
           scheduleRefresh();
         } else if (e.type === 'tasks') {

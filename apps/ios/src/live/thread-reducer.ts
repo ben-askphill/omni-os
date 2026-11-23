@@ -1,7 +1,7 @@
 import type { Artifact, ArtifactWithThread, Channel, HistoryEvent, PendingMsg, SSEState, Thread, ThreadOpen } from '@omni/client-core';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { Span } from '@omni/shared/history.ts';
-import { withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
+import { isCrewArtifact, withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
 import { isDelegatedTo } from '@omni/shared/members.ts';
 import { withOpening, type Opening } from '@omni/shared/opening.ts';
 
@@ -121,7 +121,7 @@ export function withDetail(view: ThreadView, detail: Partial<ThreadDetail>): Thr
 export function reduceThread(view: ThreadView, message: unknown): ThreadView {
   if (!isRecord(message)) return view;
   if (message.kind === 'artifact') return isArtifact(message.artifact, view.threadId) ? withArtifact(view, message.artifact) : view;
-  if (message.kind === 'crew_artifact') return isCrewArtifact(message.artifact) ? { ...view, crewArtifacts: withCrewArtifact(view.crewArtifacts, message.artifact) } : view;
+  if (message.kind === 'crew_artifact') return isCrewArtifact<ArtifactWithThread>(message.artifact) ? { ...view, crewArtifacts: withCrewArtifact(view.crewArtifacts, message.artifact) } : view;
 
   const fromStream = message.kind === 'thread';
   if (!fromStream && message.type !== 'thread') return view;
@@ -174,10 +174,6 @@ function joined(prev: ThreadView, next: ThreadView): ThreadView {
 
 function isArtifact(v: unknown, threadId: string): v is Artifact {
   return isRecord(v) && typeof v.id === 'number' && (v.thread_id === undefined || v.thread_id === threadId);
-}
-
-function isCrewArtifact(v: unknown): v is ArtifactWithThread {
-  return isRecord(v) && typeof v.id === 'number' && typeof v.thread_id === 'string' && typeof v.updated_at === 'string';
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
