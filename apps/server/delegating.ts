@@ -18,12 +18,24 @@ import { memberFields, type MemberView } from './member-view.ts';
 import { activeTasks, lives } from './runner/state.ts';
 import { isSubagent } from './stream.ts';
 import { machineNames, ranOnFields, type MachineNames } from './ran-on.ts';
-import type { StepField } from '@omni/shared/steps.ts';
-import { stepField } from './step-line.ts';
+import type { SeatedDelegation } from '@omni/shared/members.ts';
+import type { ProgressField, StepField } from '@omni/shared/steps.ts';
+import { progressField, stepField } from './step-line.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
 
-/** With `delegating`, where it runs or ran and when its run started (ran-on.ts), and the step it is on (step-line.ts), for the Inbox rows. */
-export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields> & StepField & { members?: MemberView[]; read_only?: string };
+/** What the decorator reads of a thread: a row, or the part of one a test or a list passes. */
+type Decorated = { id: string; status?: string; parent_id?: string | null; source?: string | null; job_id?: string | null; seat_agent?: string | null };
+
+/**
+ * With `delegating`, where it runs or ran and when its run started (ran-on.ts), the step it is on and, on a delegated
+ * thread, its list in brief (step-line.ts), and on work a seated agent opened the #conductor thread whose card shows it.
+ */
+export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields> & StepField & ProgressField &
+  { seated_delegation?: SeatedDelegation; members?: MemberView[]; read_only?: string };
+
+/** Work a seated agent opened shows on the card of the #conductor thread it sits in (threads.job_id), not its parent's. */
+const seatedField = (t: Decorated): { seated_delegation?: SeatedDelegation } =>
+  t.job_id && t.seat_agent ? { seated_delegation: { thread_id: t.job_id, agent: t.seat_agent } } : {};
 
 /** How long a sub-agent on another machine counts without a new row: its progress is stored every 20 s while it works. */
 export const REMOTE_TASK_STALE_MS = 15 * 60_000;
@@ -43,15 +55,18 @@ const agentHosts = () => [...new Set([...activeTasks().filter((t) => t.subagent)
 /** The ids of the threads with a delegated thread or sub-agent working below them. */
 export const delegatingIds = (): ReadonlySet<string> => new Set(threads.delegating(agentHosts()));
 
-/** The thread as the clients get it. Pass `ids` and `names` to read many with one query each. */
-export const withDelegating = <T extends { id: string; status?: string }>(t: T, ids = delegatingIds(), names: MachineNames = machineNames()): WithDelegating<T> => {
+/**
+ * The thread as the clients get it, the same on the feed, its own stream, a detail and every list. Pass `ids` and
+ * `names` to read many with one query each.
+ */
+export const withDelegating = <T extends Decorated>(t: T, ids = delegatingIds(), names: MachineNames = machineNames()): WithDelegating<T> => {
   const delegating = ids.has(t.id);
   // A group thread's agents and whether it takes messages (member-view.ts), on the threads that have them.
-  return { ...t, delegating, ...ranOnFields(t, delegating, names), ...stepField(t), ...memberFields(t as unknown as Thread) };
+  return { ...t, delegating, ...ranOnFields(t, delegating, names), ...stepField(t), ...progressField(t), ...seatedField(t), ...memberFields(t as unknown as Thread) };
 };
 
 /** Every thread as the clients get it, with one query. */
-export function allWithDelegating<T extends { id: string; status?: string }>(list: readonly T[]): WithDelegating<T>[] {
+export function allWithDelegating<T extends Decorated>(list: readonly T[]): WithDelegating<T>[] {
   const ids = delegatingIds();
   const names = machineNames();
   return list.map((t) => withDelegating(t, ids, names));

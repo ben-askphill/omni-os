@@ -1,4 +1,5 @@
 import { db, outbox, SEED_TS, syncMeta, threads, transitions, type StoredSessionState, type Thread } from '../../db.ts';
+import { SEAT_JOB_FILL } from '../../db/migrate.ts';
 import { publishFeed } from '../../bus.ts';
 import { ownerOf } from '../../ownership.ts';
 import { claim, registerHandler } from '../apply.ts';
@@ -17,11 +18,13 @@ import { logRefused } from '../verify.ts';
 // owner (the person accountable) and auto_reason, which an older build does not send, sessions and handover (the run
 // switch, runner/switch-plan.ts), the queued run (runner/switch.ts, merged by its own edit time), continued_from (a
 // continued thread's source, apps/server/continue.ts), and a quick ask's quick, workspace and promoted_to
-// (packages/shared/quick-ask.ts).
+// (packages/shared/quick-ask.ts). job_id and seat_agent (work a seated agent opened, db/repos/threads.ts) are set
+// once and follow the row; a row from an older build gets them from its parent here, as the migration does.
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
-  'branch', 'parent_id', 'task_id', 'source', 'automation', 'last_text', 'archived', 'run_machine', 'created_at', 'updated_at',
+  'branch', 'parent_id', 'task_id', 'source', 'automation', 'last_text', 'archived', 'run_machine', 'job_id', 'seat_agent',
+  'created_at', 'updated_at',
 ] as const;
 
 type Row = Thread & { run_machine: string | null };
@@ -49,6 +52,7 @@ const setContinuedFrom = db.prepare('UPDATE threads SET continued_from = ? WHERE
 const setQuickAsk = db.prepare('UPDATE threads SET quick = ?, workspace = ?, promoted_to = ? WHERE id = ?');
 const editsOf = db.prepare('SELECT field_edits FROM threads WHERE id = ?');
 const setEdits = db.prepare('UPDATE threads SET field_edits = ? WHERE id = ?');
+const fillSeatJob = (id: string) => db.prepare(`${SEAT_JOB_FILL} AND threads.id = ?`).run(id);
 const readEdits = (id: string): FieldEdits | null => {
   const raw = (editsOf.get(id) as { field_edits: string | null } | undefined)?.field_edits;
   try {
@@ -154,6 +158,8 @@ registerHandler('thread', {
     if (kept) (t.status = run.status), (t.run_machine = run.run_machine);
     const before = (folderOf.get(change.entity_id) as { folder_id: string | null } | undefined)?.folder_id ?? null;
     upsert.run(...COLUMNS.map((c) => (t[c] ?? null) as string | number | null));
+    // A row from a build before job_id carries none: read it from the seat here, if the seat has arrived.
+    if (!('job_id' in data)) fillSeatJob(change.entity_id);
     const took = (k: string) => merged.taken.has(k);
     if (took('folder_id')) file(change.entity_id, t.channel_id, t.folder_id ?? null);
     if (took('pinned_at')) setPinned.run(t.pinned_at ?? null, change.entity_id);

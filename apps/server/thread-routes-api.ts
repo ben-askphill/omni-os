@@ -32,7 +32,6 @@ import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
 import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
-import { progressField } from './step-line.ts';
 import { memberFields } from './member-view.ts';
 import { collisionsOf } from './runner/collisions.ts';
 import { machineNames } from './ran-on.ts';
@@ -290,13 +289,8 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const pending = pendingFor(t.id);
   const ids = delegatingIds();
   const names = machineNames();
-  // A delegated thread's list in brief rides along for the delegation cards (step-line.ts progressField).
-  const shown = <T extends Thread>(list: T[]) => list.map((x) => ({ ...withDelegating(x, ids, names), ...progressField(x) }));
-  const children = threads.children(t.id);
-  const delegatedBySeats = t.channel_id === 'conductor' ? threads.seatedDelegations(t.id).map((child) => ({
-    ...child,
-    seated_delegation: threads.seatedDelegationOf(child),
-  })) : [];
+  const shown = <T extends Thread>(list: T[]) => list.map((x) => withDelegating(x, ids, names));
+  const children = threads.cards(t.id);
   const parent = t.parent_id ? threads.get(t.parent_id) : null;
   const detail = {
     thread: withDelegating(t, ids, names),
@@ -307,7 +301,8 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     // The newest files and screenshots of the threads it delegated to, at any depth, each with its thread's title.
     // New ones come on the stream as crew_artifact (artifacts.ts announceArtifact).
     crew_artifacts: artifacts.crew(t.id, CREW_ARTIFACTS_MAX),
-    children: shown([...children, ...delegatedBySeats].sort((a, b) => a.created_at.localeCompare(b.created_at))),
+    // The threads on its delegation cards: the ones it delegated, and the work its seated agents opened.
+    children: shown(children),
     // Members of the teams this thread started, so its delegation cards can show their state.
     team: shown(children.flatMap((ch) => threads.team(ch.id))),
     parent: parent ? withDelegating(parent, ids, names) : null,

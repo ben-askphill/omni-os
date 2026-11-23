@@ -43,6 +43,8 @@
     "workspace": null,
     "promoted_to": null,
     "owner": null,
+    "job_id": "00000000-0000-4000-8000-000000000090",
+    "seat_agent": "builder",
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z",
     "seated_delegation": {

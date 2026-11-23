@@ -101,7 +101,7 @@ export interface StepProgress {
   live: boolean;
 }
 
-/** The field the server adds to a delegated thread on its parent's detail and the feed (apps/server/step-line.ts). */
+/** The field the server adds to a delegated thread wherever the clients get it (apps/server/step-line.ts). */
 export interface ProgressField {
   progress?: StepProgress;
 }
