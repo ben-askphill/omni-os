@@ -37,9 +37,7 @@ function imageVersion(id: string, image: string | undefined): string | null {
 }
 
 /** An agent by id among `agents`; one not listed (a deleted agent, or the list still loading) by its built-in name or id. */
-export const agentLook = (id: string, agents: readonly AgentLook[]): AgentLook => agents.find((r) => r.id === id) ?? { id, name: agentName(id, agents) };
-
-export const agentName = (id: string, agents: readonly Pick<CrewRole, 'id' | 'name'>[]) => crewRoleName(id, agents) ?? id;
+export const agentLook = (id: string, agents: readonly AgentLook[]): AgentLook => agents.find((r) => r.id === id) ?? { id, name: crewRoleName(id, agents) };
 
 export function agentFace(id: string, agents: readonly AgentLook[], size: number, opts: Omit<FaceOptions, 'size'> = {}): AgentFace {
   const look = agentLook(id, agents).avatar;

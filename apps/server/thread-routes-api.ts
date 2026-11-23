@@ -18,7 +18,7 @@ import { stampNewThreadReferences, stampThreadReferences } from './message-conte
 import { stampMachineMentions } from './message-context/machine-mention.ts';
 import { stampAgentMentions } from './message-context/agent-mention.ts';
 import { getCrew } from './crew.ts';
-import { callerOf, lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
+import { callerOf, lineageRefusal, senderOf as sender, sourceOf, threadCredential } from './automation-guard.ts';
 import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { userName } from './profile.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
@@ -180,6 +180,7 @@ threadRoutesApi.post('/', async (c) => {
   const { data, files } = await readBody(c);
   // run-on.ts: a synced machine's id, "here", or left out for Settings' default.
   const { context: raw, ...body } = createSchema.parse(data);
+  body.source = sourceOf(c, body.source);
   const filed = fileUnderCaller(c, body);
   if (filed) return filed;
   if (body.members?.length) {
@@ -255,9 +256,10 @@ function fileUnderCaller(c: Context, body: { parent_id?: string | null }) {
 threadRoutesApi.post('/team', async (c) => {
   const body = teamSchema.safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'invalid team' }, 400);
+  body.data.source = sourceOf(c, body.data.source);
   const filed = fileUnderCaller(c, body.data);
   if (filed) return filed;
-  const no = seatingRefusal(c, { channel: newThreadChannel({ ...body.data, source: body.data.source ?? 'conductor' }), parent_id: body.data.parent_id });
+  const no = seatingRefusal(c, { channel: newThreadChannel(body.data), parent_id: body.data.parent_id });
   if (no) return c.json({ error: no }, 403);
   const { thread, members } = await createTeam(body.data);
   return c.json({ thread: { ...thread, ...memberFields(thread) }, members });
@@ -348,7 +350,7 @@ threadRoutesApi.get('/:id/summary', (c) => {
     harness: t.harness, model: t.model, effort: t.effort,
     // A thread it delegated, at any depth, still runs or queues: it reports back here.
     delegating: delegatingIds().has(t.id),
-    updated_at: t.updated_at, last_reply: events.lastRunText(t.id) || events.lastAssistantText(t.id),
+    updated_at: t.updated_at, last_reply: events.lastRun(t.id).text || events.lastAssistantText(t.id),
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),

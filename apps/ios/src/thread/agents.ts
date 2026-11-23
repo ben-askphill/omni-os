@@ -9,7 +9,7 @@ import { agentRows, fileQuery, pickFile, type FileMention, type FileQuery, type 
 import { replyTo, routingHint } from '@omni/shared/members.ts';
 import { isRemoteAgentHarness, remoteLeadPlaceholder } from '@omni/shared/remote-agent.ts';
 
-import { agentName } from '../components/agent-face';
+import { crewRoleName, isConductor } from '@omni/shared/crew-role.ts';
 import { harnessLabel } from './format';
 
 export interface ThreadAgents {
@@ -22,10 +22,10 @@ export interface ThreadAgents {
 }
 
 export function threadAgents(thread: Pick<Thread, 'role' | 'members'>, agents: readonly Pick<CrewRole, 'id' | 'name' | 'hidden'>[]): ThreadAgents {
-  const lead = { id: thread.role ?? '', name: thread.role ? agentName(thread.role, agents) : 'the agent' };
+  const lead = { id: thread.role ?? '', name: thread.role ? crewRoleName(thread.role, agents) : 'the agent' };
   const members = thread.members?.length ? thread.members.map((m) => ({ id: m.agent, name: m.name })) : thread.role ? [lead] : [];
   const seated = new Set(members.map((m) => m.id));
-  const others = agents.filter((r) => !r.hidden && r.id !== 'conductor' && !seated.has(r.id)).map((r) => ({ id: r.id, name: r.name }));
+  const others = agents.filter((r) => !r.hidden && !isConductor(r.id) && !seated.has(r.id)).map((r) => ({ id: r.id, name: r.name }));
   return { lead, members, others };
 }
 

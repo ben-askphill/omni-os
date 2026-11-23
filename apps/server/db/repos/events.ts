@@ -72,24 +72,28 @@ function runRows(threadId: string, after: number, kinds: string): { kind: string
     .all(s.thread, ...s.args, s.thread, ...s.args, after) as { kind: string; payload: string }[];
 }
 
-function runTexts(threadId: string, after: number): string[] {
-  return runRows(threadId, after, `'assistant_text'`).map((r) => JSON.parse(r.payload).text as string);
+/** The most recent run, as the end of a turn reads it (events.lastRun). */
+export interface LastRun {
+  /** All its assistant text, oldest first. */
+  text: string;
+  /** Its last assistant text: the reply a push alert previews. Empty when it wrote none. */
+  reply: string;
+  /**
+   * It as a crew report: its final message, the text it wrote after its last tool call (else its last text), and what
+   * it said before that while it worked.
+   */
+  report: { text: string; notes: string[] };
 }
 
-/**
- * The most recent run as a crew report: its final message, the text it wrote after its last tool call (else its last
- * text), and what it said before that while it worked.
- */
-function runReport(threadId: string, after: number): { text: string; notes: string[] } {
-  const rows = runRows(threadId, after, `'assistant_text', 'tool_use'`);
+function lastRunOf(threadId: string, after: number): LastRun {
   const texts: string[] = [];
-  let reply = 0;
-  for (const r of rows) {
-    if (r.kind === 'tool_use') reply = texts.length;
+  let final = 0;
+  for (const r of runRows(threadId, after, `'assistant_text', 'tool_use'`)) {
+    if (r.kind === 'tool_use') final = texts.length;
     else texts.push(JSON.parse(r.payload).text as string);
   }
-  if (reply === texts.length) reply = Math.max(0, texts.length - 1);
-  return { text: texts.slice(reply).join('\n\n'), notes: texts.slice(0, reply) };
+  if (final === texts.length) final = Math.max(0, texts.length - 1);
+  return { text: texts.join('\n\n'), reply: texts.at(-1) ?? '', report: { text: texts.slice(final).join('\n\n'), notes: texts.slice(0, final) } };
 }
 
 export const events = {
@@ -183,17 +187,9 @@ export const events = {
       .get(s.thread, ...s.args) as { payload: string } | undefined;
     return row ? (JSON.parse(row.payload).text as string) : null;
   },
-  /** All assistant text produced by the most recent run (after the last message the agent actually saw, and after `after`). */
-  lastRunText(threadId: string, after = 0): string {
-    return runTexts(threadId, after).join('\n\n');
-  },
-  /** The most recent run's final message and the messages before it (runReport), for its crew report. */
-  lastRunReport(threadId: string, after = 0): { text: string; notes: string[] } {
-    return runReport(threadId, after);
-  },
-  /** The last assistant text of the most recent run, the reply a push alert previews. Empty when the run wrote none. */
-  lastRunReply(threadId: string, after = 0): string {
-    return runTexts(threadId, after).at(-1) ?? '';
+  /** The most recent run (after the last message the agent actually saw, and after `after`), read once: its text, reply and report. */
+  lastRun(threadId: string, after = 0): LastRun {
+    return lastRunOf(threadId, after);
   },
   /** A thread's question and question_answer events (packages/shared/question.ts), oldest first; with `id`, one question's. */
   questions(threadId: string, id?: string): EventRow[] {

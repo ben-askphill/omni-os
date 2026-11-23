@@ -5,6 +5,8 @@ import { addEvent, emitThread } from './runner/state.ts';
 import { createThread, type CreateThreadInput } from './runner/api.ts';
 import { events, threads, type Thread } from './db.ts';
 import { quickTurns, readsOnly, taskPrompt, taskRequest, TASK_SUGGESTED } from '@omni/shared/quick-ask.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_ROLE } from '@omni/shared/crew-role.ts';
 
 export class QuickAskRefusal extends Error {
   constructor(
@@ -55,7 +57,7 @@ export async function taskFromQuickAsk(id: string, opts: { request?: string; tit
   const task = await createThread({
     channel: t.channel_id,
     prompt,
-    ...(t.channel_id === 'conductor' && { role: 'conductor' }),
+    ...(t.channel_id === CONDUCTOR_CHANNEL && { role: CONDUCTOR_ROLE }),
     ...(title && { title }),
     source: 'capture',
   });

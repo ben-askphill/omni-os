@@ -170,7 +170,7 @@ describe('Cursor Cloud through the runner', () => {
     const finished = H.byKind(t.id, 'cloud_agent').findLast((e) => e.p.status === 'FINISHED')!;
     expect(finished.p).toMatchObject({ branch: expect.stringMatching(/^cursor\//), repo: 'acme/widgets' });
     const member = H.db.members.of(t.id, 'cloud-review')!;
-    const reply = H.db.events.lastRunText(member.session_thread);
+    const reply = H.db.events.lastRun(member.session_thread).text;
     expect(reply).toBeTruthy();
     expect(H.texts(t.id, 'assistant_text').join('\n')).toContain(reply);
     if (remote_work) await H.untilResults(t.id, 3);

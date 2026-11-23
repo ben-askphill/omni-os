@@ -58,7 +58,7 @@ describe('crew reports', () => {
     add('tool_use', { id: 'tu2', name: 'Bash', input: { command: 'npm test' } });
     add('assistant_text', { text: 'Opened PR #9.' });
     add('assistant_text', { text: '## Tests\n- 13 of 13 pass' });
-    const said = H.db.events.lastRunReport(child.id);
+    const said = H.db.events.lastRun(child.id).report;
     expect(said).toEqual({
       text: 'Opened PR #9.\n\n## Tests\n- 13 of 13 pass',
       notes: ['Checking which source the CLI sends.', 'Both tests pass. Confirming the new test fails without the fix.'],
@@ -76,7 +76,7 @@ describe('crew reports', () => {
     add('tool_use', { id: 'tu3', name: 'Edit', input: {} });
     add('assistant_text', { text: 'Now the README.' });
     add('tool_use', { id: 'tu4', name: 'Edit', input: {} });
-    H.runner.reportToParent(child.id, 'failed', H.db.events.lastRunReport(child.id));
+    H.runner.reportToParent(child.id, 'failed', H.db.events.lastRun(child.id).report);
     await H.untilResults(parent.id, 4);
     expect(H.byKind(parent.id, 'crew_report').at(-1)!.p).toMatchObject({ status: 'failed', text: 'Now the README.', notes: ['Editing the docs.'] });
     expect(H.claudeTexts(parent.id).at(-1)).toContain('Now the README.\n\nWhat it said before that:\n\nEditing the docs.');

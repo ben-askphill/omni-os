@@ -15,7 +15,7 @@ import { PRDetail, PRList } from './PRs.tsx';
 import { useDisplay } from '../display.ts';
 import { showsCode } from '@omni/shared/display.ts';
 
-function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
+function ThreadsTab({ id, conductorChannel }: { id: string; conductorChannel: boolean }) {
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
   const list = useChannelThreads(id, accept);
   const prs = useThreadPRs(id);
@@ -23,7 +23,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const { channel, needsYou } = useApp();
   return (
     <div className={`${pageColumn('measure')} pt-6 pb-16`}>
-      <NewThreadComposer key={`${id}:${presetSeq}`} channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
+      <NewThreadComposer key={`${id}:${presetSeq}`} channelId={id} placeholder={conductorChannel ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
       <NeedsYouSection inbox={inChannel(needsYou, id)} quiet />
       <div className="mt-8">
         <ThreadGroups
@@ -108,11 +108,11 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
     return <MissingChannel id={id} />;
   }
 
-  const isConductor = ch.id === 'conductor';
+  const conductorChannel = ch.id === 'conductor';
   const tabs = [
     { id: 'threads' as const, label: 'Threads', href: href.channel(id) },
     // A channel without a repo has no PRs to list, unless Show technical details is on.
-    ...(isConductor || !showsCode(display, ch) ? [] : [{ id: 'prs' as const, label: 'PRs', href: href.prs(id) }]),
+    ...(conductorChannel || !showsCode(display, ch) ? [] : [{ id: 'prs' as const, label: 'PRs', href: href.prs(id) }]),
     { id: 'settings' as const, label: 'Settings', href: href.settings(id) },
   ];
 
@@ -122,7 +122,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
     <div className="scroll-thin h-full overflow-y-auto [scrollbar-gutter:stable]">
       <div className={`${pageColumn(pr ? 'page' : 'measure')} pt-6 md:pt-10`}>
         <div className="flex items-center gap-3.5">
-          <Avatar name={ch.name} channelIcon={ch.icon} avatarBg={ch.avatar_bg} omni={isConductor} size={44} />
+          <Avatar name={ch.name} channelIcon={ch.icon} avatarBg={ch.avatar_bg} omni={conductorChannel} size={44} />
           <div className="min-w-0 flex-1">
             <div className="caption mb-1 flex items-center gap-2">
               {CHANNEL_KIND[ch.kind] ?? ch.kind}
@@ -134,7 +134,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
               )}
             </div>
             <h1 className="flex min-w-0 items-baseline gap-1 font-display text-[26px] leading-[1.1] md:text-[30px]">
-              {!isConductor && <span className="text-fg-3">#</span>}
+              {!conductorChannel && <span className="text-fg-3">#</span>}
               <span className="truncate">{ch.name}</span>
             </h1>
           </div>
@@ -156,12 +156,12 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
               <span className="truncate">{ch.repo_path}</span>
             </span>
           )}
-          {ch.notes && isConductor && <span className="truncate px-1 text-[length:var(--fs-body)] text-fg-3">{ch.notes}</span>}
+          {ch.notes && conductorChannel && <span className="truncate px-1 text-[length:var(--fs-body)] text-fg-3">{ch.notes}</span>}
         </div>
         <Tabs className="mt-4" kind="nav" label="Channel" tabs={tabs} value={tab} />
       </div>
 
-      {tab === 'threads' && <ThreadsTab id={id} isConductor={isConductor} />}
+      {tab === 'threads' && <ThreadsTab id={id} conductorChannel={conductorChannel} />}
       {tab === 'prs' && (pr ? <PRDetail channel={ch} n={pr} /> : <PRList channel={ch} />)}
       {tab === 'settings' && <ChannelSettingsTab channel={ch} />}
     </div>

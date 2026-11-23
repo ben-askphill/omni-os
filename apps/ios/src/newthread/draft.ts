@@ -7,6 +7,7 @@ import { AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { filesKey, type Staged } from '../attachments/model';
 import { classifyFailure, type SendFailure } from '../send/outbox';
 import { runChipLabel, runSheetModel, type RunSheetModel, type RunThread } from '../thread/run-model';
+import { isConductor } from '@omni/shared/crew-role.ts';
 
 export const CONDUCTOR = 'conductor';
 
@@ -25,7 +26,7 @@ export function targetsOf(channels: readonly ChannelWithRunning[] | null): Targe
 
 /** The Conductor's threads run as its crew role. Another channel's start with none. */
 export function roleOf(target: string, crew: readonly CrewRole[]): CrewRole | undefined {
-  return target === CONDUCTOR ? crew.find((r) => r.id === CONDUCTOR) : undefined;
+  return target === CONDUCTOR ? crew.find((r) => isConductor(r.id)) : undefined;
 }
 
 /** Where the new thread runs. `pick` is null until one is made, and then the server's default (Settings on the computer) applies. */

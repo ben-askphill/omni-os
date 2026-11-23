@@ -5,6 +5,7 @@ import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '..
 import { artifacts, events, memories, threads, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import { doesOwnWork, getCrew, type CrewRole } from '../crew.ts';
+import { crewRoleName, isConductor } from '@omni/shared/crew-role.ts';
 import { skillLines, type ThreadSkills } from '../skills.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
@@ -162,13 +163,12 @@ const delegateOnlyRule = (name: string) =>
   `${QUICK_ASKS} Delegate with Omni's delegate tool, before anything else, when ${REAL_WORK}. ${NO_HANDS} delegate it instead of working around that. ${plainAnswers(name)}`;
 
 /**
- * The Conductor's own rule, in step with its charter (crew/conductor.md) and ADR 0019 as amended: real work starts
- * with seat_agents in its own #conductor thread, and delegate or delegate_team only for the charter's exceptions.
+ * How a thread with the conductor tools hands work on, ahead of the rest of its delegation section. The Conductor gets
+ * nothing here: what it does with real work (seat the agent first, delegate only for the exceptions) is its charter's
+ * alone (crew/conductor.md), which its prompt carries in full. Any other delegate-only agent delegates first.
  */
-const conductorRule = (name: string) =>
-  `${QUICK_ASKS} For real work your first action is seat_agents, not delegate: when ${REAL_WORK}, seat the agent for it in this thread, where ${name} talks with it, and it opens its own thread in the client channel once the work needs one. Use delegate or delegate_team directly, instead of seating, only for a review, research that a build depends on and the build after it, a team ${name} asked for, tasks on machines ${name} @mentioned, or when ${name} asks you to delegate. ${NO_HANDS} hand it to an agent instead of working around that. ${plainAnswers(name)}`;
-
-const CONDUCTOR = 'conductor';
+const delegationRule = (role: CrewRole, name: string) =>
+  !role.delegateOnly ? `Use Omni's delegate tool when ${name} asks you to hand work to another agent. ` : isConductor(role.id) ? '' : `${delegateOnlyRule(name)} `;
 
 /**
  * A no-edits role (the reviewer): what it is without, and that the shell is not a way around it. Omni takes the edit
@@ -378,7 +378,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? [
           '',
           '## Thread delegation',
-          `${role.delegateOnly ? (role.id === CONDUCTOR ? conductorRule : delegateOnlyRule)(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another agent.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
+          `${delegationRule(role, name)}First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
           TEAM_RULE,
           SESSION_CACHE_RULE,
         ]
@@ -420,7 +420,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     // A seated member (ADR 0019): the lead commits, and several agents edit one worktree at once (Q24). A remote agent
     // seated here talks only, and where a remote agent leads, the user commits what the local members change (ADR 0020).
     const lead = thread.parent_id ? threads.get(thread.parent_id) : undefined;
-    const leadName = (lead?.role && getCrew(lead.role)?.name) || lead?.role || 'The lead';
+    const leadName = crewRoleName(lead?.role, getCrew) ?? 'The lead';
     const team = !!lead && events.teamOf(lead.id) !== null;
     const committer = isRemoteAgentHarness(lead?.harness) ? `${leadName} is a remote agent and talks only, so ${name}` : leadName;
     lines.push(

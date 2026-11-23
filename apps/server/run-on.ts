@@ -15,6 +15,7 @@
 //   Read here, never written, while machines run mixed versions.
 // - `runon.accepted.<thread>.<message>`: durable acceptance, synced so a new holder never replays it.
 import type { MessageContext } from '@omni/shared/message-context.ts';
+import { isCrewReport, type CrewReport } from '@omni/shared/report-shape.ts';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
@@ -145,7 +146,7 @@ export async function forwardMessage(
 }
 
 /** A delegated thread's report for a parent that another machine holds: that machine files it on its next sync. */
-export function forwardReport(parentId: string, key: string, prompt: string, payload: Record<string, unknown>) {
+export function forwardReport(parentId: string, key: string, prompt: string, payload: CrewReport) {
   const holder = holderOf(parentId);
   if (!holder) return;
   send({ id: reportCommandId(parentId, key), thread_id: parentId, kind: 'report', target: holder, prompt, mode: 'steer', report_key: key, report: payload });
@@ -252,7 +253,7 @@ async function act(c: RemoteCommand, self: string) {
     return;
   }
   if (c.kind === 'report') {
-    if (!c.report_key || !c.report) return answer(c, self, 'rejected', 'The report was malformed.');
+    if (!c.report_key || !isCrewReport(c.report)) return answer(c, self, 'rejected', 'The report was malformed.');
     // Saved under the report's own key, so a second sync files nothing more.
     fileReport(threadId, c.report_key, c.prompt, c.report);
     answer(c, self, 'accepted');
@@ -298,7 +299,7 @@ async function legacyMessages(self: string, now: number) {
       for (const m of value as Forwarded[]) {
         if (!isId(m?.id) || typeof m.prompt !== 'string' || typeof m.at !== 'string' || !fresh(m.at, now)) continue;
         if (m.report) {
-          if (typeof m.report.key === 'string' && m.report.payload && typeof m.report.payload === 'object') fileReport(threadId, m.report.key, m.prompt, m.report.payload);
+          if (typeof m.report.key === 'string' && isCrewReport(m.report.payload)) fileReport(threadId, m.report.key, m.prompt, m.report.payload);
           continue;
         }
         const receipt = `runon.accepted.${threadId}.${m.id}`;

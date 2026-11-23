@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { isConductor } from '@omni/shared/crew-role.ts';
 import { CREW_SHAPE_IDS, type CrewShapeId } from '@omni/shared/crew-shapes.ts';
 import { parseAvatarImage } from './agent-avatar.ts';
 import type { CrewLockedField, CrewLocks } from '@omni/shared/crew-settings.ts';
@@ -171,17 +172,25 @@ export interface CrewSource {
   error?: string;
 }
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+/**
+ * A crew file's frontmatter YAML and the body after it, as written, or null when it has no frontmatter. The one reader
+ * of the `---` block: the store's edits (crew-store.ts) and the avatar migration (crew-avatar-migrate.ts) split here too.
+ */
+export function frontmatterOf(src: string): { yaml: string; body: string } | null {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(src);
+  return m ? { yaml: m[1], body: m[2] } : null;
+}
 
 export function splitCrewFile(src: string): CrewSource {
-  const m = src.match(FRONTMATTER);
-  if (!m) return { meta: {}, body: src.trim() };
+  const parts = frontmatterOf(src);
+  if (!parts) return { meta: {}, body: src.trim() };
+  const body = parts.body.trim();
   try {
-    const meta = YAML.parse(m[1]) ?? {};
-    return { meta: typeof meta === 'object' && !Array.isArray(meta) ? meta : {}, body: m[2].trim() };
+    const meta = YAML.parse(parts.yaml) ?? {};
+    return { meta: typeof meta === 'object' && !Array.isArray(meta) ? meta : {}, body };
   } catch (err) {
     // A typo in one charter must not break every thread that uses a role.
-    return { meta: {}, body: m[2].trim(), error: `bad frontmatter: ${(err as Error).message}` };
+    return { meta: {}, body, error: `bad frontmatter: ${(err as Error).message}` };
   }
 }
 
@@ -400,7 +409,7 @@ export function listCrew(): CrewRole[] {
   const ids = new Set([...shipped.keys(), ...own.keys()]);
   return [...ids]
     .map((id) => readRole(id, read(shipped.get(id)), read(own.get(id)))!)
-    .sort((a, b) => (a.id === 'conductor' ? -1 : b.id === 'conductor' ? 1 : a.id.localeCompare(b.id)));
+    .sort((a, b) => (isConductor(a.id) ? -1 : isConductor(b.id) ? 1 : a.id.localeCompare(b.id)));
 }
 
 const read = (file: string | undefined) => (file ? readFileSync(file, 'utf8') : null);

@@ -5,7 +5,7 @@ import type { ThreadRow } from '../live/channel-model';
 import { useAgents } from '../live/react';
 import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 import { Icon } from '../ui/Icon';
-import { agentName } from './agent-face';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { MarkLine } from './MarkLine';
 import { StatusDot } from './StatusDot';
 import { ThreadAvatar } from './ThreadAvatar';
@@ -28,7 +28,7 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[row.title, row.agent && agentName(row.agent, agents), channel, row.pinned ? 'pinned' : null, marked ? 'marked done' : null, row.markLine ?? row.statusLabel, row.ago].filter(Boolean).join(', ')}
+      accessibilityLabel={[row.title, row.agent && crewRoleName(row.agent, agents), channel, row.pinned ? 'pinned' : null, marked ? 'marked done' : null, row.markLine ?? row.statusLabel, row.ago].filter(Boolean).join(', ')}
       accessibilityHint={onLongPress ? 'Swipe left for pin, done and archive. Hold for more.' : undefined}
       onPress={onPress}
       onLongPress={onLongPress}

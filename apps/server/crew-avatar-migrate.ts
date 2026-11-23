@@ -8,21 +8,20 @@ import YAML, { isMap } from 'yaml';
 import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { paths } from './config.ts';
-import { avatarOf, CREW_ID, crewFiles, writeOwnCrew } from './crew.ts';
+import { avatarOf, CREW_ID, crewFiles, frontmatterOf, writeOwnCrew } from './crew.ts';
 import { kv } from './db.ts';
 import { record } from './db/sync.ts';
 
 /** A `sync.` key, so it stays on this machine (db/sync.ts localKey): each machine switches its own files once. */
 const DONE = 'sync.migrated.crew_glyph_icons';
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 const PALETTE = new Set<string>(AGENT_PALETTE.map((c) => c.hex));
 
 /** The file without its glyph icon, or null when it shows no glyph: no avatar, another kind of icon, or a photo. */
 function withoutGlyph(text: string): string | null {
-  const m = text.match(FRONTMATTER);
-  if (!m) return null;
-  const doc = YAML.parseDocument(m[1]);
+  const parts = frontmatterOf(text);
+  if (!parts) return null;
+  const doc = YAML.parseDocument(parts.yaml);
   if (doc.errors.length || !isMap(doc.contents)) return null;
   const node = doc.get('avatar');
   // What the file shows, read as every other part of Omni reads it (crew.ts avatarOf).
@@ -32,7 +31,7 @@ function withoutGlyph(text: string): string | null {
   if (!shown.bg || !PALETTE.has(shown.bg)) node.delete('bg');
   if (!node.items.length) doc.delete('avatar');
   // A file left with no keys keeps only its charter: an overlay that names no keys reads the same either way.
-  return doc.contents.items.length ? `---\n${doc.toString({ lineWidth: 0 })}---\n${m[2]}` : m[2];
+  return doc.contents.items.length ? `---\n${doc.toString({ lineWidth: 0 })}---\n${parts.body}` : parts.body;
 }
 
 /** Run once at boot, after the database is open. The ids of the files it rewrote, each recorded for sync. */

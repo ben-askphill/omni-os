@@ -137,7 +137,8 @@ export function abortStart(live: Live, status: ThreadStatus) {
 export function endTurn(live: Live, status: ThreadStatus, more = false) {
   const id = live.threadId;
   const turnFrom = live.closeTurn();
-  const runText = events.lastRunText(id, turnFrom);
+  const run = events.lastRun(id, turnFrom);
+  const runText = run.text;
   const t = threads.update(id, {
     status: more ? 'queued' : status,
     has_run: 1,
@@ -148,16 +149,15 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   // A quick ask is read where it was asked, so it alerts nobody. The task it turns into does. A quiet automation run
   // with nothing to report alerts nobody either (automation-quiet.ts).
   if (!more && !t?.quick && t?.source !== 'member') {
-    const reply = events.lastRunReply(id, turnFrom);
-    if (!(status === 'done' && runnerPorts().reporting.quietRun(id, reply))) notifyEnded(id, status, reply);
+    if (!(status === 'done' && runnerPorts().reporting.quietRun(id, run.reply))) notifyEnded(id, status, run.reply);
   }
   applyQueued(id);
   // Shown done at once; the checkout after the turn is saved behind it.
   finishTurnSnapshot(live);
   emitThread(id);
   // Even while Omni shuts down: the report is saved and parked for Resume (queue.ts), not lost.
-  if (t?.parent_id && !more) reportToParent(id, status, events.lastRunReport(id, turnFrom));
-  if (t?.quick && status === 'done' && !more && runText) void runnerPorts().reporting.quickTurn(id, events.lastRunReply(id, turnFrom));
+  if (t?.parent_id && !more) reportToParent(id, status, run.report);
+  if (t?.quick && status === 'done' && !more && runText) void runnerPorts().reporting.quickTurn(id, run.reply);
   if (status === 'done' && !more && !t?.parent_id && !t?.quick && runText && !isShuttingDown()) {
     suggestReply(id, runText);
     suggestNextThread(id, runText);

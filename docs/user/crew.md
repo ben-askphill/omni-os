@@ -34,7 +34,7 @@ A file there with a shipped agent's name is your edit of that built-in, an overl
 - With `charter_mode: replace`, or no `charter_mode` at all (a copy made before overlays), its body is the whole charter. Omni then records the shipped charter it was written against as `based_on`, and the agent shows `builtInChanged` once a release changes that charter, or when a hand copy never recorded it.
 - Hiding a built-in is per machine (`crew` in `data/omni.config.json`): no new thread starts as it, and lists leave it out. The conductor and usage-scan cannot be hidden (see [Agents Omni relies on](#agents-omni-relies-on)).
 
-`delegatable: false` keeps an agent out of the Conductor's `list_crew` and makes `delegate` and `delegate_team` refuse it. The conductor and usage-scan set it. Starting a thread as an agent no file has, or one hidden on this machine, is refused with the valid ids; it used to run with no charter.
+`delegatable: false` keeps an agent out of the Conductor's `list_crew` and makes `delegate` and `delegate_team` refuse it, as does any other way an agent thread starts a thread (the `omni` command, `/api/threads` with its token), whatever `source` it sends. The conductor and usage-scan set it. Starting a thread as an agent no file has, or one hidden on this machine, is refused with the valid ids; it used to run with no charter.
 
 `tools` sets the tools an agent's threads get: `full` (the default), `no-edits` or `delegate-only` (`delegate_only: true`, the older key, means the same and wins over `tools`). See [No file edits](#no-file-edits).
 

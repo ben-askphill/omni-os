@@ -16,7 +16,7 @@ import { Icon } from '../../../ui/Icon';
 import { Text } from '../../../ui/Text';
 import type { Collision } from '@omni/shared/collisions.ts';
 import { eyesFor } from '@omni/shared/crew-eyes.ts';
-import { agentName } from '../../agent-face';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { AgentAvatar } from '../../AgentAvatar';
 import { ChannelAvatar } from '../../ChannelAvatar';
 import { useRowActions } from './actions';
@@ -34,7 +34,7 @@ export function AuthorRow({ row }: Of<'author'>) {
   const { colors } = useOmniTheme();
   const agents = useAgents();
   const technical = useTechnical();
-  const name = agentName(row.agent, agents);
+  const name = crewRoleName(row.agent, agents);
   return (
     <View style={styles.author} accessibilityRole="header" accessibilityLabel={[name, row.at ? clock(toDate(row.at)) : null].filter(Boolean).join(', ')}>
       {/* The Conductor's channel look when it wears one (rows.ts), else the agent's avatar; the reply being written shows live eyes. */}
@@ -75,7 +75,7 @@ export function LanesRow({ row }: Of<'lanes'>) {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist" accessibilityLabel="Agents answering">
       {row.tabs.map((tab) => {
         const on = tab.agent === row.picked;
-        const name = agentName(tab.agent, agents);
+        const name = crewRoleName(tab.agent, agents);
         return (
           <Pressable
             key={tab.agent}
@@ -149,7 +149,7 @@ export function CollisionFlag({ c, onDismiss }: { c: Collision; onDismiss: (id: 
         <Text style={[styles.flagText, { color: colors.fg }]}>
           <Text style={{ fontWeight: weight.semibold }}>Both edited </Text>
           <Text style={[styles.path, { color: colors.fg }]}>{c.label}</Text>
-          <Text style={{ color: colors.fg3 }}>{` · ${cleared ?? `${list(c.agents.map((a) => agentName(a, agents)))} were each told.`}`}</Text>
+          <Text style={{ color: colors.fg3 }}>{` · ${cleared ?? `${list(c.agents.map((a) => crewRoleName(a, agents)))} were each told.`}`}</Text>
         </Text>
         {!cleared ? (
           <Pressable accessibilityRole="button" accessibilityLabel={`Dismiss the flag on ${c.path}`} accessibilityState={{ busy }} disabled={busy} hitSlop={space.s4} onPress={() => void dismiss()} style={styles.dismiss}>

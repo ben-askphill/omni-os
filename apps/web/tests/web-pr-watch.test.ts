@@ -4,7 +4,7 @@ import { watchLine, type PRWatchView } from '@omni/shared/pr-watch.ts';
 import type { PendingMsg } from '../src/api.ts';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { PRWakeList } from '../src/components/thread/PRWatch.tsx';
-import { isOmnis, parkedHeading, parkedLabel } from '../src/requests.ts';
+import { isOmnis, parkedHeading, parkedLabel } from '@omni/shared/parked.ts';
 
 const at = '2026-10-24T10:00:00.000Z';
 const watch = (over: Partial<PRWatchView> = {}): PRWatchView => ({

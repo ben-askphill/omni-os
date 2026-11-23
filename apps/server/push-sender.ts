@@ -13,6 +13,7 @@ import { forgetPushToken } from './push-tokens.ts';
 import { globalSecret, onSecretChange } from './secrets.ts';
 import type { AppPushKind } from '@omni/shared/app-pairing.ts';
 import { crewAsker } from '@omni/shared/question.ts';
+import type { CrewReport } from '@omni/shared/report-shape.ts';
 
 export interface PushEvent {
   kind: AppPushKind;
@@ -355,13 +356,13 @@ export function notifyEnded(threadId: string, status: ThreadStatus, reply: strin
  * A crew report landed in a thread. Only the Conductor's reports alert: that is where Ben reads them. The phone gets a
  * push; the Web UI and the desktop app get a feed `alert` (Needs you does not list reports).
  */
-export function notifyCrewReport(parentId: string, report: Record<string, unknown> = {}) {
+export function notifyCrewReport(parentId: string, report: Partial<CrewReport> = {}) {
   const t = threads.get(parentId);
   if (t?.channel_id !== 'conductor') return;
-  const str = (value: unknown) => (typeof value === 'string' ? value : null);
-  emit({ kind: 'crewReport', threadId: parentId, channelId: t.channel_id, title: t.title, text: str(report.text), from: str(report.title) });
-  const from = oneLine(str(report.title));
-  const preview = pushPreview(str(report.text));
+  const text = report.text ?? null;
+  emit({ kind: 'crewReport', threadId: parentId, channelId: t.channel_id, title: t.title, text, from: report.title ?? null });
+  const from = oneLine(report.title ?? null);
+  const preview = pushPreview(text);
   publishFeed({
     type: 'alert',
     alert: {

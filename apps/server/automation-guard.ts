@@ -45,6 +45,12 @@ export function threadCredential(c: Context): string | null {
  */
 export const senderOf = (c: Context, from: 'ben' | 'conductor' = 'ben'): 'ben' | 'conductor' => (callerOf(c) ? 'conductor' : from);
 
+/**
+ * Where a thread an API call starts comes from, by the same rule: an agent thread's is delegated, whatever `source`
+ * it sends, so it starts only as an agent that may be delegated to (crew.ts crewForNewThread). Ben's clients keep theirs.
+ */
+export const sourceOf = <S extends string>(c: Context, asked: S): S | 'conductor' => (callerOf(c) ? 'conductor' : asked);
+
 export type AutomationWrite = 'create' | 'edit' | 'enable' | 'run' | 'scan' | 'disable' | 'delete';
 
 const WHAT: Record<AutomationWrite, string> = {

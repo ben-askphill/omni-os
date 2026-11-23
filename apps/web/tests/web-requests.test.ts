@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { requestIdFor } from '@omni/shared/request-id.ts';
 import type { PendingMsg, ThreadDetail } from '../src/api.ts';
-import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, reportNotes, sendKey } from '../src/requests.ts';
+import { isOmnis, isParked, parkedHeading, parkedLabel } from '@omni/shared/parked.ts';
+import { parkedOf, reportNotes, sendKey } from '../src/requests.ts';
 import { isEditable, movedOrder } from '../src/pending-edits.ts';
 
 // The Web UI's side of durable sends (apps/web/src/requests.ts), against the recorded server answers

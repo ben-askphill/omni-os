@@ -554,7 +554,7 @@ function cloudFinished(m: MemberRow, status: ThreadStatus) {
   // The branch name comes from Cursor's API and goes into a command the lead runs: a plain ref name only.
   if (!run?.branch || !SAFE_REF.test(run.branch) || run.branch.includes('..')) return;
   const who = agentName(m.agent);
-  const said = events.lastRunText(m.session_thread) || '(no reply)';
+  const said = events.lastRun(m.session_thread).text || '(no reply)';
   const reply = said.length > REPLY_MAX ? `${said.slice(0, REPLY_MAX)}\n\n[cut at ${REPLY_MAX} characters]` : said;
   // A tag the reply cannot guess, so no text in it can close the block early.
   const tag = `member-reply-${randomUUID().slice(0, 8)}`;

@@ -36,6 +36,7 @@ import { MoRound, MoSheet } from './parts.tsx';
 import { useShell } from './shell.tsx';
 import { TemplateChips, useTemplates } from '../templates.tsx';
 import { templateDraft, type Template } from '@omni/shared/templates.ts';
+import { CONDUCTOR_ROLE, isConductor } from '@omni/shared/crew-role.ts';
 
 /** The sheet's draft-context list: its reference chips, gone with its text when the sheet closes. */
 export const NEW_SHEET_DRAFT = 'new:sheet';
@@ -100,7 +101,7 @@ export function NewSheet({ channel: initial, prompt: first, run: preset }: { cha
 
   const conductor = target === 'conductor';
   const ch = conductor ? undefined : listed.find((c) => c.id === target);
-  const role = conductor && crew.some((r) => r.id === 'conductor') ? 'conductor' : '';
+  const role = conductor && crew.some((r) => isConductor(r.id)) ? CONDUCTOR_ROLE : '';
   const ro = crew.find((r) => r.id === role);
   const mentions = newThreadScope(target, mode === 'task' ? role : undefined);
   const run = harnesses ? draftRun(picked?.target === target ? picked : null, ro, channels.find((c) => c.id === target), harnesses) : null;

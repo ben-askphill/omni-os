@@ -3,7 +3,7 @@
 // the message is when it arrives; when the message was sent first, the edit turns stale and keeps Ben's text so he
 // can copy it or send it as a new message.
 import type { PendingMsg } from './api.ts';
-import { isOmnis, isParked } from './requests.ts';
+import { isOmnis, isParked } from '@omni/shared/parked.ts';
 
 /**
  * Still unsent and saved on the server: queued in the runner, held for after this turn, or parked by a restart.

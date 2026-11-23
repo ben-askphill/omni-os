@@ -29,7 +29,8 @@ import { profileTask, routeTask } from '../harness/auto.ts';
 import { autoNeedOptions } from '../display.ts';
 import { usageByHarness } from '../usage.ts';
 import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-service.ts';
-import { resolveRun, reviewerEffort, setsRun } from '../harness/resolve.ts';
+import { resolveRun, reviewerEffort } from '../harness/resolve.ts';
+import { roleRun } from '@omni/shared/draft-run.ts';
 import { reviewRun } from '../harness/review.ts';
 import type { CommandUse } from '../harness/adapter.ts';
 import { deliver } from './queue.ts';
@@ -249,7 +250,7 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   // The Conductor role is automatic in its own channel. A saved channel run overrides its charter, including
   // after a retired channel default is dropped below, when the fallback must be Auto rather than the charter.
   // Cursor Cloud is per channel: it needs the channel's GitHub repo, and can run on the channel's own key.
-  const roleDefaults = role?.id === 'conductor' && channel.id === 'conductor' && setsRun(channelDefaults) ? undefined : role;
+  const roleDefaults = roleRun(role, channel);
   const resolve = (cat: Catalog, withChannel = true) =>
     resolveRun(
       asked,

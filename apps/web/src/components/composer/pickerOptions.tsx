@@ -4,6 +4,7 @@ import { StaticMark } from '../brand.tsx';
 import { AgentAvatar } from '../AgentAvatar.tsx';
 import type { PickerOption } from '../ui.tsx';
 import type { useApp } from '../../store.tsx';
+import { isConductor } from '@omni/shared/crew-role.ts';
 
 type Channels = ReturnType<typeof useApp>['channels'];
 type Crew = ReturnType<typeof useApp>['crew'];
@@ -34,7 +35,7 @@ export function pickerOptions(visibleChannels: Channels, channel: string, crew: 
   const roleOptions: PickerOption<string>[] = [
     { value: '', label: 'No agent', sub: 'No charter', avatar: false, icon: 'user' },
     ...crew
-      .filter((r) => r.delegatable !== false || r.id === CONDUCTOR_CHANNEL)
+      .filter((r) => r.delegatable !== false || isConductor(r.id))
       .map((r) => ({
         value: r.id,
         label: r.name,

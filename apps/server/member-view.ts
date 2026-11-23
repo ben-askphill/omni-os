@@ -1,13 +1,14 @@
 // A group thread's agents as the clients get them (ADR 0019): `members` on the thread, only while an agent besides the
 // lead is seated, and `read_only` when its lead agent is gone. Reads the member list (db/repos/members.ts) and the
 // hidden thread each member runs in; runner/members.ts writes them.
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import type { MemberState } from '@omni/shared/members.ts';
 import { setShownThread } from './bus.ts';
 import { getCrew } from './crew.ts';
 import { events, members, threads, type Thread, type ThreadStatus } from './db.ts';
 
-/** An agent's name as the transcript shows it. */
-export const agentName = (id: string | null | undefined) => (id ? (getCrew(id)?.name ?? id) : 'The agent');
+/** An agent's name as the transcript shows it, read from its charter on this machine (crewRoleName). */
+export const agentName = (id: string | null | undefined) => crewRoleName(id || null, getCrew) ?? 'The agent';
 
 /** An agent in a thread as the clients get it. */
 export interface MemberView {

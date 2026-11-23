@@ -9,7 +9,7 @@ import { tallyLabel } from '../../live/thread-tree';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Text } from '../../ui/Text';
-import { agentName } from '../agent-face';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { MarkLine } from '../MarkLine';
 import { StatusDot } from '../StatusDot';
 import { ROW_AVATAR, ThreadAvatar } from '../ThreadAvatar';
@@ -81,7 +81,7 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
       <View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={[row.title, row.agent && agentName(row.agent, agents), row.pinned ? 'pinned' : null, row.markLine, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
+          accessibilityLabel={[row.title, row.agent && crewRoleName(row.agent, agents), row.pinned ? 'pinned' : null, row.markLine, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
           onPress={onPress}
           style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
         >

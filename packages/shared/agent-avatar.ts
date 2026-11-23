@@ -1,5 +1,6 @@
 import { avatarInk } from './avatar-color.ts';
 import { hasOwnLook } from './channel-icon.ts';
+import { BUILT_IN_AGENTS } from './crew-role.ts';
 import {
   CREW_LAYOUTS,
   CREW_SHAPE_IDS,
@@ -138,21 +139,8 @@ export type AgentFace = ImageFace | IconFace | CharacterFace;
 
 const isCrewShape = (shape: unknown): shape is CrewShapeId => (CREW_SHAPE_IDS as readonly unknown[]).includes(shape);
 
-/**
- * The shape each built-in agent takes when its crew file names none (D2), Store ops and Hermes included although
- * neither ships as a crew file. Kept in code: an overlay replaces a crew file's whole avatar map.
- */
-export const BUILT_IN_SHAPES: Readonly<Record<string, CrewShapeId>> = {
-  conductor: 'circle',
-  researcher: 'droplet',
-  builder: 'squircle',
-  reviewer: 'pill-wide',
-  writer: 'arch',
-  inbox: 'tray',
-  'store-ops': 'triangle',
-  'usage-scan': 'pill-tall',
-  hermes: 'pebble',
-};
+/** The shape each built-in agent takes when its crew file names none (D2), from the one list of them (crew-role.ts). */
+export const BUILT_IN_SHAPES: Readonly<Record<string, CrewShapeId>> = Object.fromEntries(Object.entries(BUILT_IN_AGENTS).map(([id, a]) => [id, a.shape]));
 
 /** The shapes no built-in agent takes, in the spec's order: any other agent gets one of them (D2). */
 export const SPARE_SHAPES: readonly CrewShapeId[] = ['diamond', 'bubble', 'cloud', 'pill-diagonal', 'fan', 'shield', 'bucket'];

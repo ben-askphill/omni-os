@@ -1,4 +1,5 @@
 import { canSteer, type HarnessInfo, type PendingMsg, type SendMode, type Thread } from '@omni/client-core';
+import { reportName } from '@omni/shared/parked.ts';
 import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
 
 /** A turn is running or waiting for a slot, so a message to it steers or queues instead of starting the next turn. */
@@ -44,9 +45,9 @@ export function sendLabel(thread: SteerFacts, catalog: readonly HarnessInfo[] | 
   return steers(thread, catalog) ? 'Send to the running turn' : 'Send after this turn';
 }
 
-/** The line over a pending message the agent has. Parked ones are the Resume card's (needs/parked.ts). */
+/** The line over a pending message the agent has. Parked ones are the Resume card's (@omni/shared/parked.ts). */
 export function pendingLabel(m: PendingMsg): string {
-  if (m.kind === 'crew_report') return `Crew report${m.task_id ? ` ${m.task_id}` : ''}${m.role ? ` from ${m.role}` : ''}`;
+  if (m.kind === 'crew_report') return reportName(m);
   if (m.state === 'waiting') return 'Waiting for a free slot';
   if (m.state === 'held') return 'Queued, runs after this turn';
   return m.mode === 'interrupt' ? 'Interrupting, runs next' : 'Sent, the agent reads it next';
