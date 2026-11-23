@@ -11,7 +11,8 @@ import type { AttachmentAvailability, CarryoverAttachment } from '@omni/shared/c
 import { uploadsDir } from './config.ts';
 import type { EventRow } from './db.ts';
 import { CAPABILITIES, isHarnessId } from './harness/types.ts';
-import { imageMime, MAX_INLINE_IMAGE, maxUploadBytes, safeName, uniqueName, type Attachment } from './uploads.ts';
+import { profileOf } from './harness/profile.ts';
+import { imageMime, maxUploadBytes, safeName, uniqueName, type Attachment } from './uploads.ts';
 
 /** One continuation takes at most four files' worth of the upload limit in all, so copying them stays quick. */
 export const carryTotalBytes = () => 4 * maxUploadBytes();
@@ -95,7 +96,8 @@ function judge(dir: string, c: Candidate): Judged {
 /** How the harness reads a copied file: images ride along inline where it can (the Claude Code image block is size capped, Codex takes any image as a local one), and the rest as a note naming the file. */
 export function arrivesAs(harness: string, a: { image: boolean; size: number | null }): 'inline' | 'path' {
   if (!isHarnessId(harness) || !CAPABILITIES[harness].inlineImages || !a.image) return 'path';
-  return harness === 'codex' || (a.size !== null && a.size <= MAX_INLINE_IMAGE) ? 'inline' : 'path';
+  const max = profileOf(harness).inlineImageMax;
+  return max === null || (a.size !== null && a.size <= max) ? 'inline' : 'path';
 }
 
 export interface AttachmentPlan {

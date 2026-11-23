@@ -18,6 +18,7 @@ import { checkSignIn } from './sign-in-check.ts';
 import { doesOwnWork, getCrew } from './crew.ts';
 import { threadSecretSet } from './secrets.ts';
 import { about } from './about.ts';
+import { profileOf } from './harness/profile.ts';
 
 export interface Automation {
   id: string;
@@ -227,7 +228,7 @@ function setReportedSignIn(id: string, key: string | null) {
 async function signInGap(a: Automation): Promise<{ key: string; message: string } | null> {
   const role = getCrew(a.role);
   const harness = a.harness ?? role?.harness;
-  if (harness && harness !== 'claude-code' && harness !== 'auto') return null;
+  if (harness && harness !== 'auto' && !profileOf(harness).claudeAi) return null;
   const declared = neededConnectors(a.prompt, a.connectors, role?.connectors);
   const needs = doesOwnWork({}, role) ? withoutTokenAccounts(declared, role?.tokens, (name) => threadSecretSet(a.channel, name)) : declared;
   if (!needs.length) return null;

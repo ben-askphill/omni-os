@@ -7,15 +7,13 @@ import { estimateTokens, usageTokens, type ContextResult, type ContextUsage, typ
 import { publishThread } from './bus.ts';
 import { kv, threads, type Thread } from './db.ts';
 import { sessionFile } from './harness/claude/adapter.ts';
+import { profileOf } from './harness/profile.ts';
+import { harnessName } from './harness/registry.ts';
 import type { ContextHint } from './stream.ts';
 import { toolLabel } from './tool-label.ts';
 
 const snapshots = new Map<string, ContextUsage>();
 
-/** The harnesses that report a context window. Cursor's is an estimate from its turn totals; Hermes and Cursor Cloud report none. */
-export const METERED = new Set(['claude-code', 'codex', 'cursor']);
-/** The harnesses Omni can compact: Claude Code's /compact, and Codex's, which takes no instructions. */
-export const COMPACTS = new Set(['claude-code', 'codex']);
 
 /**
  * The window the CLI last reported for a model, so a thread read back from its session file, or one whose
@@ -232,7 +230,7 @@ export interface ContextView {
 
 /** Why the thread can't compact now, or null when it can. */
 export function compactBlocked(t: Thread): string | null {
-  if (!COMPACTS.has(t.harness)) return `${t.harness === 'cursor' ? 'Cursor Agent' : t.harness === 'cursor-cloud' ? 'A Cursor cloud agent' : 'Hermes'} has no compact command.`;
+  if (!profileOf(t.harness).compact) return `${harnessName(t.harness)} has no compact command.`;
   if (t.status === 'running' || t.status === 'queued') return 'Wait for the current turn to finish.';
   if (!t.has_run) return 'Nothing to compact yet.';
   return null;
@@ -240,12 +238,13 @@ export function compactBlocked(t: Thread): string | null {
 
 export function contextView(t: Thread): ContextView {
   const blocked = compactBlocked(t);
-  const compact = { ok: !blocked, ...(blocked && { reason: blocked }), focus: t.harness === 'claude-code' };
-  if (!METERED.has(t.harness)) return { context: null, largest: [], compact };
+  const { compact: compacts, meter } = profileOf(t.harness);
+  const compact = { ok: !blocked, ...(blocked && { reason: blocked }), focus: !!compacts?.focus };
+  if (!meter) return { context: null, largest: [], compact };
   // Live, or kept from the last turn: an idle thread, after a restart too, shows where its window stood.
   const last = lastContext(t.id);
-  if (t.harness === 'cursor') return { context: last ? { ...last, spend: threadSpend(t.id) } : null, largest: [], compact };
-  if (t.harness !== 'claude-code') return { context: last, largest: [], compact };
+  if (meter === 'estimate') return { context: last ? { ...last, spend: threadSpend(t.id) } : null, largest: [], compact };
+  if (meter !== 'transcript') return { context: last, largest: [], compact };
   const file = transcriptOf(t);
   let context = last;
   // Nothing kept (a thread from before Omni kept readings): the session file has the last call's tokens.

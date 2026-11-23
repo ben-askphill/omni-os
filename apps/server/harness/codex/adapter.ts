@@ -36,6 +36,7 @@ import type {
   ThreadStartResponse,
   TurnError,
 } from './protocol.ts';
+import { codexProfile } from './profile.ts';
 
 interface Outgoing extends OutgoingMessage {
   accepted?: boolean;
@@ -105,6 +106,7 @@ async function beginTurn(client: CodexClient, codexThreadId: string | null, thre
 export const codexAdapter: HarnessAdapter = {
   id: 'codex',
   capabilities: CAPABILITIES.codex,
+  profile: codexProfile,
   // The thread id means no session yet: the adapter starts one and reports its id.
   freshSessionId: (thread) => thread.id,
 

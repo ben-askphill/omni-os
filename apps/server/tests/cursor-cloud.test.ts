@@ -112,7 +112,6 @@ function boot(opts: { key?: string; repo?: string | null; sessionId?: string; mo
       created_at: '',
     },
     systemPrompt: 'SYS PROMPT',
-    mcpFile: null,
     secretEnv: opts.key === '' ? {} : { CURSOR_API_KEY: opts.key ?? 'test-cursor-key', OTHER: 'x' },
     browserBusy: false,
     omniUrl: 'http://127.0.0.1:9',

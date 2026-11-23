@@ -37,6 +37,7 @@ import { agentName, readOnlyReason } from '../member-view.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { localCatalog, remoteSeesWork } from '../remote-agents.ts';
 import { DEFAULT_HARNESS } from '../harness/types.ts';
+import { profileOf } from '../harness/profile.ts';
 
 /** How long a catch-up or summary call may take before the turn goes on without it. */
 const SIDECAR_MS = 45_000;
@@ -542,7 +543,7 @@ const REPLY_MAX = 4_000;
 function cloudFinished(m: MemberRow, status: ThreadStatus) {
   const session = threads.get(m.session_thread);
   const t = threads.get(m.thread_id);
-  if (status !== 'done' || session?.harness !== 'cursor-cloud' || !t || m.lead) return;
+  if (status !== 'done' || !session || !profileOf(session.harness).pushesBranch || !t || m.lead) return;
   // The cloud card and reply are already in the transcript for Ben. A closed channel sends no pull request to its remote lead.
   if (isRemoteAgentHarness(t.harness) && !remoteSeesWork(t.channel_id)) return;
   const run = events

@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_CODEX } from './support.ts';
@@ -126,6 +128,15 @@ describe('compactBlocked', () => {
   it('names the harness that has no compact command', () => {
     expect(ctx.compactBlocked(thread({ harness: 'cursor' }))).toBe('Cursor Agent has no compact command.');
     expect(ctx.compactBlocked(thread({ harness: 'hermes' }))).toBe('Hermes has no compact command.');
+    expect(ctx.compactBlocked(thread({ harness: 'cursor-cloud' }))).toBe('Cursor Cloud has no compact command.');
+  });
+  it('names a custom harness by its own name, not Hermes', async () => {
+    const { paths } = await import('../config.ts');
+    mkdirSync(paths.harnesses, { recursive: true });
+    writeFileSync(join(paths.harnesses, 'vps.yaml'), 'name: Agent on the VPS\nkind: runs-api\nurl: https://agent.example.com/\nauth:\n  scheme: bearer\n  secret: VPS_KEY\n');
+    expect(ctx.compactBlocked(thread({ harness: 'custom:vps' }))).toBe('Agent on the VPS has no compact command.');
+    // One whose file is not on this machine is named by its id.
+    expect(ctx.compactBlocked(thread({ harness: 'custom:gone' }))).toBe('custom:gone has no compact command.');
   });
   it('waits for a running or queued turn, and needs a first run', () => {
     expect(ctx.compactBlocked(thread({ status: 'running' }))).toBe('Wait for the current turn to finish.');

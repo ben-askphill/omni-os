@@ -20,6 +20,7 @@ import { cursorCloudAdapter } from '../harness/cursor-cloud/adapter.ts';
 import { customHarness, customHarnesses } from '../harness/custom.ts';
 import { harnessName, missingHarness } from '../harness/registry.ts';
 import { detachedSession } from '../harness/session.ts';
+import { RUNS_API_PROFILE } from '../harness/profile.ts';
 
 /** Where a thread's MCP servers reach this server: the port it bound, which differs from the configured one when that is 0. */
 export const omniUrl = () => `http://127.0.0.1:${about.port}`;
@@ -41,6 +42,7 @@ function missingAdapter(harness: string): HarnessAdapter {
   return {
     id: harness as AnyHarnessId,
     capabilities: NO_CAPS,
+    profile: RUNS_API_PROFILE,
     freshSessionId: (t) => t.id,
     spawn(_ctx, cb) {
       const session = detachedSession(cb, {

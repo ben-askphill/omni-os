@@ -5,7 +5,7 @@ import { gateFor } from './approvals.ts';
 import { channelAccess, harnessRefusal } from '../access.ts';
 import { channels, events, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
-import { commandsFolder, worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
+import { commandsFolder, worktreeProblem, writeDesignSystem } from '../sandbox.ts';
 import { skillsLogLine, threadSkills } from '../skills.ts';
 import { inWorkspace } from '../workspace.ts';
 import { followBranch } from '../branch-follow.ts';
@@ -19,10 +19,11 @@ import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume, type ResumeOutcome } from '../sync/files.ts';
 import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import { missingHarness, runsApiTarget } from '../harness/registry.ts';
+import { profileOf } from '../harness/profile.ts';
 import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
-import { buildSystemPrompt } from './prompts.ts';
+import { buildSystemPrompt, replyBlock } from './prompts.ts';
 import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
 import { adapterFor, addEvent, browserHolder, cliLabel, crash, deliver, emitThread, lives, omniUrl, track, type Live, type Msg } from './state.ts';
@@ -44,7 +45,8 @@ export function launch(threadId: string, first: Msg): Live | undefined {
   live.claimTurn();
   startTurnSnapshot(live);
   // The account this process bills, kept on the thread so it shows after a switch. Cursor Cloud on a channel's own key is not this machine's.
-  if (!(thread.harness === 'cursor-cloud' && hasSecret(`channel:${thread.channel_id}`, 'CURSOR_API_KEY'))) stampThread(threadId, thread.harness);
+  const apiKey = profileOf(thread.harness).apiKeySecret;
+  if (!(apiKey && hasSecret(`channel:${thread.channel_id}`, apiKey))) stampThread(threadId, thread.harness);
   spawnLive(live, thread).catch((err) => {
     // Never let one broken thread take the whole server down.
     console.error(`[runner] ${threadId} crashed:`, err);
@@ -165,7 +167,6 @@ async function spawnLive(live: Live, thread: Thread) {
   const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
   const leadsTeam = events.teamOf(thread.id) !== null;
-  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: readsOnly(thread), leadsTeam });
 
   let secretEnv: Record<string, string> = {};
   // A Runs API server (Hermes, a custom harness) gets its own key and nothing else: no channel or global secret goes to
@@ -176,10 +177,11 @@ async function spawnLive(live: Live, thread: Thread) {
     if (runsApi) key = (await harnessKey(channel.id, runsApi.keyName)) ?? undefined;
     else secretEnv = await secretsEnv(channel.id);
     // The catalog probe reads the same global key. A channel secret of the same name already won above.
-    // A key in the secret store with no row in Secrets counts too. It goes only to Cursor Cloud's HTTP client.
-    if (thread.harness === 'cursor-cloud' && !secretEnv.CURSOR_API_KEY) {
-      const cursorKey = await globalSecret('CURSOR_API_KEY');
-      if (cursorKey) secretEnv = { ...secretEnv, CURSOR_API_KEY: cursorKey };
+    // A key in the secret store with no row in Secrets counts too. It goes only to the harness's own HTTP client (Cursor Cloud's).
+    const apiKey = profileOf(thread.harness).apiKeySecret;
+    if (apiKey && !secretEnv[apiKey]) {
+      const value = await globalSecret(apiKey);
+      if (value) secretEnv = { ...secretEnv, [apiKey]: value };
     }
   } catch (err) {
     addEvent(thread.id, 'error', { text: `Could not read secrets: ${(err as Error).message}` });
@@ -208,8 +210,8 @@ async function spawnLive(live: Live, thread: Thread) {
     channel,
     role,
     systemPrompt: buildSystemPrompt(thread, channel, role, threads.team(thread.id).length > 0, Object.keys(secretEnv), skills),
+    replyRules: replyBlock(thread),
     skills,
-    mcpFile,
     secretEnv,
     browserBusy,
     cdpEndpoint,
@@ -223,12 +225,13 @@ async function spawnLive(live: Live, thread: Thread) {
   // This spawn's own credential, in place of the install token (thread-tokens.ts). A harness that runs elsewhere gets none.
   const minted = remote ? null : mintThreadToken(thread.id);
   if (minted) ctx.threadToken = minted.token;
+  const adapter = adapterFor(thread.harness);
   let session: ReturnType<HarnessAdapter['spawn']>;
   try {
-    session = adapterFor(thread.harness).spawn(ctx, {
+    session = adapter.spawn(ctx, {
       record: (rec) => {
         // Claude chooses its id before spawning. Its user replay confirms that the session accepted input.
-        if (thread.harness === 'claude-code' && rec.kind === 'replay') sessionStarted(live);
+        if (adapter.profile.confirmsByReplay && rec.kind === 'replay') sessionStarted(live);
         onRecord(live, rec);
       },
       usage: (u, opts) => recordUsage(thread.harness as HarnessId, u, { partial: opts?.partial }),

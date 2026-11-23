@@ -165,7 +165,6 @@ describe('the adapter on an eve harness', () => {
       thread: { id: 'tid', channel_id: 'scratch', title: 't', status: 'running', role: null, model: 'default', harness: 'custom:nomos', effort: '', session_id: sessionId, has_run: 0, cwd: '/tmp', branch: null, parent_id: null, task_id: null, source: 'manual', automation: null, last_text: null, created_at: '', updated_at: '' },
       channel: { id: 'scratch', name: 'Scratch', kind: 'internal', repo_path: null, github_repo: null, use_worktree: 0, base_dir: null, store_domain: null, portal_slug: null, browser_headless: 1, notes: null, archived: 0, created_at: '' },
       systemPrompt: 'SYS PROMPT',
-      mcpFile: null,
       secretEnv: {},
       harnessKey: fake.key,
       browserBusy: false,

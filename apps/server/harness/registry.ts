@@ -6,6 +6,7 @@ import { config } from '../config.ts';
 import { HERMES_FIX } from './catalog.ts';
 import { customHarness } from './custom.ts';
 import { HERMES_KEY } from './env-guard.ts';
+import { profileOf } from './profile.ts';
 import type { RemoteKind } from './remote.ts';
 import { CAPABILITIES, HARNESS_META, isHarnessId, type HarnessCapabilities } from './types.ts';
 
@@ -58,9 +59,7 @@ export function harnessName(id: string): string {
 
 /** Where a remote harness runs, for "its files are not on this machine" reasons. */
 export function providerWhere(id: string): string {
-  if (id === 'cursor-cloud') return 'as a Cursor cloud agent';
-  if (id === 'hermes') return 'on the Hermes server';
-  return `on ${harnessName(id)}'s own server`;
+  return profileOf(id).where ?? `on ${harnessName(id)}'s own server`;
 }
 
 /**

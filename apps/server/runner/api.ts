@@ -23,6 +23,7 @@ import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { isRemoteAgent, localCatalog, remoteAgentFor } from '../remote-agents.ts';
 import { offMachineHarness } from '../thread-files.ts';
 import { capabilitiesOf, providerWhere } from '../harness/registry.ts';
+import { profileOf } from '../harness/profile.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { autoNeedOptions } from '../display.ts';
@@ -704,7 +705,7 @@ export async function postMessage(
  * a bare `/goal` waits for the turn. Null for anything else, and for a message with files, which is a prompt.
  */
 function goalSend(thread: Thread, prompt: string, files: number): { stops: boolean } | null {
-  if (thread.harness !== 'claude-code' || files) return null;
+  if (!profileOf(thread.harness).goalCommand || files) return null;
   const cmd = parseGoalCommand(prompt);
   if (!cmd) return null;
   return { stops: cmd.type === 'set' || (cmd.type === 'clear' && thread.goal_status === 'active') };

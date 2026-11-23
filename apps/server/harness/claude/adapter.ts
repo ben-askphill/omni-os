@@ -9,7 +9,9 @@ import { join } from 'node:path';
 import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
 import { DELEGATE_ONLY_DENIED, MEMBER_DENIED, NO_EDITS_DENIED, type CrewRole } from '../../crew.ts';
-import { ASK_TIMEOUT_SEC } from '../../sandbox.ts';
+import { ASK_TIMEOUT_SEC, writeMcpConfig } from '../../sandbox.ts';
+import { mcpInput } from '../mcp-input.ts';
+import { claudeProfile } from './profile.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { describeAttachments, inlinable, messageContent, type Attachment } from '../../uploads.ts';
 import { harnessEnv, threadTokenEnv } from '../env-guard.ts';
@@ -146,12 +148,13 @@ const sessionOnDisk = (t: Thread) => existsSync(sessionFile(t));
 export const claudeAdapter: HarnessAdapter = {
   id: 'claude-code',
   capabilities: CAPABILITIES['claude-code'],
+  profile: claudeProfile,
   resumeOnDisk: sessionOnDisk,
   // Never the thread id: the session the thread had here before it moved away may sit under it.
   freshSessionId: () => randomUUID(),
 
   spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession {
-    const { thread, mcpFile, secretEnv, systemPrompt } = ctx;
+    const { thread, secretEnv, systemPrompt } = ctx;
     const resume = ctx.resume || sessionOnDisk(thread);
     const model = claudeModel(thread.model, ctx.role);
 
@@ -168,7 +171,7 @@ export const claudeAdapter: HarnessAdapter = {
     ];
     if (thread.effort) args.push('--effort', thread.effort);
     if (thread.cwd !== config.brainDir && existsSync(config.brainDir)) args.push('--add-dir', config.brainDir);
-    if (mcpFile) args.push('--mcp-config', mcpFile);
+    args.push('--mcp-config', writeMcpConfig(mcpInput(ctx)));
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
     // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.
     // A quick ask only reads: the same tools go, and needing one is what turns it into a task (apps/server/quick-ask.ts).

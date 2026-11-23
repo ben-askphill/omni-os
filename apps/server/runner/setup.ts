@@ -4,6 +4,7 @@
 // runs in the channel's own checkout instead.
 import { channelActions, channels, continuations, kv, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
+import { profileOf } from '../harness/profile.ts';
 import { SHELL_REFUSAL } from '../request-trust.ts';
 import { ensureRepo } from '../repo-clone.ts';
 import { prepareWorktree } from '../sandbox.ts';
@@ -60,7 +61,7 @@ export function connectorsFor(
   prompt = messageRequests.byRequestId(t.id, START_REQUEST)?.prompt ?? '',
   declared = kv.get<string[] | null>(declaredKey(t.id)) ?? undefined,
 ): string[] {
-  if (t.harness !== 'claude-code') return [];
+  if (!profileOf(t.harness).claudeAi) return [];
   const role = getCrew(t.role);
   const needs = neededConnectors(prompt, declared, role?.connectors);
   return doesOwnWork(t, role) ? withoutTokenAccounts(needs, role?.tokens, (name) => threadSecretSet(t.channel_id, name)) : needs;
