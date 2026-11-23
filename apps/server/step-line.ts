@@ -3,8 +3,8 @@
 // (@omni/shared/steps.ts), never stored: sync brings the events, so every machine derives the same line. It goes out
 // as `step` on every thread the clients list, open or get from the feed, next to `delegating`, and only while the
 // thread runs and is on a step. When a call or an answer moves it, the thread goes out on the feed again (watchSteps).
-// A delegated thread also carries its list in brief as `progress` on its parent's detail and the feed, running or not,
-// for the delegation card (progressField).
+// A delegated thread also carries its list in brief as `progress`, running or not, for the delegation card on its
+// parent (progressField), everywhere `step` goes (delegating.ts withDelegating).
 import { ANSWER_EVENT, QUESTION_EVENT } from '@omni/shared/question.ts';
 import { stepLine, stepProgress, turnSteps, type ProgressField, type StepField, type StepsView } from '@omni/shared/steps.ts';
 import { buildItems, isAsking, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
@@ -45,17 +45,34 @@ function turnRows(threadId: string): TranscriptEvent[] {
     .all(...LIST_CALLS, threadId, ...KINDS, threadId, threadId, threadId) as unknown as TranscriptEvent[];
 }
 
-/** The newest turn's steps per thread, the newest event and whether it ran when read, so a list read does no fold twice. */
+/**
+ * How many threads' steps stay read. Every list reads its delegated threads, finished ones too, so without a bound the
+ * reads would grow for the server's life: past it, the thread read longest ago goes first.
+ */
+export const STEP_READS_MAX = 500;
+
+/**
+ * The newest turn's steps per thread, the newest event and whether it ran when read, so a list read does no fold twice.
+ * In the order they were last read, oldest first.
+ */
 const read = new Map<string, { last: number; live: boolean; view: StepsView | null }>();
+
+/** The threads whose steps are held, read longest ago first. For tests. */
+export const heldStepReads = () => [...read.keys()];
 
 function viewOf(id: string, live: boolean): StepsView | null {
   const last = events.lastId(id);
   const hit = read.get(id);
-  if (hit?.last === last && hit.live === live) return hit.view;
+  read.delete(id);
+  const entry = hit?.last === last && hit.live === live ? hit : fold(id, last, live);
+  read.set(id, entry);
+  if (read.size > STEP_READS_MAX) read.delete(read.keys().next().value!);
+  return entry.view;
+}
+
+function fold(id: string, last: number, live: boolean) {
   const rows = turnRows(id);
-  const view = rows.length ? turnSteps(buildItems(rows).items, { live, asking: live && isAsking(rows) }) : null;
-  read.set(id, { last, live, view });
-  return view;
+  return { last, live, view: rows.length ? turnSteps(buildItems(rows).items, { live, asking: live && isAsking(rows) }) : null };
 }
 
 /** A thread that can sit on a delegation card: one another thread delegated to, a team member included. */
@@ -83,7 +100,7 @@ export function threadProgress(t: Read) {
   return stepProgress(viewOf(t.id, t.status === 'running'));
 }
 
-/** `progress` on a delegated thread its parent's detail lists or the feed sends, for the delegation cards. */
+/** `progress` on a delegated thread, for the delegation cards. */
 export const progressField = (t: Read): ProgressField => {
   const progress = threadProgress(t);
   return progress ? { progress } : {};

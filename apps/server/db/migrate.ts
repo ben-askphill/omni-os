@@ -295,6 +295,14 @@ const UUID_SQL = `lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) 
   || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(lower(hex(randomblob(2))), 2) || '-' || lower(hex(randomblob(6)))`;
 
 /**
+ * Sets `job_id` and `seat_agent` on threads whose parent is an agent's seat in a #conductor thread and that have none
+ * yet. Append `AND threads.id = ?` for one thread.
+ */
+export const SEAT_JOB_FILL = `UPDATE threads SET job_id = seat.parent_id, seat_agent = seat.role FROM threads AS seat
+  WHERE seat.id = threads.parent_id AND seat.source = 'member' AND seat.channel_id = 'conductor'
+    AND seat.parent_id IS NOT NULL AND seat.role IS NOT NULL AND threads.source != 'member' AND threads.job_id IS NULL`;
+
+/**
  * Startup migration: create tables, then add columns the current schema needs to a database created by an older
  * version. Safe to run again. Existing threads pick up the column default, so they open as
  * Claude Code threads with their model unchanged.
@@ -797,4 +805,11 @@ export function migrate() {
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );`);
+  // Work an agent seated in a #conductor thread opened: `job_id` is that #conductor thread and `seat_agent` the agent,
+  // set when the thread is made (db/repos/threads.ts create). Its parent stays the agent's hidden session, where its
+  // crew report goes. Threads from before, and rows an older build synced in, get them here on every start.
+  ensureColumn('threads', 'job_id', 'TEXT');
+  ensureColumn('threads', 'seat_agent', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS threads_job ON threads(job_id) WHERE job_id IS NOT NULL');
+  db.exec(SEAT_JOB_FILL);
 }

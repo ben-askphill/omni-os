@@ -1,7 +1,7 @@
 import type { RunName } from '@omni/shared/run-switch.ts';
 import type { Goal, GoalStatus } from '@omni/shared/goal.ts';
-import type { SeatedDelegation } from '@omni/shared/members.ts';
 import { db, now, tx } from '../connection.ts';
+import { SEAT_JOB_FILL } from '../migrate.ts';
 import { outbox, record } from '../sync.ts';
 import { assignments } from './assignments.ts';
 
@@ -102,6 +102,13 @@ export interface Thread {
    * parent's. Synced, merged by its own edit time.
    */
   owner: string | null;
+  /**
+   * Work an agent seated in a #conductor thread opened (`omni new`, `delegate`): that #conductor thread, which shows it
+   * on its delegation card and nests it in the lists, and the seated agent. The parent is the agent's hidden session,
+   * where the crew report goes. Null for every other thread. Set when it is made and never changed. Synced.
+   */
+  job_id: string | null;
+  seat_agent: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -195,7 +202,7 @@ export function stampEdits(id: string, fields: readonly EditedField[], where = '
 
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, quick, workspace, promoted_to, owner, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, quick, workspace, promoted_to, owner, job_id, seat_agent, created_at, updated_at';
 
 /**
  * The machine whose status write this is: this one while it is running or queued here and sync is set up, else nobody.
@@ -236,18 +243,13 @@ export const threads = {
   /** The threads delegated from this one. A group thread's member threads are its agents' sessions, not delegations (runner/members.ts). */
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? AND source != 'member' ORDER BY created_at`).all(parentId) as unknown as Thread[],
-  /** Work opened by a #conductor thread's seated agents, including seats that have since been removed. */
-  seatedDelegations: (threadId: string) =>
-    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE source != 'member' AND parent_id IN (
-      SELECT id FROM threads WHERE parent_id = ? AND source = 'member' AND channel_id = 'conductor'
-    ) ORDER BY created_at`).all(threadId) as unknown as Thread[],
-  /** The transcript a seated agent opened the work from. The hidden session remains its parent for crew reports. */
-  seatedDelegationOf: (child: Pick<Thread, 'parent_id' | 'source'>) =>
-    child.parent_id && child.source !== 'member'
-      ? db.prepare(`SELECT parent_id AS thread_id, role AS agent FROM threads
-          WHERE id = ? AND source = 'member' AND channel_id = 'conductor' AND parent_id IS NOT NULL AND role IS NOT NULL`)
-          .get(child.parent_id) as unknown as SeatedDelegation | undefined
-      : undefined,
+  /**
+   * The threads on this one's delegation cards: the ones it delegated, and in a #conductor thread the work its seated
+   * agents opened (`job_id`), seats since removed included.
+   */
+  cards: (threadId: string) =>
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE (parent_id = ? OR job_id = ?) AND source != 'member' ORDER BY created_at`)
+      .all(threadId, threadId) as unknown as Thread[],
   /** The threads working on a branch, newest first. Omni names branches per thread, so it is one in practice. */
   withBranch: (branch: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE branch = ? ORDER BY created_at DESC, rowid DESC`).all(branch) as unknown as Thread[],
@@ -304,21 +306,19 @@ export const threads = {
     return live ?? root;
   },
   /**
-   * Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel, with `job_id`:
-   * the #conductor thread they nest under. Work a seated agent opened has its hidden session as parent (crew reports go
-   * there, runner/members.ts), so it nests under the thread that agent is seated in, as its delegation card does.
+   * Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. Work a seated
+   * agent opened nests under its `job_id`, the #conductor thread that agent sits in, as its delegation card does.
    */
   conductorHandoffChildren: () =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `child.${c}`).join(', ')}, job.id AS job_id
-         FROM threads child JOIN threads parent ON parent.id = child.parent_id
-         JOIN threads job ON job.id = CASE WHEN parent.source = 'member' THEN parent.parent_id ELSE parent.id END
-         WHERE parent.channel_id = 'conductor' AND job.channel_id = 'conductor' AND job.source != 'member' AND job.archived = 0
+        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `child.${c}`).join(', ')}
+         FROM threads child JOIN threads job ON job.id = COALESCE(child.job_id, child.parent_id)
+         WHERE job.channel_id = 'conductor' AND job.source != 'member' AND job.archived = 0
            AND child.source = 'conductor' AND child.archived = 0
          ORDER BY job.updated_at DESC, child.created_at ASC`,
       )
-      .all() as unknown as (Thread & { job_id: string })[],
+      .all() as unknown as Thread[],
   /** Every live team member whose lead is live too, by lead, in the order they were handed out. */
   teamMembers: () =>
     db
@@ -418,7 +418,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from' | 'quick' | 'workspace' | 'promoted_to' | 'owner'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from' | 'quick' | 'workspace' | 'promoted_to' | 'owner' | 'job_id' | 'seat_agent'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
       quick?: number; workspace?: ThreadWorkspace | null; owner?: string | null;
@@ -433,6 +433,8 @@ export const threads = {
         t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.auto_reason ?? null, t.session_id, t.has_run ?? 0, t.cwd,
         t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, t.quick ?? 0, t.workspace ?? null, t.owner ?? null, ts, ts,
       );
+      // Opened from an agent's seat in a #conductor thread: that thread and the agent, read from the seat once.
+      db.prepare(`${SEAT_JOB_FILL} AND threads.id = ?`).run(t.id);
       record('thread', t.id);
       if (runMachine(t.status)) assignments.claim(t.id);
       return threads.get(t.id)!;

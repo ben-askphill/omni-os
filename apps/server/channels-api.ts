@@ -157,11 +157,12 @@ const stub = (t: Thread, delegating: ReadonlySet<string>) => {
 
 /**
  * Conductor jobs with their delegated child threads, including children in other channels. Work an agent seated in a
- * job opened nests under the job, not under the agent's hidden session (threads.conductorHandoffChildren).
+ * job opened nests under its `job_id`, not under the agent's hidden session.
  */
 function conductorHandoffs(delegating: ReadonlySet<string>) {
   const groups = new Map<string, { parent: Thread; children: Thread[] }>();
-  for (const { job_id: jobId, ...child } of threads.conductorHandoffChildren()) {
+  for (const child of threads.conductorHandoffChildren()) {
+    const jobId = child.job_id ?? child.parent_id!;
     let group = groups.get(jobId);
     if (!group) {
       const parent = threads.get(jobId);
