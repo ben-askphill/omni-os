@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { tokensOf, type InsightRange, type InsightsUsage, type UsageSource } from '@omni/shared/insights.ts';
-import type { UsageRow } from '@omni/shared/account-usage.ts';
+import { nearlyFull, type UsageRow } from '@omni/shared/account-usage.ts';
 import { resetSentence } from '@omni/shared/usage-reset.ts';
 import { windowPct } from '../../format.ts';
 import { useNow } from '../../store.tsx';
@@ -45,7 +45,7 @@ function PlanPill({ row }: { row: UsageRow }) {
     >
       <HarnessLogo harness="claude-code" size={12} />
       <span className="min-w-0 truncate">{name}</span>
-      <Ticks value={p} count={12} height={10} tone={p >= 0.9 ? 'needs' : undefined} label={`${name} week usage`} className="w-[64px] shrink-0" />
+      <Ticks value={p} count={12} height={10} tone={nearlyFull(p) ? 'needs' : undefined} label={`${name} week usage`} className="w-[64px] shrink-0" />
       <span className="font-num tabular-nums">{Math.round(p * 100)}%</span>
       <ResetTime resetsAt={week.resetsAt} label={`${name} week`} className="shrink-0 text-[11px]" />
     </span>

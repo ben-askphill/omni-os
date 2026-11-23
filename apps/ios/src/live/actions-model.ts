@@ -1,17 +1,9 @@
 import { OUTPUT_LIMIT, portLabel, RUN_STATE_LABEL, type ActionRun, type ActionRunState, type ChannelAction } from '@omni/shared/channel-actions.ts';
+import { duration } from '@omni/shared/format.ts';
 
 import { shortAgo } from './channel-model';
 
-export { portLabel, RUN_STATE_LABEL };
-
-/** "12s", "3m 4s", "1h 5m". */
-export function duration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
-}
+export { duration, portLabel, RUN_STATE_LABEL };
 
 export function bytes(n: number): string {
   if (n < 1024) return `${n} B`;

@@ -1,84 +1,10 @@
-// The sidebar's Inbox view, T3 Code's default thread list: every thread in one list across channels, split into
-// shelves by what it waits on. Pure, so the rules are tested on their own (apps/web/tests/inbox.test.ts).
-import type { NeedsYouItem, ThreadStub } from './api.ts';
-import { isWorking } from '@omni/shared/delegate-count.ts';
+// The sidebar's Inbox view and the phone's Activity tab: the shelves are @omni/shared/inbox-shelves.ts, shared with the
+// iOS app. This names them for the web's thread rows.
+import type { ThreadStub } from './api.ts';
+import type { InboxLayout as Layout, ShelfView as View } from '@omni/shared/inbox-shelves.ts';
+
+export { DONE_INITIAL, DONE_PAGE, inboxCandidates, inboxLayout, shelfView } from '@omni/shared/inbox-shelves.ts';
 
 export type InboxThread = ThreadStub & { pinned_at?: string | null; source?: string; archived?: number | boolean };
-
-/**
- * Pinned on top, then the inbox (threads waiting on Ben, the latest to come back first), then Working (running or
- * queued) and Done (marked done, T3's "settled"). Each thread sits on one shelf.
- */
-export interface InboxLayout {
-  pinned: InboxThread[];
-  inbox: InboxThread[];
-  working: InboxThread[];
-  done: InboxThread[];
-}
-
-/** Done shows this many rows, then pages by DONE_PAGE, as T3 pages its Settled shelf. */
-export const DONE_INITIAL = 10;
-export const DONE_PAGE = 25;
-
-/** A shelf as a list shows it under its header. */
-export interface ShelfView {
-  /** Every thread on the shelf, listed or not: the header's count. */
-  count: number;
-  /** Open: its first `limit` threads. Folded: none. Either way the open thread, so the highlight never vanishes into it. */
-  rows: InboxThread[];
-  /** How many threads Show more adds under the open shelf, at most DONE_PAGE. 0 once every thread is listed. */
-  more: number;
-}
-
-/** Working lists every thread it holds; Done pages, `limit` growing from DONE_INITIAL by DONE_PAGE. */
-export function shelfView(list: InboxThread[], { open, openId, limit = Infinity }: { open: boolean; openId: string | null; limit?: number }): ShelfView {
-  const isOpenThread = (t: InboxThread) => t.id === openId;
-  return {
-    count: list.length,
-    rows: open ? [...list.slice(0, limit), ...list.slice(limit).filter(isOpenThread)] : list.filter(isOpenThread),
-    more: open ? Math.min(DONE_PAGE, Math.max(0, list.length - limit)) : 0,
-  };
-}
-
-const at = (t: InboxThread) => t.updated_at ?? t.created_at;
-const newest = (key: (t: InboxThread) => string) => (a: InboxThread, b: InboxThread) => key(b).localeCompare(key(a)) || a.id.localeCompare(b.id);
-const isBusy = isWorking;
-
-export function inboxLayout({
-  threads,
-  needs,
-  delegated,
-  open,
-}: {
-  /** Every candidate row: recent threads, pinned ones, and the threads in Needs you and Running. A thread may repeat. */
-  threads: InboxThread[];
-  needs: NeedsYouItem[];
-  /** Threads the Conductor delegated: their count on the job's row stands for them, as in the Projects view. */
-  delegated: ReadonlySet<string>;
-  /** The open thread's fresher copy, which wins over the listed one. */
-  open: ThreadStub | null;
-}): InboxLayout {
-  const byId = new Map<string, InboxThread>();
-  for (const t of threads) byId.set(t.id, { ...byId.get(t.id), ...t });
-  if (open && byId.has(open.id)) byId.set(open.id, { ...byId.get(open.id)!, ...open });
-
-  const needAt = new Map(needs.map((n) => [n.thread.id, n]));
-  // A thread comes back when its turn ends or something holds it up. Needs you knows when; otherwise its last change.
-  const returned = (t: InboxThread) => needAt.get(t.id)?.at ?? at(t);
-  const blocked = (t: InboxThread) => (needAt.get(t.id)?.blockers.length ?? 0) > 0;
-
-  const layout: InboxLayout = { pinned: [], inbox: [], working: [], done: [] };
-  for (const t of byId.values()) {
-    if (t.archived || t.source === 'team' || delegated.has(t.id)) continue;
-    if (t.done_at) layout.done.push(t);
-    else if (t.pinned_at) layout.pinned.push(t);
-    // A question holds a running thread up, so it waits in the inbox, as T3 keeps approvals out of Working.
-    else if (isBusy(t) && !blocked(t)) layout.working.push(t);
-    else layout.inbox.push(t);
-  }
-  layout.pinned.sort(newest((t) => t.pinned_at ?? ''));
-  layout.inbox.sort(newest(returned));
-  layout.working.sort(newest(at));
-  layout.done.sort(newest((t) => t.done_at ?? ''));
-  return layout;
-}
+export type InboxLayout = Layout<InboxThread>;
+export type ShelfView = View<InboxThread>;

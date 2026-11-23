@@ -184,6 +184,84 @@ export function windowPct(w?: { utilization: number }): number | null {
   return Math.max(0, Math.min(1, raw));
 }
 
+/** From this full on, a meter's bar and percent show in the Needs you colour. */
+const NEARLY_FULL = 0.9;
+
+/**
+ * A meter (0 to 1) close enough to full that its bar and percent show in the Needs you colour: a usage window on the
+ * Usage card and Activity, or a machine's CPU or memory on its tile.
+ */
+export const nearlyFull = (fraction: number | null | undefined): boolean => fraction != null && fraction >= NEARLY_FULL;
+
+/**
+ * What a Usage card keeps between loads: the reading per harness (GET /status, then each `usage` feed message) and
+ * the account readings the feed brought since GET /api/accounts (`account_usage`), by account.
+ */
+export interface UsageFeed {
+  harness: Partial<Record<string, PlanUsage | null>>;
+  live: Record<string, AccountUsage>;
+}
+
+/** A `usage` feed message: the reading kept per harness (Claude Code when it names none). */
+export const withHarnessUsage = <U>(prev: Partial<Record<string, U>>, e: { harness?: string; usage: U }): Partial<Record<string, U>> => ({
+  ...prev,
+  [e.harness ?? 'claude-code']: e.usage,
+});
+
+/** An `account_usage` feed message: it replaces that account's reading until the accounts list loads again. */
+export const withAccountUsage = (live: Readonly<Record<string, AccountUsage>>, usage: AccountUsage): Record<string, AccountUsage> => ({
+  ...live,
+  [accountUsageKey(usage)]: usage,
+});
+
+/** The records the card's rows read: the listed ones, then those the feed brought (`latestUsage` keeps the newer). */
+export const usageRecords = (view: { usage?: readonly AccountUsage[] } | null | undefined, live: Readonly<Record<string, AccountUsage>>): AccountUsage[] => [
+  ...(view?.usage ?? []),
+  ...Object.values(live),
+];
+
+/** An `account_usage` record read off the feed, where a client gets it untyped. Only the fields the rows read. */
+export function feedAccountUsage(v: unknown): AccountUsage | null {
+  const r = v as Partial<AccountUsage> | null;
+  if (!r || typeof r !== 'object' || typeof r.harness !== 'string' || typeof r.label !== 'string' || !r.label) return null;
+  if (typeof r.machine !== 'string' || typeof r.at !== 'string') return null;
+  const str = (s: unknown) => (typeof s === 'string' ? s : null);
+  return {
+    harness: r.harness,
+    label: r.label,
+    org: str(r.org),
+    plan: str(r.plan),
+    machine: r.machine,
+    machineName: str(r.machineName) ?? r.machine,
+    at: r.at,
+    usage: parsePlanUsage(r.usage),
+  };
+}
+
+export const EMPTY_USAGE_FEED: UsageFeed = { harness: {}, live: {} };
+
+const typeOf = (message: unknown) => (message && typeof message === 'object' && 'type' in message ? (message as { type: unknown }).type : null);
+
+/**
+ * A feed message merged into what a Usage card holds, as the web store and the iOS Activity card both do: `usage`
+ * replaces the harness's reading, `account_usage` that account's. Any other message leaves `feed` as it is.
+ */
+export function mergeUsageMessage(feed: UsageFeed, message: unknown): UsageFeed {
+  const m = message as { harness?: unknown; usage?: unknown };
+  if (typeOf(message) === 'usage') {
+    const harness = typeof m.harness === 'string' ? m.harness : undefined;
+    return { ...feed, harness: withHarnessUsage(feed.harness, { harness, usage: parsePlanUsage(m.usage) }) };
+  }
+  if (typeOf(message) === 'account_usage') {
+    const usage = feedAccountUsage(m.usage);
+    return usage ? { ...feed, live: withAccountUsage(feed.live, usage) } : feed;
+  }
+  return feed;
+}
+
+/** A feed message saying the accounts changed: the card loads GET /api/accounts again. */
+export const isAccountsMessage = (message: unknown): boolean => typeOf(message) === 'accounts';
+
 export function peakUsage(rows: readonly UsageRow[]): number | null {
   let peak: number | null = null;
   for (const { usage } of rows) {

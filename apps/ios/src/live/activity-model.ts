@@ -1,10 +1,11 @@
-// The Activity tab: phone web's Inbox (apps/web/src/mobile/ActivityScreen.tsx), with its shelves mirrored from
-// apps/web/src/inbox.ts (inboxLayout) and its card status shared with the web (inboxStatus). Pinned threads, then the
+// The Activity tab: phone web's Inbox (apps/web/src/mobile/ActivityScreen.tsx), with its shelves and card status shared
+// with the web (@omni/shared/inbox-shelves.ts, inboxStatus). Pinned threads, then the
 // threads waiting on Ben, the latest back first; Working and Done fold away below them. Pure.
 import type { BackgroundTask, ChannelWithRunning, NeedsYou, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
 import type { FaceShows } from '@omni/shared/agent-avatar.ts';
 import { rowShows } from '@omni/shared/crew-eyes.ts';
-import { delegatedIds, isWorking } from '@omni/shared/delegate-count.ts';
+import { delegatedIds } from '@omni/shared/delegate-count.ts';
+import { inboxCandidates, inboxLayout } from '@omni/shared/inbox-shelves.ts';
 
 import { asksForYou, inboxStatus, markOf, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
 import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
@@ -90,13 +91,9 @@ export interface ActivityInput {
   now: number;
 }
 
-/** Done shows this many rows, then pages by DONE_PAGE (web: apps/web/src/inbox.ts). */
-export const DONE_INITIAL = 10;
-export const DONE_PAGE = 25;
+export { DONE_INITIAL, DONE_PAGE } from '@omni/shared/inbox-shelves.ts';
 
 const at = (t: InboxThread) => t.updated_at ?? t.created_at;
-/** Newest first; a tie goes to the lower id, so the order never flickers between reloads. */
-const newest = (key: (t: InboxThread) => string) => (a: InboxThread, b: InboxThread) => key(b).localeCompare(key(a)) || a.id.localeCompare(b.id);
 
 export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }: ActivityInput): ActivityInbox {
   const list = channels ?? [];
@@ -108,28 +105,8 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
   const source = treeSource(list, needsYou);
   const agents = agentsByThread(tasks);
 
-  // Every candidate once, the later copy's fields over the earlier: recent, pinned, what runs, what needs Ben.
-  const byId = new Map<string, InboxThread>();
-  for (const t of [...(recent ?? []), ...pinned, ...list.flatMap((c) => c.active ?? []), ...needs.map((n) => n.thread)] as InboxThread[]) {
-    byId.set(t.id, { ...byId.get(t.id), ...t });
-  }
-
-  // A thread comes back when its turn ends or something holds it up. Needs you knows when; otherwise its last change.
-  const returned = (t: InboxThread) => needOf.get(t.id)?.at ?? at(t);
-  const blocked = (t: InboxThread) => (needOf.get(t.id)?.blockers.length ?? 0) > 0;
-  const shelves = { pinned: [] as InboxThread[], inbox: [] as InboxThread[], working: [] as InboxThread[], done: [] as InboxThread[] };
-  for (const t of byId.values()) {
-    if (t.archived || t.source === 'team' || delegated.has(t.id)) continue;
-    if (t.done_at) shelves.done.push(t);
-    else if (t.pinned_at) shelves.pinned.push(t);
-    // A question holds a running thread up, so it waits in the inbox, not under Working.
-    else if (isWorking(t) && !blocked(t)) shelves.working.push(t);
-    else shelves.inbox.push(t);
-  }
-  shelves.pinned.sort(newest((t) => t.pinned_at ?? ''));
-  shelves.inbox.sort(newest(returned));
-  shelves.working.sort(newest(at));
-  shelves.done.sort(newest((t) => t.done_at ?? ''));
+  // Which shelf each thread sits on, as phone web and desktop decide it.
+  const shelves = inboxLayout({ threads: inboxCandidates<InboxThread>({ recent, pinned, channels: list, needs }), needs, delegated });
 
   const row = (t: InboxThread, working = false): InboxRow => {
     const status = inboxStatus(t, needOf.get(t.id));

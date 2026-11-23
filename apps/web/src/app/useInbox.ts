@@ -1,10 +1,10 @@
 // The Inbox that the sidebar's Inbox view and the phone's Activity tab both show, so the two never drift: which threads,
-// on which shelf, with what status, and how far each shelf is open. The rules are apps/web/src/inbox.ts.
+// on which shelf, with what status, and how far each shelf is open. The rules are @omni/shared/inbox-shelves.ts.
 import { useMemo, useState } from 'react';
 import { delegatedIds } from '@omni/shared/delegate-count.ts';
 import { asksForYou, inboxStatus, type RowStatus } from '@omni/shared/status.ts';
 import { reasonOf } from '../needs-you.ts';
-import { DONE_INITIAL, DONE_PAGE, inboxLayout, shelfView, type InboxThread, type ShelfView } from '../inbox.ts';
+import { DONE_INITIAL, DONE_PAGE, inboxCandidates, inboxLayout, shelfView, type InboxThread, type ShelfView } from '../inbox.ts';
 import { useLiveThreads } from '../components/ThreadList.tsx';
 import { useRoute } from '../router.ts';
 import { readPref, useApp, writePref } from '../store.tsx';
@@ -63,7 +63,7 @@ export function useInbox(): Inbox {
   const layout = useMemo(
     () =>
       inboxLayout({
-        threads: [...(recent.data ?? []), ...pinned, ...channels.flatMap((c) => c.active ?? []), ...needs.map((n) => n.thread)],
+        threads: inboxCandidates<InboxThread>({ recent: recent.data, pinned, channels, needs }),
         needs,
         delegated: delegatedIds(handoffs),
         open: openCopy,

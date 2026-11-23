@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { crewFrom, newestList } from '@omni/shared/crew-artifacts.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { artifactUrl, type Artifact, type ArtifactWithThread } from '../api.ts';
 import { kindIcon } from '../components/ArtifactViewer.tsx';
@@ -6,11 +7,9 @@ import { MoGroup, MoListRow, MoSection } from './parts.tsx';
 
 const FOLDED = 8;
 
-const newestFirst = (a: Artifact, b: Artifact) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : b.id - a.id);
-
 /** The thread's own files and screenshots, newest first. A row opens it full screen. */
 export function ThreadFileList({ files, shots, onOpen }: { files: Artifact[]; shots: Artifact[]; onOpen: (a: Artifact) => void }) {
-  return <FileList title="Files" list={[...files, ...shots].sort(newestFirst)} onOpen={onOpen} />;
+  return <FileList title="Files" list={newestList(files, shots)} onOpen={onOpen} />;
 }
 
 /**
@@ -18,7 +17,7 @@ export function ThreadFileList({ files, shots, onOpen }: { files: Artifact[]; sh
  * full screen.
  */
 export function CrewFileList({ files, shots, onOpen }: { files: ArtifactWithThread[]; shots: ArtifactWithThread[]; onOpen: (a: ArtifactWithThread) => void }) {
-  return <FileList title="From delegated threads" list={[...files, ...shots].sort(newestFirst)} sub={(a) => a.thread_title || 'Untitled'} onOpen={onOpen} />;
+  return <FileList title="From delegated threads" list={newestList(files, shots)} sub={crewFrom} onOpen={onOpen} />;
 }
 
 /** A section of files, the newest FOLDED until Show all. Nothing when the list is empty. */

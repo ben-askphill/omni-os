@@ -1,5 +1,7 @@
 import type { AskP } from './ask.ts';
-import type { SeatedDelegation } from './members.ts';
+import type { SeatedDelegation, ThreadMember } from './members.ts';
+import type { EyeSource } from './crew-eyes.ts';
+import type { Mark } from './status.ts';
 import type { HandoverP, SwitchP } from './run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from './question.ts';
 import type { PRWakeItem } from './pr-watch.ts';
@@ -489,11 +491,56 @@ export const isReply = (it: Item): it is ReplyItem => REPLY.has(it.type);
 /** Rows between two replies that do not part them: how a turn ended, and a mod's log lines. */
 const QUIET = new Set<Item['type']>(['result', 'mod']);
 
+const ASIDE = new Set<string>(['mod', 'merge_risk', 'collision'] satisfies Item['type'][]);
+/**
+ * A row beside the conversation rather than in it: a mod's log lines, a merge-risk rating, a collision flag. The row
+ * before one is still the transcript's latest: the one that is live, waits on Ben or carries the limit line.
+ */
+export const isAside = (it: { type: string }): boolean => ASIDE.has(it.type);
+
 /** When a reply item was written, for its author line: a group of calls by its first call. A cloud run has no one time. */
 export const replyAt = (it: ReplyItem): string | null => (it.type === 'tools' ? (it.calls[0]?.at ?? null) : it.type === 'cloud' ? null : it.at);
 
 /** Who wrote a reply item: the agent its row names, else the thread's lead (rows from before Omni recorded it). */
 export const authorOf = (it: ReplyItem, lead: string | null | undefined) => it.agent ?? lead ?? null;
+
+/**
+ * The heads of the replies being written, which alone show live eyes (ADR 0021, D11), with what each shows. A thread
+ * of one agent: while it runs, the head of the run of replies the transcript ends on (back from the last row, past
+ * the rows that do not part a run). A group thread: each agent that works or waits on Ben shows its own state on its
+ * latest head, unless a message to it came after (its new reply has no head yet). `heads` is replyHeads' answer.
+ */
+export function liveHeads(
+  items: readonly Item[],
+  heads: ReadonlyMap<number, string>,
+  o: { running: boolean; lead: string | null; seats: readonly Pick<ThreadMember, 'agent' | 'state'>[] | undefined; mark: Mark },
+): Map<number, EyeSource> {
+  const out = new Map<number, EyeSource>();
+  if (o.seats?.length) {
+    const busy = new Map(o.seats.filter((s) => s.state === 'working' || s.state === 'needs').map((s) => [s.agent, s.state]));
+    const decided = new Set<string>();
+    for (let i = items.length - 1; i >= 0 && decided.size < busy.size; i--) {
+      const it = items[i];
+      if (it.type === 'user') for (const a of it.p.to?.length ? it.p.to : o.lead ? [o.lead] : []) if (busy.has(a)) decided.add(a);
+      const agent = heads.get(it.key);
+      if (!agent || !busy.has(agent) || decided.has(agent)) continue;
+      out.set(it.key, { member: busy.get(agent)! });
+      decided.add(agent);
+    }
+    return out;
+  }
+  if (!o.running) return out;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (isAside(it) || it.type === 'result' || (it.type === 'user' && it.p.source === 'lead')) continue;
+    if (!isReply(it)) break;
+    if (heads.has(it.key)) {
+      out.set(it.key, { mark: o.mark });
+      break;
+    }
+  }
+  return out;
+}
 
 /** Put work opened from a seat beside its last transcript row at creation time. The parent link identifies the
  * agent even when its CLI call had no recorded tool result. Loaded spans keep older cards beside their own replies. */

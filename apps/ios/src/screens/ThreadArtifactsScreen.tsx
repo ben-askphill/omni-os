@@ -1,8 +1,8 @@
 import type { Artifact } from '@omni/client-core';
+import { crewFrom, phoneArtifacts } from '@omni/shared/crew-artifacts.ts';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { threadArtifacts } from '../artifacts/thread-artifacts';
 import { ArtifactCard } from '../components/artifact/ArtifactCard';
 import { Notice } from '../components/Notice';
 import { shortAgo } from '../live/channel-model';
@@ -30,7 +30,7 @@ export function ThreadArtifactsScreen({ navigation, route }: RootScreenProps<'Th
   const { width } = useWindowDimensions();
   const artifacts = view?.artifacts;
   const crewArtifacts = view?.crewArtifacts;
-  const list = useMemo(() => threadArtifacts(artifacts ?? [], crewArtifacts ?? []), [artifacts, crewArtifacts]);
+  const list = useMemo(() => phoneArtifacts(artifacts ?? [], crewArtifacts ?? []), [artifacts, crewArtifacts]);
 
   if (!view || view.status === 'loading') return <Notice title="Loading" />;
   if (view.status === 'missing') return <Notice title="Thread not found" body="It may have been archived or removed on the server." />;
@@ -61,7 +61,7 @@ export function ThreadArtifactsScreen({ navigation, route }: RootScreenProps<'Th
           <Text accessibilityRole="header" style={[styles.caption, { color: colors.fg3 }]}>
             From delegated threads
           </Text>
-          {grid(list.crew, (a) => `${a.thread_title || 'Untitled'} · ${shortAgo(a.updated_at, now)}`)}
+          {grid(list.crew, (a) => `${crewFrom(a)} · ${shortAgo(a.updated_at, now)}`)}
         </View>
       ) : null}
     </ScrollView>

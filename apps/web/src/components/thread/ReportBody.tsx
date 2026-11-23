@@ -1,12 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Accordion, AccordionHeader, AccordionItem, AccordionPanel, AccordionTrigger } from '@ui-sdk/react/accordion';
-import { reportShape } from '@omni/shared/report-shape.ts';
+import { NOTES_FOLD, NOTES_TITLE, reportFolds, reportShape } from '@omni/shared/report-shape.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { useFindOpens } from '../../transcript/find-target.ts';
 import { Icon } from '../ui.tsx';
 import { Markdown } from '../Markdown.tsx';
-
-const NOTES = 'progress-notes';
 
 /**
  * A crew report's body, on desktop and the phone layout: the outcome first, its pull requests as chips, then each part
@@ -15,8 +13,8 @@ const NOTES = 'progress-notes';
  */
 export function ReportBody({ r, event, phone = false }: { r: ReportP; event?: number; phone?: boolean }) {
   const shape = useMemo(() => reportShape(r.text || '(no reply)', r.notes), [r.text, r.notes]);
-  const keys = [...shape.sections.map((s) => s.key), ...(shape.notes.length ? [NOTES] : [])];
-  const [open, setOpen] = useState<string[]>(() => (shape.lead || !shape.sections.length ? [] : [shape.sections[0].key]));
+  const { keys, open: opens } = reportFolds(shape);
+  const [open, setOpen] = useState<string[]>(opens);
   useFindOpens(
     (t) => t === event,
     () => setOpen(keys),
@@ -50,7 +48,7 @@ export function ReportBody({ r, event, phone = false }: { r: ReportP; event?: nu
             </Section>
           ))}
           {shape.notes.length > 0 && (
-            <Section value={NOTES} title="Progress notes" count={shape.notes.length}>
+            <Section value={NOTES_FOLD} title={NOTES_TITLE} count={shape.notes.length}>
               <ol className="flex flex-col gap-2 border-l border-line pl-3">
                 {shape.notes.map((n, i) => (
                   <li key={i}>

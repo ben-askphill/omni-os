@@ -231,3 +231,19 @@ export function reportShape(text: string, notes?: readonly string[]): ReportShap
   for (const p of rest) add(p.title ?? 'Details', p.lines.join('\n'));
   return { lead: stackTables(leadBlocks.join('\n\n')), sections, prs: reportPrs(text), notes: earlier };
 }
+
+/** The fold that holds a report's notes, after its sections, under this title. */
+export const NOTES_FOLD = 'progress-notes';
+export const NOTES_TITLE = 'Progress notes';
+
+/**
+ * What a report card folds, on every client: each section, then the notes. `keys` in order (empty: the card has no
+ * folds), and `open`, those that start open: the first section when the report has no lead of its own, so the card
+ * never opens on a bare list of headings. The notes always start folded.
+ */
+export function reportFolds(shape: Pick<ReportShape, 'lead' | 'sections' | 'notes'>): { keys: string[]; open: string[] } {
+  return {
+    keys: [...shape.sections.map((s) => s.key), ...(shape.notes.length ? [NOTES_FOLD] : [])],
+    open: shape.lead || !shape.sections.length ? [] : [shape.sections[0].key],
+  };
+}

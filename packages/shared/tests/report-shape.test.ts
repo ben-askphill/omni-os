@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { fixture } from '@omni/test-fixtures';
-import { reportPrs, reportShape, stackTables } from '../report-shape.ts';
+import { reportPrs, reportShape, stackTables, NOTES_FOLD, reportFolds } from '../report-shape.ts';
 
 // A builder's report as T-889E sent it: its running narration, then its final message with an outcome and ## parts.
 const NARRATION = [
@@ -159,5 +159,22 @@ describe('reportPrs', () => {
       { label: 'web #1', href: 'https://github.com/a/web/pull/1' },
       { label: 'api #2', href: 'https://github.com/a/api/pull/2' },
     ]);
+  });
+});
+
+describe('reportFolds', () => {
+  it('folds each section, then the notes, all closed when the report leads with its outcome', () => {
+    const shape = reportShape('Shipped the fix.\n\n## Checks\n\n- tests pass\n\n## Changes\n\n- one file', ['Looking at the bug.']);
+    expect(reportFolds(shape)).toEqual({ keys: ['checks', 'changes', NOTES_FOLD], open: [] });
+  });
+
+  it('opens the first section when there is no lead to read first, never the notes', () => {
+    const shape = reportShape('## Checks\n\n- tests pass\n\n## Changes\n\n- one file', ['Looking at the bug.']);
+    expect(shape.lead).toBe('');
+    expect(reportFolds(shape)).toEqual({ keys: ['checks', 'changes', NOTES_FOLD], open: ['checks'] });
+  });
+
+  it('has no folds for a report that is only its outcome', () => {
+    expect(reportFolds(reportShape('Done.', []))).toEqual({ keys: [], open: [] });
   });
 });

@@ -1,7 +1,8 @@
-import { PHASE, type Mark, type TurnPhase } from '@omni/shared/status.ts';
+import type { Mark, TurnPhase } from '@omni/shared/status.ts';
 import { agentLook, conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
+import { isBrief, lanePlan, lockedReply, promptCaption, promptRecipients, replyShows, thinkingLabel, turnLive } from '@omni/shared/turn-plan.ts';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
-import { agentShows, laneShows } from '@omni/shared/crew-eyes.ts';
+import { laneShows } from '@omni/shared/crew-eyes.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, MemberLine, SwitchLine, UserText } from '../components/Transcript.tsx';
@@ -14,15 +15,12 @@ import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import type { AgentLook } from '../components/AgentAvatar.tsx';
 import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
 import { RemoteLockLine } from '../components/thread/RemoteLockLine.tsx';
-import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
 import { Avatar, Icon, Segmented } from '../components/ui.tsx';
 import { tabPanelProps } from '../components/ui/segmented.tsx';
 import { AgentAvatar } from '../components/AgentAvatar.tsx';
 import { CollisionFlag, CollisionMark } from '../components/thread/Collision.tsx';
-import { collisionLabel } from '@omni/shared/collisions.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { sentContext } from '@omni/shared/message-context-machine.ts';
 import { SentTo } from '../message-context/agent-mention.tsx';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';
@@ -32,7 +30,6 @@ import { HtmlRender } from '../components/HtmlRender.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoConnectors, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { askCaption } from '@omni/shared/ask.ts';
-import { leadMessage } from '@omni/shared/members.ts';
 import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
@@ -83,9 +80,6 @@ export type TurnCtx = {
   mark: Mark;
 };
 
-/** A turn still being written: running, or queued for a slot. */
-const running = (t: Pick<TurnView, 'status'>) => t.status === 'running' || t.status === 'queued';
-
 /** Who a turn's Asks went to, when each thread it started came from one: one role by name, several by count. */
 function askedOf(t: TurnView): { name: string; remote: string | null } | undefined {
   const asks = new Map(t.asks.map((a) => [a.thread_id, a]));
@@ -112,14 +106,14 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         {t.children.length > 0 && <Delegation kids={t.children} answers={t.answers} asked={askedOf(t)} />}
       </>
     );
-    if (t.status === 'running' || t.status === 'queued') {
+    if (turnLive(t)) {
       const lead = !t.author || t.author === thread.role;
       return (
         <>
           {t.status === 'queued' ? (
             <NowLine now={{ verb: 'Waiting for a free slot', target: '' }} />
           ) : (
-            <ThinkingLine label={(lead && c.status) || (lead && c.turn === 'starting' ? PHASE.starting.label : 'Thinking')} phase={(lead && c.turn) || 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
+            <ThinkingLine label={thinkingLabel(t, thread.role, c.status, c.turn)} phase={(lead && c.turn) || 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
           )}
           <MoConnectors t={t} onOpen={() => steps(t)} />
           {showsSteps(t.progress) && <MoSteps v={t.progress} failed={t.failed} onActions={() => steps(t)} />}
@@ -144,7 +138,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
         {/* A remote agent could not read the thread's files: its reply ends with the lock line (ADR 0020), unless the
             channel lets remote agents see its work. */}
-        {t.prose && !!t.author && !!c.agents.find((a) => a.id === t.author)?.server && !remoteReadsOpen(ch) && <RemoteLockLine channelId={thread.channel_id} />}
+        {lockedReply(t, c.agents, ch) && <RemoteLockLine channelId={thread.channel_id} />}
         {delegated}
         {t.artifacts.filter((a) => !isRenderPath(a.path)).map((a) => (
           <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
@@ -187,16 +181,12 @@ function Reply({ t, c, shows, children }: { t: TurnView; c: TurnCtx; shows: Face
  */
 function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
   const lanes = t.lanes!;
-  // While any lane works, each tab's face shows its own lane's state; once they all ended they are history (D11).
-  const live = lanes.turns.some(running);
   const [picked, setPicked] = useState(lanes.turns[0]?.author ?? '');
   const panel = useId();
-  const lane = lanes.turns.find((l) => l.author === picked) ?? lanes.turns[0];
-  if (!lane) return null;
-  const open = lanes.flags.filter((f) => !f.cleared);
-  const hit = (agent: string) => (lanes.files[agent] ?? []).some((f) => open.some((x) => x.path === f));
-  const files = lanes.files[lane.author ?? ''] ?? [];
-  const working = lane.status === 'running' || lane.status === 'queued';
+  const plan = lanePlan(lanes, picked);
+  if (!plan) return null;
+  // While any lane works, each tab's face shows its own lane's state; once they all ended they are history (D11).
+  const { lane, live, open, files, working } = plan;
   return (
     <div className="flex flex-col gap-3" data-lanes={t.key}>
       {lanes.flags.map((f) => (
@@ -208,18 +198,18 @@ function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
         panel={panel}
         value={lane.author ?? ''}
         onChange={setPicked}
-        options={lanes.turns.map((l) => {
-          const look = agentLook(l.author ?? '', c.agents);
+        options={plan.tabs.map((tab) => {
+          const look = agentLook(tab.agent, c.agents);
           return {
-            id: l.author ?? '',
+            id: tab.agent,
             label: (
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <AgentAvatar agent={look} size={18} shows={live ? laneShows(l.status) : undefined} placement={live ? 'focus' : 'still'} />
+                <AgentAvatar agent={look} size={18} shows={live ? laneShows(tab.status) : undefined} placement={live ? 'focus' : 'still'} />
                 <span className="truncate">{look.name}</span>
-                {hit(l.author ?? '') && <Icon name="alert" size={13} className="shrink-0 text-warn" />}
+                {tab.hit && <Icon name="alert" size={13} className="shrink-0 text-warn" />}
               </span>
             ),
-            title: `${look.name}: ${l.status}`,
+            title: `${look.name}: ${tab.status}`,
           };
         })}
       />
@@ -229,20 +219,17 @@ function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
             <QuestionCard key={q.id} threadId={c.thread.id} q={q} touch />
           ))}
           {/* Its own latest line while it works, not the thread's. */}
-          <TurnBody t={lane} last={working} c={{ ...c, status: lanes.latest[lane.author ?? ''] ?? null, turn: 'working' }} />
+          <TurnBody t={lane} last={working} c={{ ...c, status: plan.latest, turn: 'working' }} />
           {files.length > 0 && (
             <ul className="flex flex-col gap-0.5 rounded-2xl bg-surface px-2 py-1.5" aria-label="Files it changed">
-              {files.map((f) => {
-                const flagged = open.some((x) => x.path === f);
-                return (
-                  <li key={f} className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-[13px] ${flagged ? 'lane-file-hit' : ''}`}>
-                    {flagged ? <CollisionMark path={f} collisions={open} /> : <Icon name="file" size={13} className="shrink-0 text-fg-3" />}
-                    <span className="min-w-0 flex-1 truncate font-mono text-[12px]" title={f}>
-                      {collisionLabel(f)}
-                    </span>
-                  </li>
-                );
-              })}
+              {files.map((f) => (
+                <li key={f.path} className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-[13px] ${f.flagged ? 'lane-file-hit' : ''}`}>
+                  {f.flagged ? <CollisionMark path={f.path} collisions={open} /> : <Icon name="file" size={13} className="shrink-0 text-fg-3" />}
+                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]" title={f.path}>
+                    {f.label}
+                  </span>
+                </li>
+              ))}
             </ul>
           )}
         </Reply>
@@ -257,26 +244,9 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
   return (
     <>
     {t.prompts.map((p, k) => {
-      const brief = first && k === 0 && !!thread.parent_id && atStart(c.history.history);
-      const sent = sentContext(p.text ?? '', p.context);
-      const lead = leadMessage(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a);
-      // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
-      const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
-      const words = p.dropped
-        ? p.undelivered
-          ? `Not delivered · ${p.undelivered}`
-          : 'Not sent'
-        : lead
-          ? lead.from
-        : p.source === 'pr-watch'
-          ? 'PR watch'
-        : p.source === 'team'
-          ? 'Team'
-          : brief
-            ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
-            : k > 0
-              ? 'Sent while it ran'
-              : undefined;
+      const brief = isBrief(thread, { first, index: k, atStart: atStart(c.history.history) });
+      const { lead, to, chips } = promptRecipients(p, thread.role, (a) => c.agents.find((x) => x.id === a)?.name ?? a);
+      const words = promptCaption(p, { index: k, brief, lead: lead?.from ?? null, taskId: thread.task_id }).text;
       return (
       <Fragment key={k}>
         <MoBubble
@@ -295,7 +265,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
           above={
             <>
               {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} lazy={!last} /> : null}
-              <ContextChips records={sent.chips} align="end" className="w-full max-w-[86%]" />
+              <ContextChips records={chips} align="end" className="w-full max-w-[86%]" />
             </>
           }
         >
@@ -313,7 +283,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
       <MoLanes t={t} c={c} />
     ) : (
       // The reply being written shows live eyes; a past one's head stays idle (ADR 0021, D11).
-      <Reply t={t} c={c} shows={running(t) ? agentShows(thread.members, t.author, c.mark) : undefined}>
+      <Reply t={t} c={c} shows={replyShows(t, thread.members, c.mark)}>
         {t.questions.map((q) => (
           <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
         ))}

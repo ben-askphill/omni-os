@@ -1,7 +1,7 @@
 import { OmniHttpError, type OmniApi } from '@omni/client-core';
-import { accountTitle, HARNESS_ROWS, planWindows, slotSummary, usageRows, waitingTitle } from '@omni/shared/account-usage.ts';
+import { accountTitle, EMPTY_USAGE_FEED, HARNESS_ROWS, isAccountsMessage, mergeUsageMessage, nearlyFull, planWindows, slotSummary, usageRecords, usageRows, waitingTitle } from '@omni/shared/account-usage.ts';
 import { resetSentence } from '@omni/shared/usage-reset.ts';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useLink, useLiveHub } from '../../live/react';
@@ -16,17 +16,15 @@ import { Text } from '../../ui/Text';
 const harnessIds = HARNESS_ROWS.map(({ id }) => id);
 const names: Record<string, string> = Object.fromEntries(HARNESS_ROWS.map(({ id, name }) => [id, name]));
 
-const loadUsage = async (api: OmniApi) => {
-  const [status, accounts] = await Promise.all([
-    api.status(),
-    api.accounts().catch((err: unknown) => {
-      // Older servers only report harness-level usage in status.
-      if (err instanceof OmniHttpError && err.failure.kind === 'http' && err.failure.status === 404) return null;
-      throw err;
-    }),
-  ]);
-  return { rows: usageRows(harnessIds, accounts, accounts?.usage ?? [], status.usage), slots: slotSummary(status.slots) };
-};
+const loadStatus = (api: OmniApi) => api.status();
+
+const loadAccounts = async (api: OmniApi) => ({
+  view: await api.accounts().catch((err: unknown) => {
+    // Older servers only report harness-level usage in status.
+    if (err instanceof OmniHttpError && err.failure.kind === 'http' && err.failure.status === 404) return null;
+    throw err;
+  }),
+});
 
 export function ActivityUsage({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const { colors } = useOmniTheme();
@@ -52,15 +50,31 @@ function UsageDetails() {
   const { kind: link } = useLink();
   const previousLink = useRef(link);
   const now = useMinuteClock();
-  const { data, error, reload } = useRemote(loadUsage);
+  const status = useRemote(loadStatus);
+  const accounts = useRemote(loadAccounts);
+  const { reload: reloadStatus } = status;
+  const { reload: reloadAccounts } = accounts;
+  // What the feed brought since the last load, merged in as the web store does: no refetch per reading.
+  const [feed, setFeed] = useState(EMPTY_USAGE_FEED);
+  const reload = useCallback(() => {
+    setFeed(EMPTY_USAGE_FEED);
+    void reloadStatus();
+    void reloadAccounts();
+  }, [reloadStatus, reloadAccounts]);
   useEffect(() => {
-    if (link === 'live' && previousLink.current !== 'live') void reload();
+    if (link === 'live' && previousLink.current !== 'live') reload();
     previousLink.current = link;
   }, [link, reload]);
   useEffect(() => hub.watchFeed((message) => {
-    if (!message || typeof message !== 'object' || !('type' in message)) return;
-    if (message.type === 'account_usage' || message.type === 'accounts' || message.type === 'usage') void reload();
-  }), [hub, reload]);
+    if (isAccountsMessage(message)) void reloadAccounts();
+    else setFeed((prev) => mergeUsageMessage(prev, message));
+  }), [hub, reloadAccounts]);
+  const data = useMemo(() => {
+    if (!status.data || !accounts.data) return null;
+    const view = accounts.data.view;
+    return { rows: usageRows(harnessIds, view, usageRecords(view, feed.live), { ...status.data.usage, ...feed.harness }), slots: slotSummary(status.data.slots) };
+  }, [status.data, accounts.data, feed]);
+  const error = status.error ?? accounts.error;
 
   return (
     <View style={styles.details}>
@@ -93,7 +107,7 @@ function UsageDetails() {
                   </View>
                   <View aria-hidden style={styles.ticks}>
                     {Array.from({ length: 24 }, (_, i) => (
-                      <View key={i} style={[styles.tick, { backgroundColor: i < filled ? (fraction >= 0.9 ? colors.needs : colors.fg) : colors.surface3 }]} />
+                      <View key={i} style={[styles.tick, { backgroundColor: i < filled ? (nearlyFull(fraction) ? colors.needs : colors.fg) : colors.surface3 }]} />
                     ))}
                   </View>
                   {detail ? <Text style={{ color: colors.fg3 }}>{detail}</Text> : null}
