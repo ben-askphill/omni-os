@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { agentFace } from '@omni/shared/agent-avatar.ts';
+import { branchShows } from '@omni/shared/crew-eyes.ts';
 
 // A delegated thread's avatar on the Delegation card follows the thread's live status without opening the thread: eyes
 // from the status, and the working loop while it runs (ADR 0021, D29). Idle once it finishes, fails or is stopped.
 const crew = vi.hoisted(() => ({ roles: [{ id: 'builder', name: 'builder' }] as { id: string; name: string }[] }));
 vi.mock('../src/store.tsx', () => ({ useCrewRoles: () => crew.roles, useNow: () => Date.now() }));
 
-import { BranchFace, branchShows } from '../src/components/Delegation.tsx';
+import { BranchFace } from '../src/components/Delegation.tsx';
 
 const card = (status: string) => renderToStaticMarkup(createElement(BranchFace, { role: 'builder', title: 'Build it', status, children: null }));
 const eyes = (status: string) => card(status).match(/data-eyes="(\w+)"/)?.[1];

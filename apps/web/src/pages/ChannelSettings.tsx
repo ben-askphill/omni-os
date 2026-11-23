@@ -9,10 +9,8 @@ import { apiUrl } from '../api-base.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { Avatar, Button, ErrorNote, fieldDescribedBy, fieldHintId, FolderInput, Icon, IDENTIFIER, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle, useFieldErrors } from '../components/ui.tsx';
-import {
-  CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon, sameIcon, scaleSvgIcon, SVG_PREFIX, SVG_SCALE_DEFAULT, SVG_SCALE_MAX, SVG_SCALE_MIN, SVG_SCALE_STEP,
-  svgIconScalable, svgIconScale,
-} from '@omni/shared/channel-icon.ts';
+import { CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon, sameIcon, SVG_PREFIX, svgIconScalable } from '@omni/shared/channel-icon.ts';
+import { SvgSizeControl } from '../components/SvgSizeControl.tsx';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { lastGrapheme } from '../format.ts';
@@ -137,37 +135,6 @@ function IconPicker({ value, name, avatarBg, omni, onChange, describedBy }: { av
           );
         })}
       </div>
-    </div>
-  );
-}
-
-/** How big an uploaded SVG sits in its avatar. The Avatar beside it previews each step; Save keeps it. */
-function SvgSizeControl({ markup, onChange }: { markup: string; onChange: (markup: string) => void }) {
-  const scale = svgIconScale(markup);
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <label htmlFor="ch-icon-size" className="text-fg-2">
-        Size
-      </label>
-      <input
-        id="ch-icon-size"
-        type="range"
-        min={SVG_SCALE_MIN}
-        max={SVG_SCALE_MAX}
-        step={SVG_SCALE_STEP}
-        value={scale}
-        aria-valuetext={`${scale}%`}
-        onChange={(e) => onChange(scaleSvgIcon(markup, Number(e.target.value)))}
-        className="focus-ring w-44 rounded-full accent-fg"
-      />
-      <output htmlFor="ch-icon-size" className="w-10 tabular-nums text-fg-3">
-        {scale}%
-      </output>
-      {scale !== SVG_SCALE_DEFAULT && (
-        <Button type="button" onClick={() => onChange(scaleSvgIcon(markup, SVG_SCALE_DEFAULT))}>
-          Reset size
-        </Button>
-      )}
     </div>
   );
 }

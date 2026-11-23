@@ -2,23 +2,22 @@ import { useRef, useState, type ReactNode } from 'react';
 import { agentFace, agentShape, AVATAR_UPLOAD_MAX_BYTES } from '@omni/shared/agent-avatar.ts';
 import { AVATAR_SOURCES, avatarSourceLabel, characterLine, CREW_SHAPE_NAMES, EYE_STATE_NAMES, glyphOf, iconFor, isSvgFile, shapeTile, sourceOf, styleTakesColor, uploadStyle, type AvatarStash, type AvatarStyle } from '@omni/shared/agent-identity.ts';
 import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
-import { CHANNEL_GLYPHS, glyphIcon, readSvgIcon, SVG_MAX } from '@omni/shared/channel-icon.ts';
+import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon, SVG_MAX, SVG_PREFIX, svgIconScalable } from '@omni/shared/channel-icon.ts';
 import { CREW_SHAPE_IDS, CREW_SHAPES, EYE_STATES } from '@omni/shared/crew-shapes.ts';
 import { errorText } from '../api.ts';
 import { squareAvatar } from '../agent-avatar-upload.ts';
 import { lastGrapheme } from '../format.ts';
-import { useReducedMotion } from '../motion.ts';
 import { useCrewRoles } from '../store.tsx';
 import { AgentAvatar, type AgentLook } from './AgentAvatar.tsx';
 import { AvatarColorPicker } from './AvatarColorPicker.tsx';
 import { Button, ErrorNote, Icon, Segmented } from './ui.tsx';
+import { SvgSizeControl } from './SvgSizeControl.tsx';
 import { ROVING_ITEM, useRovingFocus } from './ui/use-roving-focus.ts';
-import { useCrewPop } from './use-crew-motion.ts';
 
 // The identity block at the top of an agent's page in Settings > Agents, and of New agent: the live preview with a
 // reply-sized and a rail-sized sample and the eye states under it, its name and description, and one Avatar control
 // with four sources (agent-identity.ts): Character (its crew character, where every agent starts), Emoji, Icon and
-// Upload, which takes a photo or an SVG. Picking one replaces the others. Character picks a shape; the color sits
+// Upload, which takes a photo or an SVG, sized in its avatar as a channel's is. Picking one replaces the others. Character picks a shape; the color sits
 // under every source but a photo. Nothing here saves on its own: the photo picked, the icon, the shape and the color
 // go with the editor's Save.
 
@@ -82,22 +81,15 @@ export function AgentIdentity({
 }) {
   const look = identityLook(id, name, value, saved);
   const set = (patch: Partial<IdentityValue>) => onChange({ ...value, ...patch });
-  const reducedMotion = useReducedMotion();
-  const face = agentFace(look, { size: 88, placement: 'focus', reducedMotion });
   // The color Automatic draws: the one its shape is paired with (ADR 0021, D13), the shape picked or its id's.
   const paired = CREW_SHAPES[agentShape({ id, avatar: { shape: value.shape } })].color;
-  // The wrapper the agent-switch pop plays on (ADR 0021, Motion), apart from the avatar's own loops: the key changes
-  // with what it shows, its shape and its color. A character pops; a photo or an icon has no body to pop.
-  const pop = face.kind === 'character' ? `${face.shape} ${face.body}` : face.kind === 'icon' ? `${face.icon} ${face.bg}` : face.image;
-  const popRef = useCrewPop<HTMLSpanElement>(pop, face.kind === 'character' ? face.motion.pop : null);
   return (
     <div className="space-y-5" data-agent-identity>
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         <figure className="flex shrink-0 flex-col items-center gap-2.5 sm:w-[132px]" aria-label="Avatar preview">
           <span className="relative">
-            <span className="block" data-crew-pop={pop} ref={popRef}>
-              <AgentAvatar agent={look} size={88} placement="focus" />
-            </span>
+            {/* In focus, a new shape or color pops it, as an agent switch does anywhere (ADR 0021, Motion). */}
+            <AgentAvatar agent={look} size={88} placement="focus" />
             {value.picked && <span className="absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full bg-[var(--live)] shadow-[0_0_0_2.5px_var(--surface)]" title="Not saved yet" />}
           </span>
           {/* How it reads on a reply's author line, at the size threads draw it, and in a rail row, at 18px. */}
@@ -109,7 +101,7 @@ export function AgentIdentity({
             <AgentAvatar agent={look} size={18} placement="still" />
             <span className="min-w-0 truncate">{name}</span>
           </span>
-          {face.kind === 'character' && (
+          {agentFace(look, { size: 32 }).kind === 'character' && (
             <ul className="grid grid-cols-6 gap-1.5 sm:grid-cols-3 sm:gap-2" aria-label="Eye states">
               {EYE_STATES.map((eyes) => (
                 <li key={eyes} title={EYE_STATE_NAMES[eyes]} aria-label={EYE_STATE_NAMES[eyes]}>
@@ -223,6 +215,8 @@ function SourcePanel({ id, value, saved, name, set }: { id: string; value: Ident
   switch (sourceOf(value.style)) {
     case 'upload': {
       const has = value.style === 'svg' ? !!value.stash.svg : !!(value.picked || saved);
+      // An SVG sizes in its avatar as a channel's does (#946): the size lives in its markup, so every client draws it.
+      const svg = value.style === 'svg' ? parseChannelIcon(value.stash.svg) : null;
       panel = (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -240,6 +234,7 @@ function SourcePanel({ id, value, saved, name, set }: { id: string; value: Ident
               ? `A plain SVG up to ${SVG_MAX / 1000} KB, drawn on the background below. Transparent parts show the color.`
               : `A PNG, JPEG or WebP up to ${AVATAR_UPLOAD_MAX_BYTES / 1024 / 1024} MB fills the circle, cropped square from the center. An SVG up to ${SVG_MAX / 1000} KB sits on a background color.`}
           </p>
+          {svg?.kind === 'svg' && svgIconScalable(svg.markup) && <SvgSizeControl markup={svg.markup} onChange={(markup) => stash({ svg: `${SVG_PREFIX}${markup}` })} />}
           <input
             ref={file}
             type="file"

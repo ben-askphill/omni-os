@@ -1,19 +1,17 @@
-import type { FacePlacement, FaceShows } from '@omni/shared/agent-avatar.ts';
-import type { BodyMotion, CrewChange, CrewEase, EyeMotion } from '@omni/shared/crew-motion.ts';
-import type { EyeState } from '@omni/shared/crew-shapes.ts';
+import { movingFace, type FaceAgent, type FacePlacement, type FaceShows } from '@omni/shared/agent-avatar.ts';
+import { crewStep, type BodyMotion, type CrewChange, type CrewEase, type EyeMotion } from '@omni/shared/crew-motion.ts';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { cancelAnimation, Easing, useAnimatedProps, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { ease } from '../theme';
-import { agentFace, type AgentFace, type AgentLook } from './agent-face';
 
-// A crew character's motion (ADR 0021, Motion): what agentFace() returns, played on the UI thread with Reanimated, as
-// the Web UI plays it with Web Animations (apps/web/src/components/use-crew-motion.ts). Body loops play on a view around
-// the character, eye loops on a group around each eye, and a state change squeezes the eyes shut, swaps the glyphs once
-// that squeeze finishes, then springs the new eyes open (the wide beat and the hop with it) before the new state's loops
-// start. Every number comes from the face, the curves from theme.ts. The helpers below that run on the UI thread carry
-// 'worklet'.
+// A crew character's motion (ADR 0021, Motion): the shared player's steps (crewStep, crew-motion.ts), played on the UI
+// thread with Reanimated, as the Web UI plays them with Web Animations (apps/web/src/components/use-crew-motion.ts).
+// Body loops play on a view around the character, eye loops on a group around each eye, and a state change squeezes the
+// eyes shut, swaps the glyphs once that squeeze finishes, then springs the new eyes open (the wide beat and the hop with
+// it) before the new state's loops start. Every number comes from the face, the curves from theme.ts. The helpers below
+// that run on the UI thread carry 'worklet'.
 
 /** The four curves, built once on the JS thread and read in the worklets. */
 const CURVES: Record<CrewEase, (x: number) => number> = {
@@ -92,20 +90,15 @@ function rest<M>(motion: SharedValue<M | null>, p: SharedValue<number>) {
 /**
  * The face an AgentAvatar draws where it can move (in focus or in a row), and the animated props its motion plays on:
  * `body` on a view around the character, `pop` on one around that (the agent-switch pop, apart from any loop), and
- * `eyes` on a group around each eye. Reduce Motion stops all of it: the face then moves nothing and a state change swaps
- * the eyes at once. A change plays only once it happens live, never on first render.
+ * `eyes` on a group around each eye. What plays is the shared player's (movingFace, crewStep): this only plays it.
+ * Reduce Motion stops all of it: the face then moves nothing and a state change swaps the eyes at once. A change and
+ * the pop play only once they happen live, never on first render.
  */
-export function useCrewMotion(agent: string, agents: readonly AgentLook[], size: number, shows: FaceShows | undefined, placement: FacePlacement) {
-  const reducedMotion = useReducedMotion();
-  const opts = { shows, placement, reducedMotion };
-  const peek = agentFace(agent, agents, size, opts);
-  const target = peek.kind === 'character' ? peek.eyes : null;
+export function useCrewMotion(agent: FaceAgent, size: number, shows: FaceShows | undefined, placement: FacePlacement) {
+  const opts = { size, shows, placement, reducedMotion: useReducedMotion() };
   // The eyes on screen: they follow the face's once a change has squeezed them shut.
-  const [drawn, setDrawn] = useState<EyeState | null>(target);
-  const changing = target !== null && drawn !== null && drawn !== target;
-  // While a squeeze plays, the eyes drawn until now stay on screen; the face's motion holds the change into the new ones.
-  const face: AgentFace = changing ? agentFace(agent, agents, size, { ...opts, shows: { eyes: drawn } }) : peek;
-  const next = changing ? agentFace(agent, agents, size, { ...opts, from: drawn }) : peek;
+  const [drawn, setDrawn] = useState(() => movingFace(agent, opts, null).eyes);
+  const plan = movingFace(agent, opts, drawn);
 
   const bodyMotion = useSharedValue<BodyMotion | null>(null);
   const bodyP = useSharedValue(0);
@@ -113,16 +106,18 @@ export function useCrewMotion(agent: string, agents: readonly AgentLook[], size:
   const eyeP = useSharedValue(0);
   const popMotion = useSharedValue<BodyMotion | null>(null);
   const popP = useSharedValue(0);
-  // The change whose squeeze has finished, waiting for the new eyes to be drawn and open.
+  // The change whose squeeze has finished, waiting for the new eyes to be drawn and open. Its shut eyes stay on the
+  // eye motion until the open replaces them.
   const handover = useRef<CrewChange | null>(null);
-  const key = next.kind === 'character' ? `${next.shape} ${next.size} ${placement} ${reducedMotion}` : '';
 
   useLayoutEffect(() => {
-    if (target === null || drawn === null) {
-      if (drawn !== target) setDrawn(target);
+    const step = crewStep(plan.eyes, drawn, plan.motion, handover.current);
+    handover.current = null;
+    if (step.kind === 'swap') {
+      rest(eyeMotion, eyeP);
+      setDrawn(step.eyes);
       return;
     }
-    if (next.kind !== 'character') return;
     let live = true;
     // Once a squeeze hands over, its shut eyes stay for the new ones to open from.
     let handed = false;
@@ -132,20 +127,14 @@ export function useCrewMotion(agent: string, agents: readonly AgentLook[], size:
       if (!handed) rest(eyeMotion, eyeP);
     };
 
-    if (drawn !== target) {
-      const change = next.motion.change;
-      handover.current = null;
-      if (!change) {
-        setDrawn(target);
-        return;
-      }
+    if (step.kind === 'squeeze') {
       const squeezed = () => {
         if (!live) return;
         handed = true;
-        handover.current = change;
-        setDrawn(target);
+        handover.current = step.change;
+        setDrawn(step.eyes);
       };
-      play(eyeMotion, eyeP, change.squeeze, (finished) => {
+      play(eyeMotion, eyeP, step.squeeze, (finished) => {
         'worklet';
         // A new state, an unmount or a new face cut it off: the next run starts again from the face.
         if (finished) scheduleOnRN(squeezed);
@@ -153,46 +142,43 @@ export function useCrewMotion(agent: string, agents: readonly AgentLook[], size:
       return stop;
     }
 
-    const opening = handover.current;
-    handover.current = null;
-    const loops = next.motion;
-    const start = () => {
+    const loops = () => {
       if (!live) return;
-      if (loops.body) play(bodyMotion, bodyP, loops.body);
-      if (loops.eyes) play(eyeMotion, eyeP, loops.eyes);
+      if (step.body) play(bodyMotion, bodyP, step.body);
+      // A state with no eye loop lets go of eyes a squeeze held shut, as the Web UI cancels them.
+      if (step.eyes) play(eyeMotion, eyeP, step.eyes);
+      else rest(eyeMotion, eyeP);
     };
-    if (!opening) {
-      start();
+    const { open } = step;
+    if (!open) {
+      loops();
       return stop;
     }
-    // The new eyes open from shut, the hop with them; the loops start once the longer of the two ends.
-    const { open, body: hop } = opening;
+    // The new eyes open from shut, the hop with them; the loops start once the one that ends last does.
     const ready = (finished?: boolean) => {
       'worklet';
-      if (finished) scheduleOnRN(start);
+      if (finished) scheduleOnRN(loops);
     };
-    const hopLast = hop !== null && hop.ms > open.ms;
-    play(eyeMotion, eyeP, open, hopLast ? undefined : ready);
-    if (hop) play(bodyMotion, bodyP, hop, hopLast ? ready : undefined);
+    play(eyeMotion, eyeP, open.eyes, open.last === 'eyes' ? ready : undefined);
+    if (open.body) play(bodyMotion, bodyP, open.body, open.last === 'body' ? ready : undefined);
     return stop;
-    // `next` is the same motion for the same key, eyes and drawn eyes: a new color or name restarts nothing.
-  }, [key, target, drawn]);
+    // The plan's motion is the same for the same key, eyes and drawn eyes: a new color or name restarts nothing.
+  }, [plan.key, plan.eyes, drawn]);
 
-  // The agent-switch pop (D17), in focus only: another agent, shape or color drawn in the same place. Never on first render.
-  const look = next.kind === 'character' ? `${agent} ${next.shape} ${next.body}` : '';
-  const lastLook = useRef(look);
+  // The agent-switch pop (D17): another agent, shape or color drawn in the same place. In focus only: elsewhere the face has none.
+  const lastLook = useRef(plan.look);
   useLayoutEffect(() => {
-    if (lastLook.current === look) return;
-    lastLook.current = look;
-    const pop = next.kind === 'character' ? next.motion.pop : null;
+    if (lastLook.current === plan.look) return;
+    lastLook.current = plan.look;
+    const pop = plan.motion.pop;
     if (!pop) return;
     play(popMotion, popP, pop);
     return () => rest(popMotion, popP);
-  }, [look]);
+  }, [plan.look]);
 
   const body = useAnimatedStyle(() => ({ transform: bodyTransform(bodyMotion.value, bodyP.value, size) }));
   const pop = useAnimatedStyle(() => ({ transform: bodyTransform(popMotion.value, popP.value, size) }));
   const left = useAnimatedProps<EyeProps>(() => ({ matrix: eyeMatrix(eyeMotion.value, 0, eyeP.value) }));
   const right = useAnimatedProps<EyeProps>(() => ({ matrix: eyeMatrix(eyeMotion.value, 1, eyeP.value) }));
-  return { face, body, pop, eyes: [left, right] as const };
+  return { face: plan.face, body, pop, eyes: [left, right] as const };
 }

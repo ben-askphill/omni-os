@@ -37,7 +37,7 @@ interface ThreadTitleProps {
   onOpenMachine?: () => void;
   /** The lead agent's id, for its avatar beside its name. */
   lead?: string | null;
-  /** What the lead's eyes show: the thread's state, or in a group thread the lead's own (leadEyes). */
+  /** What the lead's eyes show: the thread's state, or in a group thread the lead's own (agentShows). */
   leadShows?: FaceShows;
   /** A remote agent leads it: "talks only" after its name (ADR 0020). */
   talksOnly?: boolean;

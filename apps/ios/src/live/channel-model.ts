@@ -1,7 +1,8 @@
 import type { ChannelWithRunning, NeedsYou, ThreadStub } from '@omni/client-core';
 import type { FaceShows } from '@omni/shared/agent-avatar.ts';
+import { rowShows } from '@omni/shared/crew-eyes.ts';
 import { statusWord } from '@omni/shared/display.ts';
-import { avatarMark, groupGlyph, markLine, type AvatarMark, type ThreadMember } from '@omni/shared/members.ts';
+import { avatarMark, groupGlyph, markLine, type AvatarMark } from '@omni/shared/members.ts';
 import { glyphFor, markOf, type Glyph } from '@omni/shared/status.ts';
 
 type ConductorHandoff = NonNullable<ChannelWithRunning['handoffs']>[number];
@@ -64,7 +65,7 @@ export interface ThreadRow {
   glyph: Glyph;
   /** The agent whose avatar leads the row (ADR 0021, D23); null for a thread with no agent, which leads with its channel's. */
   agent: string | null;
-  /** What that avatar's eyes show (leadEyes). */
+  /** What that avatar's eyes show (rowShows). */
   eyes: FaceShows;
   /** A group thread at work says who on its second line: "Builder asks you · Designer working". Null otherwise. */
   markLine: string | null;
@@ -108,15 +109,6 @@ export function shortAgo(iso: string, now: number): string {
   return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-/**
- * What the avatar leading a thread's row shows in its eyes: the row's status dot, except that a group thread's lead
- * shows its own state, as each face in the group does, since the dot is the busiest of all its agents (ADR 0019).
- */
-export function leadEyes(glyph: Glyph, members: readonly Pick<ThreadMember, 'lead' | 'state'>[] | undefined): FaceShows {
-  const lead = members?.find((m) => m.lead);
-  return lead ? { member: lead.state } : { mark: markOf(glyph) };
-}
-
 /** `technical`: Show technical details. Off, the status reads as one of five plain words (Working, Needs you, ...). */
 export function threadRow(t: ThreadStub, now: number, technical = true): ThreadRow {
   const glyph = groupGlyph(glyphFor(t.status), t.members);
@@ -128,8 +120,8 @@ export function threadRow(t: ThreadStub, now: number, technical = true): ThreadR
     statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusWord(t.status, technical),
     glyph,
     agent: t.role ?? null,
-    // A thread marked done shows the done arcs in its avatar's eyes, as on the Web UI (rowShows); its dot reads Stopped.
-    eyes: t.done_at ? { mark: 'done' } : leadEyes(glyph, t.members),
+    // A thread marked done shows the done arcs in its avatar's eyes; its dot reads Stopped.
+    eyes: rowShows(markOf(glyph), { done: !!t.done_at, members: t.members }),
     markLine: markLine(t.members),
     faces: avatarMark(t.members),
     ...(t.owner && { owner: t.owner }),

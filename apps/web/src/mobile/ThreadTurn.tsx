@@ -1,8 +1,7 @@
-import { PHASE, glyphFor, markOf, type Mark, type TurnPhase } from '@omni/shared/status.ts';
-import { conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
+import { PHASE, type Mark, type TurnPhase } from '@omni/shared/status.ts';
+import { agentLook, conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
-import { eyesForMark } from '@omni/shared/crew-eyes.ts';
-import { agentShows } from '@omni/shared/crew-eyes.ts';
+import { agentShows, laneShows } from '@omni/shared/crew-eyes.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, MemberLine, SwitchLine, UserText } from '../components/Transcript.tsx';
@@ -12,7 +11,7 @@ import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { MergeRiskCard } from '../components/thread/MergeRiskCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
-import { agentLook, type AgentLook } from '../components/AgentAvatar.tsx';
+import type { AgentLook } from '../components/AgentAvatar.tsx';
 import { AuthorLine, REPLY_INDENT } from '../components/AuthorLine.tsx';
 import { RemoteLockLine } from '../components/thread/RemoteLockLine.tsx';
 import { remoteReadsOpen } from '@omni/shared/remote-agent.ts';
@@ -86,9 +85,6 @@ export type TurnCtx = {
 
 /** A turn still being written: running, or queued for a slot. */
 const running = (t: Pick<TurnView, 'status'>) => t.status === 'running' || t.status === 'queued';
-
-/** A lane's eyes from its own turn: working while it runs, waiting while it is queued, as a lane in a list (D7). */
-const laneShows = (t: Pick<TurnView, 'status'>): FaceShows => ({ eyes: eyesForMark(markOf(glyphFor(t.status))) });
 
 /** Who a turn's Asks went to, when each thread it started came from one: one role by name, several by count. */
 function askedOf(t: TurnView): { name: string; remote: string | null } | undefined {
@@ -218,7 +214,7 @@ function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
             id: l.author ?? '',
             label: (
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <AgentAvatar agent={look} size={18} shows={live ? laneShows(l) : undefined} placement={live ? 'focus' : 'still'} />
+                <AgentAvatar agent={look} size={18} shows={live ? laneShows(l.status) : undefined} placement={live ? 'focus' : 'still'} />
                 <span className="truncate">{look.name}</span>
                 {hit(l.author ?? '') && <Icon name="alert" size={13} className="shrink-0 text-warn" />}
               </span>
@@ -228,7 +224,7 @@ function MoLanes({ t, c }: { t: TurnView; c: TurnCtx }) {
         })}
       />
       <div {...tabPanelProps(panel, lane.author ?? '')} className="flex flex-col gap-3">
-        <Reply t={lane} c={c} shows={live ? laneShows(lane) : undefined}>
+        <Reply t={lane} c={c} shows={live ? laneShows(lane.status) : undefined}>
           {lane.questions.map((q) => (
             <QuestionCard key={q.id} threadId={c.thread.id} q={q} touch />
           ))}

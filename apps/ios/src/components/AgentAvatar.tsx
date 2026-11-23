@@ -1,4 +1,4 @@
-import type { CharacterFace, CrewEye, FacePlacement, FaceShows } from '@omni/shared/agent-avatar.ts';
+import { agentLook, type CharacterFace, type CrewEye, type FacePlacement, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { useEffect, useState, type ComponentClass } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import Animated, { useReducedMotion } from 'react-native-reanimated';
@@ -7,7 +7,7 @@ import Svg, { Circle, G, Path, type GProps } from 'react-native-svg';
 import type { FileSource } from '../live/hub';
 import { useAgents, useLiveHub } from '../live/react';
 import { useOmniTheme } from '../theme';
-import { agentFace, agentLook, type AgentLook } from './agent-face';
+import { agentFace, faceAgent, type AgentLook } from './agent-face';
 import { ChannelAvatar } from './ChannelAvatar';
 import { useCrewMotion, type EyeProps } from './use-crew-motion';
 
@@ -63,7 +63,7 @@ export function AgentAvatar({ agent, size = 24, shows, placement }: { agent: str
  * one, about the origins the face names, so neither fights the other; each eye moves in its own group.
  */
 function MovingCharacter({ agent, agents, size, shows, placement }: { agent: string; agents: readonly AgentLook[]; size: number; shows?: FaceShows; placement: FacePlacement }) {
-  const { face, body, pop, eyes } = useCrewMotion(agent, agents, size, shows, placement);
+  const { face, body, pop, eyes } = useCrewMotion(faceAgent(agent, agents), size, shows, placement);
   if (face.kind !== 'character') return null;
   return (
     <Animated.View style={pop}>

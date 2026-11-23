@@ -23,6 +23,8 @@ export interface RowItem {
   phase?: Phase | null;
   /** Finished: the title drops to fg-2. */
   settled: boolean;
+  /** Ben marked it done: done eyes on its avatar (rowShows). */
+  done?: boolean;
   time: string;
   /** What follows the channel on the second line. */
   meta: string | null;
@@ -62,6 +64,7 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     status: glyph,
     ...(phase && { phase }),
     settled: !isWorking(t),
+    ...(t.done_at && { done: true }),
     time: shortTime(t.updated_at ?? t.created_at, now),
     meta: [state, owner].filter(Boolean).join(' · ') || null,
     ...(t.members?.length && { members: t.members }),

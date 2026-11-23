@@ -7,7 +7,8 @@ import { drag, useFolders } from '../folders.tsx';
 import { groupByDay, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
-import { Button, Chip, Empty, ErrorNote, Icon, Loading, RowDot, StatusDot, rowShows, useRowMark } from './ui.tsx';
+import { Button, Chip, Empty, ErrorNote, Icon, Loading, RowDot, StatusDot, useRowMark } from './ui.tsx';
+import { rowShows } from '@omni/shared/crew-eyes.ts';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
 import { AvatarMark, drawsFaces } from './thread/AvatarMark.tsx';
@@ -83,7 +84,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         {drawsFaces(t.members) ? (
           <AvatarMark members={t.members} size={18} facesOnly />
         ) : (
-          <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row)} size={32} />
+          <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row.mark, { done: row.done, members: t.members })} size={32} />
         )}
       </span>
       <div className="min-w-0 flex-1">

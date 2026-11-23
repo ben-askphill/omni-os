@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { agentFace, type AgentFace, type FaceAgent, type FaceOptions } from '@omni/shared/agent-avatar.ts';
-import type { BodyMotion, CrewChange, CrewEase, EyeMotion } from '@omni/shared/crew-motion.ts';
-import type { EyeState } from '@omni/shared/crew-shapes.ts';
+import { movingFace, type AgentFace, type FaceAgent, type FaceOptions } from '@omni/shared/agent-avatar.ts';
+import { crewStep, type BodyMotion, type CrewChange, type CrewEase, type EyeMotion } from '@omni/shared/crew-motion.ts';
 import { useReducedMotion } from '../motion.ts';
 
-// A crew character's motion (ADR 0021, Motion, D25): what agentFace() returns, played from code through the Web
-// Animations API. Body loops play on the avatar's own box, eye loops on each eye group, and a state change squeezes the
-// eyes shut, swaps the glyphs once that squeeze finishes, then springs the new eyes open (the wide beat and the hop with
-// it) before the new state's loops start. No CSS keyframes: CSS holds only the eyes' transform box and origin.
+// A crew character's motion (ADR 0021, Motion, D25): the shared player's steps (crewStep, crew-motion.ts), played from
+// code through the Web Animations API. Body loops play on the avatar's own box, eye loops on each eye group, and a state
+// change squeezes the eyes shut, swaps the glyphs once that squeeze finishes, then springs the new eyes open (the wide
+// beat and the hop with it) before the new state's loops start. The agent-switch pop plays on a group of its own. No
+// CSS keyframes: CSS holds only the eyes' transform box and origin.
 
 /** The four curves, read from index.css (`--ease-*`), their one web copy. */
 const curves = new Map<CrewEase, string>();
@@ -45,41 +45,40 @@ function animate(el: Element, keyframes: Keyframe[], options: KeyframeAnimationO
   return a;
 }
 
-/** The squeeze that has finished and the change it began, waiting for the new eyes to be drawn. */
-interface Handover {
-  change: CrewChange;
-  squeezes: Animation[];
-}
-
 /**
- * The face an AgentAvatar draws, and the refs its motion plays on: `body` on the character's svg, `eyes` on its two eye
- * groups. Reduced motion, read through matchMedia and followed live, stops all of it (D18): the face then moves nothing
- * and a state change swaps the eyes at once. A change plays only once it happens live, never on first render.
+ * The face an AgentAvatar draws, and the refs its motion plays on: `body` on the character's svg, `pop` on the group
+ * inside it the agent-switch pop plays on, apart from the loops, and `eyes` on its two eye groups. What plays is the
+ * shared player's (movingFace, crewStep): this only plays it. Reduced motion, read through matchMedia and followed
+ * live, stops all of it (D18): the face then moves nothing and a state change swaps the eyes at once. A change and the
+ * pop play only once they happen live, never on first render.
  */
 export function useCrewMotion(
   agent: FaceAgent,
   opts: Omit<FaceOptions, 'reducedMotion' | 'from'>,
-): { face: AgentFace; body: RefObject<SVGSVGElement | null>; eyes: readonly [RefObject<SVGGElement | null>, RefObject<SVGGElement | null>] } {
-  const reducedMotion = useReducedMotion() || !canAnimate;
-  const peek = agentFace(agent, { ...opts, reducedMotion });
-  const target = peek.kind === 'character' ? peek.eyes : null;
+): { face: AgentFace; body: RefObject<SVGSVGElement | null>; pop: RefObject<SVGGElement | null>; eyes: readonly [RefObject<SVGGElement | null>, RefObject<SVGGElement | null>] } {
+  const all = { ...opts, reducedMotion: useReducedMotion() || !canAnimate };
   // The eyes on screen: they follow the face's once a change has squeezed them shut.
-  const [drawn, setDrawn] = useState<EyeState | null>(target);
-  const changing = target !== null && drawn !== null && drawn !== target;
-  // While a squeeze plays, the eyes drawn until now stay on screen; the face's motion holds the change into the new ones.
-  const face = changing ? agentFace(agent, { ...opts, reducedMotion, shows: { eyes: drawn } }) : peek;
-  const next = changing ? agentFace(agent, { ...opts, reducedMotion, from: drawn }) : peek;
+  const [drawn, setDrawn] = useState(() => movingFace(agent, all, null).eyes);
+  const plan = movingFace(agent, all, drawn);
   const body = useRef<SVGSVGElement | null>(null);
+  const pop = useRef<SVGGElement | null>(null);
   const eyes = [useRef<SVGGElement | null>(null), useRef<SVGGElement | null>(null)] as const;
-  const handover = useRef<Handover | null>(null);
-  const key = next.kind === 'character' ? `${next.shape} ${next.size} ${opts.placement ?? ''} ${reducedMotion}` : '';
+  // The change whose squeeze has ended, and that squeeze, holding the eyes shut until the open replaces it.
+  const handover = useRef<CrewChange | null>(null);
+  const held = useRef<Animation[]>([]);
 
   useLayoutEffect(() => {
-    if (target === null || drawn === null) {
-      if (drawn !== target) setDrawn(target);
+    const step = crewStep(plan.eyes, drawn, plan.motion, handover.current);
+    handover.current = null;
+    const release = () => {
+      for (const a of held.current) a.cancel();
+      held.current = [];
+    };
+    if (step.kind === 'swap') {
+      release();
+      setDrawn(step.eyes);
       return;
     }
-    if (next.kind !== 'character') return;
     const svg = body.current;
     const [left, right] = [eyes[0].current, eyes[1].current];
     if (!svg || !left || !right) return;
@@ -96,22 +95,17 @@ export function useCrewMotion(
       for (const a of playing) a.cancel();
     };
 
-    if (drawn !== target) {
-      const change = next.motion.change;
-      handover.current?.squeezes.forEach((a) => a.cancel());
-      handover.current = null;
-      if (!change) {
-        setDrawn(target);
-        return;
-      }
-      // Shut, and stay shut until the new eyes are drawn and spring open from here.
-      const squeezes = both(change.squeeze, { ...timing(change.squeeze), fill: 'forwards' });
-      Promise.all(squeezes.map((a) => a.finished)).then(
+    if (step.kind === 'squeeze') {
+      release();
+      const squeezes = both(step.squeeze, { ...timing(step.squeeze), fill: 'forwards' });
+      squeezes[0].finished.then(
         () => {
           if (!live) return;
-          handover.current = { change, squeezes };
+          // Shut, and kept shut past this run, until the new eyes are drawn and spring open from here.
+          handover.current = step.change;
+          held.current = squeezes;
           playing.length = 0;
-          setDrawn(target);
+          setDrawn(step.eyes);
         },
         // A new state, an unmount or reduced motion cancelled it: the next run starts again from the face.
         () => {},
@@ -119,46 +113,36 @@ export function useCrewMotion(
       return stop;
     }
 
-    const handed = handover.current;
-    handover.current = null;
-    let ready: Promise<unknown> = Promise.resolve();
-    if (handed) {
-      const opened = both(handed.change.open, timing(handed.change.open));
-      if (handed.change.body) opened.push(play(svg, bodyKeyframes(handed.change.body), timing(handed.change.body)));
-      for (const a of handed.squeezes) a.cancel();
-      ready = Promise.all(opened.map((a) => a.finished));
+    const loops = () => {
+      if (!live) return;
+      if (step.body) play(svg, bodyKeyframes(step.body), timing(step.body));
+      if (step.eyes) both(step.eyes, timing(step.eyes));
+    };
+    const { open } = step;
+    if (!open) {
+      release();
+      loops();
+      return stop;
     }
-    const loops = next.motion;
-    if (loops.body || loops.eyes)
-      ready.then(
-        () => {
-          if (!live) return;
-          if (loops.body) play(svg, bodyKeyframes(loops.body), timing(loops.body));
-          if (loops.eyes) both(loops.eyes, timing(loops.eyes));
-        },
-        () => {},
-      );
+    const [opened] = both(open.eyes, timing(open.eyes));
+    const hop = open.body && play(svg, bodyKeyframes(open.body), timing(open.body));
+    release();
+    (open.last === 'body' && hop ? hop : opened).finished.then(loops, () => {});
     return stop;
-    // `next` is the same motion for the same key, eyes and drawn eyes: a new color or name restarts nothing.
-  }, [key, target, drawn]);
+    // The plan's motion is the same for the same key, eyes and drawn eyes: a new color or name restarts nothing.
+  }, [plan.key, plan.eyes, drawn]);
 
-  return { face, body, eyes };
-}
-
-/**
- * Plays the agent-switch pop (D17) on the element the returned ref names, apart from any loop inside it, whenever `key`
- * changes after the first render. `pop` is the face's: null under reduced motion, where nothing plays.
- */
-export function useCrewPop<T extends Element>(key: string, pop: BodyMotion | null): RefObject<T | null> {
-  const ref = useRef<T | null>(null);
-  const last = useRef(key);
+  // The agent-switch pop (D17): another agent, shape or color drawn in the same place. In focus only: elsewhere the face has none.
+  const lastLook = useRef(plan.look);
   useLayoutEffect(() => {
-    if (last.current === key) return;
-    last.current = key;
-    const el = ref.current;
-    if (!el || !pop || !canAnimate) return;
-    const a = animate(el, bodyKeyframes(pop), timing(pop));
+    if (lastLook.current === plan.look) return;
+    lastLook.current = plan.look;
+    const el = pop.current;
+    const m = plan.motion.pop;
+    if (!el || !m) return;
+    const a = animate(el, bodyKeyframes(m), timing(m));
     return () => a.cancel();
-  }, [key, pop]);
-  return ref;
+  }, [plan.look]);
+
+  return { face: plan.face, body, pop, eyes };
 }

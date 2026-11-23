@@ -285,7 +285,7 @@ const SPEC_AGENTS = Object.fromEntries(SHAPES.flatMap((shape) => (SPEC.shapes[sh
 describe('agentFace runs the chain: photo, then icon, then character', () => {
   it('draws an uploaded photo over an icon, and an icon or emoji on its color over the character', () => {
     const image = '/api/crew/designer/avatar?v=0123456789ab';
-    expect(agentFace({ id: 'designer', avatar: { image, icon: '🎨', bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toEqual({ kind: 'image', size: 24, image });
+    expect(agentFace({ id: 'designer', avatar: { image, icon: '🎨', bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toEqual({ kind: 'image', size: 24, image, ring: null });
     expect(agentFace({ id: 'designer', avatar: { icon: '🎨', bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toMatchObject({ kind: 'icon', size: 24, icon: '🎨', bg: '#52cdfe' });
     expect(agentFace({ id: 'designer', avatar: { bg: '#52cdfe', shape: 'cloud' } }, { size: 24 })).toMatchObject({ kind: 'character', shape: 'cloud', body: '#52cdfe' });
   });

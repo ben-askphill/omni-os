@@ -1,8 +1,7 @@
 // Delegation card: the threads a Conductor (or a team lead) fanned out to, or a thread's own sub-agents, each with its live state.
 import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
-import type { FaceShows } from '@omni/shared/agent-avatar.ts';
-import { glyphFor, markOf } from '@omni/shared/status.ts';
+import { branchShows } from '@omni/shared/crew-eyes.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
@@ -38,9 +37,6 @@ export function RailItem({ row, children }: { row: ReactNode; children?: ReactNo
     </li>
   );
 }
-
-/** What a delegated thread's avatar shows from its live status: a running thread works (and moves), a queued one waits, a finished one rests on its done or failed eyes. */
-export const branchShows = (status: string): FaceShows => ({ mark: markOf(glyphFor(status)) });
 
 export const ROW_CARD = 'press flex w-full min-w-0 items-start gap-3 rounded-[16px] bg-bg px-3.5 py-3 text-left shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)]';
 

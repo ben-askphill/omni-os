@@ -1,10 +1,10 @@
 // What a crew character's eyes show (ADR 0021, Eyes from thread state): a thread's status mark or a group member's
 // state, to an eye state. The eyes take the status mark's rule of who has the ball (`MarkFamily`, status.ts): circles
 // while the agent has it, squares while something else holds it, diamonds when Ben does, arcs once done. The agent
-// face reads it (agent-avatar.ts). Pure.
+// face reads it (agent-avatar.ts), and every client asks here what a row, a lane or a branch shows. Pure.
 import type { EyeState } from './crew-shapes.ts';
 import type { MemberState, ThreadMember } from './members.ts';
-import { MARK, type Mark, type MarkFamily } from './status.ts';
+import { glyphFor, MARK, markOf, type Mark, type MarkFamily } from './status.ts';
 
 /** Each family's eyes. A mark that broke waits on Ben to look into it, so it takes his diamonds (D6). */
 const FAMILY_EYES: Record<MarkFamily, EyeState> = { agent: 'working', system: 'waiting', you: 'needs', broken: 'needs', settled: 'done', quiet: 'idle' };
@@ -49,3 +49,27 @@ export function agentShows(members: readonly Pick<ThreadMember, 'agent' | 'state
   const seat = members.find((m) => m.agent === agent);
   return seat && { member: seat.state };
 }
+
+/**
+ * What the avatar leading a thread's row shows (ADR 0021, D23), on every client: the done arcs once Ben marked it
+ * done; else in a group thread its lead's own state, as each face on the row's second line shows its own, since the
+ * row's mark is the busiest of all its agents (ADR 0019); else the row's mark. Nothing (idle eyes) without one.
+ */
+type RowFacts = { done?: boolean; members?: readonly Pick<ThreadMember, 'lead' | 'state'>[] };
+export function rowShows(mark: Mark, row?: RowFacts): EyeSource;
+export function rowShows(mark: Mark | null | undefined, row?: RowFacts): EyeSource | undefined;
+export function rowShows(mark: Mark | null | undefined, row: RowFacts = {}): EyeSource | undefined {
+  if (row.done) return { mark: 'done' };
+  const lead = row.members?.find((m) => m.lead);
+  if (lead) return { member: lead.state };
+  return mark ? { mark } : undefined;
+}
+
+/**
+ * A lane's eyes from its own turn's status (ADR 0019): a lane's mark is not the open thread's, so a running lane works
+ * and a queued one waits, as in a list (D7), in focus too.
+ */
+export const laneShows = (status: string): EyeSource => ({ eyes: eyesForMark(markOf(glyphFor(status))) });
+
+/** A branch's eyes (a thread the open one delegated, on its card or row): its status mark, read without opening it (D29). */
+export const branchShows = (status: string): EyeSource => ({ mark: markOf(glyphFor(status)) });
