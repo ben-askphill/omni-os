@@ -22,7 +22,8 @@ import { Markdown } from '../Markdown';
 import { QuestionCard } from '../QuestionCard';
 import { ReportBody } from './ReportBody';
 import { useRowActions } from './actions';
-import { MentionText, SentTo } from './Group';
+import { MentionText } from '../../MentionText';
+import { SentTo } from './Group';
 
 type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
 

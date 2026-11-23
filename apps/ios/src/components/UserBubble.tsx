@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import { fontSize, lineHeight, radius, space, useOmniTheme } from '../theme';
+import { MentionText } from './MentionText';
 
 /** What Ben said, right-aligned with a caption under it. The transcript and the outbox draw it the same way. */
 export function UserBubble({
@@ -10,9 +11,12 @@ export function UserBubble({
   caption,
   busy = false,
   dimmed = false,
+  records,
   children,
 }: {
   text: string;
+  /** The message's context records, so the agents and machines its text mentions show as pills. */
+  records?: unknown;
   caption: string;
   /** Shows a spinner beside the caption, for a message still on its way. */
   busy?: boolean;
@@ -24,9 +28,7 @@ export function UserBubble({
   return (
     <View style={styles.wrap}>
       <View style={[styles.bubble, { backgroundColor: colors.surface2 }]}>
-        <Text selectable style={[styles.text, { color: colors.fg }, dimmed && styles.dimmed]}>
-          {text}
-        </Text>
+        <MentionText text={text} records={records} style={[styles.text, { color: colors.fg }, dimmed && styles.dimmed]} />
         {busy ? (
           <View style={styles.captionRow}>
             <ActivityIndicator size="small" color={colors.fg3} />

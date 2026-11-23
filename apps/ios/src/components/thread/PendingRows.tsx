@@ -15,6 +15,7 @@ import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
 import { OutboxRow } from './OutboxRow';
 import { sentContext } from '@omni/shared/message-context-machine.ts';
 import { SentTo } from './rows/Group';
+import { MentionText } from '../MentionText';
 
 /**
  * Everything below the last transcript row: the messages the agent has not read yet, then the one this phone is
@@ -48,9 +49,7 @@ function PendingRow({ message, threadId, trouble }: { message: PendingMsg; threa
         {label}
       </Text>
       <SentTo agents={sentContext(message.text, message.context).to} />
-      <Text numberOfLines={3} style={[styles.text, { color: quiet ? colors.fg3 : colors.fg2 }]}>
-        {message.text}
-      </Text>
+      <MentionText text={message.text} records={message.context} numberOfLines={3} selectable={false} style={[styles.text, { color: quiet ? colors.fg3 : colors.fg2 }]} />
       <AttachmentRow threadId={threadId} items={message.attachments ?? []} />
     </View>
   );
