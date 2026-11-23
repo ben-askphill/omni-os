@@ -122,9 +122,7 @@ export function ThreadHeader({
           )}
           {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3 @max-[24rem]/crumbs:hidden">{thread.task_id}</span>}
           <AccountChip ran={account} />
-          <span className="contents @max-[30rem]/crumbs:hidden">
-            <ContinueCrumbs links={links} />
-          </span>
+          <ContinueCrumbs links={links} className="@max-[30rem]/crumbs:hidden" />
         </div>
         <h1 className="mt-0.5 line-clamp-2 font-display text-[length:var(--fs-heading)] leading-snug text-balance" title={thread.title}>
           {thread.title}
