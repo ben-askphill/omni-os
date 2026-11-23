@@ -5,7 +5,7 @@ import Animated, { cancelAnimation, Easing, useAnimatedProps, useReducedMotion, 
 import Svg, { ClipPath, Defs, G, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import { tracking, useOmniTheme, weight } from '../theme';
-import { breakable, ELLIPSIS, fitLabel, type MeasuredLine } from './shimmer-fit';
+import { breakable, ELLIPSIS, sweepText, type Measured } from './shimmer-fit';
 import { Text } from './Text';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -24,15 +24,16 @@ interface Box {
  * One line of muted text with a vermilion highlight sweeping across it: the web's `.shimmer-text`
  * (apps/web/src/index.css), from the shared spec in @omni/shared/shimmer.ts. The web clips a moving gradient to the
  * glyphs with `background-clip: text`; here the glyphs are SVG text clipping a gradient rectangle that slides under
- * them, tiled as CSS repeats a background. A transparent copy of the label sizes the line and carries it for VoiceOver. Reduce Motion draws the label
- * still, in fg3, as the web does.
+ * them, tiled as CSS repeats a background. The label as plain text sizes the line and carries it for VoiceOver: it
+ * shows still, in the sweep's resting fg4, until the sweep can draw over it, then turns transparent, so the line is
+ * never blank. Reduce Motion draws the label still, in fg3, as the web does.
  */
 export function ShimmerText({ label, size }: { label: string; size: number }) {
   const { colors } = useOmniTheme();
   const reduced = useReducedMotion();
   const [area, setArea] = useState<{ width: number; height: number } | null>(null);
   const [baseline, setBaseline] = useState<number | null>(null);
-  const [fit, setFit] = useState<{ label: string; room: number; text: string } | null>(null);
+  const [measured, setMeasured] = useState<Measured | null>(null);
   const font = { fontSize: size };
 
   if (reduced) {
@@ -43,12 +44,12 @@ export function ShimmerText({ label, size }: { label: string; size: number }) {
     );
   }
   const box: Box | null = area && baseline !== null ? { ...area, baseline } : null;
-  const text = box && fit?.label === label && fit.room === box.width ? fit.text : null;
+  const text = box ? sweepText(label, box.width, measured) : null;
   return (
     <View style={styles.shrink}>
       <Text
         numberOfLines={1}
-        style={[font, styles.clear]}
+        style={[font, text === null ? { color: colors.fg4 } : styles.clear]}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
           setArea((b) => (b && b.width === width && b.height === height ? b : { width, height }));
@@ -66,10 +67,7 @@ export function ShimmerText({ label, size }: { label: string; size: number }) {
         <View style={[styles.measure, { width: box.width }]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Text
             style={[font, styles.grow]}
-            onTextLayout={(e) => {
-              const lines: MeasuredLine[] = e.nativeEvent.lines.map((l) => ({ text: l.text, width: l.width }));
-              setFit({ label, room: box.width, text: fitLabel(label, lines, box.width) });
-            }}
+            onTextLayout={(e) => setMeasured({ label, lines: e.nativeEvent.lines.map((l) => ({ text: l.text, width: l.width })) })}
           >
             {breakable(label)}
           </Text>
