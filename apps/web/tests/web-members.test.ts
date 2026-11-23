@@ -69,7 +69,7 @@ afterEach(async () => {
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 5))));
 const mount = async (phone: boolean, thread: Thread) => {
   await act(async () =>
-    root.render(phone ? createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} }) : createElement(ReplyComposer, { thread })),
+    root.render(phone ? createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onChanged: () => {}, onFork: () => {}, onNewThread: () => {} }) : createElement(ReplyComposer, { thread })),
   );
   await settle();
 };

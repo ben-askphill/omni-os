@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { newThreadBody, sameSettings } from '../src/new-thread-preset.ts';
+import { sameSettings } from '../src/new-thread-preset.ts';
+import { newThreadBody } from '@omni/shared/composer-slash.ts';
 import { draftRun, draftRunRequest, runPreselect } from '@omni/shared/draft-run.ts';
 import type { Channel, CrewRole, Thread } from '../src/api.ts';
 

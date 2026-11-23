@@ -48,7 +48,7 @@ export function PromptRow({ row }: Of<'prompt'>) {
       {showsBubble({ ...p, context: chips }) ? (
         <View style={[styles.bubble, { backgroundColor: colors.surface2 }, p.dropped && styles.dim]}>
           {p.attachments?.length ? <AttachmentRow threadId={threadId} items={p.attachments} /> : null}
-          {p.text ? <MentionText text={p.text} records={p.context} style={[styles.bubbleText, { color: colors.fg }]} /> : null}
+          {p.text ? <MentionText text={p.text} records={p.context} slash={p.slash} style={[styles.bubbleText, { color: colors.fg }]} /> : null}
           {p.items?.length ? (
             <View style={styles.wake}>
               {p.items.map((it, i) => (

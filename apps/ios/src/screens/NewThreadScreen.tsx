@@ -14,7 +14,12 @@ import { MachineSheet } from '../components/thread/MachineSheet';
 import { QuickAnswer } from '../components/QuickAnswer';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { RunOptions } from '../components/thread/RunOptions';
-import { useChannels, useThreadKey } from '../live/react';
+import { useChannels, useTechnical, useThreadKey } from '../live/react';
+import { CommandMenu } from '../components/thread/CommandMenu';
+import { commandMenu, newThreadHint } from '@omni/shared/composer-slash.ts';
+import { pickCommand } from '@omni/shared/slash-menu.ts';
+import { parseSlash } from '@omni/shared/slash.ts';
+import { asksAuto } from '@omni/shared/thread-run.ts';
 import { useMachineFacts } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
 import {
@@ -34,7 +39,7 @@ import {
 import { useCrew, useStartThread, useTemplates } from '../newthread/hooks';
 import { sortTemplates, templateDraft } from '@omni/shared/templates.ts';
 import { chipHeight, chipSlop, fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
-import { useHarnessCatalog } from '../thread/hooks';
+import { useCommands, useHarnessCatalog } from '../thread/hooks';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
 import { OptionGroup, OptionRow } from '../ui/OptionRow';
@@ -54,13 +59,14 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const [target, setTarget] = useState(route.params?.channel ?? CONDUCTOR);
   // An open item's + starts with its prompt (components/thread/OpenItemsCard.tsx).
   const [text, setText] = useState(route.params?.prompt ?? '');
-  const [pick, setPick] = useState<{ target: string; run: DraftRun } | null>(null);
+  // `/clear` in a thread starts here on that thread's run.
+  const [pick, setPick] = useState<{ target: string; run: DraftRun } | null>(() => (route.params?.run ? { target: route.params.channel ?? CONDUCTOR, run: route.params.run } : null));
   const [picking, setPicking] = useState(false);
   const [machinePick, setMachinePick] = useState<string | null>(null);
   const [pickingMachine, setPickingMachine] = useState(false);
   const [pickingTarget, setPickingTarget] = useState(false);
-  // Ask: answered on this screen (components/QuickAnswer.tsx). An open item's prompt is a task to start.
-  const [mode, setMode] = useState<'ask' | 'task'>(route.params?.prompt ? 'task' : 'ask');
+  // Ask: answered on this screen (components/QuickAnswer.tsx). An open item's prompt, or `/clear`, is a task to start.
+  const [mode, setMode] = useState<'ask' | 'task'>(route.params?.prompt || route.params?.run ? 'task' : 'ask');
   const [answering, setAnswering] = useState<string | null>(null);
   const { facts } = useMachineFacts(true);
   const devices = offersRunOn(facts?.devices) ? facts.devices : null;
@@ -89,6 +95,25 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const asking = mode === 'ask';
   const request = asking ? quickRequest(inputs) : createRequest(inputs);
   const shown = shownDraftRun(inputs);
+  // The `/` menu: the commands the picked harness lists for the channel (Auto picks later, so Claude Code's), as the Web
+  // UI's new-thread composer offers them, and why a command would stay text.
+  const technical = useTechnical();
+  const [caret, setCaret] = useState(0);
+  const menuHarness = !shown || asksAuto(shown.choice) ? 'claude-code' : shown.choice.harness;
+  const commands = useCommands({ harness: menuHarness, channel: target });
+  const slashMenu = commandMenu(text, Math.min(caret, text.length), commands.list, 'new-thread');
+  const showSlash = !!slashMenu && (slashMenu.sections.length > 0 || commands.list?.status !== 'ready');
+  const slashHint = newThreadHint(text, commands.list, menuHarness);
+  const { load } = commands;
+  const typed = useRef(text);
+  useEffect(() => {
+    typed.current = text;
+  });
+  // A fresh list each time the menu opens; another harness or channel has its own, so fetch it for what is typed.
+  useEffect(() => {
+    const { lead, mentions } = parseSlash(typed.current);
+    if (showSlash || lead || mentions.length) load();
+  }, [showSlash, load]);
   const targets = useMemo(() => targetsOf(channels), [channels]);
   const ready = request !== null && crew !== null && !starting;
 
@@ -167,6 +192,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
             setText(next);
             dismiss();
           }}
+          onSelectionChange={(e) => setCaret(e.nativeEvent.selection.end)}
           editable={!starting}
           accessibilityLabel="First message"
           placeholder={asking ? 'Ask anything. The answer shows here.' : target === CONDUCTOR ? 'Ask the Conductor. It delegates to the crew.' : `Describe the task for #${channelName ?? target}`}
@@ -174,6 +200,24 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
           style={[styles.input, { color: colors.fg, backgroundColor: colors.surface }]}
           textAlignVertical="top"
         />
+        {showSlash && slashMenu ? (
+          <View style={styles.notice}>
+            <CommandMenu
+              list={commands.list}
+              sections={slashMenu.sections}
+              technical={technical}
+              onPick={(c) => {
+                const picked = pickCommand(text, slashMenu.at, c.name);
+                setText(picked.text);
+                setCaret(picked.caret);
+              }}
+            />
+          </View>
+        ) : slashHint ? (
+          <Text accessibilityLiveRegion="polite" style={[styles.slashHint, { color: colors.fg3 }]}>
+            {slashHint}
+          </Text>
+        ) : null}
         {!text.trim() && templates.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templates} keyboardShouldPersistTaps="handled" accessibilityLabel="Templates">
             {sortTemplates(templates).map((t) => (
@@ -351,6 +395,10 @@ const styles = StyleSheet.create({
     padding: space.s8,
     fontSize: fontSize.input,
     lineHeight: Math.round(fontSize.input * lineHeight.body),
+  },
+  slashHint: {
+    fontSize: fontSize.caption,
+    paddingHorizontal: space.s10,
   },
   notice: {
     paddingHorizontal: space.s8,

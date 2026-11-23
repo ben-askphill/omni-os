@@ -22,6 +22,11 @@ import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { bottomInset, MoDiff, MoRound } from './parts.tsx';
 import { useThreadAgents } from '../thread-agents.ts';
+import { useCommands } from '../components/composer/use-commands.ts';
+import { runReplyCommand } from '../components/composer/reply-command.ts';
+import { replySlash, sameRun } from '@omni/shared/composer-slash.ts';
+import { href, navigate } from '../router.ts';
+import type { DraftRun } from '@omni/shared/draft-run.ts';
 
 export interface ComposerChip {
   label: string;
@@ -43,8 +48,9 @@ export function MoComposer({
   chips,
   placeholder,
   onSent,
-  onSwitched,
+  onChanged,
   onFork,
+  onNewThread,
   stop,
   takeover,
   onTakeOver,
@@ -60,10 +66,12 @@ export function MoComposer({
   /** A function gets whether a busy thread steers, so it can say queue where the harness cannot steer. */
   placeholder: string | ((steers: boolean) => string);
   onSent: (t: Thread, mode?: SendMode) => void;
-  /** The thread after its run switched. */
-  onSwitched: (t: Thread) => void;
+  /** The thread after its run switched or `/rename`. */
+  onChanged: (t: Thread) => void;
   /** Opens the sheet that forks the thread. */
   onFork: () => void;
+  /** `/clear` or `/new` on its own: the New sheet on the thread's channel, set to `run`, its run. */
+  onNewThread: (run: DraftRun) => void;
 }) {
   const [text, setText] = useState(() => drafts.get(thread.id) ?? '');
   const [busy, setBusy] = useState(false);
@@ -90,6 +98,11 @@ export function MoComposer({
     drafts.set(thread.id, v);
   };
   const mic = useDictation((p) => update(withPhrase(latest.current, p)));
+  // The `/` menu, and what Send does with a command, as in the desktop reply box (packages/shared/composer-slash.ts).
+  const commands = useCommands(`thread=${encodeURIComponent(thread.id)}`);
+  const slash = useMemo(() => replySlash(text, commands.list, thread.harness), [text, commands.list, thread.harness]);
+  const omni = slash.action.kind !== 'send';
+  const [menuOpen, setMenuOpen] = useState(false);
   // The agents the message goes to (ADR 0019): the ones it names, else the lead, as in the desktop reply box.
   const agents = useThreadAgents(thread);
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
@@ -139,6 +152,31 @@ export function MoComposer({
     }
   };
 
+  /** Run the Omni command the message starts with. The thread itself sees none of it. */
+  const runOmni = () => {
+    if (!slash.armed || busy) return;
+    const raw = text;
+    void runReplyCommand(slash.action, thread, att.files, {
+      sent: (files) => {
+        // Unless Ben typed more while it was in flight.
+        if (drafts.get(thread.id) === raw) drafts.delete(thread.id);
+        if (latest.current === raw) setText('');
+        if (files) att.clear();
+      },
+      openNew: () => onNewThread(sameRun(thread)),
+      pickModel: () => {
+        // A remote agent's run is its server: there is no model to pick (ADR 0020).
+        if (!harnesses || remoteLead) return;
+        reload();
+        setRunSheet(true);
+      },
+      started: (t) => navigate(href.thread(t.id)),
+      renamed: onChanged,
+      busy: setBusy,
+      error: setError,
+    });
+  };
+
   const shown = shownRun(thread);
   const next = shown !== thread ? threadRunLabels(shown, harnesses).model : null;
   const switchRun = async (choice: { harness: string; model: string }, effort: string) => {
@@ -149,7 +187,7 @@ export function MoComposer({
     setSwitching(true);
     setError(null);
     try {
-      onSwitched(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/run`, run));
+      onChanged(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/run`, run));
     } catch (e) {
       setError(errorText(e));
       // The error shows above the composer, which the sheet covers.
@@ -228,15 +266,20 @@ export function MoComposer({
             // The `@` menu: files, and in a thread that can delegate, the machines a task can be sent to.
             mentions={`thread=${encodeURIComponent(thread.id)}`}
             agents={agents}
+            commands={{ ...commands, where: 'reply' }}
             anchor={frame}
             onError={setError}
+            onMenuOpen={setMenuOpen}
             onPaste={att.onPaste}
             enterKeyHint="send"
             placeholder={hint}
             label={hint}
             className="max-h-[132px] min-w-0 flex-1 self-center overflow-y-auto bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none"
           />
-          {stop && !canSend && !att.files.length && !mic.on ? (
+          {omni ? (
+            // Named for what Send does, as the desktop reply box's Send button is: Rename, New thread, Pick model.
+            <MoRound ink icon="send" label={slash.label ?? 'Send'} onClick={runOmni} disabled={!slash.armed || busy} />
+          ) : stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />
           ) : canSend || !mic.supported ? (
             <MoRound ink icon="send" label={!busyThread || toOthers ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
@@ -245,8 +288,10 @@ export function MoComposer({
           )}
         </div>
       </div>
+      {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
       <div aria-live="polite">
-        {routing && (
+        {slash.hint && !menuOpen && <div className="px-4 pt-1.5 text-[12px] text-fg-3">{slash.hint}</div>}
+        {!slash.hint && routing && (
           <div data-routing-hint className="px-4 pt-1.5 text-[12px] text-fg-3">
             {routing}
           </div>

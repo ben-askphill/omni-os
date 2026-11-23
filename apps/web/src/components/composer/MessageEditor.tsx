@@ -66,7 +66,7 @@ export interface MessageEditorProps {
    * a mention would seat. Picking one sends the message to it. Without them the menu has no Agents tab.
    */
   agents?: { members: readonly MentionAgent[]; others: readonly MentionAgent[] };
-  /** The `/` menu's commands. Without them `/` is plain text, as in the phone composers. */
+  /** The `/` menu's commands. Without them `/` is plain text. */
   commands?: { list: CommandList | null; load: () => void | Promise<void>; where: 'reply' | 'new-thread' };
   /** Opens the menus below the box, for a composer near the top of the page. */
   below?: boolean;

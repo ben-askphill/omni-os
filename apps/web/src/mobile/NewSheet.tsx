@@ -19,9 +19,10 @@ import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote, Segmented } from '../components/ui.tsx';
 import { QuickAnswer } from '../components/QuickAnswer.tsx';
-import { draftRun, draftRunRequest } from '@omni/shared/draft-run.ts';
+import { draftRun, draftRunRequest, type DraftRun } from '@omni/shared/draft-run.ts';
 import { baseRequest } from '../worktree-base.ts';
-import { asksAuto } from '@omni/shared/thread-run.ts';
+import { AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
+import { useNewThreadCommands } from '../components/composer/menus.tsx';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { GROK_BOT_NOTE, GROK_BOT_PLACEHOLDER, GROK_BOT_SENT, grokBotBlock } from '@omni/shared/thread-machine.ts';
 import { sendMessageToGrokBot } from '../grokbot.ts';
@@ -49,7 +50,8 @@ const pill = (on: boolean) =>
  * makes, with the role's or the channel's run defaults until Ben picks another model. With Grok Bot on the machine
  * chip it posts the text to /api/grokbot instead, as the desktop composer does, and no thread starts. `prompt` fills the box to start.
  */
-export function NewSheet({ channel: initial, prompt: first }: { channel?: string; prompt?: string }) {
+/** `run`: the run to start on, from `/clear` or `/new` in a thread (shell.tsx), which also makes it a task. */
+export function NewSheet({ channel: initial, prompt: first, run: preset }: { channel?: string; prompt?: string; run?: DraftRun }) {
   const shell = useShell();
   const { channels, crew } = useApp();
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
@@ -69,7 +71,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(target));
   const technical = useTechnical();
   // A pick holds for the target it was made for; another target starts on its own defaults, as on the desktop.
-  const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(null);
+  const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(() => (preset ? { target: initial ?? 'conductor', ...preset } : null));
   const [picking, setPicking] = useState(false);
   const [pickingBase, setPickingBase] = useState(false);
   const [pickingMachine, setPickingMachine] = useState(false);
@@ -84,7 +86,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const [base, setBase] = useBasePick(target);
   const [busy, setBusy] = useState(false);
   // An open item's prompt is a task to start; anything typed fresh is asked first.
-  const [mode, setMode] = useState<'ask' | 'task'>(first ? 'task' : 'ask');
+  const [mode, setMode] = useState<'ask' | 'task'>(first || preset ? 'task' : 'ask');
   const [answering, setAnswering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const att = useAttachments();
@@ -118,6 +120,9 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
     setPicked(null);
   };
   const close = () => shell.sheet(null);
+  // The `/` menu: the commands the picked harness lists for the channel, and why a command would stay text.
+  const { commands, hint } = useNewThreadCommands({ text, choice: run?.choice ?? AUTO_CHOICE, channel: target });
+  const [menuOpen, setMenuOpen] = useState(false);
   // Grok Bot takes the text alone: the model and the base do not apply, and attachments stop the send.
   const toGrok = runOn.grokBot;
   const grokBlock = toGrok ? grokBotBlock(att.files.length + refs.length) : null;
@@ -247,9 +252,11 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
             // Files, and for a task the Conductor starts, the machine each task goes to, as on the desktop. An Ask
             // runs here with read-only tools, so it lists no machines.
             mentions={mentions}
+            commands={toGrok ? undefined : { ...commands, where: 'new-thread' }}
             // Upward: the sheet ends near the box, and the phone keyboard sits under it.
             anchor={frame}
             onError={setError}
+            onMenuOpen={setMenuOpen}
             onPaste={att.onPaste}
             enterKeyHint="send"
             label="Message"
@@ -327,6 +334,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
           </div>
         )}
         {(att.error || error) && <ErrorNote className="mx-3 mt-2">{att.error ?? error}</ErrorNote>}
+        <div aria-live="polite">{hint && !menuOpen && !toGrok && <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">{hint}</p>}</div>
         <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
           {toGrok
             ? GROK_BOT_NOTE

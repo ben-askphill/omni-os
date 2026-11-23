@@ -24,7 +24,8 @@ import { useThreadAgents } from '../thread-agents.ts';
 import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
-import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
+import { sameSettings } from '../new-thread-preset.ts';
+import { runReplyCommand } from './composer/reply-command.ts';
 import { draftRun, draftRunRequest, type DraftRun } from '@omni/shared/draft-run.ts';
 import { sendKey } from '../requests.ts';
 import { beginSend, keepLocalFiles } from '../sending.ts';
@@ -514,38 +515,20 @@ export function ReplyComposer({
 
   /** Run the Omni command the message starts with. The thread itself sees none of it. */
   const runOmni = async () => {
-    const { action } = slash;
     if (!slash.armed || busy) return;
     const raw = text;
-    if (action.kind === 'pick-model') {
-      sent(raw);
-      setPillRequest((n) => n + 1);
-      return;
-    }
-    if (action.kind === 'new-thread' && !action.prompt) {
-      sent(raw);
-      openNewThread(sameSettings(thread));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      if (action.kind === 'new-thread') {
-        const t = await api.send<Thread>('/threads', newThreadBody(thread, action.prompt), att.files);
-        keepLocalFiles(t.id, att.files);
+    await runReplyCommand(slash.action, thread, att.files, {
+      sent: (files) => {
         sent(raw);
-        att.clear();
-        navigate(`/t/${t.id}`);
-      } else if (action.kind === 'rename') {
-        const t = await api.patch<Thread>(`/threads/${encodeURIComponent(threadId)}`, { title: action.title });
-        sent(raw);
-        onChanged?.(t);
-      }
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+        if (files) att.clear();
+      },
+      openNew: () => openNewThread(sameSettings(thread)),
+      pickModel: () => setPillRequest((n) => n + 1),
+      started: (t) => navigate(`/t/${t.id}`),
+      renamed: (t) => onChanged?.(t),
+      busy: setBusy,
+      error: setError,
+    });
   };
 
   return (

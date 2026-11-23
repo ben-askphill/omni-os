@@ -76,7 +76,7 @@ const mount = async (phone: boolean) => {
   await act(async () =>
     root.render(
       phone
-        ? createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} })
+        ? createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onChanged: () => {}, onFork: () => {}, onNewThread: () => {} })
         : createElement(ReplyComposer, { thread }),
     ),
   );

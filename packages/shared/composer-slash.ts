@@ -1,7 +1,11 @@
 // What the composers do with a `/`, as pure functions: the Omni commands every thread's menu offers,
 // what Send does with a message that starts with one, and the quiet hints for commands that stay
 // plain text. The new-thread composer offers no Omni commands. The grammar itself is in slash.ts.
+// Every client uses it: the Web UI on desktop and phone, and the iOS app.
 import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type CommandList, type SlashCommand } from './slash.ts';
+import { mentionSections, menuSections, slashQuery, type MenuSection, type SlashQuery } from './slash-menu.ts';
+import type { DraftRun } from './draft-run.ts';
+import { AUTO, AUTO_CHOICE } from './thread-run.ts';
 
 const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };
 export const harnessName = (id: string) => HARNESS_NAME[id] ?? id;
@@ -14,6 +18,17 @@ export const menuCommands = (list: SlashCommand[] | undefined, where: 'reply' | 
   ...visibleCommands(list ?? []),
   ...(where === 'reply' ? OMNI_COMMANDS : []),
 ];
+
+/**
+ * The `/` menu at the caret, for a composer that reads the caret itself (the iOS app's; the Web UI's editor finds the
+ * `/` with its trigger menu): the command being typed and the rows for it. Null when no command is being typed.
+ */
+export function commandMenu(text: string, caret: number, list: CommandList | null, where: 'reply' | 'new-thread'): { at: SlashQuery; sections: MenuSection[] } | null {
+  const at = slashQuery(text, caret);
+  if (!at) return null;
+  const rows = at.mention ? mentionSections : menuSections;
+  return { at, sections: rows(menuCommands(list?.commands, where), at.query, list?.recent) };
+}
 
 export type ReplyAction =
   /** To the harness, as typed. */
@@ -99,3 +114,25 @@ function textHint(text: string, r: ReturnType<typeof resolveSlash>, list: Comman
 
 /** "a", "a and b", "a, b and c". */
 const and = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
+
+/** Enough of a thread to start another one with its settings. */
+export interface ThreadSettings {
+  channel_id: string;
+  role: string | null;
+  harness: string;
+  model: string | null;
+  effort: string;
+  /** Set when Auto picked the thread's run: the new one starts on Auto too. */
+  auto_reason: string | null;
+}
+
+/** The run `/clear` or `/new` starts the next thread on: this one's harness, model and effort, or Auto when Auto picked them. */
+export const sameRun = (t: ThreadSettings): DraftRun => (t.auto_reason ? { choice: { ...AUTO_CHOICE }, effort: '' } : { choice: { harness: t.harness, model: t.model ?? '' }, effort: t.effort });
+
+/** The POST /threads body `/clear <prompt>` sends: this thread's channel, harness, model, effort and role. */
+export const newThreadBody = (t: ThreadSettings, prompt: string) => ({
+  channel: t.channel_id,
+  prompt,
+  role: t.role || undefined,
+  ...(t.auto_reason ? { model: AUTO } : { harness: t.harness, model: t.model || undefined, effort: t.effort || undefined }),
+});

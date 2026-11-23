@@ -379,8 +379,9 @@ export function ThreadScreen() {
         stop={slotBusy && !thread.setup && !view.asking ? { busy: interrupting, run: () => void interrupt() } : null}
         placeholder={(steers) => (conductor ? 'Reply to the Conductor' : !slotBusy ? 'Follow up' : view.asking && steers ? 'Reply' : steers ? `Steer ${theirs}` : 'Queue for after this turn')}
         onSent={(t) => applyThread(t, true)}
-        onSwitched={(t) => applyThread(t)}
+        onChanged={(t) => applyThread(t)}
         onFork={() => shell.sheet({ name: 'continue', source: thread })}
+        onNewThread={(run) => shell.sheet({ name: 'new', channel: thread.channel_id, run })}
         takeover={takeover}
         onTakeOver={() => void machine.pick(HERE)}
       />

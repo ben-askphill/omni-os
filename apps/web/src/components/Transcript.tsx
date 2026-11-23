@@ -111,6 +111,34 @@ function CommandPill({ label, cmd, open, onToggle }: { label: string; cmd: Slash
   );
 }
 
+/**
+ * A message's text as its bubble shows it: a pill for each command it names, which a press opens to its description,
+ * and the rest with its mentions. `visible` cuts it there, with an ellipsis. The desktop and phone transcripts use it.
+ */
+export function UserText({ text, slash, records, visible }: { text: string; slash?: UserP['slash']; records?: UserP['context']; visible?: number }) {
+  // Where the pill whose description is open starts.
+  const [about, setAbout] = useState<number | null>(null);
+  const pieces = slashPieces(text, slash, visible ?? text.length);
+  const open = pieces.find((x) => x.hit?.start === about)?.hit;
+  return (
+    <>
+      {pieces.map(({ text: t, hit }, i) =>
+        hit ? (
+          <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
+        ) : (
+          <MentionText key={i} text={t} records={records} />
+        ),
+      )}
+      {visible !== undefined && '...'}
+      {open && (
+        <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
+          {open.description || 'No description'} <span className="text-fg-3">· {SOURCE_TAG[open.source]}</span>
+        </span>
+      )}
+    </>
+  );
+}
+
 /** A small Copy control under a message, shown on hover or keyboard focus (always on touch). Copies the source text. */
 function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'end' }) {
   const { state, copy, icon } = useCopy();
@@ -140,14 +168,10 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy, from }: { p: 
   const [more, setMore] = useState(false);
   // The find bar's match is in this message: a long one shows all of it.
   const found = useFindOpens((t) => t === event, () => setMore(true));
-  // Where the pill whose description is open starts.
-  const [about, setAbout] = useState<number | null>(null);
   const text = p.text ?? '';
   // A clipped message shows all it came with; Show all under it loads the rest. A folded one has its own Show more.
   const long = !clipped && !fold && text.length > 1400;
   const cut = long && !more && !found;
-  const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
-  const open = pieces.find((x) => x.hit?.start === about)?.hit;
   const { crew } = useApp();
   // A team lead's message to its members (slice 6) names who sent it and who it went to.
   const lead = leadMessage(p, from, (a) => crew.find((r) => r.id === a)?.name ?? a);
@@ -156,23 +180,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy, from }: { p: 
   const sent = useMemo(() => sentContext(text, p.context), [text, p.context]);
   // A lead's message names its members in `to`, not as agent mentions, and they show the same way.
   const to = lead ? [...sent.to, ...lead.to.filter((m) => !sent.to.some((x) => x.agent === m.agent))] : sent.to;
-  const body = (
-    <>
-      {pieces.map(({ text: t, hit }, i) =>
-        hit ? (
-          <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
-        ) : (
-          <MentionText key={i} text={t} records={p.context} />
-        ),
-      )}
-      {cut && '...'}
-      {open && (
-        <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-          {open.description || 'No description'} <span className="text-fg-3">· {SOURCE_TAG[open.source]}</span>
-        </span>
-      )}
-    </>
-  );
+  const body = <UserText text={text} slash={p.slash} records={p.context} visible={cut ? 1200 : undefined} />;
   return (
     <div className={`group/msg flex flex-col items-end ${p.dropped ? 'opacity-60' : ''}`}>
       <div className="mb-1 flex flex-wrap items-center justify-end gap-x-2 text-[11.5px] text-fg-3">

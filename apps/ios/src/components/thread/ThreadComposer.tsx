@@ -1,8 +1,12 @@
-import { useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Text, TextInput } from '../../ui/Text';
 
-import type { HarnessInfo, Thread } from '@omni/client-core';
+import type { HarnessInfo, SlashCommand, Thread } from '@omni/client-core';
+import { commandMenu, replySlash } from '@omni/shared/composer-slash.ts';
+import { pickCommand } from '@omni/shared/slash-menu.ts';
 
 import { AttachControl, AttachNotice } from '../../attachments/AttachControl';
 import { AttachmentChips } from '../../attachments/AttachmentChips';
@@ -12,15 +16,22 @@ import type { FileMention, FileQuery } from '@omni/shared/mention-menu.ts';
 
 import { addDraftContext, removeDraftContext, useDraftContext } from '../../context/draft';
 import type { ThreadLive } from '../../live/hub';
-import { useAgents, useStore, useTechnical, useThreadKey } from '../../live/react';
+import { useAgents, useLiveHub, useStore, useTechnical, useThreadKey } from '../../live/react';
 import { agentMenu, composerRouting, pickAgent, threadAgents } from '../../thread/agents';
 import { AgentAvatar } from '../AgentAvatar';
 import { canStop, composerPlaceholder, sendLabel } from '../../send/rules';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { tap } from '../../ui/haptics';
 import { Icon } from '../../ui/Icon';
-import { restoreDraft, setDraft, useDraft, useFocusRequests } from './drafts';
+import { getDraft, restoreDraft, setDraft, useDraft, useFocusRequests } from './drafts';
 import { ModelButton, NextTurnChip } from './RunChips';
+import { CommandMenu } from './CommandMenu';
+import { commandStep } from '../../thread/commands';
+import { useCommands, useThreadActions } from '../../thread/hooks';
+import { targetOfThread } from '../../thread/target';
+import { toUploadFiles } from '../../attachments/model';
+import { newThreadId } from '../../newthread/draft';
+import type { RootStackParamList } from '../../navigation/types';
 
 const INPUT_LINE_HEIGHT = Math.round(fontSize.input * lineHeight.body);
 const MAX_LINES = 6;
@@ -65,6 +76,21 @@ export function ThreadComposer({
   // Who gets the message (ADR 0019): the lead in the placeholder, the agents an `@` names in the hint under the box.
   const routing = composerRouting(thread, agents, draft, context);
   const menu = routing.readOnly ? null : agentMenu(draft, Math.min(caret, draft.length), agents);
+  // The `/` menu, and what Send does with a command, as in the Web UI's reply box (packages/shared/composer-slash.ts).
+  const commands = useCommands({ thread: thread.id });
+  const slashMenu = routing.readOnly ? null : commandMenu(draft, Math.min(caret, draft.length), commands.list, 'reply');
+  const showSlash = !!slashMenu && (slashMenu.sections.length > 0 || commands.list?.status !== 'ready');
+  const slash = replySlash(draft, commands.list, thread.harness);
+  const omni = slash.action.kind !== 'send';
+  const [running, setRunning] = useState(false);
+  const hub = useLiveHub();
+  const runAction = useThreadActions();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // A fresh list each time the menu opens. The server only probes a list older than 30 seconds.
+  const { load } = commands;
+  useEffect(() => {
+    if (showSlash) load();
+  }, [showSlash, load]);
 
   const empty = draft.trim() === '' && context.length === 0;
   // The server takes files only with a message, so a file with no text says what is missing.
@@ -83,7 +109,53 @@ export function ThreadComposer({
     setCaret(picked.caret);
   };
 
+  const pickRow = (c: SlashCommand) => {
+    if (!slashMenu) return;
+    tap();
+    const picked = pickCommand(draft, slashMenu.at, c.name);
+    setDraft(key, picked.text);
+    setCaret(picked.caret);
+  };
+
+  /** Run the Omni command the message starts with. The thread itself sees none of it. */
+  const runOmni = async () => {
+    if (!slash.armed || running || routing.readOnly) return;
+    tap();
+    const text = draft;
+    // Clear what was sent, unless Ben typed more while it was in flight.
+    const sent = () => getDraft(key) === text && setDraft(key, '');
+    const step = commandStep(slash.action, thread);
+    if (step.kind === 'pick-model') {
+      sent();
+      return onOpenRun();
+    }
+    if (step.kind === 'open-new') {
+      sent();
+      return navigation.navigate('NewThread', { channel: step.channel, run: step.run });
+    }
+    setRunning(true);
+    setAttachNotice(null);
+    try {
+      if (step.kind === 'start') {
+        const attached = getStaged(key);
+        const t = await hub.request((api) => api.createThread({ id: newThreadId(), ...step.body }, attached.length ? { files: toUploadFiles(attached) } : undefined));
+        sent();
+        clearStaged(key);
+        navigation.push('Thread', { id: t.id });
+      } else if (step.kind === 'rename') {
+        const outcome = await runAction(targetOfThread(thread), { kind: 'rename', title: step.title });
+        if (outcome.kind === 'failed') setAttachNotice(outcome.error);
+        else sent();
+      }
+    } catch (e) {
+      setAttachNotice(e instanceof Error && e.message ? e.message : 'Something went wrong');
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const send = async () => {
+    if (omni) return runOmni();
     if (empty || slotTaken || routing.readOnly) return;
     tap();
     const text = draft;
@@ -118,6 +190,7 @@ export function ThreadComposer({
         </View>
       ) : null}
       {menu ? <AgentMenu rows={menu.rows} onPick={(row) => pick(menu.at, row)} /> : null}
+      {showSlash && slashMenu ? <CommandMenu list={commands.list} sections={slashMenu.sections} technical={technical} onPick={pickRow} /> : null}
       {chips.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.contextRow} accessibilityLabel="Added to this message">
           {chips.map((c) => (
@@ -141,13 +214,19 @@ export function ThreadComposer({
           editable={!routing.readOnly}
           value={draft}
           onChangeText={(text) => setDraft(key, text)}
+          onFocus={load}
           onSelectionChange={(e) => setCaret(e.nativeEvent.selection.end)}
           placeholder={placeholder}
           placeholderTextColor={colors.fg3}
           style={[styles.input, { color: colors.fg }]}
         />
         <ModelButton thread={thread} harnesses={harnesses} onPress={onOpenRun} />
-        {showStop ? (
+        {omni ? (
+          // Named for what Send does, as the Web UI's Send button is: Rename, New thread, Pick model.
+          <RoundButton label={slash.label ?? 'Send'} busy={running} disabled={!slash.armed || routing.readOnly} onPress={() => void runOmni()}>
+            <Icon name="arrowUp" size={16} color={colors.onInk} />
+          </RoundButton>
+        ) : showStop ? (
           <RoundButton
             label={stopping ? 'Stopping' : 'Stop'}
             busy={stopping}
@@ -165,7 +244,11 @@ export function ThreadComposer({
           </RoundButton>
         )}
       </View>
-      {routing.hint ? (
+      {slash.hint && !showSlash ? (
+        <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: colors.fg3 }]}>
+          {slash.hint}
+        </Text>
+      ) : routing.hint ? (
         <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: colors.fg3 }]}>
           {routing.hint}
         </Text>
