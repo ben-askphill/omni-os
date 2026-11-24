@@ -26,12 +26,16 @@
 //   the real agy does (probed on 1.5.16): it starts the server with the entry's command, args and env pairs, shows a
 //   tool_call named `mcp_<server>_<tool>` (kind other), asks permission, calls the tool and shows what came back.
 //   The call gives up after FAKE_AGY_MCP_TIMEOUT_MS (default: never).
+//   `DELETE <path>`, `MOVE <from> <to>`, `MCPCALL <server> <tool>` and `SUBAGENT` (each asks first, as EDIT does, and
+//   RUNFREE skips the ask for any of them). CMD really runs its command in the session's folder once allowed, EDIT,
+//   DELETE and MOVE really change the disk, so a test can prove a refused call left it alone. `WAITASK` asks to run a command and
+//   waits for the answer without cancelling, for a session that ends while an approval waits.
 //   Anything else is answered `ack: <text>`.
 // - FAKE_AGY_LOG_ENV: names of environment variables whose values the spawn line of the log also records (envValues).
 // - FAKE_AGY_EMAIL: the account `authenticate` signs in as, written to --log-file in agy's own words (default
 //   agy-user@example.com). Empty leaves the line out. FAKE_AGY_TIER: the tier it reports (default Google AI Pro).
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 
@@ -229,6 +233,18 @@ async function guarded(s, toolCall, run) {
   await run();
 }
 
+/** A tool call that changes something: announced, asked about, and done only on an allow (or at once with RUNFREE). */
+async function change(s, body, { id, kind, title, paths, raw }, run) {
+  const call = { toolCallId: id, title, kind, status: 'pending', ...(paths && { locations: paths.map((path) => ({ path })) }), rawInput: raw ?? (paths ? { TargetFile: paths[0] } : {}) };
+  update(s, { sessionUpdate: 'tool_call', ...call });
+  const done = async () => {
+    run();
+    update(s, { sessionUpdate: 'tool_call_update', toolCallId: id, status: 'completed' });
+  };
+  if (/\bRUNFREE\b/.test(body)) await done();
+  else await guarded(s, call, done);
+}
+
 
 /** MCP <server> <tool> [json]: what the real agy does with a stdio server from session/new (probed on 1.5.16). */
 async function mcpCall(s, server, tool, args) {
@@ -286,9 +302,15 @@ async function turn(s, params) {
   if (cmd) {
     const call = { toolCallId: `c${++counter}`, title: `Run ${cmd[1]}`, kind: 'execute', status: 'pending', rawInput: { CommandLine: cmd[1], Cwd: s.cwd } };
     update(s, { sessionUpdate: 'tool_call', ...call });
-    await guarded(s, call, async () => {
-      update(s, { sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: `ran ${cmd[1]}\n` } }], rawOutput: { exit_code: 0 } });
-    });
+    const run = async () => {
+      let out = '';
+      try {
+        out = execSync(cmd[1], { cwd: s.cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch {}
+      update(s, { sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: `ran ${cmd[1]}\n${out}` } }], rawOutput: { exit_code: 0 } });
+    };
+    if (/\bRUNFREE\b/.test(body)) await run();
+    else await guarded(s, call, run);
   }
   const edit = /\bEDIT (\S+)/.exec(body);
   if (edit) {
@@ -304,6 +326,20 @@ async function turn(s, params) {
   }
   const mcp = /\bMCP (\S+) (\S+)(?: (\{.*\}))?/.exec(body);
   if (mcp) await mcpCall(s, mcp[1], mcp[2], mcp[3] ? JSON.parse(mcp[3]) : {});
+  const del = /\bDELETE (\S+)/.exec(body);
+  if (del) await change(s, body, { id: `d${++counter}`, kind: 'delete', title: `Delete ${del[1]}`, paths: [join(s.cwd, del[1])] }, () => rmSync(join(s.cwd, del[1]), { force: true }));
+  const move = /\bMOVE (\S+) (\S+)/.exec(body);
+  if (move) await change(s, body, { id: `m${++counter}`, kind: 'move', title: `Move ${move[1]}`, paths: [join(s.cwd, move[1])], raw: { from: join(s.cwd, move[1]), to: join(s.cwd, move[2]) } }, () => renameSync(join(s.cwd, move[1]), join(s.cwd, move[2])));
+  const mcpc = /\bMCPCALL (\S+) (\S+)/.exec(body);
+  if (mcpc) await change(s, body, { id: `p${++counter}`, kind: 'other', title: `${mcpc[1]}: ${mcpc[2]}`, raw: { server: mcpc[1], tool: mcpc[2] } }, () => {});
+  if (/\bSUBAGENT\b/.test(body))
+    await change(s, body, { id: `a${++counter}`, kind: 'other', title: 'Run invoke_subagent', raw: { subagents: [{ role: 'helper', prompt: 'do the thing' }] } }, () => {});
+  if (/\bWAITASK\b/.test(body)) {
+    const call = { toolCallId: `w${++counter}`, title: 'Run touch waited.txt', kind: 'execute', status: 'pending', rawInput: { CommandLine: 'touch waited.txt', Cwd: s.cwd } };
+    update(s, { sessionUpdate: 'tool_call', ...call });
+    const answer = await ask('session/request_permission', { sessionId: s.id, toolCall: call, options: OPTIONS });
+    if (answer?.outcome?.outcome === 'cancelled') return done('cancelled');
+  }
   if (/\bASK\b/.test(body)) {
     const answer = await ask('session/request_permission', {
       sessionId: s.id,
@@ -322,7 +358,7 @@ async function turn(s, params) {
     text(s, `${say[1].slice(0, 40)} `);
     await pause(5);
     text(s, 'and the rest');
-  } else if (!cmd && !edit && !mcp && !/\bASK\b/.test(body)) {
+  } else if (!cmd && !edit && !del && !move && !mcp && !mcpc && !/\b(ASK|SUBAGENT|WAITASK)\b/.test(body)) {
     text(s, `ack: ${body.split('\n').pop()}`);
   }
   return done();
