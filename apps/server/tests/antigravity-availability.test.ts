@@ -8,8 +8,7 @@ import { delimiter, join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_AGY } from './support.ts';
-import { FIX, SKILLS_HINT } from '../harness/antigravity/state.ts';
-import { NOT_BUILT } from '../harness/antigravity/adapter.ts';
+
 import { STRIPPED_VARS } from '../harness/env-guard.ts';
 
 let H: Awaited<ReturnType<typeof startRunner>>;
@@ -90,13 +89,14 @@ describe('the harness list', () => {
     expect(h.capabilities).toMatchObject({ warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'none', remote: false, toolLimits: false, switchable: true });
     expect(h.cap).toBe(12);
     expect(h.fix).toBeUndefined();
-    expect(h.models).toEqual([expect.objectContaining({ id: 'default', label: 'Antigravity default', default: true, efforts: [] })]);
+    expect(h.models[0]).toMatchObject({ id: 'gemini-4-neon', label: 'Gemini 4 Neon', default: true });
+    expect(h.models.map((m: { id: string }) => m.id)).toEqual(['gemini-4-neon', 'gemini-4-carbon', 'claude-opus-5-5', 'gpt-oss-120b']);
   });
 
   it('marks it missing, with how to install agy, when there is no binary', async () => {
     set({ OMNI_ANTIGRAVITY_BIN: join(tmp, 'no-such-agy') });
     const h = await checkNow();
-    expect(h).toMatchObject({ available: false, missing: true, fix: FIX.notInstalled, models: [] });
+    expect(h).toMatchObject({ available: false, missing: true, fix: state.FIX.notInstalled, models: [] });
     expect(h.install).toBe('curl -fsSL https://antigravity.google/cli/install.sh | bash');
   });
 
@@ -112,7 +112,7 @@ describe('the harness list', () => {
 
   it('reads the legacy server name prefix off the version, as T3 Code does', async () => {
     set({ FAKE_AGY_VERSION: 'agy_acp_server_1.1.1' });
-    expect((await checkNow()).fix).toBe(FIX.tooOld('1.1.1'));
+    expect((await checkNow()).fix).toBe(state.FIX.tooOld('1.1.1'));
   });
 
   it('stays available on a newer major version, with a note that Omni was not tested on it', async () => {
@@ -124,44 +124,44 @@ describe('the harness list', () => {
 
   it('says signed out, with the sign-in step', async () => {
     set({ FAKE_AGY_AUTH: 'signed-out' });
-    expect(await checkNow()).toMatchObject({ available: false, fix: FIX.signedOut });
+    expect(await checkNow()).toMatchObject({ available: false, fix: state.FIX.signedOut });
   });
 
   it('tells no subscription apart from signed out', async () => {
     set({ FAKE_AGY_AUTH: 'no-subscription' });
-    expect(await checkNow()).toMatchObject({ available: false, fix: FIX.noSubscription });
+    expect(await checkNow()).toMatchObject({ available: false, fix: state.FIX.noSubscription });
   });
 
   it('says agy is not answering, with the last line it printed', async () => {
     set({ FAKE_AGY_INIT: 'silent' });
     const h = await checkNow();
     expect(h.available).toBe(false);
-    expect(h.fix).toBe(FIX.silent('initialize', 1500, 'fake agy: unpacking the runtime'));
+    expect(h.fix).toBe(state.FIX.silent('initialize', 1500, 'fake agy: unpacking the runtime'));
   });
 
   it('says agy exited, with the last line it printed, when it crashes', async () => {
     set({ FAKE_AGY_INIT: 'crash' });
-    expect((await checkNow()).fix).toBe(FIX.exited('initialize', 'fake agy: panic: runtime could not start'));
+    expect((await checkNow()).fix).toBe(state.FIX.exited('initialize', 'fake agy: panic: runtime could not start'));
   });
 
   it('gives delegate the same reason', async () => {
     set({ FAKE_AGY_AUTH: 'signed-out' });
     await checkNow();
-    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'hi', harness: 'antigravity' })).rejects.toThrow(FIX.signedOut);
+    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'hi', harness: 'antigravity' })).rejects.toThrow(state.FIX.signedOut);
   });
 });
 
 describe('a sign-in link', () => {
   it('is recorded, opens no browser, and reads as signed out', async () => {
     set({ FAKE_AGY_AUTH: 'link' });
-    expect(await checkNow()).toMatchObject({ available: false, fix: FIX.signedOut });
+    expect(await checkNow()).toMatchObject({ available: false, fix: state.FIX.signedOut });
     expect(state.antigravityState()?.signInLink).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?/);
     expect(existsSync(opened)).toBe(false);
   });
 
   it('is caught on stdout too, from an agy that prints it', async () => {
     set({ FAKE_AGY_AUTH: 'link-stdout' });
-    expect(await checkNow()).toMatchObject({ available: false, fix: FIX.signedOut });
+    expect(await checkNow()).toMatchObject({ available: false, fix: state.FIX.signedOut });
     expect(state.antigravityState()?.signInLink).toMatch(/^https:\/\/accounts\.google\.com\//);
     expect(existsSync(opened)).toBe(false);
   });
@@ -215,8 +215,9 @@ describe('when agy is checked', () => {
     expect(existsSync(spawn.cwd)).toBe(false);
     // agy's own log goes into that folder, not into the user's Antigravity home.
     expect(spawn.argv).toEqual(['acp', '--log-file', expect.stringContaining('omni-agy-check-')]);
-    // No session was opened, so agy wrote no conversation.
-    expect(requests().filter((r) => r.kind === 'request').map((r) => r.method)).not.toContain('session/new');
+    // The check opens one session, in that folder, to read the models (antigravity-models.test.ts proves it deletes it).
+    const opened = requests().filter((r) => r.kind === 'request' && r.method === 'session/new');
+    expect(opened.at(-1)?.params.cwd).toBe(spawn.cwd);
   });
 });
 
@@ -231,16 +232,18 @@ describe("agy's environment", () => {
 
     // The catalog's check, then a thread's: the thread's agy gets the channel's secrets behind the guard.
     await checkNow();
-    const t = await H.start('hi', { harness: 'antigravity', model: 'default' });
+    const t = await H.start('hi', { harness: 'antigravity', model: 'gemini-4-neon' });
     await H.untilResults(t.id, 1);
-    expect(H.byKind(t.id, 'error').map((e) => e.p.text)).toContain(NOT_BUILT);
+    expect(H.byKind(t.id, 'error')).toEqual([]);
 
     const [catalogSpawn, threadSpawn] = spawns().slice(-2);
     for (const spawn of [catalogSpawn, threadSpawn]) {
       for (const name of STRIPPED_VARS.antigravity) expect(spawn.envKeys).not.toContain(name);
       expect(spawn.GEMINI_HOME).toBe('/test/gemini-home');
-      expect(spawn.BROWSER).toContain('omni-agy-check-');
     }
+    // Both put recording openers first on PATH: the check's in its scratch folder, the thread's in its own folder.
+    expect(catalogSpawn.BROWSER).toContain('omni-agy-check-');
+    expect(threadSpawn.BROWSER).toContain('agy-bin');
     // Other secrets still reach a thread's agy.
     expect(threadSpawn.envKeys).toContain('PLAIN_SECRET');
   });
@@ -282,9 +285,9 @@ describe('the skills hint', () => {
   it('shows when ~/.agents/skills has skills agy cannot see, and never makes the harness unavailable', async () => {
     mkdirSync(join(skills(), 'writing'), { recursive: true });
     writeFileSync(join(skills(), 'writing', 'SKILL.md'), '---\nname: writing\n---\n');
-    expect(await checkNow()).toMatchObject({ available: true, hint: SKILLS_HINT });
+    expect(await checkNow()).toMatchObject({ available: true, hint: state.SKILLS_HINT });
     set({ FAKE_AGY_AUTH: 'signed-out' });
-    expect(await checkNow()).toMatchObject({ available: false, hint: SKILLS_HINT });
+    expect(await checkNow()).toMatchObject({ available: false, hint: state.SKILLS_HINT });
   });
 
   it('goes away once agy has the link', async () => {
@@ -297,6 +300,6 @@ describe('the skills hint', () => {
 
   it('comes back when the link is gone', async () => {
     rmSync(agySkills());
-    expect((await checkNow()).hint).toBe(SKILLS_HINT);
+    expect((await checkNow()).hint).toBe(state.SKILLS_HINT);
   });
 });

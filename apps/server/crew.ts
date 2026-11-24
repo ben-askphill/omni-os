@@ -483,5 +483,9 @@ export const MEMBER_DENIED = [
 export const localDelegateOnlyRefusal = (role: string, harness: string) =>
   `${role} only routes work, and Omni cannot take ${harness}'s own tools away yet, so it would do the work itself. Run ${role} on Claude Code, Codex or Cursor instead.`;
 
+/** Why a no-edits agent or a quick ask cannot run on a local harness whose own tools Omni cannot limit yet (Antigravity). */
+export const localToolsRefusal = (what: string, harness: string) =>
+  `${what} needs its file-edit tools taken away, and Omni cannot take ${harness}'s own tools away yet. Use Claude Code, Codex or Cursor Agent instead.`;
+
 export const remoteDelegateOnlyRefusal = (role: string, where: string) =>
   `${role} only routes work, with Omni's delegate tools, and a thread that runs ${where} does not get them. Omni cannot take that agent's own tools away either, so it would do the work itself. Run ${role} on Claude Code, Codex or Cursor instead.`;

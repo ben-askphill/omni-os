@@ -4,8 +4,8 @@ import type { HarnessProfile } from '../profile.ts';
 export const antigravityProfile: HarnessProfile = {
   // ACP treats /compact as plain model input, so Omni never sends one.
   compact: null,
-  // Only when agy reports its window (usage_update). No made-up meter until it does (#979).
-  meter: null,
+  // The window agy reports on usage_update, with the turn's tokens as spend. Nothing shows before its first usage_update.
+  meter: 'estimate',
   // No turns run on it yet, so an agent's skills are not loaded on it. #979 adds them with its turns.
   skills: null,
   // agy keeps its conversations in the user's Antigravity home on each machine. A thread handed to another machine

@@ -15,7 +15,9 @@ export type ContextSource =
   /** A Cursor turn with one model call: the total is exact, the window comes from the model's name. */
   | 'cursor'
   /** A Cursor turn with several model calls. Cursor sums them, so the total is an average per call. */
-  | 'cursor-estimate';
+  | 'cursor-estimate'
+  /** Antigravity's usage_update: the tokens in the window and the window's size. */
+  | 'antigravity';
 
 /** A thread's tokens and billed cost, summed over its turns. Cursor only: it reports tokens per turn. */
 export interface ThreadSpend {

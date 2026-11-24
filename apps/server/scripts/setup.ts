@@ -230,7 +230,7 @@ async function harnesses(server: string | null) {
   if (gh.reason) say(`${indent}${gh.reason}`);
   const ghWho = githubLine(gh);
   if (ghWho) say(`${indent}${ghWho}`);
-  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex and Cursor Agent are optional.');
+  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex, Cursor Agent and Antigravity are optional.');
 }
 
 async function createChannel(server: string | null, name: string, repo: string, store: string) {

@@ -248,7 +248,7 @@ async function spawnLive(live: Live, thread: Thread) {
       contextHint: (h) => recordContextHint(thread.id, h),
       turnTokens: (u) => {
         addCursorTurn(thread.id, u);
-        afterCursorTurn();
+        if (thread.harness === 'cursor') afterCursorTurn();
       },
       stderr: (d) => live.sawStderr(d),
       spawnError: (err) => {

@@ -103,6 +103,8 @@ export interface ModelEntry {
   defaultEffort: string;
   /** Whether this is the harness's default model. */
   default?: boolean;
+  /** Listed in no picker until it is switched on under Models: it bills somewhere else (Antigravity's non-Gemini models). */
+  hiddenUntilOn?: boolean;
   /**
    * Left out of the pickers by Ben's model visibility settings (harness/model-visibility.ts). Only GET /harnesses sets
    * it. The model still runs: anything that already names it keeps working.

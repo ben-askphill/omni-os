@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { channelAccess, harnessRefusal } from '../access.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource, type ThreadWorkspace } from '../db.ts';
-import { crewForNewThread, listCrew, localDelegateOnlyRefusal, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
+import { crewForNewThread, listCrew, localDelegateOnlyRefusal, localToolsRefusal, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { threadDir } from '../config.ts';
 import { capture } from '../analytics.ts';
@@ -270,6 +270,9 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
   // A harness Omni cannot hold to tool limits (a remote one runs its own tools) cannot run a delegate-only role.
   if (role?.delegateOnly && !capabilitiesOf(harness)?.toolLimits) throw new Error(capabilitiesOf(harness)?.remote === false ? localDelegateOnlyRefusal(role.name, harnessName(harness)) : remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
+  // The same for an agent without file edits and for a quick ask, whose read-only tools Omni takes away per harness.
+  if (role?.tools === 'no-edits' && !capabilitiesOf(harness)?.toolLimits && capabilitiesOf(harness)?.remote === false) throw refusal(localToolsRefusal(`${role.name} runs without file edits, which`, harnessName(harness)), 400);
+  if (input.quick && !capabilitiesOf(harness)?.toolLimits && capabilitiesOf(harness)?.remote === false) throw refusal(localToolsRefusal('A quick ask runs read only, which', harnessName(harness)), 400);
   // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
   const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
   if (unenforced) throw refusal(unenforced, 400);

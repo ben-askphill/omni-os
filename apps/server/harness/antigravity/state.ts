@@ -12,7 +12,10 @@
 //   same helper for any agy that reads it.
 // - agy's own log (--log-file, into the scratch folder) says "authenticated successfully as <email>". That line is
 //   the account's email: read from what agy prints, never from the file its Google sign-in lives in.
-// - The check opens no session, so agy writes no conversation for it. The scratch folder goes when it ends.
+// - Once signed in, the check opens one session in the scratch folder to read the model list and each model's effort
+//   levels (models.ts), then deletes what agy wrote for that session id (conversations/<id>.db and brain/<id>/ in its
+//   home), and only those. The list is kept on disk; a check that cannot read one keeps the last list.
+//   The scratch folder goes when it ends.
 //
 // Starting agy is heavy, so a check runs only when asked (catalog-service.ts): at server start, on Check again and
 // Check for new models, when a thread starts, and on demand while the harness is down. The last reading is kept.
@@ -22,6 +25,7 @@ import { delimiter, join } from 'node:path';
 import { harnessEnv } from '../env-guard.ts';
 import { AcpClient, AcpError, AcpExited, AcpTimeout } from '../acp/client.ts';
 import { antigravityBin } from './bin.ts';
+import { keepModels, lastModels, readModels, type AgyModel } from './models.ts';
 
 /** The oldest agy Omni runs: T3 Code's lower bound. Older runtimes hide non-Gemini models from clients off their allowlist. */
 export const MIN_VERSION = '1.5.1';
@@ -53,6 +57,8 @@ export interface AntigravityState {
   email: string | null;
   /** The plan agy reports for the account ("Google AI Pro"). */
   tier: string | null;
+  /** The models agy offers this account, with their effort levels: the last list read, kept across a failed check. */
+  models: AgyModel[];
   /** agy cannot see the skills in ~/.agents/skills. Never makes the harness unavailable. */
   hint?: string;
   /** agy tried to open a sign-in link. The link is kept here only, never sent to a client. */
@@ -77,6 +83,17 @@ export const UNTESTED_NOTE = (version: string) => `agy ${version} is a newer maj
 
 /** The skills hint, worded once for Settings > Models. */
 export const SKILLS_HINT = 'agy does not see your skills in ~/.agents/skills. Link them for it: ln -s ~/.agents/skills ~/.gemini/antigravity-cli/skills';
+
+/** The home agy keeps its conversations in. */
+export const agyHome = (home = homedir()) => join(home, '.gemini', 'antigravity-cli');
+
+/** Remove what agy wrote for one session id, and nothing else. */
+export function removeSessionFiles(sessionId: string, home = homedir()) {
+  if (!/^[\w.-]+$/.test(sessionId)) return;
+  const root = agyHome(home);
+  rmSync(join(root, 'conversations', `${sessionId}.db`), { force: true });
+  rmSync(join(root, 'brain', sessionId), { recursive: true, force: true });
+}
 
 /** "agy_acp_server_1.5.16" or "1.5.16" as [1, 5, 16], or null. */
 export function parseVersion(v: string | null | undefined): number[] | null {
@@ -135,7 +152,8 @@ export function skillsHint(home = homedir()): string | undefined {
   const source = join(home, '.agents', 'skills');
   const names = (dir: string): string[] | null => {
     try {
-      return readdirSync(dir).filter((n) => !n.startsWith('.') && statSync(join(dir, n)).isDirectory());
+      // A skill is a folder (a link to one counts) that holds a SKILL.md: a stray folder is not one.
+      return readdirSync(dir).filter((n) => !n.startsWith('.') && existsSync(join(dir, n, 'SKILL.md')) && statSync(join(dir, n)).isDirectory());
     } catch {
       return null;
     }
@@ -188,11 +206,12 @@ export async function checkAntigravity(opts: CheckOptions = {}): Promise<Antigra
   const base = opts.env ?? process.env;
   const at = () => Date.now();
   const hint = skillsHint(base.HOME || homedir());
-  const reading = (s: Omit<AntigravityState, 'checkedAt' | 'email' | 'tier' | 'version' | 'bin'> & Partial<AntigravityState>): AntigravityState => ({
+  const reading = (s: Omit<AntigravityState, 'checkedAt' | 'email' | 'tier' | 'version' | 'bin' | 'models'> & Partial<AntigravityState>): AntigravityState => ({
     bin: null,
     version: null,
     email: null,
     tier: null,
+    models: lastModels(),
     ...(hint && { hint }),
     ...s,
     checkedAt: at(),
@@ -265,7 +284,8 @@ export async function checkAntigravity(opts: CheckOptions = {}): Promise<Antigra
       await new Promise((r) => setTimeout(r, 100));
       email = emailFromLog(read(logFile));
     }
-    return reading({ state: 'ready', bin, version, email, tier: typeof tierName === 'string' ? tierName : null, ...(note && { note }) });
+    const models = await readSessionModels(client, cwd, base.HOME || homedir());
+    return reading({ state: 'ready', bin, version, email, tier: typeof tierName === 'string' ? tierName : null, ...(models.length ? { models } : {}), ...(note && { note }) });
   } catch (e) {
     const last = lastLine(stderr);
     if (spawnError) {
@@ -286,6 +306,28 @@ export async function checkAntigravity(opts: CheckOptions = {}): Promise<Antigra
   }
 }
 
+/**
+ * Open a session in `cwd`, read the models, and delete what agy wrote for it. Empty when agy will not open one: the
+ * harness still runs on the list it had.
+ */
+async function readSessionModels(client: AcpClient, cwd: string, home: string): Promise<AgyModel[]> {
+  let sessionId: string | undefined;
+  try {
+    const opened = await client.request<{ sessionId?: unknown }>('session/new', { cwd, mcpServers: [] }, NEW_MS());
+    if (typeof opened?.sessionId !== 'string') return [];
+    sessionId = opened.sessionId;
+    const models = await readModels(client, sessionId, opened);
+    keepModels(models);
+    return models;
+  } catch {
+    return [];
+  } finally {
+    if (sessionId) removeSessionFiles(sessionId, home);
+  }
+}
+
+const NEW_MS = () => checkMs(30_000);
+
 let last: AntigravityState | null = null;
 let running: Promise<AntigravityState> | null = null;
 
@@ -297,6 +339,14 @@ export function refreshAntigravity(opts: CheckOptions = {}): Promise<Antigravity
       running = null;
     });
   return running;
+}
+
+/**
+ * A thread's agy tried to open a sign-in link: the harness is signed out on this machine until a check says otherwise.
+ * The link itself is dropped, never kept or sent to a client.
+ */
+export function markSignedOut() {
+  last = { ...(last ?? { bin: null, version: null, email: null, tier: null, models: lastModels() }), state: 'signed-out', fix: FIX.signedOut, checkedAt: Date.now() };
 }
 
 /** The last reading, or null before the first check. */
