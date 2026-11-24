@@ -61,6 +61,7 @@ function HarnessesCard({ channel }: { channel?: string }) {
                       To fix: {isCommand(h.fix ?? h.install ?? '') ? <code className="text-[11.5px]">{h.fix ?? h.install}</code> : (h.fix ?? h.install)}
                     </p>
                   )}
+                  {h.hint && <p className="mt-1 text-[12.5px] break-words text-fg-3">{h.hint}</p>}
                 </div>
                 <span className="mt-0.5 inline-flex w-[76px] shrink-0 items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
                   <StatusDot status={h.available ? 'done' : 'needs'} size={7} />

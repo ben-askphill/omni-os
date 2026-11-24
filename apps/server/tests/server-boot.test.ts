@@ -57,6 +57,7 @@ function boot(data: string, port = 0) {
       OMNI_ACCESS_DEFAULT: 'full',
       OMNI_CODEX_BIN: join(tmp, 'no-codex'),
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
+      OMNI_ANTIGRAVITY_BIN: join(tmp, 'no-agy'),
       OMNI_BROWSER: '0',
       // Secrets in the data dir, never this Mac's Keychain.
       OMNI_SECRET_STORE: 'file',

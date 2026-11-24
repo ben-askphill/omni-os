@@ -75,6 +75,7 @@ async function once() {
     OMNI_CLAUDE_BIN: join(fixtures, 'fake-claude.mjs'),
     OMNI_CODEX_BIN: join(fixtures, 'fake-codex.mjs'),
     OMNI_CURSOR_BIN: join(fixtures, 'fake-cursor.mjs'),
+    OMNI_ANTIGRAVITY_BIN: join(fixtures, 'fake-agy.mjs'),
     OMNI_BROWSER: '0',
     OMNI_SUGGESTIONS: '0',
     OMNI_UPDATE_CHECK: '0',

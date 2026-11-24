@@ -45,6 +45,7 @@ function boot() {
       OMNI_ACCESS_DEFAULT: 'full',
       OMNI_CODEX_BIN: join(tmp, 'no-codex'),
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
+      OMNI_ANTIGRAVITY_BIN: join(tmp, 'no-agy'),
       OMNI_BROWSER: '0',
       OMNI_BRAIN_DIR: brain,
       OMNI_DEFAULT_MODEL: 'sonnet',

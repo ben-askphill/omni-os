@@ -7,7 +7,7 @@ import { mentionSections, menuSections, slashQuery, type MenuSection, type Slash
 import type { DraftRun } from './draft-run.ts';
 import { AUTO, AUTO_CHOICE } from './thread-run.ts';
 
-const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };
+const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud', antigravity: 'Antigravity' };
 export const harnessName = (id: string) => HARNESS_NAME[id] ?? id;
 
 /**

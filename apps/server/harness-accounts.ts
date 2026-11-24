@@ -9,6 +9,9 @@
 // - Cursor Agent: `cursor-agent about --format json`: email and subscription tier.
 // - Cursor Cloud: GET /v1/me with the global CURSOR_API_KEY: the email the key belongs to, and the key's name.
 // - Hermes: nothing to read. It bills an Anthropic key on its own server, so the row names that server only.
+// - Antigravity: the state reader's last check (harness/antigravity/state.ts), or a new one when there is none or
+//   Check again asked. The email is what agy's own log says it signed in as, and the plan is the tier agy reports.
+//   Without an email the row is signed in with no account named, so no switch can be raised for it.
 // Only the fields harness/accounts-parse.ts picks leave a reader, and every string goes through its `clean`, which
 // drops anything shaped like a token: a CLI that one day prints one never gets it into a response, a log or the synced record. A failed
 // check keeps its output to itself too: the row says "Could not check", never what the CLI printed.
@@ -50,6 +53,7 @@ import { CursorCloudClient } from './harness/cursor-cloud/client.ts';
 import { probeHermes } from './harness/hermes/client.ts';
 import { account, clean, parseAccountUsage, parseClaudeStatus, parseCodexAccount, parseCursorAbout, parseCursorMe, sanitize } from './harness/accounts-parse.ts';
 import { harnessEnv } from './harness/env-guard.ts';
+import { antigravityState, refreshAntigravity } from './harness/antigravity/state.ts';
 import { HARNESS_IDS, type HarnessId } from './harness/types.ts';
 import { globalSecret } from './secrets.ts';
 import { computerName, currentRecords, deviceRecords } from './sync/devices.ts';
@@ -69,6 +73,8 @@ const LOCAL_ID = 'local';
 const LOCAL_KEY = 'sync.accounts.local';
 
 const options: { env?: NodeJS.ProcessEnv; read?: (harness: HarnessId) => Promise<HarnessAccount> } = {};
+/** A Check again under way: the readers that keep a reading of their own (Antigravity) read again too. */
+let recheck = false;
 /** For tests: the environment the checks run in (each Mac in one process has its own), or a reader that stands in for them. */
 export function configureAccounts(o: typeof options) {
   Object.assign(options, o);
@@ -157,12 +163,25 @@ async function readHermes(): Promise<HarnessAccount> {
     : account('hermes', 'unknown', { note: `${host} did not answer` });
 }
 
+/** Antigravity's row, from the same reader its catalog entry uses. agy is heavy to start, so a kept reading is used. */
+async function readAntigravity(): Promise<HarnessAccount> {
+  const s = (!recheck && antigravityState()) || (await refreshAntigravity({ env: baseEnv() }));
+  if (s.state === 'not-installed') return account('antigravity', 'not-installed');
+  if (s.state === 'signed-out') return account('antigravity', 'signed-out', { note: 'Run agy in a terminal and sign in with Google' });
+  if (s.state === 'no-subscription') return account('antigravity', 'signed-out', { note: 'The Google account has no Antigravity subscription' });
+  if (s.state === 'too-old') return account('antigravity', 'unknown', { note: s.version ? `agy ${s.version} is too old` : 'agy is too old' });
+  if (s.state === 'not-answering') return account('antigravity', 'unknown', { note: 'agy did not answer' });
+  if (!s.email) return account('antigravity', 'not-reported', { plan: s.tier, note: 'Signed in with Google. agy did not say which account' });
+  return account('antigravity', 'signed-in', { label: s.email, plan: s.tier });
+}
+
 const READERS: Record<HarnessId, () => Promise<HarnessAccount>> = {
   'claude-code': readClaude,
   codex: readCodex,
   cursor: readCursor,
   'cursor-cloud': readCursorCloud,
   hermes: readHermes,
+  antigravity: readAntigravity,
 };
 
 /** One harness's reading, cleaned whatever its reader returned. A reader that throws reads as unknown. */
@@ -257,6 +276,17 @@ export function ownAccounts({ force = false }: { force?: boolean } = {}): Promis
   return reading;
 }
 
+/** Check again: every harness is read again, the ones that keep a reading of their own included. */
+async function recheckOwn(): Promise<MachineAccountsRecord> {
+  if (reading) await reading.catch(() => null);
+  recheck = true;
+  try {
+    return await ownAccounts({ force: true });
+  } finally {
+    recheck = false;
+  }
+}
+
 /** After a sync: read again when the last reading is old, so a switch here reaches the other machines. */
 export function refreshAfterSync(now = Date.now()) {
   if (reading || (own && now - own.at < SYNC_EVERY_MS)) return;
@@ -297,7 +327,7 @@ function otherRecords(self: string): MachineAccountsRecord[] {
 
 /** GET /api/accounts. `refresh` reads this machine again (joining a reading under way) instead of the last one. */
 export async function accountsView({ refresh = false }: { refresh?: boolean } = {}): Promise<AccountsView> {
-  const mine = await ownAccounts({ force: refresh });
+  const mine = await (refresh ? recheckOwn() : ownAccounts());
   const self = outbox.machineId();
   const synced = !!self && !!activeWorker();
   return { machines: [viewOf(mine, true), ...(synced ? otherRecords(self).map((r) => viewOf(r, false)) : [])], synced, usage: accountUsages() };

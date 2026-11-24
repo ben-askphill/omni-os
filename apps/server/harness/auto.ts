@@ -302,11 +302,13 @@ const LANES: { why: string; run: (p: TaskProfile, ctx: RouteContext, effort: str
 
 const KIND_LABEL: Record<TaskKind, string> = { code: 'code', math: 'math', research: 'research', writing: 'writing', ops: 'ops', chat: 'quick' };
 const TIER_LABEL: Record<Tier, string> = { light: 'Light', standard: 'Standard', heavy: 'Hard', max: 'Very hard' };
-const HARNESS_LABEL: Record<HarnessId, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };
+const HARNESS_LABEL: Record<HarnessId, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud', antigravity: 'Antigravity' };
 
 /**
  * Map a profile onto the catalog through LANES, else Claude Code's tier model. Hermes bills the Anthropic API, and Cursor
  * Cloud runs off this Mac with no Mac build, browser or Omni tools, so Auto picks neither: they run only when chosen.
+ * No lane names Antigravity either: it bills the Google AI plan, and runs only when a thread, channel, automation or
+ * agent is set to it.
  */
 export function routeTask(profile: TaskProfile, ctx: RouteContext): AutoPick {
   const speed = profile.needs.includes('speed');

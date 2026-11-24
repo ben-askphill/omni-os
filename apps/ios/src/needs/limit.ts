@@ -8,6 +8,7 @@ const HARNESS_LABEL: Record<string, string> = {
   cursor: 'Cursor',
   hermes: 'Hermes',
   'cursor-cloud': 'Cursor Cloud',
+  antigravity: 'Antigravity',
 };
 
 export const harnessLabel = (id: string): string => HARNESS_LABEL[id] ?? id;

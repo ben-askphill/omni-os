@@ -18,6 +18,7 @@ export default defineConfig({
     // OMNI_CLAUDE_LOGIN_SYNC: no test copies the real Claude Code login into the real Keychain (harness/claude/login-sync.ts).
     // OMNI_UPDATE_CHECK, OMNI_CAFFEINATE: a test server never fetches origin or keeps the Mac awake (update.ts, index.ts).
     // OMNI_POSTHOG_KEY, OMNI_POSTHOG_HOST: no test sends usage analytics to PostHog (analytics.ts); tests that check it pass a key and a fake.
-    env: { OMNI_POSTHOG_KEY: '', OMNI_POSTHOG_HOST: 'http://127.0.0.1:9', OMNI_CLAUDE_LOGIN_SYNC: '0', OMNI_UPDATE_CHECK: '0', OMNI_CAFFEINATE: '0', OMNI_BROWSER: '1', OMNI_BROWSER_LIVE: '0', OMNI_TZ: 'Europe/Amsterdam', OMNI_HARDWARE_ID: 'test-mac', OMNI_CURSOR_DASHBOARD: '0', OMNI_USAGE_PRICES: '0', OMNI_CURSOR_API_URL: 'http://127.0.0.1:9', OMNI_TOKEN: 'test-token-0123456789abcdef0123456789abcdef' },
+    // OMNI_ANTIGRAVITY_BIN: no test starts the real agy on the machine running it; tests that need it pass the fake.
+    env: { OMNI_POSTHOG_KEY: '', OMNI_POSTHOG_HOST: 'http://127.0.0.1:9', OMNI_CLAUDE_LOGIN_SYNC: '0', OMNI_UPDATE_CHECK: '0', OMNI_CAFFEINATE: '0', OMNI_BROWSER: '1', OMNI_BROWSER_LIVE: '0', OMNI_TZ: 'Europe/Amsterdam', OMNI_HARDWARE_ID: 'test-mac', OMNI_CURSOR_DASHBOARD: '0', OMNI_USAGE_PRICES: '0', OMNI_CURSOR_API_URL: 'http://127.0.0.1:9', OMNI_TOKEN: 'test-token-0123456789abcdef0123456789abcdef', OMNI_ANTIGRAVITY_BIN: '/nonexistent/omni-test/agy' },
   },
 });

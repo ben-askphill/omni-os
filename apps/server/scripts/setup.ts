@@ -203,6 +203,7 @@ async function harnesses(server: string | null) {
       ['claude-code', 'claude', 'claude (then /login)'],
       ['codex', 'codex', 'codex login'],
       ['cursor', 'cursor-agent', 'cursor-agent login'],
+      ['antigravity', 'agy', 'agy (then sign in with Google)'],
     ];
     list = bins.map(([id, bin, fix]) => (has(bin) ? { id, name: HARNESS_META[id].name, available: true } : { id, name: HARNESS_META[id].name, available: false, missing: true, fix, install: HARNESS_INSTALL[id] }));
     say('   (Omni is not running, so this only checks the CLIs are on PATH, not that they are signed in.)');
@@ -210,8 +211,8 @@ async function harnesses(server: string | null) {
   const pad = Math.max(...Object.values(HARNESS_CHECK_LABEL).map((l) => l.length));
   const indent = ' '.repeat(pad + 5);
   for (const h of list) {
-    // Remote harnesses are opt-in: listed once they work, never as missing.
-    if ((h.id === 'hermes' || h.id === 'cursor-cloud') && !h.available) continue;
+    // Remote harnesses are opt-in: listed once they work, never as missing. So is Antigravity until agy is installed.
+    if ((h.id === 'hermes' || h.id === 'cursor-cloud' || (h.id === 'antigravity' && h.missing)) && !h.available) continue;
     const check = harnessCheck(h);
     say(`   ${HARNESS_CHECK_LABEL[check.state].toLowerCase().padEnd(pad)}  ${h.name}`);
     if (h.id === 'codex') say(`${indent}Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.`);

@@ -20,6 +20,20 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
   hermes: [],
   // Cursor Cloud's key goes on its API client's Authorization header only. The holder process never sees it.
   'cursor-cloud': ['CURSOR_API_KEY', 'CURSOR_AUTH_TOKEN'],
+  // Each of these moves agy off the signed-in Google account onto a Gemini API key, Vertex or a Cloud project's
+  // billing. GEMINI_HOME stays: it says where the user's own sign-in lives.
+  antigravity: [
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_CLOUD_LOCATION',
+    'GOOGLE_CLOUD_QUOTA_PROJECT',
+    'GOOGLE_GENAI_USE_VERTEXAI',
+    'GCLOUD_PROJECT',
+    'CLOUDSDK_CORE_PROJECT',
+    'AGY_ACP_CCPA_PROJECT',
+  ],
 };
 
 /**

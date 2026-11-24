@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SKILL_HARNESSES } from '@omni/shared/agent-skills.ts';
+import { antigravityAdapter } from '../harness/antigravity/adapter.ts';
 import { claudeAdapter } from '../harness/claude/adapter.ts';
 import { codexAdapter } from '../harness/codex/adapter.ts';
 import { cursorAdapter } from '../harness/cursor/adapter.ts';
@@ -10,7 +11,7 @@ import { providerWhere } from '../harness/registry.ts';
 import { CAPABILITIES, HARNESS_IDS, RUNS_API_CAPABILITIES } from '../harness/types.ts';
 
 // The adapter is the one answer to what its harness does (ADR 0017): runner, sync, handoff and skills read its profile.
-const ADAPTERS = [claudeAdapter, codexAdapter, cursorAdapter, cursorCloudAdapter, hermesAdapter];
+const ADAPTERS = [claudeAdapter, codexAdapter, cursorAdapter, cursorCloudAdapter, hermesAdapter, antigravityAdapter];
 
 describe('harness profiles', () => {
   it('each built-in adapter carries the profile its id looks up', () => {

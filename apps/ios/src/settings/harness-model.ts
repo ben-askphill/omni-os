@@ -9,6 +9,8 @@ export interface HarnessRow {
   detail: string;
   /** How to make one that is not ready run, as the server says it. */
   fix: string | null;
+  /** Worth fixing while it runs (Antigravity not seeing ~/.agents/skills). */
+  hint: string | null;
 }
 
 /**
@@ -19,6 +21,6 @@ export function harnessRows(list: readonly HarnessInfo[]): HarnessRow[] {
   return localHarnesses(list).map((h) => {
     const def = h.models.find((m) => m.default) ?? h.models[0];
     const detail = [h.plan, `${h.models.length} ${h.models.length === 1 ? 'model' : 'models'}`, def && `default ${def.label}`, `${h.running} of ${h.cap} running`].filter(Boolean).join(' · ');
-    return { id: h.id, name: h.name, ready: h.available, detail, fix: h.available ? null : (h.fix ?? h.install ?? null) };
+    return { id: h.id, name: h.name, ready: h.available, detail, fix: h.available ? null : (h.fix ?? h.install ?? null), hint: h.hint ?? null };
   });
 }

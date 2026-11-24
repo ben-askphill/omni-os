@@ -1,19 +1,20 @@
 // The harness abstraction: the agent a thread runs in, together with what it bills.
 // Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan) or
 // Hermes (Anthropic API on Ben's server — not his Claude, ChatGPT or Cursor plan), or
-// Cursor Cloud (a Cursor cloud agent on Cursor's own Linux machines, Cursor plan).
+// Cursor Cloud (a Cursor cloud agent on Cursor's own Linux machines, Cursor plan), or Antigravity (Google's `agy` over
+// the Agent Client Protocol, billing the Google account it is signed in with).
 // Beside these built-ins, the user can register custom harnesses: remote agents that speak the Runs API, one file each
 // in data/harnesses/ (custom.ts), with ids `custom:<slug>`.
 // See GLOSSARY.md for the domain terms.
 import { isCustomHarnessId, type CustomHarnessId } from '@omni/shared/custom-harness.ts';
 
 /** The built-in harnesses. */
-export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud';
+export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud' | 'antigravity';
 
 /** A built-in or a custom harness. A thread's `harness` column holds one of these. */
 export type AnyHarnessId = HarnessId | CustomHarnessId;
 
-export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud'];
+export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud', 'antigravity'];
 
 /**
  * Harnesses that run on a remote provider (the Hermes server, Cursor's cloud, a custom harness's server): no worktree,
@@ -82,6 +83,10 @@ export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
   // An HTTP API too. A message sent mid-run waits for the run to end and goes as a follow-up run; Stop cancels the run.
   // Images go up with the prompt, but the runner's attachment notes stay paths. Usage is Cursor's, not a plan window.
   'cursor-cloud': { warmProcess: false, steer: false, interrupt: true, inlineImages: false, usage: 'none', remote: true, toolLimits: false, switchable: false },
+  // One warm `agy acp` per session. It cannot take a message mid-turn, so one waits for the next turn, and Stop sends
+  // session/cancel. Images go as ACP image blocks. Omni reads no Google AI allowances (#982). toolLimits stays false
+  // until Omni answers agy's permission requests through the channel's gate, so it runs only at Full access for now.
+  antigravity: { warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'none', remote: false, toolLimits: false, switchable: true },
 };
 
 /** One model a harness offers. */
@@ -131,8 +136,10 @@ export interface HarnessInfo {
   available: boolean;
   /** The command that fixes availability, e.g. "codex login". Present when unavailable. */
   fix?: string;
-  /** Unavailable because Omni found no binary for this CLI, so installing it comes first. Only on Codex and Cursor Agent. */
+  /** Unavailable because Omni found no binary for this CLI, so installing it comes first. Only on the local CLIs. */
   missing?: true;
+  /** Something worth fixing that does not stop the harness running, e.g. Antigravity not seeing ~/.agents/skills. */
+  hint?: string;
   models: ModelEntry[];
   /** Concurrency cap for this harness. */
   cap: number;
@@ -146,6 +153,7 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
   cursor: { name: 'Cursor Agent', plan: 'Cursor plan' },
   hermes: { name: 'Hermes', plan: 'Anthropic API via Hermes' },
   'cursor-cloud': { name: 'Cursor Cloud', plan: 'Cursor plan' },
+  antigravity: { name: 'Antigravity', plan: 'Google AI plan' },
 };
 
 /**
@@ -156,4 +164,5 @@ export const HARNESS_INSTALL: Partial<Record<HarnessId, string>> = {
   'claude-code': 'npm install -g @anthropic-ai/claude-code',
   codex: 'npm install -g @openai/codex',
   cursor: 'curl https://cursor.com/install -fsS | bash',
+  antigravity: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
 };

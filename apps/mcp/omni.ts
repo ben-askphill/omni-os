@@ -390,8 +390,9 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'Override the agent\'s default harness: claude-code, codex, cursor or cursor-cloud, from list_harnesses. cursor runs the cursor-agent CLI on this machine; ' +
+          'Override the agent\'s default harness: claude-code, codex, cursor, cursor-cloud or antigravity, from list_harnesses. cursor runs the cursor-agent CLI on this machine; ' +
             'cursor-cloud launches a Cursor cloud agent on Cursor\'s Linux machines that pushes a branch and opens a PR (no Mac build or screenshots). ' +
+            'antigravity runs Google\'s agy CLI on this machine and bills the Google AI plan; use it only when asked. ' +
             'A remote agent (list_crew marks it `remote`) is not a harness: pass it as `role` with no harness, and no local agent runs on its server.',
         ),
       model: z
@@ -550,10 +551,10 @@ server.registerTool(
   'list_harnesses',
   {
     description:
-      'List the local agent harnesses (Claude Code, Codex, Cursor, Cursor Cloud) with their availability, fix command, models, effort levels and capabilities, so you can pass valid ids to delegate. ' +
+      'List the local agent harnesses (Claude Code, Codex, Cursor, Cursor Cloud, Antigravity) with their availability, fix command, models, effort levels and capabilities, so you can pass valid ids to delegate. ' +
       'Remote agents (Hermes, and the servers the user connected) are not harnesses: they are agents, in list_crew with `remote` set, and run only on their own server. ' +
       'Pass channel to see them as that channel does: cursor-cloud needs the channel\'s GitHub repo. ' +
-      'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks cursor-cloud or a remote agent. ' +
+      'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks cursor-cloud, antigravity or a remote agent. ' +
       `A model marked hidden is one ${USER} left out of the pickers in Settings. It still runs: pass it when asked for it. ` +
       `Only ${USER} adds, changes or removes a remote agent, since it decides where briefs and keys go: when asked to add one, hand ${USER} the page #/settings/crew (Add remote agent), or the pairing link its helper printed, and say they press Connect there.`,
     inputSchema: {

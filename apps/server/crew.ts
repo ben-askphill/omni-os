@@ -479,5 +479,9 @@ export const MEMBER_DENIED = [
  * Why a delegate-only role cannot run on a remote harness (Hermes, Cursor Cloud): it would have no omni tools to
  * delegate with, and Omni cannot take its work tools away there, so it could only do the work itself.
  */
+/** The same refusal for a harness on this machine whose own tools Omni cannot limit yet (Antigravity). */
+export const localDelegateOnlyRefusal = (role: string, harness: string) =>
+  `${role} only routes work, and Omni cannot take ${harness}'s own tools away yet, so it would do the work itself. Run ${role} on Claude Code, Codex or Cursor instead.`;
+
 export const remoteDelegateOnlyRefusal = (role: string, where: string) =>
   `${role} only routes work, with Omni's delegate tools, and a thread that runs ${where} does not get them. Omni cannot take that agent's own tools away either, so it would do the work itself. Run ${role} on Claude Code, Codex or Cursor instead.`;

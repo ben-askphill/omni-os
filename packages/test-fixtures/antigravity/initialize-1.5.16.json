@@ -1,0 +1,64 @@
+{
+  "_source": "Recorded from the real agy 1.5.16 (agy acp, Linux x86-64) on 2026-11-24 by the Antigravity A1 ticket (#978): its initialize answer, unchanged.",
+  "protocolVersion": 1,
+  "agentCapabilities": {
+    "loadSession": true,
+    "load_session": true,
+    "promptCapabilities": {
+      "image": true,
+      "audio": false,
+      "embeddedContext": true
+    },
+    "sessionCapabilities": {
+      "resume": {},
+      "close": {},
+      "load": {},
+      "list": {},
+      "additionalDirectories": {}
+    },
+    "session_capabilities": {
+      "resume": {},
+      "close": {},
+      "load": {},
+      "list": {},
+      "additionalDirectories": {}
+    },
+    "auth": {
+      "logout": {}
+    },
+    "_meta": {
+      "antigravity": {
+        "tier": true,
+        "systemPrompt": {
+          "append": true
+        }
+      }
+    }
+  },
+  "agentInfo": {
+    "name": "Antigravity ACP Server",
+    "version": "1.5.16"
+  },
+  "authMethods": [
+    {
+      "id": "oauth-personal",
+      "name": "Log in with Google",
+      "description": "Log in with your Google account"
+    },
+    {
+      "id": "oauth-business",
+      "name": "Log in with Gemini Enterprise",
+      "description": "Log in with your Gemini Enterprise account"
+    },
+    {
+      "id": "gemini-api-key",
+      "name": "Gemini API key",
+      "description": "Use an API key with Gemini Developer API"
+    },
+    {
+      "id": "agent-platform",
+      "name": "Gemini Enterprise Agent Platform",
+      "description": "Use Gemini Enterprise Agent Platform (formerly Vertex AI) with Application Default Credentials"
+    }
+  ]
+}

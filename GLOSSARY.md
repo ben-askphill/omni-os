@@ -275,7 +275,7 @@ _Avoid_: Spinner, badge
 ### Runs
 
 **Harness**:
-The AI tool an agent runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent or Cursor Cloud. A remote agent has none for the user to pick.
+The AI tool an agent runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent, Cursor Cloud or Antigravity. A remote agent has none for the user to pick.
 _Avoid_: Agent (who takes part in a thread), remote agent, custom harness, provider, engine, backend, runtime
 
 **Account**:

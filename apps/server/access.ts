@@ -275,7 +275,10 @@ export function codexPolicy(a: ChannelAccess): { approvalPolicy: 'never' | 'untr
  * below full access. An id that names no harness here is refused as well.
  */
 export function harnessRefusal(harness: string, a: ChannelAccess): string | null {
-  if (unrestricted(a) || capabilitiesOf(harness)?.toolLimits) return null;
+  const caps = capabilitiesOf(harness);
+  if (unrestricted(a) || caps?.toolLimits) return null;
+  if (caps && !caps.remote)
+    return `Omni cannot hold ${harnessName(harness)} to this channel's access level yet. Pick Claude Code, Codex or Cursor Agent, or set the channel to Full access.`;
   return `${harnessName(harness)} runs off this machine, so Omni cannot hold it to this channel's access level. Pick Claude Code, Codex or Cursor Agent, or set the channel to Full access.`;
 }
 

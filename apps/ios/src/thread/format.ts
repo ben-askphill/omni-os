@@ -10,6 +10,7 @@ const HARNESS: Record<string, string> = {
   cursor: 'Cursor',
   hermes: 'Hermes',
   'cursor-cloud': 'Cursor Cloud',
+  antigravity: 'Antigravity',
 };
 
 export const harnessLabel = (harness: string): string => HARNESS[harness] ?? harness;
