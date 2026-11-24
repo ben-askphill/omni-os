@@ -29,7 +29,7 @@ import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels, rememberCursorWindows } from './cursor/models.ts';
 import { probeHermes } from './hermes/client.ts';
 import { probeRemote, probeRoute } from './remote.ts';
-import { customHarnesses, type CustomHarness } from './custom.ts';
+import { customHarnesses, pairable, PAIR_HERE_FIX, refusedKeyFix, type CustomHarness } from './custom.ts';
 import { CursorCloudClient, CursorCloudError } from './cursor-cloud/client.ts';
 import { harnessEnv } from './env-guard.ts';
 import { globalSecret, hasSecret } from '../secrets.ts';
@@ -324,10 +324,10 @@ const probeKey = (h: CustomHarness) => `${h.id}\n${h.url}\n${h.secret}`;
 export async function probeCustomHarness(h: CustomHarness): Promise<CustomProbe> {
   if (h.error) return { available: false, fix: h.error };
   const key = await globalSecret(h.secret).catch(() => null);
-  if (!key) return { available: false, fix: `Key not on this machine: set ${h.secret} in Secrets to the server's key` };
+  if (!key) return { available: false, keyProblem: 'missing', fix: pairable(h) ? PAIR_HERE_FIX : `Key not on this machine: set ${h.secret} in Secrets to the server's key` };
   const probe = await probeRemote(h.kind, h.url, key);
   if (probe.state === 'ok') return { available: true };
-  if (probe.state === 'rejected') return { available: false, fix: `${h.host} refused the key in ${h.secret}. Replace it in Secrets` };
+  if (probe.state === 'rejected') return { available: false, keyProblem: 'refused', fix: refusedKeyFix(h, key) };
   if (probe.state === 'status') return { available: false, fix: `${h.host} answered HTTP ${probe.status} to ${probeRoute(h.kind)}. Check the URL points at ${h.kind === 'eve' ? 'the eve agent' : 'a Runs API server'}` };
   return { available: false, fix: `Could not reach ${h.host}. Check the URL, and that this machine can reach it (on the tailnet, or over HTTPS)` };
 }

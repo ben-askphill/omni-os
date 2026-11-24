@@ -323,17 +323,13 @@ function ConnectBody({ initial, onClose, onConnected }: { initial?: string; onCl
 
 /**
  * The one sign-in step for an agent that pairs: get a code where its owner sees it (an eve agent's Connect Omni page,
- * opened in a new tab or the system browser), paste it, Pair.
+ * opened in a new tab or the system browser), paste it, Pair. Pair this machine on a Server card uses it too.
  */
-function CodeEntry({ found, code, onCode, ready, busy, disabled, onPair }: { found: FoundAgent; code: string; onCode: (c: string) => void; ready: boolean; busy: boolean; disabled: boolean; onPair: () => void }) {
+export function CodeEntry({ found, code, onCode, ready, busy, disabled, onPair }: { found: Pick<FoundAgent, 'name' | 'codeUrl'>; code: string; onCode: (c: string) => void; ready: boolean; busy: boolean; disabled: boolean; onPair: () => void }) {
+  // No <form> of its own: Pair this machine shows it inside the agent editor's form, and forms cannot nest. Enter in the
+  // field pairs, and never reaches a form around it.
   return (
-    <form
-      className="space-y-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (ready && !disabled) onPair();
-      }}
-    >
+    <div className="space-y-2">
       <p className="text-[12.5px] leading-[18px] text-fg-2">
         {found.codeUrl ? (
           <>
@@ -354,15 +350,20 @@ function CodeEntry({ found, code, onCode, ready, busy, disabled, onPair }: { fou
           className="field min-w-0 flex-1 font-mono"
           value={code}
           onChange={(e) => onCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            if (ready && !disabled) onPair();
+          }}
           placeholder="XXXX-XXXX-…"
           autoComplete="one-time-code"
           spellCheck={false}
         />
-        <Button type="submit" variant="primary" busy={busy} disabled={disabled || !ready}>
+        <Button variant="primary" busy={busy} disabled={disabled || !ready} onClick={onPair}>
           Pair
         </Button>
       </div>
-    </form>
+    </div>
   );
 }
 

@@ -307,6 +307,7 @@ describe('who may connect an agent', () => {
         ['harnesses/connect/test', { url: runs.url, secret: 'MANUAL_AGENT_KEY' }],
         ['harnesses/connect', { slug: 'sneaky', name: 'Sneaky', url: runs.url, secret: 'MANUAL_AGENT_KEY', role: true }],
         ['harnesses/custom/box/test', {}],
+        ['crew/box/server/pair', { code: CODE }],
       ] as const) {
         const r = await post(path, body, headers);
         expect(r.status, path).toBe(403);
@@ -363,6 +364,98 @@ describe('an eve agent', () => {
     // Remove revokes the key at the agent.
     const gone = await app.request('/api/harnesses/custom/nomos', { method: 'DELETE' });
     expect((await gone.json()) as unknown).toMatchObject({ revoked: true, secret: 'AGENT_NOMOS_KEY' });
+  });
+
+  describe('on a machine the file synced to', () => {
+    const crewServer = async (id: string) => {
+      const list = (await (await app.request('/api/crew')).json()) as { id: string; server?: Record<string, unknown> }[];
+      return list.find((r) => r.id === id)?.server;
+    };
+    const check = async (id: string) => (await import('../harness/catalog-service.ts')).checkCustomHarness(id);
+
+    beforeAll(async () => {
+      // Connect on "the other machine", then drop the key: what a machine has when only the file synced to it.
+      const paired = await post('harnesses/connect/pair', { url: eve.url, code: eve.code, name: 'Nomos', kind: 'eve' });
+      await post('harnesses/connect/test', { draft: paired.json.draft });
+      expect((await post('harnesses/connect', { slug: 'synced-eve', name: 'Synced eve', draft: paired.json.draft })).status).toBe(201);
+    });
+    beforeEach(async () => {
+      const { deleteSecret } = await import('../secrets.ts');
+      await deleteSecret('global', 'AGENT_SYNCED_EVE_KEY');
+      await check('custom:synced-eve');
+    });
+
+    it('says the key stays on the machine that paired, and offers Pair this machine', async () => {
+      const s = await crewServer('synced-eve');
+      // The card is the agent's page, so its line does not send the user there.
+      expect(s).toMatchObject({ available: false, pairAt: eve.url, fix: 'This machine has no key for it yet: the key stays on the machine that paired it. Press Pair this machine' });
+      // Test connection says it too, and probes again, so the card follows.
+      expect((await post('crew/synced-eve/server/test', {})).json).toMatchObject({ ok: false, failed: 'probe', detail: expect.stringMatching(/^This machine has no key for it yet/) });
+      // A thread started here says the same, not "set the server's key": pairing never shows the key.
+      const { runsApiTarget } = await import('../harness/registry.ts');
+      expect(runsApiTarget('custom:synced-eve')?.fix).toMatch(/^Synced eve: This machine has no key for it yet/);
+    });
+
+    it('pairs this machine with a code of its own, keeps the key only here once the test passed, and leaves the file as it was', async () => {
+      const file = readFileSync(harnessFile('synced-eve'), 'utf8');
+      eve.reset();
+      const r = await post('crew/synced-eve/server/pair', { code: eve.code.toLowerCase().replaceAll('-', ' ') });
+      expect(r.status).toBe(200);
+      expect(r.json).toMatchObject({ ok: true, reply: 'You have two reminders.' });
+      expect(r.text).not.toContain(eve.key);
+      expect(eve.calls.find((c) => c.path === '/v1/omni/pair' && c.method === 'POST')?.body).toMatchObject({ code: eve.code, client_name: expect.stringMatching(/^Omni on /) });
+      expect(await secretValue('AGENT_SYNCED_EVE_KEY')).toBe(eve.key);
+      expect(readFileSync(harnessFile('synced-eve'), 'utf8')).toBe(file);
+      const s = await crewServer('synced-eve');
+      expect(s).toMatchObject({ available: true });
+      expect(s?.pairAt).toBeUndefined();
+      // Connected now: pairing again would leave this key live at the agent with nothing holding it.
+      const again = await post('crew/synced-eve/server/pair', { code: eve.code });
+      expect(again.status).toBe(409);
+      expect(again.json.error).toMatch(/already connected on this machine/);
+    });
+
+    it('names a pasted pairing code for what it is, and keeps nothing for a wrong code', async () => {
+      const { setSecret } = await import('../secrets.ts');
+      await setSecret('global', 'AGENT_SYNCED_EVE_KEY', eve.code);
+      await check('custom:synced-eve');
+      expect(await crewServer('synced-eve')).toMatchObject({ available: false, pairAt: eve.url, fix: 'AGENT_SYNCED_EVE_KEY holds a pairing code, not a key. Press Pair this machine' });
+      // Read anywhere else (the harness list, a thread), it says where the button is.
+      expect((await check('custom:synced-eve'))?.fix).toBe('AGENT_SYNCED_EVE_KEY holds a pairing code, not a key. Press Pair this machine on its page in Settings > Agents');
+      const wrong = await post('crew/synced-eve/server/pair', { code: 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA' });
+      expect(wrong.status).toBe(400);
+      expect(wrong.json.error).toMatch(/wrong, used or expired/);
+      expect(await secretValue('AGENT_SYNCED_EVE_KEY')).toBe(eve.code);
+      expect((await post('crew/synced-eve/server/pair', { code: 'not a code' })).json.error).toMatch(/not a pairing code/);
+    });
+
+    it('offers no Pair this machine for a key the server is down for, nor for a server Omni did not pair', async () => {
+      const { setSecret } = await import('../secrets.ts');
+      await setSecret('global', 'MANUAL_EVE_KEY', eve.key);
+      expect((await post('harnesses/connect/test', { url: eve.url, secret: 'MANUAL_EVE_KEY', kind: 'eve' })).json.ok).toBe(true);
+      expect((await post('harnesses/connect', { slug: 'manual-eve', name: 'Manual eve', url: eve.url, secret: 'MANUAL_EVE_KEY', kind: 'eve' })).status).toBe(201);
+      await setSecret('global', 'MANUAL_EVE_KEY', 'a-key-the-server-refuses');
+      await check('custom:manual-eve');
+      const s = await crewServer('manual-eve');
+      expect(s).toMatchObject({ available: false, fix: expect.stringMatching(/refused the key in MANUAL_EVE_KEY\. Replace it in Secrets/) });
+      expect(s?.pairAt).toBeUndefined();
+      const r = await post('crew/manual-eve/server/pair', { code: eve.code });
+      expect(r.status).toBe(409);
+      expect(r.json.error).toMatch(/Omni did not pair Manual eve/);
+    });
+
+    it('revokes this machine\'s key and deletes its secret when Remove on another machine reaches it', async () => {
+      const { setSecret } = await import('../secrets.ts');
+      await setSecret('global', 'AGENT_SYNCED_EVE_KEY', eve.key);
+      eve.reset();
+      await import('../sync/handlers/harness-file.ts');
+      const { getHandler } = await import('../sync/apply.ts');
+      const applied = getHandler('harness_file')!.apply({ machine_id: 'mac-b', entity: 'harness_file', entity_id: 'synced-eve', op: 'delete', data: null, ts: new Date(Date.now() + 60_000).toISOString() } as never, {} as never);
+      expect(applied).toBe(true);
+      expect(existsSync(harnessFile('synced-eve'))).toBe(false);
+      await expect.poll(() => secretValue('AGENT_SYNCED_EVE_KEY')).toBeNull();
+      expect(eve.calls.find((c) => c.path === '/v1/omni/revoke')?.authorization).toBe(`Bearer ${eve.key}`);
+    });
   });
 
   it('says how to get past Vercel\'s login wall instead of calling it unreachable', async () => {

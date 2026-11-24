@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { KIND_LABEL, type AgentTest } from '@omni/shared/connect-agent.ts';
+import { useEffect, useState } from 'react';
+import { KIND_LABEL, normalizeCode, type AgentTest, type FoundAgent } from '@omni/shared/connect-agent.ts';
 import { serverStatus, type RemoteServer } from '@omni/shared/remote-agent.ts';
 import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
 import { api, errorText, useApi, type CrewRole } from '../api.ts';
 import { useTechnical } from '../display.ts';
-import { TestOutcome } from '../components/ConnectAgent.tsx';
+import { CodeEntry, TestOutcome } from '../components/ConnectAgent.tsx';
 import { Button, ErrorNote, InlineConfirm, Label, Loading, Modal, ModalFooter, StatusDot, Toggle } from '../components/ui.tsx';
 import { href, navigate } from '../router.ts';
 import { Card } from './settings-parts.tsx';
@@ -21,6 +21,8 @@ export function ServerCard({ agent, onChanged }: { agent: CrewRole & { server: R
   const [test, setTest] = useState<AgentTest | null>(null);
   const [testing, setTesting] = useState(false);
   const [editing, setEditing] = useState(false);
+  // The pairing address the sheet opened with: it stays open on Paired after the card stops offering it.
+  const [pairing, setPairing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const runTest = async () => {
     setTesting(true);
@@ -66,6 +68,11 @@ export function ServerCard({ agent, onChanged }: { agent: CrewRole & { server: R
         </dl>
       )}
       <div className="flex flex-wrap items-center gap-1.5">
+        {s.pairAt && (
+          <Button size="sm" variant="primary" onClick={() => setPairing(s.pairAt ?? null)}>
+            Pair this machine
+          </Button>
+        )}
         <Button size="sm" busy={testing} disabled={testing} onClick={() => void runTest()}>
           Test connection
         </Button>
@@ -89,7 +96,66 @@ export function ServerCard({ agent, onChanged }: { agent: CrewRole & { server: R
           : 'Remove revokes its key on its server where the server can, removes the secret Omni made for it and the agent, on every machine. Its threads stay readable.'}
       </p>
       {editing && slug && <EditServerSheet slug={slug} name={agent.name} onClose={() => setEditing(false)} onSaved={onChanged} />}
+      {pairing && <PairHereSheet agent={agent} url={s.url} pairAt={pairing} onClose={() => setPairing(null)} onPaired={onChanged} />}
     </Card>
+  );
+}
+
+/**
+ * Pair this machine: the agent's file synced here from the machine that paired it, its key did not. A code from the
+ * agent's own page, redeemed by this machine's server, which keeps the key only once a test turn passed with it. The key
+ * never reaches this page.
+ */
+function PairHereSheet({ agent, url, pairAt, onClose, onPaired }: { agent: CrewRole; url: string; pairAt: string; onClose: () => void; onPaired: () => void }) {
+  // Where to get a code: the agent's Connect Omni page, as Add remote agent finds it. Without one, the code field alone.
+  const [found, setFound] = useState<Pick<FoundAgent, 'codeUrl'> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api
+      .post<FoundAgent>('/harnesses/connect/find', { url, ...(pairAt !== url && { pair: pairAt }) })
+      .then((f) => alive && setFound(f))
+      .catch(() => alive && setFound({}));
+    return () => {
+      alive = false;
+    };
+  }, [url, pairAt]);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [test, setTest] = useState<AgentTest | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pair = async () => {
+    setBusy(true);
+    setError(null);
+    setTest(null);
+    try {
+      const r = await api.post<AgentTest>(`/crew/${encodeURIComponent(agent.id)}/server/pair`, { code });
+      setTest(r);
+      if (r.ok) onPaired();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal open onClose={onClose} title={`Pair this machine with ${agent.name}`}>
+      <div className="space-y-3 px-6 pb-5">
+        <p className="text-[13px] text-fg-2">Each machine keeps its own key for {agent.name}, and this one needs a new one: pair it with a code of its own. Your other machines keep theirs.</p>
+        {found ? (
+          <CodeEntry found={{ name: agent.name, codeUrl: found.codeUrl }} code={code} onCode={setCode} ready={!!normalizeCode(code)} busy={busy} disabled={busy || !!test?.ok} onPair={() => void pair()} />
+        ) : (
+          <Loading />
+        )}
+        {test && <TestOutcome test={test} />}
+        {test?.ok && <p className="text-[13px] text-fg-2">Paired. Threads on this machine reach {agent.name} with the new key.</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
+      </div>
+      <ModalFooter>
+        <Button variant={test?.ok ? 'primary' : 'secondary'} onClick={onClose}>
+          {test?.ok ? 'Done' : 'Cancel'}
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }
 

@@ -4,7 +4,7 @@
 import { isCustomHarnessId } from '@omni/shared/custom-harness.ts';
 import { config } from '../config.ts';
 import { HERMES_FIX } from './catalog.ts';
-import { customHarness } from './custom.ts';
+import { customHarness, pairable, PAIR_HERE_FIX, type CustomHarness } from './custom.ts';
 import { HERMES_KEY } from './env-guard.ts';
 import { profileOf } from './profile.ts';
 import type { RemoteKind } from './remote.ts';
@@ -23,6 +23,8 @@ export interface RunsApiTarget {
   capabilities: HarnessCapabilities;
   /** How to make it usable, for a missing key or an unreachable server. */
   fix: string;
+  /** Omni paired it, so a refused or missing key is fixed by Pair this machine on its page (custom.ts pairable). */
+  pairable?: boolean;
   /** Why it cannot run at all as set up (a custom harness's file error). */
   error?: string;
 }
@@ -30,16 +32,16 @@ export interface RunsApiTarget {
 /** Hermes, from Settings (or OMNI_HERMES_URL) and HERMES_API_KEY. */
 const hermesTarget = (): RunsApiTarget => ({ id: 'hermes', name: HARNESS_META.hermes.name, kind: 'runs-api', url: config.hermesUrl ?? '', keyName: HERMES_KEY, capabilities: CAPABILITIES.hermes, fix: HERMES_FIX });
 
-/** How to make a custom harness usable once its file is fine. */
-export const customFix = (h: { secret: string; host: string }) =>
-  `Set ${h.secret} in Secrets on this machine to the server's key, and check that ${h.host || 'its server'} is reachable from here`;
+/** How to make a custom harness usable once its file is fine. A paired one pairs this machine on its page instead. */
+export const customFix = (h: CustomHarness) =>
+  pairable(h) ? `${h.name}: ${PAIR_HERE_FIX}` : `Set ${h.secret} in Secrets on this machine to the server's key, and check that ${h.host || 'its server'} is reachable from here`;
 
 /** Hermes or a custom harness with a file here, or null for any other id. */
 export function runsApiTarget(id: string | null | undefined): RunsApiTarget | null {
   if (id === 'hermes') return hermesTarget();
   const h = customHarness(id);
   if (!h) return null;
-  return { id: h.id, name: h.name, kind: h.kind, url: h.url, keyName: h.secret, capabilities: h.capabilities, fix: customFix(h), ...(h.error && { error: h.error }) };
+  return { id: h.id, name: h.name, kind: h.kind, url: h.url, keyName: h.secret, capabilities: h.capabilities, fix: customFix(h), ...(pairable(h) && { pairable: true }), ...(h.error && { error: h.error }) };
 }
 
 /** A built-in, or a custom harness whose file is on this machine. */

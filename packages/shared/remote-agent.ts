@@ -31,6 +31,11 @@ export interface RemoteServer {
   available: boolean;
   /** Why it cannot run, when it cannot. */
   fix?: string;
+  /**
+   * Set when this machine pairs with a code of its own (Pair this machine, POST /api/crew/:id/server/pair): Omni paired
+   * it, its file synced here, and the key here is missing or refused. The pairing address, on the server's own host.
+   */
+  pairAt?: string;
   /** Its avatar is the one the server offered, which Test connection reads again (Q29). */
   avatarOffered?: boolean;
 }

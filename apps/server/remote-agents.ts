@@ -19,7 +19,7 @@ import { record } from './db/sync.ts';
 import { publishFeed } from './bus.ts';
 import { fillPlaceholders } from './user-config.ts';
 import type { Catalog } from './harness/catalog.ts';
-import { customHarness, customHarnesses, type CustomHarness } from './harness/custom.ts';
+import { customHarness, customHarnesses, pairable, PAIR_HERE_WHERE, type CustomHarness } from './harness/custom.ts';
 import { hostOf } from './harness/catalog.ts';
 
 export { isRemoteAgentHarness };
@@ -55,7 +55,12 @@ export function serverOf(role: Pick<CrewRole, 'harness'>, cat: Catalog): RemoteS
   const h: CustomHarness | null = customHarness(harness as `custom:${string}`);
   if (!h) return { harness, builtIn: false, kind: 'runs-api', url: '', host: '', secret: '', cap: 1, available: false, fix: 'Its server is not on this machine: it was removed, or has not synced here yet.' };
   const fix = h.error ?? (info && !info.available ? info.fix : undefined);
-  return { harness, builtIn: false, kind: h.kind, url: h.url, host: h.host, secret: h.secret, cap: h.cap, available: !h.error && !!info?.available, ...(fix && { fix }) };
+  const available = !h.error && !!info?.available;
+  // Pair this machine only when the key is why: a server that is down needs no new key.
+  const pairAt = !available && info?.remote?.keyProblem && pairable(h) ? h.pairing!.at || h.url : '';
+  // The card is that page, with the button beside the line: no need to say where it is.
+  const shown = pairAt && fix ? fix.replace(PAIR_HERE_WHERE, '') : fix;
+  return { harness, builtIn: false, kind: h.kind, url: h.url, host: h.host, secret: h.secret, cap: h.cap, available, ...(shown && { fix: shown }), ...(pairAt && { pairAt }) };
 }
 
 /** The starter charter Connect wrote before slice 4 (agent-connect.ts), which Ben did not write. */
