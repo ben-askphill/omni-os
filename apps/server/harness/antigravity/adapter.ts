@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { artifactsDir, threadDir, uploadsDir } from '../../config.ts';
 import { browserHeld } from '../../access.ts';
-import { buildMcpConfig } from '../../sandbox.ts';
+import { ANTIGRAVITY_ASK_WAIT_SEC, ASK_SERVER, buildMcpConfig } from '../../sandbox.ts';
 import { describeAttachments } from '../../uploads.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { AcpClient, AcpError } from '../acp/client.ts';
@@ -176,7 +176,7 @@ export const antigravityAdapter: HarnessAdapter = {
           for (const r of planRecords(u.entries, `plan-${turnNo}-${++plans}`)) emit(r);
           break;
         case 'tool_call': {
-          const use = toolUse(u as AcpToolCall);
+          const use = toolUse(u as AcpToolCall, serverNames());
           const id = String(u.toolCallId ?? '');
           if (use && !seen.has(id)) (seen.add(id), emit(use));
           const end = toolEnd(u as AcpToolCall);
@@ -186,7 +186,7 @@ export const antigravityAdapter: HarnessAdapter = {
         case 'tool_call_update': {
           const id = String(u.toolCallId ?? '');
           if (!seen.has(id)) {
-            const use = toolUse(u as AcpToolCall);
+            const use = toolUse(u as AcpToolCall, serverNames());
             if (use) (seen.add(id), emit(use));
           }
           const end = toolEnd(u as AcpToolCall);
@@ -238,14 +238,20 @@ export const antigravityAdapter: HarnessAdapter = {
       }
     }
 
+    /** The names of the MCP servers this session was given, to read agy's `mcp_<server>_<tool>` call names by. */
+    let given: string[] = [];
+    const serverNames = () => given;
+
     /** The session's MCP servers, in ACP's shape. */
     function mcpServers() {
       const cfg = buildMcpConfig(mcpInput(ctx, { noBrowser: browserHeld(ctx.permission?.access) }));
+      given = Object.keys(cfg.mcpServers);
       return Object.entries(cfg.mcpServers).map(([name, s]) => ({
         name,
         command: s.command,
         args: s.args,
-        env: Object.entries(s.env ?? {}).map(([k, v]) => ({ name: k, value: String(v) })),
+        // agy ends an MCP call after 3 minutes, so the question waits a little less and hands itself back (ANTIGRAVITY_ASK_WAIT_SEC).
+        env: Object.entries(name === ASK_SERVER ? { ...s.env, OMNI_ASK_WAIT_SEC: String(ANTIGRAVITY_ASK_WAIT_SEC) } : (s.env ?? {})).map(([k, v]) => ({ name: k, value: String(v) })),
       }));
     }
 
