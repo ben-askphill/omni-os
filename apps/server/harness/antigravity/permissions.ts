@@ -35,7 +35,7 @@ export function callOf(call: AcpToolCall): Asked {
   const raw = obj(call.rawInput);
   if (/\b(start|invoke)_subagent\b/.test(title) || 'subagents' in raw) return { type: 'subagent', summary: title || 'a sub-agent' };
   // A changing kind is never an MCP call, whatever fields its input carries.
-  const changing = kind === 'edit' || kind === 'delete' || kind === 'move' || kind === 'execute';
+  const changing = !kind || kind === 'edit' || kind === 'delete' || kind === 'move' || kind === 'execute';
   const server = first(raw, ['server', 'ServerName', 'server_name', 'serverName']);
   const tool = first(raw, ['tool', 'ToolName', 'tool_name', 'toolName']);
   if (!changing && server && tool) return { type: 'call', tool: `mcp__${server}__${tool}`, input: raw, edits: false };

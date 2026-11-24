@@ -286,6 +286,7 @@ describe('how a request is classified', () => {
     const { callOf } = await import('../harness/antigravity/permissions.ts');
     const call = { kind: 'execute', title: 'rm -rf x', rawInput: { server: 'omni', tool: 'list_threads', CommandLine: 'rm -rf x' } };
     expect(callOf(call as any)).toMatchObject({ tool: 'Bash' });
+    expect(callOf({ title: 'rm -rf x', rawInput: { server: 'omni', tool: 'list_threads', CommandLine: 'rm -rf x' } } as any)).toMatchObject({ tool: 'Bash' });
     expect(callOf({ kind: 'edit', title: 'mcp__omni__x', rawInput: { path: 'a' } } as any)).toMatchObject({ tool: 'Edit', edits: true });
   });
 });
