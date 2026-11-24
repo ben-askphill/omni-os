@@ -193,8 +193,6 @@ capabilities:
 
 ## Antigravity
 
-> Antigravity is decided ([ADR 0022](../adr/0022-antigravity-over-acp.md)) and being built in #978 to #981. Until they ship, it is not in the pickers. This section describes what they build.
-
 An Antigravity thread runs Google's Antigravity CLI, `agy`, on your machine, and bills the Google AI plan (Google AI Pro, say) of the Google account it is signed in with. Omni starts `agy acp` and talks to it over the Agent Client Protocol ([ADR 0022](../adr/0022-antigravity-over-acp.md)). It is how you run Gemini 4 Neon on that plan; Gemini on Cursor Agent bills Cursor instead.
 
 ### Set it up on a machine
@@ -274,7 +272,7 @@ Because the agent runs on a Cursor machine, it cannot build the desktop app for 
 
 Omni drives the [Cloud Agents API v1](https://cursor.com/docs/cloud-agent/api/endpoints), which Cursor marks as a public beta.
 
-## Antigravity
+## How Antigravity runs
 
 Antigravity is Google's `agy` CLI, signed in with your Google account, so it bills your Google AI plan. Install it and sign in once per machine in a terminal (run `agy` and pick Log in with Google). Omni uses that sign-in: `agy acp` reads the same login as the terminal `agy` (checked on agy 1.5.16).
 
