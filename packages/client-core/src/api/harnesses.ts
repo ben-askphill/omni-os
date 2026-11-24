@@ -1,6 +1,6 @@
 import { apiPath, type HttpClient } from '../http.ts';
 
-export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud';
+export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud' | 'antigravity';
 
 export interface HarnessCapabilities {
   /** The process stays warm between turns. */
@@ -43,6 +43,8 @@ export interface HarnessInfo {
   fix?: string;
   /** Unavailable because the server found no binary for this CLI. */
   missing?: true;
+  /** Worth fixing, but it still runs (Antigravity not seeing ~/.agents/skills). */
+  hint?: string;
   models: ModelEntry[];
   /** Concurrency cap. */
   cap: number;
@@ -54,12 +56,12 @@ export interface HarnessInfo {
 
 /**
  * Whether a follow-up on a busy thread can steer, or has to queue. The catalog is `GET /harnesses`. While it has not
- * loaded, or has no row for this harness, every harness but Cursor and Cursor Cloud steers.
+ * loaded, or has no row for this harness, every harness but Cursor, Cursor Cloud and Antigravity steers.
  */
 export function canSteer(harnessId: string, catalog: readonly Pick<HarnessInfo, 'id' | 'capabilities'>[] | null | undefined): boolean {
   const row = catalog?.find((h) => h.id === harnessId);
   if (row) return row.capabilities.steer;
-  return harnessId !== 'cursor' && harnessId !== 'cursor-cloud';
+  return harnessId !== 'cursor' && harnessId !== 'cursor-cloud' && harnessId !== 'antigravity';
 }
 
 export function harnessesApi(http: HttpClient) {

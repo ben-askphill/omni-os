@@ -183,6 +183,28 @@
     "running": 0
   },
   {
+    "id": "antigravity",
+    "name": "Antigravity",
+    "plan": "Google AI plan",
+    "capabilities": {
+      "warmProcess": true,
+      "steer": false,
+      "interrupt": true,
+      "inlineImages": true,
+      "usage": "none",
+      "remote": false,
+      "toolLimits": false,
+      "switchable": true
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "Omni found no agy on its PATH. Install the Antigravity CLI or set OMNI_ANTIGRAVITY_BIN to its path",
+    "missing": true,
+    "models": [],
+    "running": 0,
+    "install": "curl -fsSL https://antigravity.google/cli/install.sh | bash"
+  },
+  {
     "id": "custom:fixture-agent",
     "name": "Fixture agent",
     "plan": "Bills the fixture server",

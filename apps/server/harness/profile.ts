@@ -4,6 +4,7 @@
 // instead of checking its id. A custom harness runs on the Runs API and has RUNS_API_PROFILE.
 import type { Thread } from '../db.ts';
 import type { ThreadSkills } from '../skills.ts';
+import { antigravityProfile } from './antigravity/profile.ts';
 import { claudeProfile } from './claude/profile.ts';
 import { codexProfile } from './codex/profile.ts';
 import { cursorProfile } from './cursor/profile.ts';
@@ -99,6 +100,7 @@ const PROFILES: Record<HarnessId, HarnessProfile> = {
   cursor: cursorProfile,
   hermes: hermesProfile,
   'cursor-cloud': cursorCloudProfile,
+  antigravity: antigravityProfile,
 };
 
 /** What a harness does, by id. A custom harness, or an id this machine does not know, gets the Runs API profile. */

@@ -11,7 +11,8 @@
     "codex": null,
     "cursor": null,
     "hermes": null,
-    "cursor-cloud": null
+    "cursor-cloud": null,
+    "antigravity": null
   },
   "slots": {
     "claude-code": {
@@ -31,6 +32,10 @@
       "cap": 4
     },
     "cursor-cloud": {
+      "running": 0,
+      "cap": 4
+    },
+    "antigravity": {
       "running": 0,
       "cap": 4
     },

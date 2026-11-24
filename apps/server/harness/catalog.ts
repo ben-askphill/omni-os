@@ -7,6 +7,7 @@ import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
 import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
 import { claudeModelLabel, stripClaudeModelSuffixes } from '@omni/shared/claude-model-label.ts';
 import { parseClaudeStatus } from './accounts-parse.ts';
+import type { AntigravityState } from './antigravity/state.ts';
 
 // ---------- Claude Code ----------
 // A bundled list, then whatever else Claude Code itself reports (its `initialize` answer, as T3 Code reads it), so a
@@ -288,6 +289,29 @@ export function customHarnessInfo(h: CustomHarness, probe: CustomProbe): Harness
   return { ...base, available: true, models: [{ id: CUSTOM_MODEL, label: `${h.name} default`, note, efforts: [], defaultEffort: '', default: true }] };
 }
 
+// ---------- Antigravity ----------
+
+/** The one model Antigravity lists until the live model list lands: no model is sent, so agy runs its own current one. */
+export const ANTIGRAVITY_MODEL = 'default';
+const ANTIGRAVITY_NOTE = "agy's current model. Bills your Google AI plan.";
+/** Before the first check, which runs at server start. */
+export const ANTIGRAVITY_UNCHECKED = 'Omni has not checked agy on this machine yet';
+
+/** Antigravity as the state reader last found it (antigravity/state.ts). Null: not checked yet. */
+export function antigravityHarness(s: AntigravityState | null, cap: number): HarnessInfo {
+  const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
+    id: 'antigravity',
+    ...HARNESS_META.antigravity,
+    capabilities: CAPABILITIES.antigravity,
+    cap,
+    ...(s?.hint && { hint: s.hint }),
+  };
+  if (!s) return { ...base, available: false, fix: ANTIGRAVITY_UNCHECKED, models: [] };
+  if (s.state !== 'ready') return { ...base, available: false, fix: s.fix, ...(s.state === 'not-installed' && { missing: true as const }), models: [] };
+  const note = s.note ? `${ANTIGRAVITY_NOTE} ${s.note}.` : ANTIGRAVITY_NOTE;
+  return { ...base, available: true, models: [{ id: ANTIGRAVITY_MODEL, label: 'Antigravity default', note, efforts: [], defaultEffort: '', default: true }] };
+}
+
 // ---------- Cursor Cloud ----------
 
 /** No key in Secrets or the secret store. Kept apart from the other reasons: a channel key can still fix this one. */
@@ -343,6 +367,7 @@ const UNAVAILABLE_FIX: Partial<Record<HarnessId, string>> = {
   cursor: 'cursor-agent login',
   hermes: HERMES_FIX,
   'cursor-cloud': CURSOR_CLOUD_FIX,
+  antigravity: ANTIGRAVITY_UNCHECKED,
 };
 
 // ---------- resolution & validation ----------

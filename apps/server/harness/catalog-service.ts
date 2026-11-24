@@ -8,6 +8,10 @@
 // - What Claude Code last reported is kept on disk, so a restart starts from it, not from the bundled list alone.
 // - Custom harnesses (custom.ts) are listed from their files on every read, so a new, changed or deleted file shows at
 //   once. Only their probe answers are kept here, by URL and secret name, so a changed address is checked again.
+// - Antigravity is checked only when asked, since starting agy is heavy (antigravity/state.ts): at server start, on
+//   Check for new models, while it is down (freshCatalog), and when a thread starts. The 15-minute timer and the
+//   picker's background refresh skip it. Its entry is built from the state reader's last reading on every read, so a
+//   check Settings > Accounts or a thread ran shows here too.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -36,8 +40,10 @@ import { globalSecret, hasSecret } from '../secrets.ts';
 import { channels } from '../db.ts';
 import { recordUsage } from '../usage.ts';
 import { refreshCursorUsage } from '../cursor-usage.ts';
-import { type HarnessId, type HarnessInfo } from './types.ts';
+import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
+import { antigravityState, refreshAntigravity } from './antigravity/state.ts';
 import {
+  antigravityHarness,
   claudeHarness,
   claudeProbeOf,
   customHarnessInfo,
@@ -85,7 +91,13 @@ const caps = (): Record<HarnessId, number> => ({
   cursor: config.maxConcurrentCursor,
   hermes: config.maxConcurrentHermes,
   'cursor-cloud': config.maxConcurrentCursorCloud,
+  antigravity: config.maxConcurrentAntigravity,
 });
+
+/** Harnesses too heavy to start on a timer: the 15-minute refresh and a picker's background refresh leave them out. */
+const ON_REQUEST_ONLY: HarnessId[] = ['antigravity'];
+/** Every harness a timed refresh asks. */
+const TIMED = HARNESS_IDS.filter((id) => !ON_REQUEST_ONLY.includes(id));
 
 /** What Claude Code reported when Omni last asked, here or before a restart. Empty: the bundled list alone. */
 let claudeReported: ClaudeReportedModel[] | null = null;
@@ -391,7 +403,8 @@ export function loadCatalog(only?: readonly string[]): Promise<Catalog> {
     const c = caps();
     const asks = (id: HarnessId) => !only || only.includes(id);
     const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
-    const [claude, codex, cursor, hermes, cursorCloud] = await Promise.all([
+    const [, claude, codex, cursor, hermes, cursorCloud] = await Promise.all([
+      asks('antigravity') ? refreshAntigravity() : null,
       asks('claude-code') ? probeClaudeHarness(c['claude-code']) : keep('claude-code'),
       asks('codex') ? probeCodexHarness(c.codex) : keep('codex'),
       asks('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
@@ -401,7 +414,7 @@ export function loadCatalog(only?: readonly string[]): Promise<Catalog> {
     ]);
     current = { harnesses: [claude, codex, cursor, hermes, cursorCloud] };
     checkedAt = Date.now();
-    if (!only) fullAt = checkedAt;
+    if (!only || TIMED.every((id) => only.includes(id))) fullAt = checkedAt;
     return getCatalog();
   })().finally(() => {
     loading = null;
@@ -419,7 +432,7 @@ export function getCatalog(): Catalog {
     hermesHarness({ available: false }, c.hermes, config.hermesUrl),
     cursorCloudHarness({ available: false }, c['cursor-cloud']),
   ];
-  return { harnesses: [...builtIns, ...customEntries()] };
+  return { harnesses: [...builtIns, antigravityHarness(antigravityState(), c.antigravity), ...customEntries()] };
 }
 
 /**
@@ -439,13 +452,13 @@ export async function freshCatalog(): Promise<Catalog> {
  */
 export function refreshStale(now = Date.now()) {
   if (loading || now - fullAt < ON_DEMAND_MS) return;
-  void loadCatalog().catch(() => {});
+  void loadCatalog(TIMED).catch(() => {});
 }
 
 export function startCatalogRefresh() {
   void loadCatalog().catch(() => {});
   if (!timer) {
-    timer = setInterval(() => void loadCatalog().catch(() => {}), 15 * 60 * 1000);
+    timer = setInterval(() => void loadCatalog(TIMED).catch(() => {}), 15 * 60 * 1000);
     timer.unref?.();
   }
 }

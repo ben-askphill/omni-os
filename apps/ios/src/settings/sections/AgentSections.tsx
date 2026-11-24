@@ -59,6 +59,7 @@ export function ModelsSection() {
               </View>
               <Text style={[styles.meta, { color: colors.fg3 }]}>{h.detail}</Text>
               {h.fix ? <Text style={[styles.fix, { color: colors.fg2 }]}>To fix: {h.fix}</Text> : null}
+              {h.hint ? <Text style={[styles.fix, { color: colors.fg3 }]}>{h.hint}</Text> : null}
             </View>
           ))}
         </Group>

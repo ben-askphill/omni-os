@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { channelAccess, harnessRefusal } from '../access.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource, type ThreadWorkspace } from '../db.ts';
-import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
+import { crewForNewThread, listCrew, localDelegateOnlyRefusal, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { threadDir } from '../config.ts';
 import { capture } from '../analytics.ts';
@@ -22,7 +22,7 @@ import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { isRemoteAgent, localCatalog, remoteAgentFor } from '../remote-agents.ts';
 import { offMachineHarness } from '../thread-files.ts';
-import { capabilitiesOf, providerWhere } from '../harness/registry.ts';
+import { capabilitiesOf, harnessName, providerWhere } from '../harness/registry.ts';
 import { profileOf } from '../harness/profile.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
@@ -269,7 +269,7 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const { harness, model } = picked;
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
   // A harness Omni cannot hold to tool limits (a remote one runs its own tools) cannot run a delegate-only role.
-  if (role?.delegateOnly && !capabilitiesOf(harness)?.toolLimits) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
+  if (role?.delegateOnly && !capabilitiesOf(harness)?.toolLimits) throw new Error(capabilitiesOf(harness)?.remote === false ? localDelegateOnlyRefusal(role.name, harnessName(harness)) : remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
   // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
   const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
   if (unenforced) throw refusal(unenforced, 400);
