@@ -16,12 +16,14 @@ export interface MemberRow {
   session_thread: string;
   /** The uid of the last transcript row this agent has read, null before its first turn. */
   cursor: string | null;
+  /** The machine this seat's client-channel threads must run on, if pinned. */
+  device: string | null;
   seated_at: string;
   removed_at: string | null;
   updated_at: string;
 }
 
-const COLUMNS = 'id, thread_id, agent, lead, session_thread, cursor, seated_at, removed_at, updated_at';
+const COLUMNS = 'id, thread_id, agent, lead, session_thread, cursor, seated_at, removed_at, updated_at, device';
 export const memberId = (threadId: string, agent: string) => `${threadId}:${agent}`;
 
 export const members = {
@@ -50,12 +52,17 @@ export const members = {
       const id = memberId(threadId, agent);
       const at = now();
       db.prepare(
-        `INSERT INTO thread_members (${COLUMNS}) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, ?)
-         ON CONFLICT(id) DO UPDATE SET session_thread = excluded.session_thread, cursor = NULL, seated_at = excluded.seated_at, removed_at = NULL, updated_at = excluded.updated_at`,
+        `INSERT INTO thread_members (${COLUMNS}) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, ?, NULL)
+         ON CONFLICT(id) DO UPDATE SET session_thread = excluded.session_thread, cursor = NULL, seated_at = excluded.seated_at, removed_at = NULL, updated_at = excluded.updated_at, device = NULL`,
       ).run(id, threadId, agent, lead ? 1 : 0, sessionThread, at, at);
       record('thread_member', id);
       return members.get(id)!;
     });
+  },
+  setDevice(id: string, device: string | null) {
+    if (db.prepare('UPDATE thread_members SET device = ?, updated_at = ? WHERE id = ? AND device IS NOT ?').run(device, now(), id, device).changes) {
+      record('thread_member', id);
+    }
   },
   setCursor(id: string, cursor: string | null) {
     const changed = db.prepare('UPDATE thread_members SET cursor = ?, updated_at = ? WHERE id = ? AND cursor IS NOT ?').run(cursor, now(), id, cursor).changes > 0;

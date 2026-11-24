@@ -26,6 +26,8 @@ export interface DeviceRecord {
   signKey?: string;
   /** Its concurrency cap per harness, for the dashboard's machine tiles (apps/server/machines.ts). Missing before that build. */
   caps?: Record<string, number>;
+  /** This machine told its peers that it paused sync. */
+  syncPaused?: true;
   at: string;
 }
 

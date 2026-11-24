@@ -86,13 +86,14 @@ export async function targetFor(asked: string | null | undefined): Promise<{ fro
   const pick = asked === undefined || asked === null ? userConfig().runOn.device : asked;
   const self = outbox.machineId();
   if (!pick || pick === 'here' || pick === self) return null;
-  if (!self || !activeWorker()) throw refused(syncProblem(RUN_ON_NEEDS));
+  if (!self || !activeWorker() || kv.get<boolean>('sync.enabled') === false) throw refused(syncProblem(RUN_ON_NEEDS));
   const target = deviceRecord(pick);
   if (!target) {
     // A stale default (the machine was removed) falls back to this one; a pick Ben just made does not.
     if (asked === undefined || asked === null) return null;
     throw refused('No synced machine has that id. A machine shows up once it has synced with this one.');
   }
+  if (target.syncPaused) throw refused(`Sync is paused on ${target.name}. Resume it there to run this thread.`);
   const [net, name] = await Promise.all([tailnet(), deviceName(self) ?? computerName()]);
   const reach = reachabilityOf(net, target);
   if (reach.reachability === 'offline') {

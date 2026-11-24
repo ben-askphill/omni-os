@@ -25,8 +25,9 @@ import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
-import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
-import { forwardLimit, forwardStop, type LimitAction } from './run-on.ts';
+import { artifacts, channels, events, fileDigests, members, messageRequests, publicChannel, requestFingerprint, threads, type MessageRequest, type Thread } from './db.ts';
+import { forwardLimit, forwardStop, targetFor, type LimitAction } from './run-on.ts';
+import { pickFor } from './machine-pick.ts';
 import { remoteHolder } from './ownership.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
@@ -200,7 +201,11 @@ threadRoutesApi.post('/', async (c) => {
   if (!referenced.ok) return c.json({ error: referenced.error }, 400);
   const stamped = await stampMachineMentions(referenced.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
-  const input = { ...body, files, ...(stamped.value.length && { context: stamped.value }) };
+  const caller = callerOf(c);
+  const pinned = caller ? members.bySession(caller)?.device : null;
+  if (pinned && body.quick) return c.json({ error: 'Open a client-channel thread for machine-pinned work.' }, 400);
+  const device = pinned ?? body.device;
+  const input = { ...body, device, files, ...(stamped.value.length && { context: stamped.value }) };
   const make = body.quick ? startQuickAsk : createThread;
   // A thread made with members says who is seated, as GET does.
   const shown = (t: Thread) => (body.members?.length ? { ...t, ...memberFields(t) } : t);
@@ -373,7 +378,7 @@ threadActionsApi.get('/:id/base', (c) => {
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from: asked, mode, request_id, context: raw, wake_cold, if_away } = z
+  const { prompt, from: asked, mode, request_id, context: raw, wake_cold, if_away, device } = z
     .object({
       prompt: z.string(),
       from: z.enum(['ben', 'conductor']).default('ben'),
@@ -385,6 +390,8 @@ threadActionsApi.post('/:id/messages', async (c) => {
       context: z.unknown().optional(),
       // A parent thread's send to a thread whose session went cold is refused unless it was asked to resume that thread.
       wake_cold: z.boolean().default(false),
+      // The Conductor's machine pick for work it hands to agents in this thread.
+      device: z.string().trim().min(1).max(100).optional(),
       // A thread that lives on another machine Tailscale sees asleep: "ask" refuses with `lives_on` (Send there, Take
       // over) instead of leaving the message to wait there. The reply box asks; Send there sends again without it.
       if_away: z.enum(['ask', 'send']).default('send'),
@@ -405,7 +412,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const unsendable = checkAnnotations(id, context.value);
   if (unsendable) return c.json({ error: unsendable }, 400);
   checkUploads(files);
-  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files), context: context.value });
+  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files), context: context.value, seatDevice: device });
   // A retry: answered before its files are saved a second time.
   const again = request_id ? acceptedAgain(id, request_id, fingerprint) : null;
   if (again) return c.json(again);
@@ -423,11 +430,21 @@ threadActionsApi.post('/:id/messages', async (c) => {
     if (no) return c.json({ error: no }, 403);
     if (remoteHolder(target)) return c.json({ error: 'This thread runs on another machine: seat agents in it there.' }, 409);
   }
+  let seatDevice: string | undefined;
+  if (device !== undefined) {
+    if (!seats || callerOf(c) !== id || target.channel_id !== 'conductor' || !getCrew(target.role)?.delegateOnly) {
+      return c.json({ error: 'A device can be picked only when seating agents in your own #conductor thread.' }, 403);
+    }
+    const pick = await pickFor(device);
+    // Use the same availability checks as a new delegated thread, before seating anyone.
+    await targetFor(pick.device);
+    seatDevice = pick.id ?? pick.device;
+  }
   const attachments = await saveUploads(id, files);
   // Ben's Fix checks step (the channel's own prompt or the built-in one) goes out with the failing checks and their log tails (fix-checks.ts), from any client.
   const step = from === 'ben' ? stepOf(prompt, stepPrompts(channels.get(target.channel_id))) : null;
   const text = step === 'checks' ? await fixChecksPrompt(target) : prompt;
-  const sent = await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away, seats });
+  const sent = await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away, seats, seatDevice });
   // Kinds only (packages/shared/analytics.ts): never the message.
   const harness = harnessToken(target.harness);
   capture('message_sent', { harness, mode, from: from === 'ben' ? 'user' : 'conductor', attachments: attachments.length, ...(step && { step }) });
@@ -435,6 +452,9 @@ threadActionsApi.post('/:id/messages', async (c) => {
   // A group thread's members and read-only reason, as GET sends them: the client takes this thread as its new state.
   return c.json({ ...sent, ...memberFields(sent) });
 });
+
+// The machine pin is stored for delivery and recovery. Clients keep the existing request shape.
+const publicRequest = ({ seat_device: _seatDevice, ...request }: MessageRequest) => request;
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });
 
@@ -569,7 +589,7 @@ threadActionsApi.patch('/:id/requests/:rid', async (c) => {
   const added = await saveUploads(id, files);
   try {
     const request = editRequest(id, c.req.param('rid'), { prompt, keep, added });
-    return c.json({ ...afterRecovery(id), request });
+    return c.json({ ...afterRecovery(id), request: publicRequest(request) });
   } catch (err) {
     // Refused: the files this edit saved belong to nothing.
     removeUploads(added);
@@ -611,7 +631,7 @@ threadActionsApi.post('/:id/requests/steer', async (c) => {
 threadActionsApi.get('/:id/requests', (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  return c.json(messageRequests.forThread(id, Math.min(Number(c.req.query('limit') ?? 100) || 100, 500)));
+  return c.json(messageRequests.forThread(id, Math.min(Number(c.req.query('limit') ?? 100) || 100, 500)).map(publicRequest));
 });
 
 /** Ask the thread to act on the comments on a page it published. Queued, so it never cuts into a running turn. */

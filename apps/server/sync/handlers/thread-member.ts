@@ -37,12 +37,13 @@ registerHandler('thread_member', {
     }
     if (!claim(change)) return false;
     db.prepare(
-      `INSERT INTO thread_members (id, thread_id, agent, lead, session_thread, cursor, seated_at, removed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO thread_members (id, thread_id, agent, lead, session_thread, cursor, seated_at, removed_at, updated_at, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET session_thread = excluded.session_thread, cursor = excluded.cursor,
-         seated_at = excluded.seated_at, removed_at = excluded.removed_at, updated_at = excluded.updated_at`,
+         seated_at = excluded.seated_at, removed_at = excluded.removed_at, updated_at = excluded.updated_at, device = excluded.device`,
     ).run(
       id, d.thread_id, d.agent, lead ? 1 : 0, d.session_thread, typeof d.cursor === 'string' ? d.cursor : null, d.seated_at,
       isTime(d.removed_at) ? d.removed_at : null, isTime(d.updated_at) ? d.updated_at : change.ts,
+      !lead && typeof d.device === 'string' && /^[a-z0-9-]{1,100}$/i.test(d.device) ? d.device : null,
     );
     threadOf.set(id, d.thread_id);
     return true;

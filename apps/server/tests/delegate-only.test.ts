@@ -78,7 +78,7 @@ describe('a delegate-only role', () => {
     // The charter says it once, and the prompt carries the charter.
     expect(conductor.match(/first action is/g)).toHaveLength(1);
     expect(conductor).toContain(
-      'Use `delegate` or `delegate_team` directly, instead of seating, only for a review (below), research that a build depends on and the build after it (above), a team the user asked for, tasks on machines the user @mentioned, or when the user asks you to delegate.',
+      'Use `delegate` or `delegate_team` directly for a review (below), research that a build depends on and the build after it (above), a team the user asked for, or when the user asks you to delegate. Seat the agent for other work.',
     );
     expect(conductorRole.charter).toContain('Your first action is `seat_agents`');
 

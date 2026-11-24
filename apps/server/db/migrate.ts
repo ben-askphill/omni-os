@@ -763,6 +763,7 @@ export function migrate() {
   // The agent that wrote a transcript row (group threads slice 1, ADR 0019): the thread's agent on the rows its runs
   // write. Ben's rows and Omni's own have none, and rows from before this read as the thread's lead's.
   ensureColumn('events', 'agent', 'TEXT');
+  ensureColumn('message_requests', 'seat_device', 'TEXT');
   // Sub-agents another machine runs, read from their synced task rows (db/repos/events.ts openTasksSince): the recent
   // ones, and each one's start.
   db.exec(`CREATE INDEX IF NOT EXISTS events_task_at ON events(created_at) WHERE kind = 'task';
@@ -783,6 +784,7 @@ export function migrate() {
     updated_at TEXT NOT NULL
   );
   CREATE UNIQUE INDEX IF NOT EXISTS thread_members_agent ON thread_members(thread_id, agent);`);
+  ensureColumn('thread_members', 'device', 'TEXT');
   // Older builds counted every sync's retry of an unsigned change waiting in sync_deferred as one more change applied
   // without a valid signature (sync/apply.ts): two rows on one Mac passed 12 million. The real number is lost, so those
   // counts start over at one; each row keeps its machine, entity, reason and time. Refusals and held actions
