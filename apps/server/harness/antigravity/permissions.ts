@@ -34,10 +34,12 @@ export function callOf(call: AcpToolCall): Asked {
   const title = str(call.title).trim();
   const raw = obj(call.rawInput);
   if (/\b(start|invoke)_subagent\b/.test(title) || 'subagents' in raw) return { type: 'subagent', summary: title || 'a sub-agent' };
+  // A changing kind is never an MCP call, whatever fields its input carries.
+  const changing = kind === 'edit' || kind === 'delete' || kind === 'move' || kind === 'execute';
   const server = first(raw, ['server', 'ServerName', 'server_name', 'serverName']);
   const tool = first(raw, ['tool', 'ToolName', 'tool_name', 'toolName']);
-  if (server && tool) return { type: 'call', tool: `mcp__${server}__${tool}`, input: raw, edits: false };
-  if (/^mcp__[^_]+/.test(title)) return { type: 'call', tool: title, input: raw, edits: false };
+  if (!changing && server && tool) return { type: 'call', tool: `mcp__${server}__${tool}`, input: raw, edits: false };
+  if (!changing && /^mcp__[^_]+/.test(title)) return { type: 'call', tool: title, input: raw, edits: false };
   if (kind === 'read' || kind === 'search' || kind === 'think') return { type: 'call', tool: 'Read', input: { file_path: pathOf(call) }, edits: false };
   if (kind === 'fetch') return { type: 'call', tool: 'WebFetch', input: raw, edits: false };
   if (kind === 'edit' || kind === 'delete' || kind === 'move') return { type: 'call', tool: 'Edit', input: { file_path: pathOf(call) || title }, edits: true };
