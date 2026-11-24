@@ -1,5 +1,6 @@
-// A local harness whose own tools Omni cannot limit yet (Antigravity, until #980) cannot run what needs tools taken
-// away: a delegate-only agent, an agent without file edits, or a read-only thread (a quick ask, a read workspace).
+// A local harness that cannot take tools away (`toolLimits` false) cannot run what needs them taken away: a
+// delegate-only agent, an agent without file edits, or a read-only thread (a quick ask, a read workspace). Every local
+// harness has toolLimits today (Antigravity too, #980: it runs there as far as agy asks), so this refuses nothing yet.
 // One check for starting a thread, switching its run and spawning its process, so no path skips it.
 import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { localDelegateOnlyRefusal, localToolsRefusal, type CrewRole } from '../crew.ts';

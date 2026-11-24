@@ -137,7 +137,7 @@ async function spawnLive(live: Live, thread: Thread) {
   // Checked here as well as at start and switch: a channel's level can change under a thread that already exists.
   const unenforced = harnessRefusal(thread.harness, channelAccess(channel, role?.access));
   if (unenforced) return refuseUnenforced(live, unenforced);
-  // A limited agent or a read-only thread on a harness whose own tools Omni cannot limit (Antigravity until #980): a role or workspace can change under a thread too.
+  // A limited agent or a read-only thread on a harness whose own tools Omni cannot limit (none today: every local harness limits tools): a role or workspace can change under a thread too.
   const limited = toolLimitRefusal(thread.harness, role, thread);
   if (limited) return refuseUnenforced(live, limited);
 

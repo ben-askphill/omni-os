@@ -1,7 +1,7 @@
 // Antigravity's models and what limits where it runs (spec #977, ticket #979), through the runner and the API against
 // the scripted fake `agy acp` (packages/test-fixtures/fake-agy.mjs): the list agy gives, its default and effort levels,
 // the non-Gemini models hidden until switched on, a failed refresh, a restart, what the check leaves behind in agy's
-// home, and the runs Omni refuses because it cannot limit agy's own tools yet.
+// home, and which runs it takes.
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,37 +100,34 @@ describe('a refresh that fails, and a restart', () => {
   });
 });
 
-describe('what Omni cannot hold agy to yet', () => {
-  it('refuses a channel below Full access', async () => {
+describe('what Antigravity may run', () => {
+  it('is selectable in a channel below Full access', async () => {
     const { harnessRefusal } = await import('../access.ts');
     const at = (level: 'read' | 'ask' | 'full') => ({ level, connectors: {} }) as any;
-    expect(harnessRefusal('antigravity', at('ask'))).toMatch(/cannot hold Antigravity to this channel's access level/);
-    expect(harnessRefusal('antigravity', at('full'))).toBeNull();
+    for (const level of ['read', 'ask', 'full'] as const) expect(harnessRefusal('antigravity', at(level)), level).toBeNull();
   });
 
-  it('refuses a quick ask', async () => {
-    await checkNow();
-    await expect(H.start('what is in here?', { harness: 'antigravity', model: 'gemini-4-neon', quick: true } as any)).rejects.toThrow(/read only, which needs its file-edit tools taken away/);
-  });
-
-  it('refuses an agent that runs without file edits, and a delegate-only one', async () => {
+  it('starts a quick ask, an agent without file edits and a delegate-only agent', async () => {
     await checkNow();
     const { saveCrew } = await import('../crew-store.ts');
     const ctx = { catalog: (await import('../harness/catalog-service.ts')).getCatalog(), channelExists: () => true };
     saveCrew('trim', { fields: { name: 'Trim', harness: 'antigravity', model: 'gemini-4-neon', tools: 'no-edits', avatar: { bg: '#f5e6ba' } } }, ctx, { create: true });
-    await expect(H.start('hello', { harness: 'antigravity', model: 'gemini-4-neon', role: 'trim' } as any)).rejects.toThrow(/without file edits/);
+    for (const extra of [{ quick: true }, { role: 'trim' }]) {
+      const t = await H.start('what is in here?', { harness: 'antigravity', model: 'gemini-4-neon', ...extra } as any);
+      expect(t.id).toBeTruthy();
+    }
   });
 });
 
 describe('the same limits at spawn and switch', () => {
-  it('refuses a read-only thread and a limited agent on every path', async () => {
+  it('refuses a read-only thread and a limited agent only on a local harness that cannot limit tools', async () => {
     const { toolLimitRefusal } = await import('../runner/tool-limits.ts');
-    expect(toolLimitRefusal('antigravity', null, { quick: 1 })).toMatch(/read only/);
-    expect(toolLimitRefusal('antigravity', null, { workspace: 'read' })).toMatch(/read only/);
-    expect(toolLimitRefusal('antigravity', { name: 'Trim', delegateOnly: false, tools: 'no-edits' }, {})).toMatch(/without file edits/);
-    expect(toolLimitRefusal('antigravity', { name: 'Router', delegateOnly: true, tools: 'delegate-only' }, {})).toMatch(/only routes work/);
-    expect(toolLimitRefusal('antigravity', null, {})).toBeNull();
-    expect(toolLimitRefusal('claude-code', null, { quick: 1 })).toBeNull();
+    for (const harness of ['antigravity', 'claude-code']) {
+      expect(toolLimitRefusal(harness, null, { quick: 1 })).toBeNull();
+      expect(toolLimitRefusal(harness, null, { workspace: 'read' })).toBeNull();
+      expect(toolLimitRefusal(harness, { name: 'Trim', delegateOnly: false, tools: 'no-edits' }, {})).toBeNull();
+      expect(toolLimitRefusal(harness, { name: 'Router', delegateOnly: true, tools: 'delegate-only' }, {})).toBeNull();
+    }
   });
 });
 
