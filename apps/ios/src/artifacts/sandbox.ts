@@ -1,3 +1,5 @@
+import { withNarrowSheet } from '@omni/shared/html-render.ts';
+
 /**
  * What the app lets an artifact's web view do. The app fetches the file with the token in native code and hands the
  * web view only its content. The view gets no token, no message handler and no base URL, so a page has no way to
@@ -27,13 +29,16 @@ const cspMeta = (policy: string) => `<meta http-equiv="Content-Security-Policy" 
 /** Whitespace, complete comments and the doctype: everything a document may hold before its first element. */
 const PROLOGUE = /^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i;
 
+/** Whatever a document holds before its first element ends here. */
+const afterPrologue = (html: string) => PROLOGUE.exec(html)?.[0].length ?? 0;
+
 /**
  * Puts the policy first in the document. It goes after the doctype, so the page keeps standards mode, and never inside
  * a comment or a tag. The browser's parser files the meta under the head, ahead of every script the page has.
  */
 export function sandboxHtml(html: string): string {
   const source = html.replace(/^﻿/, '');
-  const at = PROLOGUE.exec(source)?.[0].length ?? 0;
+  const at = afterPrologue(source);
   return source.slice(0, at) + cspMeta(PAGE_CSP) + source.slice(at);
 }
 
@@ -47,6 +52,18 @@ export interface DocumentColors {
 }
 
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
+
+/**
+ * A page html_render showed (packages/shared/html-render.ts). It gets the phone's width when it names none, where the
+ * web view would lay it out 980px wide and shrink it, and the narrow sheet the web's frame adds, so a table scrolls
+ * sideways instead of breaking its words. Pass the result through `sandboxHtml` like any page.
+ */
+export function renderPageHtml(html: string): string {
+  const page = withNarrowSheet(html.replace(/^\uFEFF/, ''));
+  if (/<meta[^>]*name\s*=\s*["']?viewport/i.test(page)) return page;
+  const at = afterPrologue(page);
+  return page.slice(0, at) + VIEWPORT + page.slice(at);
+}
 
 /** An SVG drawn as an image. In an image a file runs no script and loads nothing else, whatever it contains. */
 export function svgDocument(svg: string, colors: Pick<DocumentColors, 'bg'>): string {

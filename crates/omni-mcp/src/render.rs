@@ -23,7 +23,11 @@ const GUIDE: &str = "Use the theme variables on :root, never fixed colours, so t
     A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. \
     Give charts a fixed pixel height and fluid width. \
     Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone. \
-    Let the content set the height: no vh units and no height:100% on html or body.";
+    Let the content set the height: no vh units and no height:100% on html or body. \
+    Every page needs a breakpoint rule for very narrow frames, @media (max-width: 360px), so nothing is squeezed or cut off at 320px: \
+    let a wide table scroll sideways in a wrapper with overflow-x:auto, or stack its rows as cards; \
+    keep SHAs, ids, numbers and code on one line with white-space:nowrap; \
+    never put overflow-wrap:anywhere or word-break:break-all on table cells, which splits words a few characters per line.";
 
 pub fn tool() -> Tool {
     let user = user();

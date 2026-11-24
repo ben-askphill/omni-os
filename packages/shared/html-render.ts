@@ -101,6 +101,37 @@ if(window.ResizeObserver){var o=new ResizeObserver(size);o.observe(document.docu
 document.addEventListener("DOMContentLoaded",function(){apply();size();});window.addEventListener("load",function(){apply();size();});
 })(${JSON.stringify(HEIGHT_MESSAGE)},${JSON.stringify(THEME_MESSAGE)},${JSON.stringify(THEME_FRAGMENT)});</script>`;
 
+/** The frame width at and below which a page gets the narrow sheet: a phone's reply column, never the desktop one. */
+export const NARROW_MAX_WIDTH = 480;
+
+/**
+ * What a page gets in a narrow frame, whatever it says itself. A table scrolls sideways rather than squeezing its columns,
+ * a cell breaks only between words, so a SHA or a header word stays whole, and code blocks, images and charts stay inside
+ * the frame. Table rules use plain element selectors and come after the page's head styles, so they beat a page's own
+ * `td { overflow-wrap: anywhere }` but not a rule with a class. Images, charts and body text get `:where()` defaults.
+ */
+export const RENDER_NARROW_CSS =
+  `@media (max-width:${NARROW_MAX_WIDTH}px){` +
+  'table{display:block;max-width:100%;overflow-x:auto}' +
+  'th,td{overflow-wrap:break-word;word-break:normal;hyphens:manual}' +
+  'pre{max-width:100%;overflow-x:auto}' +
+  ':where(body){overflow-wrap:break-word}' +
+  ':where(img,video){max-width:100%;height:auto}' +
+  ':where(svg,canvas,iframe){max-width:100%}' +
+  '}';
+
+const NARROW_STYLE = `<style id="omni-narrow">${RENDER_NARROW_CSS}</style>`;
+
+/**
+ * The page with the narrow sheet at the end of its head, after the page's own head styles, or at the end of a page
+ * with no head. Comments are blanked before the search, as in `withFrameScript`.
+ */
+export function withNarrowSheet(html: string) {
+  const scan = html.replace(/<!--[\s\S]*?(?:-->|$)/g, (m) => ' '.repeat(m.length));
+  const at = /<\/head\s*>/i.exec(scan)?.index ?? html.length;
+  return html.slice(0, at) + NARROW_STYLE + html.slice(at);
+}
+
 /** The fragment that gives a framed page Omni's theme before its first paint. */
 export const frameThemeFragment = (theme: FrameTheme) => `#${THEME_FRAGMENT}=${encodeURIComponent(JSON.stringify(theme))}`;
 
@@ -108,14 +139,14 @@ export const frameThemeFragment = (theme: FrameTheme) => `#${THEME_FRAGMENT}=${e
 export const frameThemeMessage = (theme: FrameTheme) => ({ type: THEME_MESSAGE, theme });
 
 /**
- * The page with the frame script first in its head. Comments are blanked before the search, so a `<head>` written in
- * one is skipped. A page with no head or html tag gets the script first.
+ * The page with the frame script first in its head and the narrow sheet (`withNarrowSheet`) at its end. Comments are
+ * blanked before the search, so a `<head>` written in one is skipped. A page with no head or html tag gets the script first.
  */
 export function withFrameScript(html: string) {
   const scan = html.replace(/<!--[\s\S]*?(?:-->|$)/g, (m) => ' '.repeat(m.length));
   const open = /<head(?:\s[^>]*)?>/i.exec(scan) ?? /<html(?:\s[^>]*)?>/i.exec(scan) ?? /^\s*<!doctype[^>]*>/i.exec(scan);
   const at = open ? open.index + open[0].length : 0;
-  return html.slice(0, at) + FRAME_SCRIPT + html.slice(at);
+  return withNarrowSheet(html.slice(0, at) + FRAME_SCRIPT + html.slice(at));
 }
 
 /** The height a framed page reported, or undefined for any other message. The page can send anything, so this clamps it. */
