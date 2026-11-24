@@ -21,6 +21,9 @@ export interface AcpToolCall {
   title?: unknown;
   kind?: unknown;
   status?: unknown;
+  /** An MCP call's own name, `mcp_<server>_<tool>` (agy 1.5.16), with its input also in `args`. */
+  name?: unknown;
+  args?: unknown;
   rawInput?: unknown;
   rawOutput?: unknown;
   content?: unknown;
@@ -47,14 +50,36 @@ export function pathOf(call: AcpToolCall): string {
   return '';
 }
 
-/** The row a tool call opens. Null for a call that is only agy thinking out loud. */
-export function toolUse(call: AcpToolCall): StreamRecord | null {
+/**
+ * An MCP call's name the way every harness's transcript has it, `mcp__<server>__<tool>`, from agy's `mcp_<server>_<tool>`
+ * (probed on 1.5.16: kind `other`, the same name as the title's last word). Omni's own server names have dashes and
+ * their tools underscores, so the split is at the first underscore after the known server names, else after the first.
+ * Null when the call is no MCP call.
+ */
+export function mcpName(raw: unknown, servers: readonly string[] = []): string | null {
+  const name = str(raw);
+  if (!name.startsWith('mcp_') || name.startsWith('mcp__')) return null;
+  const rest = name.slice(4);
+  const known = [...servers].sort((a, b) => b.length - a.length).find((s) => rest.startsWith(`${s}_`) && rest.length > s.length + 1);
+  if (known) return `mcp__${known}__${rest.slice(known.length + 1)}`;
+  const at = rest.indexOf('_');
+  return at > 0 && at < rest.length - 1 ? `mcp__${rest.slice(0, at)}__${rest.slice(at + 1)}` : null;
+}
+
+/** The row a tool call opens. Null for a call that is only agy thinking out loud. `servers` names the session's MCP servers. */
+export function toolUse(call: AcpToolCall, servers: readonly string[] = []): StreamRecord | null {
   const id = str(call.toolCallId);
   if (!id) return null;
   const title = str(call.title).trim();
   const kind = str(call.kind);
   const use = (name: string, input: unknown): StreamRecord => ({ kind: 'tool_use', payload: { id, name, input, parent: null } });
   if (kind === 'think') return null;
+  const mcp = mcpName(call.name, servers);
+  if (mcp) {
+    // agy adds a one-line summary of its own to an MCP call's input; the server never saw it.
+    const { toolSummary: _summary, ...input } = obj(call.rawInput ?? call.args);
+    return use(mcp, input);
+  }
   if (!kind || kind === 'execute') return use('Bash', { command: commandOf(call.rawInput) ?? title, ...(title && commandOf(call.rawInput) ? { description: title } : {}) });
   if (kind === 'edit' || kind === 'delete' || kind === 'move') return use('Edit', { file_path: pathOf(call) || title });
   if (kind === 'read') return use('Read', { file_path: pathOf(call) || title });

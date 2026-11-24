@@ -22,7 +22,12 @@
 //   with a window), `NOUSAGE` (a prompt answer with no usage), `SLOW <ms>`, `HANG` (waits for session/cancel),
 //   `HANG-DEAF` (never answers a cancel), `CRASH`, `SIGNIN` (asks the system opener to open a link, then waits),
 //   `QUOTA` (a quota error as a chat message), `REFUSE` (stopReason refusal), `RUNFREE` (runs an edit without asking).
+//   `MCP <server> <tool> [<json arguments>]` (#981): call a tool on one of the stdio MCP servers session/new gave, as
+//   the real agy does (probed on 1.5.16): it starts the server with the entry's command, args and env pairs, shows a
+//   tool_call named `mcp_<server>_<tool>` (kind other), asks permission, calls the tool and shows what came back.
+//   The call gives up after FAKE_AGY_MCP_TIMEOUT_MS (default: never).
 //   Anything else is answered `ack: <text>`.
+// - FAKE_AGY_LOG_ENV: names of environment variables whose values the spawn line of the log also records (envValues).
 // - FAKE_AGY_EMAIL: the account `authenticate` signs in as, written to --log-file in agy's own words (default
 //   agy-user@example.com). Empty leaves the line out. FAKE_AGY_TIER: the tier it reports (default Google AI Pro).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -40,7 +45,7 @@ const flag = (name) => {
 const logFile = flag('--log-file') ?? flag('--cli_log_file');
 const agyLog = (line) => logFile && appendFileSync(logFile, `I1124 21:36:07.556509       1 ${line}\n`);
 
-log({ kind: 'spawn', argv: args, cwd: process.cwd(), envKeys: Object.keys(env).sort(), GEMINI_HOME: env.GEMINI_HOME ?? null, BROWSER: env.BROWSER ?? null, SSL_CERT_FILE: env.SSL_CERT_FILE ?? null });
+log({ kind: 'spawn', argv: args, cwd: process.cwd(), envKeys: Object.keys(env).sort(), GEMINI_HOME: env.GEMINI_HOME ?? null, envValues: Object.fromEntries((env.FAKE_AGY_LOG_ENV ?? '').split(',').filter(Boolean).map((k) => [k, env[k] ?? null])), BROWSER: env.BROWSER ?? null, SSL_CERT_FILE: env.SSL_CERT_FILE ?? null });
 
 if (args[0] !== 'acp') {
   process.stderr.write(`fake agy: only the acp subcommand is scripted, got ${args.join(' ')}\n`);
@@ -143,7 +148,7 @@ function configOptions(s) {
 
 function open(id, params) {
   const first = MODELS[0];
-  const s = { id, cwd: params?.cwd ?? process.cwd(), model: first.id, level: first.level ?? first.levels?.[0] ?? '', cancel: null };
+  const s = { id, mcpServers: params?.mcpServers ?? [], cwd: params?.cwd ?? process.cwd(), model: first.id, level: first.level ?? first.levels?.[0] ?? '', cancel: null };
   sessions.set(id, s);
   return s;
 }
@@ -175,6 +180,7 @@ function sessionResume(id, params) {
   if (env.FAKE_AGY_RESUME === 'fail' || !known) return fail(id, -32602, 'Resource not found', { details: `session ${sid} not found` });
   // A cold resume comes back on the account's default model.
   const s = sessions.get(sid) ?? open(sid, params);
+  s.mcpServers = params?.mcpServers ?? [];
   s.model = MODELS[0].id;
   s.level = MODELS[0].level ?? MODELS[0].levels?.[0] ?? '';
   reply(id, { configOptions: configOptions(s), models: { availableModels: MODELS.map((m) => ({ modelId: m.id, name: m.name })), currentModelId: s.model } });
@@ -223,6 +229,34 @@ async function guarded(s, toolCall, run) {
   await run();
 }
 
+
+/** MCP <server> <tool> [json]: what the real agy does with a stdio server from session/new (probed on 1.5.16). */
+async function mcpCall(s, server, tool, args) {
+  const entry = s.mcpServers.find((e) => e.name === server);
+  const call = { toolCallId: `call_${++counter}`, name: `mcp_${server}_${tool}`, args, status: 'in_progress', kind: 'other', title: `Run mcp_${server}_${tool}`, rawInput: args };
+  update(s, { sessionUpdate: 'tool_call', ...call });
+  const finish = (status, body) => update(s, { sessionUpdate: 'tool_call_update', ...call, status, ...(body !== undefined && { content: [{ type: 'content', content: { type: 'text', text: body } }] }) });
+  if (!entry) return finish('failed', `no MCP server named ${server}`);
+  await guarded(s, { ...call, status: 'pending' }, async () => {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    const client = new Client({ name: 'antigravity-client', version: 'v1.0.0' });
+    const timeout = env.FAKE_AGY_MCP_TIMEOUT_MS ? Number(env.FAKE_AGY_MCP_TIMEOUT_MS) : 2 ** 31 - 1;
+    try {
+      await client.connect(new StdioClientTransport({ command: entry.command, args: entry.args ?? [], env: { ...process.env, ...Object.fromEntries((entry.env ?? []).map((e) => [e.name, e.value])) }, stderr: 'ignore' }));
+      const res = await client.callTool({ name: tool, arguments: args }, undefined, { timeout });
+      const out = (res.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+      finish(res.isError ? 'failed' : 'completed', out);
+      text(s, `mcp said: ${out}`);
+    } catch (err) {
+      finish('failed', `MCP error: ${err.message}`);
+      text(s, `mcp failed: ${err.message}`);
+    } finally {
+      await client.close().catch(() => {});
+    }
+  });
+}
+
 async function turn(s, params) {
   const blocks = params?.prompt ?? [];
   const body = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
@@ -268,6 +302,8 @@ async function turn(s, params) {
     if (/\bRUNFREE\b/.test(body)) await write();
     else await guarded(s, call, write);
   }
+  const mcp = /\bMCP (\S+) (\S+)(?: (\{.*\}))?/.exec(body);
+  if (mcp) await mcpCall(s, mcp[1], mcp[2], mcp[3] ? JSON.parse(mcp[3]) : {});
   if (/\bASK\b/.test(body)) {
     const answer = await ask('session/request_permission', {
       sessionId: s.id,
@@ -286,7 +322,7 @@ async function turn(s, params) {
     text(s, `${say[1].slice(0, 40)} `);
     await pause(5);
     text(s, 'and the rest');
-  } else if (!cmd && !edit && !/\bASK\b/.test(body)) {
+  } else if (!cmd && !edit && !mcp && !/\bASK\b/.test(body)) {
     text(s, `ack: ${body.split('\n').pop()}`);
   }
   return done();

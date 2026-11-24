@@ -266,6 +266,11 @@ export const TEAM_SERVER = 'omni-team';
 export const ASK_TIMEOUT_SEC = 86_400;
 /** How long ask_user_question waits on Cursor Agent, inside the 60 seconds its print mode allows any MCP call. */
 export const CURSOR_ASK_WAIT_SEC = 45;
+/**
+ * How long ask_user_question waits on Antigravity: agy ends any MCP call after 3 minutes (measured on agy 1.5.16: a call of
+ * 130 s returned, one of 330 s and one of 700 s failed at "timed out after 3m0s"), so it waits less and hands the question back.
+ */
+export const ANTIGRAVITY_ASK_WAIT_SEC = 150;
 
 /** One server entry. `timeout` (ms) is Claude Code's, written only into its own config file (writeMcpConfig). */
 interface McpServer {
