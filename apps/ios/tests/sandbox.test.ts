@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fileNavigationDecision, navigationDecision, PAGE_CSP, sandboxHtml, sandboxProps, STATIC_CSP, svgDocument, textDocument } from '../src/artifacts/sandbox';
+import { fileNavigationDecision, navigationDecision, PAGE_CSP, renderPageHtml, sandboxHtml, sandboxProps, STATIC_CSP, svgDocument, textDocument } from '../src/artifacts/sandbox';
 
 const META = '<meta http-equiv="Content-Security-Policy"';
 const colors = { bg: '#fff', fg: '#000', fg2: '#333', fg3: '#666', surface: '#eee', line: '#ddd' };
@@ -41,6 +41,27 @@ describe('sandboxHtml', () => {
   it('keeps the page unchanged apart from the policy', () => {
     const page = '<!doctype html><title>t</title><p>hi</p>';
     expect(sandboxHtml(page).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, '')).toBe(page);
+  });
+});
+
+describe('renderPageHtml', () => {
+  const page = '<!doctype html><html><head><style>td{overflow-wrap:anywhere}</style></head><body><table></table></body></html>';
+
+  it('lays the page out at the phone width, after the doctype', () => {
+    const out = renderPageHtml(page);
+    expect(out.startsWith('<!doctype html><meta name="viewport" content="width=device-width')).toBe(true);
+    expect(sandboxHtml(out).startsWith('<!doctype html><meta http-equiv="Content-Security-Policy"')).toBe(true);
+  });
+
+  it('keeps a viewport the page sets itself', () => {
+    const own = '<!doctype html><html><head><meta name="viewport" content="width=400"></head></html>';
+    expect(renderPageHtml(own).match(/name="viewport"/g)).toHaveLength(1);
+  });
+
+  it('adds the narrow sheet after the page\'s head styles', () => {
+    const out = renderPageHtml(page);
+    expect(out.indexOf('id="omni-narrow"')).toBeGreaterThan(out.indexOf('anywhere'));
+    expect(out.indexOf('id="omni-narrow"')).toBeLessThan(out.indexOf('</head>'));
   });
 });
 

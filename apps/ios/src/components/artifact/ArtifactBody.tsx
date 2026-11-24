@@ -1,12 +1,13 @@
 import type { Artifact } from '@omni/client-core';
 import { parseCsv } from '@omni/shared/artifacts.ts';
+import { isRenderPath } from '@omni/shared/html-render.ts';
 import type { File } from 'expo-file-system';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 
 import { markdownDocument } from '../../artifacts/markdown';
-import { sandboxHtml, svgDocument, type DocumentColors } from '../../artifacts/sandbox';
+import { renderPageHtml, sandboxHtml, svgDocument, type DocumentColors } from '../../artifacts/sandbox';
 import { useArtifactFile } from '../../artifacts/use-artifact-file';
 import { textPreview, viewerFor } from '../../artifacts/viewer-kind';
 import { type ColorTokens, fontSize, space, useOmniTheme, weight } from '../../theme';
@@ -36,18 +37,19 @@ export function ArtifactBody({ artifact, onFile }: { artifact: Artifact; onFile?
     case 'file':
       return <FileView file={load.file} />;
     default:
-      return <TextBody kind={kind} artifactKind={artifact.kind} file={load.file} name={artifact.name} />;
+      return <TextBody kind={kind} artifactKind={artifact.kind} file={load.file} name={artifact.name} render={isRenderPath(artifact.path)} />;
   }
 }
 
-function TextBody({ kind, artifactKind, file, name }: { kind: 'page' | 'svg' | 'markdown' | 'table' | 'text'; artifactKind: string; file: File; name: string }) {
+/** `render`: a page html_render showed, which gets the phone's width and the narrow sheet first. */
+function TextBody({ kind, artifactKind, file, name, render }: { kind: 'page' | 'svg' | 'markdown' | 'table' | 'text'; artifactKind: string; file: File; name: string; render: boolean }) {
   const { colors } = useOmniTheme();
   const text = useFileText(file);
   if (text.status === 'loading') return <Centered><ActivityIndicator color={colors.fg3} /></Centered>;
   if (text.status === 'error') return <Notice text="Could not read this file." />;
   switch (kind) {
     case 'page':
-      return <SandboxWebView content={{ kind: 'html', html: sandboxHtml(text.value) }} scripts background="#ffffff" label={name} />;
+      return <SandboxWebView content={{ kind: 'html', html: sandboxHtml(render ? renderPageHtml(text.value) : text.value) }} scripts background="#ffffff" label={name} />;
     case 'svg':
       return <SandboxWebView content={{ kind: 'html', html: svgDocument(text.value, colors) }} scripts={false} background={colors.bg} label={name} />;
     case 'markdown':
