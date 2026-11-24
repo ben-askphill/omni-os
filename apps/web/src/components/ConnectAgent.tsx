@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { api, errorText, useApi } from '../api.ts';
 import { agentKeyName, groupedCode, KIND_LABEL, NETWORK_LABEL, normalizeCode, parseConnectInput, slugFrom, type AgentTest, type FoundAgent, type PairedAgent } from '@omni/shared/connect-agent.ts';
 import { Button, CheckItem, Chip, CopyButton, ErrorNote, Label, LinkButton, Modal, ModalFooter, Picker, type PickerOption } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 import { href } from '../router.ts';
 import { AgentAvatar } from './AgentAvatar.tsx';
 
@@ -351,7 +352,7 @@ export function CodeEntry({ found, code, onCode, ready, busy, disabled, onPair }
           value={code}
           onChange={(e) => onCode(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            if (e.key !== 'Enter' || isImeEnter(e)) return;
             e.preventDefault();
             if (ready && !disabled) onPair();
           }}
