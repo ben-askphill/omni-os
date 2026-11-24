@@ -13,12 +13,19 @@
 //   and the next message resumes the session.
 // - agy never opens a browser for Omni: a sign-in link in a turn fails it with the sign-in step and marks the
 //   harness signed out (the openers on PATH only write the link down).
-// - Until Omni can hold agy to a channel's access level (#980), it runs at Full access only and every permission
-//   request is answered allow_once. A multiple-choice question (`interaction_`) becomes a question card.
+// - Permissions (#980): at Full access with full tools every request is answered allow_once. Below that, or for an agent
+//   with limited tools, each request goes through the channel's gate (permissions.ts maps it) and is answered
+//   allow_once or reject_once, with the reason in the thread. A request waiting when the turn is cancelled is dismissed
+//   and answered `cancelled`. A changing call that finishes with no request before it stops the turn (the tripwire).
+//   The real agy asks for shell commands but not for file edits or sub-agents (permissions.ts), so a Read only level is not a promise there.
+//   A multiple-choice question (`interaction_`) becomes a question card.
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { artifactsDir, threadDir, uploadsDir } from '../../config.ts';
-import { browserHeld } from '../../access.ts';
+import { browserHeld, judge, type ChannelAccess } from '../../access.ts';
+import { toolFailures } from '../../tool-failures.ts';
+import { readsOnly } from '@omni/shared/quick-ask.ts';
+import { toolResult } from '../tool-result.ts';
 import { ANTIGRAVITY_ASK_WAIT_SEC, ASK_SERVER, buildMcpConfig } from '../../sandbox.ts';
 import { describeAttachments } from '../../uploads.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
@@ -31,6 +38,7 @@ import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { antigravityBin } from './bin.ts';
 import { allowOption, interaction, isRateLimit, normalizeCommands, planRecords, quotaLimit, rejectOption, toolEnd, toolUse, turnUsage, windowOf, type AcpToolCall } from './normalize.ts';
+import { callOf, needsAsk, requestedCall } from './permissions.ts';
 import { antigravityProfile } from './profile.ts';
 import { antigravityEnv, FIX, GOOGLE_METHOD, markSignedOut, writeOpeners } from './state.ts';
 import { parseEfforts } from './models.ts';
@@ -117,6 +125,19 @@ export const antigravityAdapter: HarnessAdapter = {
     let initSent = false;
     let turnText = '';
     let seen = new Set<string>();
+    /** The calls agy asked about this turn, the tool calls it announced (merged with their updates), and what Omni refused. */
+    let asked = new Set<string>();
+    let announced = new Map<string, AcpToolCall>();
+    const refused = new Map<string, string>();
+    /** The tripwire's words once a call ran unasked: the turn then ends as an error, not as stopped. */
+    let tripped = '';
+    /** The turn is being cancelled: a request still waiting is answered `cancelled`. */
+    let cancelling = false;
+    // An agent held to less than its channel's level: delegate-only agents and quick asks only read, and a no-edits
+    // agent loses file edits whatever the level. Either one is held below Full access, whatever the channel says.
+    const limited = !!ctx.role?.delegateOnly || readsOnly(thread);
+    const noEdits = ctx.role?.tools === 'no-edits';
+    const held = !!ctx.permission || limited || noEdits;
     const outbox: OutgoingMessage[] = [];
     const emit = (rec: StreamRecord) => cb.record(rec);
 
@@ -175,22 +196,23 @@ export const antigravityAdapter: HarnessAdapter = {
         case 'plan':
           for (const r of planRecords(u.entries, `plan-${turnNo}-${++plans}`)) emit(r);
           break;
-        case 'tool_call': {
-          const use = toolUse(u as AcpToolCall, serverNames());
-          const id = String(u.toolCallId ?? '');
-          if (use && !seen.has(id)) (seen.add(id), emit(use));
-          const end = toolEnd(u as AcpToolCall);
-          if (end) emit(end);
-          break;
-        }
+        case 'tool_call':
         case 'tool_call_update': {
           const id = String(u.toolCallId ?? '');
-          if (!seen.has(id)) {
-            const use = toolUse(u as AcpToolCall, serverNames());
-            if (use) (seen.add(id), emit(use));
+          const call = { ...announced.get(id), ...(u as AcpToolCall) };
+          for (const k of Object.keys(call) as (keyof AcpToolCall)[]) if (call[k] === undefined || call[k] === null) delete call[k];
+          if (id) announced.set(id, call);
+          if (u.sessionUpdate === 'tool_call' || !seen.has(id)) {
+            const use = toolUse(call, serverNames());
+            if (use && !seen.has(id)) (seen.add(id), emit(use));
           }
-          const end = toolEnd(u as AcpToolCall);
-          if (end) emit(end);
+          const end = toolEnd(call);
+          if (end) {
+            // A call Omni refused ends with Omni's reason, not agy's own words about it.
+            const why = refused.get(id);
+            emit(why ? toolResult(id, why, true) : end);
+            if (!why && String(call.status) === 'completed') trip(id, call);
+          }
           break;
         }
         case 'available_commands_update':
@@ -206,14 +228,58 @@ export const antigravityAdapter: HarnessAdapter = {
       }
     }
 
+    /**
+     * The tripwire: in a thread held below Full access, a changing call that finished with no permission request before
+     * it ran on agy's own say-so. The turn stops, names the tool, and the failure is recorded for triage.
+     */
+    function trip(id: string, call: AcpToolCall) {
+      const tool = held && !asked.has(id) ? needsAsk(call) : null;
+      if (!tool || tripped) return;
+      tripped = `Antigravity ran ${tool} without asking Omni first, so this thread's access level was not held. The turn was stopped.`;
+      emit({ kind: 'error', payload: { text: tripped } });
+      try {
+        toolFailures.record({ thread_id: thread.id, channel_id: thread.channel_id, harness: 'antigravity', session_id: sessionId ?? thread.id, call_id: id, tool, category: 'permission' });
+      } catch {
+        console.error('[tool-failures] capture failed; the turn still stops');
+      }
+      cancelTurn();
+    }
+
+    /** What the thread's access allows an agent: the channel's gate, held no looser by a limited agent's own powers. */
+    function access(): ChannelAccess {
+      const base = ctx.permission?.access ?? { level: 'full' as const, connectors: {} };
+      return limited ? { level: 'read', connectors: base.connectors } : base;
+    }
+
     /** What agy asks of the client. Anything but a permission request is not supported here. */
     async function onRequest(method: string, params: unknown): Promise<unknown> {
       if (method !== 'session/request_permission') return undefined;
       const ask = interaction(params);
       if (ask) return answerQuestion(ask);
-      // A harness Omni cannot hold to a level runs at Full access only (#979); the gate refuses the rest before agy starts.
-      const options = ctx.permission ? rejectOption(params) : allowOption(params);
-      return options ? { outcome: { outcome: 'selected', optionId: options } } : { outcome: { outcome: 'cancelled' } };
+      const raw = requestedCall(params);
+      const id = String(raw.toolCallId ?? '');
+      asked.add(id);
+      const cancelled = { outcome: { outcome: 'cancelled' } };
+      if (cancelling || ending) return cancelled;
+      const verdict = await judgeRequest(raw);
+      // The run stopped while the card waited: nothing runs after it.
+      if (cancelling || ending) return cancelled;
+      const option = verdict.allow ? allowOption(params) : rejectOption(params);
+      if (!verdict.allow) refused.set(id, verdict.message);
+      return option ? { outcome: { outcome: 'selected', optionId: option } } : cancelled;
+    }
+
+    /** Omni's answer for one call: Full access with full tools allows it, anything else is the gate's to judge. */
+    async function judgeRequest(raw: AcpToolCall): Promise<{ allow: true } | { allow: false; message: string }> {
+      if (!held) return { allow: true };
+      const asked = callOf(raw);
+      if (asked.type === 'subagent') return { allow: false, message: `Omni refused this: ${asked.summary} cannot run here, because sub-agents run on Antigravity only at Full access. Do the work yourself.` };
+      if (noEdits && asked.edits) return { allow: false, message: 'Omni refused this: this agent works without file edits. Do not try another way; say what you would have changed instead.' };
+      if (limited) {
+        const verdict = judge(access(), { tool: asked.tool, input: asked.input, cwd: thread.cwd, threadDir: dir });
+        return verdict.decision === 'allow' ? { allow: true } : { allow: false, message: verdict.decision === 'deny' ? verdict.reason : 'Omni refused this: this agent only reads.' };
+      }
+      return ctx.permission ? ctx.permission.check({ tool: asked.tool, input: asked.input }) : { allow: true };
     }
 
     /** A multiple-choice question: a card in the thread, and agy gets the option that was picked. */
@@ -303,12 +369,34 @@ export const antigravityAdapter: HarnessAdapter = {
       await select();
     }
 
+    /** Stop the turn: approvals still waiting are dismissed and answered `cancelled`, and agy is told to cancel. */
+    function cancelTurn() {
+      if (!turnActive || !sessionId) return;
+      cancelling = true;
+      ctx.permission?.end();
+      client.notify('session/cancel', { sessionId });
+      cancelTimer ??= setTimeout(() => {
+        // agy never answered the cancel: end it. The next message resumes the session.
+        if (!turnActive) return;
+        // The turn ends as stopped before the process goes, so the exit is not read as a crash.
+        const why = tripped;
+        endTurn();
+        emit({ kind: 'result', payload: why ? { ok: false, subtype: 'error', turns: 1 } : { ok: false, subtype: 'interrupted', turns: 1 } });
+        client.child.kill('SIGTERM');
+      }, cancelMs());
+      cancelTimer.unref();
+    }
+
     function pump() {
       if (!ready || turnActive || ending || !outbox.length) return;
       const m = outbox.shift()!;
       turnActive = true;
       turnText = '';
       seen = new Set();
+      asked = new Set();
+      announced = new Map();
+      refused.clear();
+      tripped = '';
       turnNo++;
       const blocks = promptBlocks(m, takesImages, lead);
       lead = '';
@@ -327,6 +415,7 @@ export const antigravityAdapter: HarnessAdapter = {
       cancelTimer = null;
       turnActive = false;
       initSent = false;
+      cancelling = false;
     }
 
     function finish(res: { stopReason?: unknown; usage?: unknown }) {
@@ -335,8 +424,10 @@ export const antigravityAdapter: HarnessAdapter = {
       const tokens = turnUsage(res?.usage);
       if (tokens) cb.turnTokens?.(tokens);
       endTurn();
+      const why = tripped;
       if (signedOut) return;
-      if (reason === 'end_turn' && !quota) emit({ kind: 'result', payload: { ok: true, subtype: 'success', turns: 1 } });
+      if (why) emit({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
+      else if (reason === 'end_turn' && !quota) emit({ kind: 'result', payload: { ok: true, subtype: 'success', turns: 1 } });
       else if (reason === 'cancelled') emit({ kind: 'result', payload: { ok: false, subtype: 'interrupted', turns: 1 } });
       else if (quota || reason === 'refusal') {
         emit({ kind: 'limit', payload: quota ?? { resets_at: null } });
@@ -386,18 +477,7 @@ export const antigravityAdapter: HarnessAdapter = {
       },
       interrupt(requestId) {
         emit({ kind: 'control', payload: { request_id: requestId, subtype: 'success', still_queued: [] } });
-        if (turnActive && sessionId) {
-          client.notify('session/cancel', { sessionId });
-          cancelTimer ??= setTimeout(() => {
-            // agy never answered the cancel: end it. The next message resumes the session.
-            if (!turnActive) return;
-            // The turn ends as stopped before the process goes, so the exit is not read as a crash.
-            endTurn();
-            emit({ kind: 'result', payload: { ok: false, subtype: 'interrupted', turns: 1 } });
-            client.child.kill('SIGTERM');
-          }, cancelMs());
-          cancelTimer.unref();
-        }
+        cancelTurn();
         return true;
       },
     });
