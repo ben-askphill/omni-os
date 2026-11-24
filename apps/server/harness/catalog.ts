@@ -291,9 +291,13 @@ export function customHarnessInfo(h: CustomHarness, probe: CustomProbe): Harness
 
 // ---------- Antigravity ----------
 
-/** The one model Antigravity lists until the live model list lands: no model is sent, so agy runs its own current one. */
+/** The one model Antigravity lists before agy has told Omni its own: no model is sent, so agy runs its current one. */
 export const ANTIGRAVITY_MODEL = 'default';
+/** The model agy opens on, by the id agy reports (read from a live agy, #978). */
+export const ANTIGRAVITY_DEFAULT = 'gemini-4-neon';
 const ANTIGRAVITY_NOTE = "agy's current model. Bills your Google AI plan.";
+/** What the models from other makers carry: they cost the Google plan's quota, not the maker's plan. */
+export const ANTIGRAVITY_OTHER_NOTE = 'Bills your Google AI plan, not your Claude or ChatGPT plan.';
 /** Before the first check, which runs at server start. */
 export const ANTIGRAVITY_UNCHECKED = 'Omni has not checked agy on this machine yet';
 
@@ -309,7 +313,24 @@ export function antigravityHarness(s: AntigravityState | null, cap: number): Har
   if (!s) return { ...base, available: false, fix: ANTIGRAVITY_UNCHECKED, models: [] };
   if (s.state !== 'ready') return { ...base, available: false, fix: s.fix, ...(s.state === 'not-installed' && { missing: true as const }), models: [] };
   const note = s.note ? `${ANTIGRAVITY_NOTE} ${s.note}.` : ANTIGRAVITY_NOTE;
-  return { ...base, available: true, models: [{ id: ANTIGRAVITY_MODEL, label: 'Antigravity default', note, efforts: [], defaultEffort: '', default: true }] };
+  if (!s.models.length) return { ...base, available: true, models: [{ id: ANTIGRAVITY_MODEL, label: 'Antigravity default', note, efforts: [], defaultEffort: '', default: true }] };
+  const first = s.models.find((m) => m.id === ANTIGRAVITY_DEFAULT) ?? s.models[0];
+  return {
+    ...base,
+    available: true,
+    models: s.models.map((m) => {
+      const gemini = /^gemini/i.test(m.id);
+      return {
+        id: m.id,
+        label: m.label,
+        note: gemini ? note : ANTIGRAVITY_OTHER_NOTE,
+        efforts: m.efforts,
+        defaultEffort: m.defaultEffort,
+        ...(m.id === first.id && { default: true }),
+        ...(!gemini && { hiddenUntilOn: true }),
+      };
+    }),
+  };
 }
 
 // ---------- Cursor Cloud ----------

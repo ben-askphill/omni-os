@@ -5,6 +5,7 @@
 // - `latest` (the default): the newest model of each family, plus the harness default. When Opus 5.6 ships, it shows
 //   and Opus 5.5 drops out of the list, unless it was switched on by hand.
 // - `all`: every model the harness reports.
+// A model flagged `hiddenUntilOn` is in neither: it lists only once switched on (a model that bills somewhere else).
 // A toggle that matches what the rule gives is no override, so the rule keeps deciding for that model later.
 
 export type NewModelPolicy = 'latest' | 'all';
@@ -26,6 +27,8 @@ export type ModelVisibility = Partial<Record<string, HarnessModelPrefs>>;
 interface Listed {
   id: string;
   default?: boolean;
+  /** Not shown by either rule: only a model switched on by hand (`show`) lists. Antigravity's non-Gemini models. */
+  hiddenUntilOn?: boolean;
 }
 
 const VERSION_TOKEN = /^([a-z]*?)(\d+(?:[.p]\d+)*)$/;
@@ -83,7 +86,9 @@ export function latestModelIds(models: readonly Listed[]): Set<string> {
 
 /** What a harness's rule shows before any toggle. */
 export function ruleShows(models: readonly Listed[], policy: NewModelPolicy = DEFAULT_NEW_MODELS): Set<string> {
-  return policy === 'all' ? new Set(models.map((m) => m.id)) : latestModelIds(models);
+  const shown = policy === 'all' ? new Set(models.map((m) => m.id)) : latestModelIds(models);
+  for (const m of models) if (m.hiddenUntilOn && !m.default) shown.delete(m.id);
+  return shown;
 }
 
 /**

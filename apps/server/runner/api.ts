@@ -22,6 +22,7 @@ import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { isRemoteAgent, localCatalog, remoteAgentFor } from '../remote-agents.ts';
 import { offMachineHarness } from '../thread-files.ts';
+import { toolLimitRefusal } from './tool-limits.ts';
 import { capabilitiesOf, harnessName, providerWhere } from '../harness/registry.ts';
 import { profileOf } from '../harness/profile.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
@@ -273,6 +274,9 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
   const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
   if (unenforced) throw refusal(unenforced, 400);
+  // A harness whose own tools Omni cannot limit cannot run a limited agent or a quick ask (a new thread is read only only as a quick ask).
+  const limited = toolLimitRefusal(harness, role, { quick: input.quick ? 1 : 0 });
+  if (limited) throw refusal(limited, 400);
   // Its tools are taken away on this machine (harness adapters), which Hermes and Cursor Cloud do not run on.
   if (input.quick && isProviderHarness(harness)) throw refusal(quickAskRemoteRefusal(providerWhere(harness)), 409);
   // A team's lead gives out the parts with an Omni tool (runner/team.ts), which a harness on another server never gets.

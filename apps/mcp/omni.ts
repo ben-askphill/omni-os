@@ -555,6 +555,7 @@ server.registerTool(
       'Remote agents (Hermes, and the servers the user connected) are not harnesses: they are agents, in list_crew with `remote` set, and run only on their own server. ' +
       'Pass channel to see them as that channel does: cursor-cloud needs the channel\'s GitHub repo. ' +
       'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks cursor-cloud, antigravity or a remote agent. ' +
+      'Antigravity (Google\'s agy) runs at Full access only for now (tool_limits false): it cannot take an agent without file edits, a delegate-only agent or a quick ask. Its non-Gemini models are hidden until switched on and bill the Google AI plan. ' +
       `A model marked hidden is one ${USER} left out of the pickers in Settings. It still runs: pass it when asked for it. ` +
       `Only ${USER} adds, changes or removes a remote agent, since it decides where briefs and keys go: when asked to add one, hand ${USER} the page #/settings/crew (Add remote agent), or the pairing link its helper printed, and say they press Connect there.`,
     inputSchema: {
@@ -574,7 +575,7 @@ server.registerTool(
         running: h.running,
         // What it cannot do, so a brief does not lean on it: a remote harness has no steer or tool limits, say.
         capabilities: h.capabilities ? { steer: h.capabilities.steer, interrupt: h.capabilities.interrupt, remote: h.capabilities.remote, tool_limits: h.capabilities.toolLimits } : undefined,
-        models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default, hidden: m.hidden })),
+        models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default, hidden: m.hidden, note: m.note })),
       })),
     );
   },

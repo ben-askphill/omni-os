@@ -11,6 +11,7 @@ import { getHarness, resolveModel, unavailableError, validateRun, type Catalog }
 import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { HARNESS_META, isHarnessId, type HarnessId } from '../harness/types.ts';
 import { getCrew } from '../crew.ts';
+import { toolLimitRefusal } from './tool-limits.ts';
 import { reviewerEffort } from '../harness/resolve.ts';
 import { switchBlocked } from '../sync/guard.ts';
 import { buildHandover } from './handover.ts';
@@ -50,6 +51,8 @@ export function invalid(cat: Catalog, to: Run & { harness: HarnessId }, t?: Thre
   const ch = t ? channels.get(t.channel_id) : undefined;
   const unenforced = ch ? harnessRefusal(to.harness, channelAccess(ch, getCrew(t!.role)?.access)) : null;
   if (unenforced) return unenforced;
+  const limited = t ? toolLimitRefusal(to.harness, getCrew(t.role), t) : null;
+  if (limited) return limited;
   const h = getHarness(cat, to.harness);
   if (!h) return `Unknown harness "${to.harness}".`;
   if (!h.available) return unavailableError(h.name, h.fix);
@@ -254,6 +257,26 @@ export function handOverWith(live: Live, m: Msg, thread = threads.get(live.threa
   m.text = h.text + m.text;
   m.commands = m.commands?.map((c) => ({ ...c, start: c.start + h.text.length, end: c.end + h.text.length }));
   live.carryHandover(m.uuid, { to, session, entries: h.entries, omitted: h.omitted, chars: h.chars });
+}
+
+/**
+ * What a new native session reads ahead of the next message when the thread's own could not be resumed (agy's
+ * session/resume failed): the thread so far from Omni's transcript, as fresh context on the same run. The adapter
+ * puts it in front of the message itself, since no pending handover marks this case.
+ */
+export function restartHandoverText(thread: Thread): string {
+  const run = runName(runOf(thread));
+  return buildHandover({
+    from: run,
+    to: run,
+    session: 'fresh',
+    restart: true,
+    user: userName(),
+    thread,
+    uploadsDir: uploadsDir(thread.id),
+    artifacts: artifacts.byThread(thread.id).reverse().slice(0, 20).map((a) => a.name),
+    events: events.since(thread.id, 0),
+  }).text;
 }
 
 /** The harness read the handover: the transcript says so and the thread no longer has one pending. */

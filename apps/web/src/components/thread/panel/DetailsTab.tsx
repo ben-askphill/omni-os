@@ -156,7 +156,9 @@ export function DetailsTab({
   // The composer's model pill reads these too, so Details names the model and effort the same way.
   const run = threadRunLabels(thread, harnesses);
   const slug = thread.model || init?.model;
-  const resume = runsElsewhere ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
+  // agy's ACP sessions have no terminal command that opens them, so Antigravity gets no card rather than Claude's.
+  const terminalResume = thread.harness !== 'antigravity';
+  const resume = runsElsewhere || !terminalResume ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-[var(--sp-6)] overflow-y-auto px-[var(--sp-5)] pb-[var(--sp-6)] [&>*]:shrink-0">
       {code && <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} parked={parked} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />}
@@ -255,7 +257,7 @@ export function DetailsTab({
             </p>
           )}
         </div>
-      ) : (
+      ) : !terminalResume ? null : (
         <div className={`rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
           <div className={`flex items-center justify-between gap-[var(--sp-4)] ${CAPTION}`}>
             <span className="caption">Resume in terminal</span>
