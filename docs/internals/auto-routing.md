@@ -26,6 +26,7 @@ Composer draws on Cursor's Auto and Composer usage bucket (`monthly.auto`), so t
 Not given a lane:
 
 - **Grok and Gemini on Cursor.** Grok 4.7 sits mid-pack on coding benchmarks, below Composer at a higher price, and the named models draw on Cursor's API bucket, which runs out first (82% used when this was written, against 40% for Auto and Composer). Nothing in a brief says Grok would do better.
+- **Antigravity.** It bills the Google AI plan, and Omni reads none of its allowances ([ADR 0022](../adr/0022-antigravity-over-acp.md)), so Auto could not skip it once the plan is spent. Nothing in a brief says Gemini 4 Neon would beat the lanes above, so it runs only when a thread, channel, automation or agent picks it.
 - **Hermes.** It bills the Anthropic API per token, for the same Claude models Claude Code runs on the plan.
 - **Cursor Cloud.** It runs off the Mac, without the browser, Omni's tools or a Mac build, and opens its own PR. That is a choice to make on purpose, so it runs only when picked or asked for.
 - **Antigravity.** It bills the Google AI plan, mainly for writing on Gemini, next to Gemini on Cursor above. A thread, channel, automation or agent runs on it only when set to, and only at Full access, for an agent with all its tools, and not as a quick ask.
