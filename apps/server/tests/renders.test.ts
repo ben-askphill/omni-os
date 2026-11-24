@@ -59,7 +59,9 @@ describe('GET /api/artifacts/:id/raw?frame=1', () => {
     expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts allow-popups');
     expect(body.indexOf('omni:render-height')).toBeGreaterThan(-1);
     expect(body.indexOf('omni:render-height')).toBeLessThan(body.indexOf('<title>'));
-    expect(body.replace(/<script>\(function\([\s\S]*?<\/script>/, '')).toBe(page);
+    // The narrow sheet (packages/shared/html-render.ts) goes after the page's own head styles.
+    expect(body.indexOf('<style id="omni-narrow">')).toBeGreaterThan(-1);
+    expect(body.replace(/<script>\(function\([\s\S]*?<\/script>/, '').replace(/<style id="omni-narrow">[^<]*<\/style>/, '')).toBe(page);
     expect(await (await raw(artifact.id)).text()).toBe(page);
     expect(await (await raw(artifact.id, '?frame=1&download=1')).text()).toBe(page);
   });
