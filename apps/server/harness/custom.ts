@@ -152,6 +152,50 @@ export function secretProblem(name: string): string | null {
   return null;
 }
 
+const hostnameOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * A harness file's pairing record, when Omni may act on it: the file runs as written, still names the secret the paired
+ * key went into, and its pairing address is a fine one on the agent's own host. Otherwise null, so a stale or
+ * hand-edited record never sends a key or a code elsewhere, nor writes or deletes a secret Connect did not make.
+ */
+export function usablePairing(h: CustomHarness): HarnessPairing | null {
+  const p = h.pairing;
+  if (!p || h.error || !p.secret || p.secret !== h.secret || secretProblem(h.secret)) return null;
+  const at = p.at || h.url;
+  return !urlProblem(at) && hostnameOf(at) === hostnameOf(h.url) ? p : null;
+}
+
+/**
+ * A harness Connect paired, which another machine pairs again with a code of its own (Pair this machine,
+ * agent-connect.ts pairHere): the file syncs, the key in the secret Connect made does not.
+ */
+export const pairable = (h: CustomHarness): boolean => !!usablePairing(h)?.secretMade;
+
+/** Where Pair this machine is, for a fix read away from the agent's page (a thread, the harness list). */
+export const PAIR_HERE_WHERE = ' on its page in Settings > Agents';
+
+/** Where a paired harness's fix points: the agent's page, which offers Pair this machine. */
+const PAIR_HERE = `Press Pair this machine${PAIR_HERE_WHERE}`;
+
+/** A paired harness with no key on this machine. Pairing keeps the key on the machine that paired. */
+export const PAIR_HERE_FIX = `This machine has no key for it yet: the key stays on the machine that paired it. ${PAIR_HERE}`;
+
+/** A pairing code, as an agent's page or the helper prints it: letters and digits in groups of four, with dashes. */
+const looksLikeCode = (v: string) => /^[0-9a-z]{4}(-[0-9a-z]{1,4}){3,}$/i.test(v.trim());
+
+/** What a refused key says. A pasted pairing code is not a key; a paired harness pairs this machine again. */
+export function refusedKeyFix(h: CustomHarness, key: string): string {
+  const next = pairable(h) ? PAIR_HERE : "Replace it in Secrets with the server's key";
+  return looksLikeCode(key) ? `${h.secret} holds a pairing code, not a key. ${next}` : `${h.host} refused the key in ${h.secret}. ${next}`;
+}
+
 /** A custom harness from its file's text. Never throws: a file that cannot run comes back with `error`. */
 export function parseHarnessFile(slug: string, text: string): CustomHarness {
   const id = `${CUSTOM_HARNESS_PREFIX}${slug}` as CustomHarnessId;

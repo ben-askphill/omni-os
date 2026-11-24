@@ -44,7 +44,8 @@ const sessionIdOf = (thread: { id: string; session_id: string }) =>
 /** What a failed turn says. Never the key, nor an error message that could carry it. */
 function failText(e: unknown, t: RunsApiTarget): string {
   if (e instanceof HermesHttpError && e.status === 429) return `${t.name} is at its concurrent run cap, so this turn was not started.`;
-  if (e instanceof HermesHttpError && e.status === 401) return `${t.name} rejected the key. Check the ${t.keyName} secret.`;
+  if (e instanceof HermesHttpError && e.status === 401)
+    return t.pairable ? `${t.name} rejected the key in ${t.keyName}. Press Pair this machine on its page in Settings > Agents.` : `${t.name} rejected the key. Check the ${t.keyName} secret.`;
   if (e instanceof HermesHttpError) return `${t.name} returned HTTP ${e.status}.`;
   return `Could not reach ${t.name} at ${t.url}. ${t.fix}`;
 }

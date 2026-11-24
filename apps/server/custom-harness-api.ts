@@ -9,7 +9,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { pairHelperCommand } from '@omni/shared/connect-agent.ts';
 import { about } from './about.ts';
-import { connectAgent, findAgent, pairAgent, removeAgent, removeAgentServer, testAgentServer, testConnection, testSaved } from './agent-connect.ts';
+import { connectAgent, findAgent, pairAgent, pairHere, removeAgent, removeAgentServer, testAgentServer, testConnection, testSaved } from './agent-connect.ts';
 import { callerOf } from './automation-guard.ts';
 import { channels } from './db.ts';
 import { checkCustomHarness, getCatalog } from './harness/catalog-service.ts';
@@ -59,6 +59,20 @@ customHarnessApi.post('/crew/:id/server/test', async (c) => {
   if (refusal) return refusal;
   try {
     return c.json(await testAgentServer(c.req.param('id')));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+// Pair this machine: the agent's file synced here, its key did not. A code of this machine's own, redeemed server to
+// server; the key goes into this machine's secret store only once a test turn passed with it, and never to the client.
+customHarnessApi.post('/crew/:id/server/pair', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  const body = z.object({ code: z.string().trim().min(1).max(100) }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Send { code }.' }, 400);
+  try {
+    return c.json(await pairHere(c.req.param('id'), body.data.code));
   } catch (err) {
     return failed(c, err);
   }

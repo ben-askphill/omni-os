@@ -115,6 +115,8 @@ export interface RemoteTarget {
   host: string;
   /** The secret store name its key is read from, on each machine. */
   secret: string;
+  /** Why it is down, when the key is why: none on this machine, or the server refused it. */
+  keyProblem?: 'missing' | 'refused';
 }
 
 /** A harness plus its availability, models and cap, as the catalog reports it. */

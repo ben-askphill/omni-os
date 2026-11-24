@@ -27,7 +27,7 @@ import { config } from './config.ts';
 import { getCrew } from './crew.ts';
 import { isRemoteAgent } from './remote-agents.ts';
 import { updateUserConfig } from './user-config.ts';
-import { customHarness, customHarnesses, loopback, secretProblem, tailnet, urlProblem, type CustomHarness } from './harness/custom.ts';
+import { customHarness, customHarnesses, loopback, pairable, PAIR_HERE_FIX, secretProblem, tailnet, urlProblem, usablePairing, type CustomHarness } from './harness/custom.ts';
 import { deleteCustomHarness, saveCustomHarness } from './harness/custom-store.ts';
 import { EveClient } from './harness/eve/client.ts';
 import { HermesHttpError } from './harness/hermes/client.ts';
@@ -349,6 +349,8 @@ export function resetConnectDrafts() {
 
 // ---------- sign in: pairing ----------
 
+const NOT_A_CODE = 'That is not a pairing code: it is letters and digits in groups of four, as the helper printed it.';
+
 /** This machine, as the agent will list who paired. */
 const client = () => ({ client_id: outbox.machineId() ?? `omni-${about.name}`, client_name: `Omni on ${about.name.split('.')[0]}` });
 
@@ -363,9 +365,33 @@ export async function pairAgent(given: { url?: string; pair?: string; code: stri
   const bad = urlProblem(pair) ?? (url ? urlProblem(url) : null) ?? pairProblem(url || undefined, pair === url ? undefined : pair);
   if (bad) throw refused(bad);
   const code = normalizeCode(given.code ?? '');
-  if (!code) throw refused('That is not a pairing code: it is letters and digits in groups of four, as the helper printed it.');
+  if (!code) throw refused(NOT_A_CODE);
   prune();
   if (drafts.size >= MAX_DRAFTS) throw refused('Too many pairings are waiting to be connected. Finish or close one first.', 409);
+  const { a, key, runs } = await redeem(pair, url, code);
+  const d: Draft = {
+    id: randomUUID(),
+    // The agent's answer or the find says eve: only which protocol threads speak, checked by the test turn.
+    kind: a.kind === 'eve' || given.kind === 'eve' ? 'eve' : 'runs-api',
+    url: runs,
+    name: plain(a.name, 80) || plain(given.name, 80) || `Agent on ${hostOf(runs)}`,
+    key,
+    keyId: plain(a.key_id, 200),
+    sharedKey: a.shared_key === true,
+    revoke: a.revoke === true,
+    pair,
+    tested: false,
+    expires: Date.now() + DRAFT_MS,
+  };
+  drafts.set(d.id, d);
+  return { draft: d.id, url: d.url, host: hostOf(d.url), name: d.name, sharedKey: d.sharedKey, revoke: d.revoke };
+}
+
+/**
+ * POST a normalized code to `pair`/v1/omni/pair and check the answer: a usable key, and runs on the pairing address's
+ * own host (`url`, else `pair`, when the answer names none). Throws what to tell the user for anything else.
+ */
+async function redeem(pair: string, url: string, code: string): Promise<{ a: Record<string, unknown>; key: string; runs: string }> {
   let res: Response;
   try {
     res = await fetch(`${pair}/v1/omni/pair`, {
@@ -394,22 +420,7 @@ export async function pairAgent(given: { url?: string; pair?: string; code: stri
   const runsBad = urlProblem(runs);
   if (runsBad) throw refused(`The agent named an address Omni will not use: ${runsBad}`, 502);
   if (hostnameOf(runs) !== hostnameOf(pair)) throw refused(`The agent named ${hostOf(runs)} for its runs, another host than the one it paired on, so Omni did not keep the key.`, 502);
-  const d: Draft = {
-    id: randomUUID(),
-    // The agent's answer or the find says eve: only which protocol threads speak, checked by the test turn.
-    kind: a.kind === 'eve' || given.kind === 'eve' ? 'eve' : 'runs-api',
-    url: runs,
-    name: plain(a.name, 80) || plain(given.name, 80) || `Agent on ${hostOf(runs)}`,
-    key,
-    keyId: plain(a.key_id, 200),
-    sharedKey: a.shared_key === true,
-    revoke: a.revoke === true,
-    pair,
-    tested: false,
-    expires: Date.now() + DRAFT_MS,
-  };
-  drafts.set(d.id, d);
-  return { draft: d.id, url: d.url, host: hostOf(d.url), name: d.name, sharedKey: d.sharedKey, revoke: d.revoke };
+  return { a, key, runs };
 }
 
 /** Revoke a key at the pairing address that minted it (POST /v1/omni/revoke). False when it did not answer 2xx. */
@@ -634,33 +645,33 @@ export interface Removed {
 }
 
 /**
- * A harness file's pairing record, when Remove may act on it: the file runs as written, still names the secret the
- * paired key went into, and its revoke address is a fine one on the agent's own host. Otherwise Remove only deletes the
- * file, so a stale or hand-edited record never sends a key elsewhere or deletes a secret it did not make.
+ * Undo what pairing made on this machine for a harness whose file is gone (or going): revoke this machine's key at the
+ * agent when it offers that, and delete the secret Connect or Pair this machine made (only when no other harness file
+ * names it). Only for a usable pairing record (custom.ts usablePairing), so a stale or hand-edited one never sends a key
+ * elsewhere or deletes a secret pairing did not make. Each machine runs it for its own key: Remove here, a synced
+ * removal on the others (sync/handlers/harness-file.ts).
  */
-function pairingOf(h: CustomHarness) {
-  const p = h.pairing;
-  if (!p || h.error || !p.secret || p.secret !== h.secret || secretProblem(h.secret)) return null;
-  const at = p.at || h.url;
-  return !urlProblem(at) && hostnameOf(at) === hostnameOf(h.url) ? p : null;
+export async function dropPairedKey(h: CustomHarness): Promise<Omit<Removed, 'deleted'>> {
+  const p = usablePairing(h);
+  const key = p?.revoke && p.keyId ? await globalSecret(h.secret).catch(() => null) : null;
+  const revoked = p?.revoke && p.keyId ? (key ? await revokeAt(p.at || h.url, key, p.keyId) : false) : null;
+  const shared = customHarnesses().some((x) => x.id !== h.id && x.secret === h.secret);
+  const dropSecret = !!p?.secretMade && !shared && hasSecret('global', h.secret);
+  if (dropSecret) await deleteSecret('global', h.secret);
+  return { revoked, secret: dropSecret ? h.secret : null };
 }
 
 /**
  * Remove a custom harness: revoke its key at the agent when it offers that, delete the secret Connect made for it
- * (only when no other harness file names the same one), then delete the file here and on the other machines. Its
- * threads stay readable and refuse to run (registry.ts missingHarness).
+ * (only when no other harness file names the same one), then delete the file here and on the other machines, which
+ * revoke and delete their own keys as the removal reaches them. Its threads stay readable and refuse to run
+ * (registry.ts missingHarness).
  */
 export async function removeAgent(slug: string): Promise<Removed> {
   const h = CUSTOM_HARNESS_SLUG.test(slug) ? customHarness(`custom:${slug}`) : null;
   if (!h) throw refused(`No custom harness "${slug}".`, 404);
-  const p = pairingOf(h);
-  const key = p?.revoke && p.keyId ? await globalSecret(h.secret).catch(() => null) : null;
-  const revoked = p?.revoke && p.keyId ? (key ? await revokeAt(p.at || h.url, key, p.keyId) : false) : null;
   deleteCustomHarness(slug);
-  const shared = customHarnesses().some((x) => x.secret === h.secret);
-  const dropSecret = !!p?.secretMade && !shared && hasSecret('global', h.secret);
-  if (dropSecret) await deleteSecret('global', h.secret);
-  return { deleted: true, revoked, secret: dropSecret ? h.secret : null };
+  return { deleted: true, ...(await dropPairedKey(h)) };
 }
 
 /** Test a saved custom harness with the key on this machine: the harness row's Test connection. */
@@ -669,7 +680,11 @@ export async function testSaved(slug: string): Promise<AgentTest> {
   if (!h) throw refused(`No custom harness "${slug}".`, 404);
   if (h.error) return { ok: false, failed: 'probe', detail: h.error };
   const key = await globalSecret(h.secret).catch(() => null);
-  if (!key) return { ok: false, failed: 'probe', detail: `Key not on this machine: set ${h.secret} in Secrets.` };
+  if (!key) {
+    // Probed again, so the card's status (and Pair this machine) follows what the test found.
+    await checkCustomHarness(h.id);
+    return { ok: false, failed: 'probe', detail: pairable(h) ? PAIR_HERE_FIX : `Key not on this machine: set ${h.secret} in Secrets.` };
+  }
   const r = await testAgent(h.url, key, h.kind);
   await checkCustomHarness(h.id);
   if (r.ok) await refreshOfferedAvatar(h.id, h.kind, h.url, key, h.pairing?.at);
@@ -715,6 +730,35 @@ export async function testAgentServer(id: string): Promise<AgentTest> {
   const r = await testAgent(url, key, 'runs-api');
   await loadCatalog(['hermes']);
   if (r.ok) await refreshOfferedAvatar('hermes', 'runs-api', url, key);
+  return r;
+}
+
+/**
+ * Pair this machine, on a remote agent's Server card. Connect paired the agent on one machine and its file synced here,
+ * but the key stays in that machine's secret store, so this one redeems a code of its own at the pairing address and
+ * keeps the key in the secret the file names, on this machine only. As on Connect, the key is kept only once a test turn
+ * passed with it, and revoked at the agent when that fails. The file stays as it is: it syncs.
+ */
+export async function pairHere(id: string, typed: string): Promise<AgentTest> {
+  const role = remoteAgentOf(id);
+  const h = role.harness === 'hermes' ? null : customHarness(role.harness);
+  const p = h ? usablePairing(h) : null;
+  if (!h || !p?.secretMade) throw refused(`Omni did not pair ${role.name}, so this machine cannot pair with a code. Set its key in Secrets${h?.secret ? ` as ${h.secret}` : ''} on this machine.`, 409);
+  const code = normalizeCode(typed);
+  if (!code) throw refused(NOT_A_CODE);
+  // A key that works here stays: pairing again would leave it live at the agent with nothing holding it.
+  const current = await globalSecret(h.secret).catch(() => null);
+  if (current && (await probeRemote(h.kind, h.url, current)).state === 'ok') throw refused(`${role.name} is already connected on this machine.`, 409);
+  const pair = base(p.at || h.url);
+  const { a, key } = await redeem(pair, h.url, code);
+  const r = await testAgent(h.url, key, h.kind);
+  if (!r.ok) {
+    if (a.revoke === true) await revokeAt(pair, key, plain(a.key_id, 200));
+    return r;
+  }
+  await setSecret('global', h.secret, key);
+  await checkCustomHarness(h.id);
+  await refreshOfferedAvatar(h.id, h.kind, h.url, key, p.at);
   return r;
 }
 

@@ -265,6 +265,8 @@ export const CUSTOM_MODEL = 'default';
 export interface CustomProbe {
   available: boolean;
   fix?: string;
+  /** The key is why it is down: none on this machine, or the server refused it. */
+  keyProblem?: 'missing' | 'refused';
 }
 
 /** How to read a probe that has not run yet. */
@@ -281,7 +283,7 @@ export function customHarnessInfo(h: CustomHarness, probe: CustomProbe): Harness
     remote: { custom: true, kind: h.kind, host: h.host, secret: h.secret },
   };
   if (h.error) return { ...base, available: false, fix: h.error, models: [] };
-  if (!probe.available) return { ...base, available: false, fix: probe.fix ?? UNCHECKED_FIX, models: [] };
+  if (!probe.available) return { ...base, ...(probe.keyProblem && { remote: { ...base.remote!, keyProblem: probe.keyProblem } }), available: false, fix: probe.fix ?? UNCHECKED_FIX, models: [] };
   const note = `Runs on ${h.host}. ${h.bills}.`;
   return { ...base, available: true, models: [{ id: CUSTOM_MODEL, label: `${h.name} default`, note, efforts: [], defaultEffort: '', default: true }] };
 }
