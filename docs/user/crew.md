@@ -131,6 +131,7 @@ Each thread of the agent then loads them when it starts, whatever its brief says
 | Claude Code | `Edit`, `Write`, `MultiEdit`, `NotebookEdit` (`--disallowedTools`) | Bash, reading, MCP tools, subagents |
 | Codex | File patches: it asks before each one (`approvalPolicy: untrusted`) and Omni declines | Shell commands, with network, without asking you |
 | Cursor Agent | File writes (`Write(**)` in its deny rules) | Shell, reading, MCP tools |
+| Antigravity | File edits, deletes and moves: Omni refuses each request, and leaves agy's edit tools out of the session. Until a live check proves agy asks before every such tool, an agent with No file edits cannot run on Antigravity at all ([Antigravity](harnesses.md#permissions)) | Shell, judged by the channel's level, reading, MCP tools |
 | Cursor Cloud | Nothing: Omni cannot take a tool away there, so the prompt is the only rule | Everything |
 
 On Codex, a read-only sandbox would also stop the network, and with it `gh`, so Omni declines the patches instead. A channel at Read only or Ask first still holds the commands as its level says. `tools` is one of an agent's powers: an agent's save never sets it (see the crew guard below).

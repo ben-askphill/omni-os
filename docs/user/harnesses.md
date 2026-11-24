@@ -9,27 +9,28 @@ Hermes and the AI agents on servers of your own are not harnesses you pick. Each
 | Claude Code | Claude plan | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` | `claude -p` with stream-json |
 | Codex | ChatGPT plan | `npm install -g @openai/codex && codex login` | `codex app-server` ([ADR 0001](../adr/0001-codex-app-server.md)) |
 | Cursor Agent | Cursor plan | `curl https://cursor.com/install -fsS \| bash && cursor-agent login` | `cursor-agent` |
+| Antigravity | Google AI plan | `curl -fsSL https://antigravity.google/cli/install.sh \| bash`, then `agy` and sign in with Google, see [below](#antigravity) | `agy acp` over ACP ([ADR 0022](../adr/0022-antigravity-over-acp.md)) |
 | Cursor Cloud | Cursor plan | Secret `CURSOR_API_KEY`, see [below](#cursor-cloud) | A Cursor cloud agent, through the Cloud Agents API |
-| Antigravity | Google AI plan | `curl -fsSL https://antigravity.google/cli/install.sh \| bash`, then `agy` once and sign in with Google, see [below](#antigravity) | `agy acp`, the Agent Client Protocol. Runs threads, at Full access only for now |
 
-- `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN`, `OMNI_CURSOR_BIN` and `OMNI_ANTIGRAVITY_BIN` in `.env` point at a binary that is not on `PATH`. Without one, Codex also tries the copy inside the ChatGPT app, and Antigravity tries `antigravity` after `agy`.
-- A harness Omni can't use shows why in the model picker, Settings > Models and the error `delegate` gets. Claude Code is asked with `claude auth status --json`: signed out reads as `claude auth login`, no `claude` on `PATH` as missing, and a CLI too old to answer stays available. For Codex that is one of: signed out (`codex login`), signed in with an API key, no `codex` on `PATH`, a binary that won't run, `codex app-server` exiting before it answers (with the last line it printed), or no answer to a request. A server busy with disk writes does not count as no answer.
-- Open **Usage** in the desktop sidebar or near the top of **Activity** on phone web and iOS. The card has a row per signed-in account. Each limit shows when it resets. On desktop, hover or tap for the local time. On phones, the countdown and local time appear together. Claude's rate-limit events drive the 5h and week windows, Codex reports its own, and Cursor's dashboard gives the monthly cycle. Hermes and Cursor Cloud have no plan limit to show. A window whose source sent no reset time shows no reset. An account with no reading of its own yet says **no reading yet** (and never borrows another account's numbers); a stale or missing reading on a lone account still says **no data**.
-- Each harness has its own concurrency cap (12 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`, `OMNI_MAX_CONCURRENT_CURSOR_CLOUD`, `OMNI_MAX_CONCURRENT_ANTIGRAVITY`. A full harness never holds up threads on another.
-- Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Antigravity drops `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_CLOUD_QUOTA_PROJECT`, `GOOGLE_GENAI_USE_VERTEXAI`, `GCLOUD_PROJECT`, `CLOUDSDK_CORE_PROJECT` and `AGY_ACP_CCPA_PROJECT`, so it never moves onto API or Vertex billing, and keeps `GEMINI_HOME`. Every harness drops `HERMES_API_KEY`, and no harness, terminal or channel action gets a remote agent's key (a secret its server's file names): those keys go only to that server's HTTP client. The guard wins over the server environment, a channel or global secret, and any extras, so a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
+- `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN`, `OMNI_CURSOR_BIN` and `OMNI_ANTIGRAVITY_BIN` in `.env` point at a binary that is not on `PATH`. Without one, Codex also tries the copy inside the ChatGPT app, and Antigravity tries `agy`, then `antigravity`, on `PATH`.
+- A harness Omni can't use shows why in the model picker, Settings > Models and the error `delegate` gets. Claude Code is asked with `claude auth status --json`: signed out reads as `claude auth login`, no `claude` on `PATH` as missing, and a CLI too old to answer stays available. For Codex that is one of: signed out (`codex login`), signed in with an API key, no `codex` on `PATH`, a binary that won't run, `codex app-server` exiting before it answers (with the last line it printed), or no answer to a request. A server busy with disk writes does not count as no answer. Antigravity's reasons are in [Antigravity](#antigravity).
+- Open **Usage** in the desktop sidebar or near the top of **Activity** on phone web and iOS. The card has a row per signed-in account. Each limit shows when it resets. On desktop, hover or tap for the local time. On phones, the countdown and local time appear together. Claude's rate-limit events drive the 5h and week windows, Codex reports its own, and Cursor's dashboard gives the monthly cycle. Hermes and Cursor Cloud have no plan limit to show. Antigravity shows no rows for now: Omni does not read its allowances ([Antigravity](#antigravity)). A window whose source sent no reset time shows no reset. An account with no reading of its own yet says **no reading yet** (and never borrows another account's numbers); a stale or missing reading on a lone account still says **no data**.
+- Each harness has its own concurrency cap (12 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_ANTIGRAVITY`, `OMNI_MAX_CONCURRENT_HERMES`, `OMNI_MAX_CONCURRENT_CURSOR_CLOUD`. A full harness never holds up threads on another.
+- Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Antigravity drops `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_CLOUD_QUOTA_PROJECT`, `GOOGLE_GENAI_USE_VERTEXAI`, `GCLOUD_PROJECT`, `CLOUDSDK_CORE_PROJECT` and `AGY_ACP_CCPA_PROJECT`, so it bills the Google account and never an API key or a Cloud project. It keeps `GEMINI_HOME`, which says where your sign-in lives. Every harness drops `HERMES_API_KEY`, and no harness, terminal or channel action gets a remote agent's key (a secret its server's file names): those keys go only to that server's HTTP client. The guard wins over the server environment, a channel or global secret, and any extras, so a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
 - Cursor Agent streams partial reply text into one Markdown message as it writes, and tool rows show the call name and path, command or pattern when they start. Each progress message it writes between tool calls shows once, as on Claude Code and Codex. It gets Omni's MCP servers from a plugin folder in the thread's data dir (`--plugin-dir`), and Omni reads their calls back under their own names, so `set_steps` moves the step rail and `html_render`, `ask_user_question` and the Conductor's delegation cards show as they do on the other harnesses. Its print mode ends any MCP call after a minute, so a question waits 45 seconds there ([When the agent asks you](threads.md#when-the-agent-asks-you)). It still cannot steer or interrupt a running turn. Messages sent mid-turn wait for the next one ([Sending while a thread is busy](threads.md#sending-while-a-thread-is-busy)).
 - Some features are Claude Code only: published artifact cards, [mods](mods.md) and [`/goal`](threads.md#goals).
 - Claude Code's model picker includes Fable 5.2 (`claude-fable-5-2`, between Sonnet 5 and Fable 5.1). The `fable` alias resolves to 5.2.
 
 ## Models in the picker
 
-Omni asks each harness which models it has, so a model that ships in a new CLI release shows up without an Omni update: Claude Code's `initialize` answer (nothing goes to the API), Codex's `model/list`, `cursor-agent --list-models` and Cursor's `/v1/models`. Claude Code keeps Omni's bundled list first and adds whatever else it reports. Hermes has one model.
+Omni asks each harness which models it has, so a model that ships in a new CLI release shows up without an Omni update: Claude Code's `initialize` answer (nothing goes to the API), Codex's `model/list`, `cursor-agent --list-models`, Cursor's `/v1/models` and the models in agy's `session/new` answer. Claude Code keeps Omni's bundled list first and adds whatever else it reports. Hermes has one model.
 
 The composer and picker show a friendly name (Opus 5.5, Haiku 5.5) even for a model Claude Code reports without one: Omni derives it from the id, dated or context-suffixed ids included. Settings and thread Details use the same label, and Claude Code still gets the original id.
 
 - Omni asks at start and every 15 minutes. Antigravity is the exception, since starting `agy` is heavy: it is asked at start, on **Check for new models**, when a thread starts on it, and while it is down when a picker opens (at most every 10 seconds), never on the timer. A picker that opens on a list older than 5 minutes asks again in the background, so the next open has the new models. **Check for new models** in Settings > Models asks at once.
 - What Claude Code last reported is kept in `data/claude-models.json`, so a restart starts from it. When Claude Code does not answer, the last list stays.
 - **Models in the picker**, in the same section, chooses per harness which models the pickers list (desktop, phone and iOS). By default each harness shows the newest model of each family and its default: when Opus 5.6 ships it shows and Opus 5.5 drops out. **All** shows every model. A switch on a model wins over the rule, and **Reset** clears them. The choice syncs to your other machines.
+- Antigravity lists every model your Google account offers, with Gemini 4 Neon as its default. Its Claude and GPT models are listed but hidden until you switch one on here, and carry the note "Bills your Google AI plan, not your Claude or ChatGPT plan". **Reset** hides them again. The effort picker offers the levels agy gives for the picked model, and none when it gives none.
 - A hidden model still runs. A thread, agent, channel default or automation that names one keeps it, the picker still shows it while it is the one picked, and Auto picks from every model. The Conductor's `list_harnesses` marks it `hidden`.
 
 ## Accounts
@@ -104,7 +105,7 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 - Your claude.ai connectors (Gmail, Calendar, Slack, Productive, the Portal) exist only in Claude Code, so that work stays there even when the plan is busy. Notion briefs go there too, though threads reach Notion through `OMNI_NOTION_TOKEN` in any local harness ([Notion](notion.md)).
 - A review goes to Codex, always at high effort, so a different model family checks work Claude most likely wrote. The Conductor's PR reviews skip Auto and pick the family from the builder's model ([Crew](crew.md)).
 - "Quick", "fast", "asap" and the like lower the effort a step on any harness. For code, they also move the thread to Cursor's Composer, a fast and cheap coding model, as does a mechanical change across many files ("rename X across the repo"). This does not happen for the hardest tasks, or when the first message has images, which Cursor Agent cannot see.
-- Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, Cursor Cloud or a remote agent. [Auto routing](../internals/auto-routing.md#lanes) explains why.
+- Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, Antigravity, Cursor Cloud or a remote agent. [Auto routing](../internals/auto-routing.md#lanes) explains why.
 - A model picked on the thread, an agent's or a channel's default all win over Auto. Set a channel's default to Auto in its settings, or `model: auto` in an agent's frontmatter.
 - In #conductor, a saved channel default takes precedence over the Conductor agent's charter. New thread follows saved settings until you pick a model or effort for that draft. Other agents keep their own defaults ahead of the channel's.
 - How well it picks, and how to check that again: [Auto routing](../internals/auto-routing.md).
@@ -189,6 +190,65 @@ capabilities:
 - **What it runs like**: a Hermes thread (an eve agent differs where [eve agents](#eve-agents) says). No browser, Omni tools, channel secrets or plan meter; Omni's prompt goes as `instructions`; a local agent, the Conductor included, never runs on its server, and it cannot run below Full access. Its replies come from a server outside Omni.
 - **Only you** add, change or remove one: an agent thread, a Google or Omni Connect session and an app paired by code get a 403. It takes the install token or a browser paired with it.
 - **Removing one** (Remove on its agent's Server card) keeps its threads readable. They do not run again, on it or on any other harness, until a server with that id is back.
+
+## Antigravity
+
+> Antigravity is decided ([ADR 0022](../adr/0022-antigravity-over-acp.md)) and being built in #978 to #981. Until they ship, it is not in the pickers. This section describes what they build.
+
+An Antigravity thread runs Google's Antigravity CLI, `agy`, on your machine, and bills the Google AI plan (Google AI Pro, say) of the Google account it is signed in with. Omni starts `agy acp` and talks to it over the Agent Client Protocol ([ADR 0022](../adr/0022-antigravity-over-acp.md)). It is how you run Gemini 4 Neon on that plan; Gemini on Cursor Agent bills Cursor instead.
+
+### Set it up on a machine
+
+1. Install `agy`: `curl -fsSL https://antigravity.google/cli/install.sh | bash`. It goes to `~/.local/bin/agy`. If you keep it somewhere that is not on `PATH`, set `OMNI_ANTIGRAVITY_BIN` in `.env`. Omni needs 1.5.1 or newer (`agy --version`).
+2. Run `agy` once in a terminal and sign in with **Google OAuth** (your personal Google account), not a Google Cloud project or an API key. Omni never signs `agy` in and never opens a browser for it, so this step is the same on every machine.
+3. Open Settings > Models and press **Check again**. Antigravity shows as available, with its models. Each machine checks its own `agy`, so do this on every machine that should run it.
+4. Pick **Antigravity** and **Gemini 4 Neon** in a thread's model picker, as a channel's default, in an automation, or as an agent's run defaults (`harness: antigravity` in its agent file).
+
+### When it is not available
+
+The model picker, Settings > Models and the Conductor's `delegate` error say why, and the fix:
+
+| Reason | Fix |
+| --- | --- |
+| Not installed | The install command above, or `OMNI_ANTIGRAVITY_BIN` |
+| Too old | Update `agy`; the reason names the version found and 1.5.1 |
+| Signed out | Run `agy` in a terminal once and sign in with Google |
+| No Antigravity subscription | The Google account has no plan that includes Antigravity |
+| Not answering | `agy acp` did not answer the check; the reason shows the last line it printed |
+
+- A newer major version than Omni was tested on stays available, with a note.
+- Starting `agy` is slow, so Omni checks it at server start, on **Check again** and **Check for new models**, when a thread on it starts, and at most every 10 seconds while it is down. The 15-minute model refresh skips it. A fix shows the next time you open a picker, with no restart.
+- Omni signs every session in with the Google account method only. An `agy` set up for an API key, Vertex or Gemini Enterprise does not run in Omni, and the environment guard (above) strips the variables that would move it there.
+
+### What it does and does not do
+
+- Replies stream, each tool call shows as a row, agy's plan becomes the thread's checklist, and the thinking line shows while it reasons, without its private reasoning in the transcript.
+- **Stop** cancels the turn and keeps the session. A message sent mid-turn waits for the next turn: agy cannot steer ([Sending while a thread is busy](threads.md#sending-while-a-thread-is-busy)). After a restart, the thread resumes its agy session; when agy cannot resume it, a new session starts with a handover from the transcript.
+- Images go to the model; other attachments go as file paths. The commands and skills agy offers show in the thread's `/` menu, and agy's own multiple-choice questions show as question cards.
+- Omni's MCP servers (questions, renders, steps, the browser, the Omni tools) reach agy with each session, and Notion works through `OMNI_NOTION_TOKEN` ([Notion](notion.md)). Gmail, Calendar, Drive and Slack stay Claude Code only. Your own Antigravity setup (its MCP servers and rules) applies as it does in your terminal; Omni writes nothing into `~/.gemini`.
+- It cannot steer a running turn, compact the conversation (Omni never sends `/compact` to it) or rewind agy's own conversation. Omni's file checkpoints and undo still work. A handoff to another machine starts a new agy session there with a handover.
+
+### Permissions
+
+Every tool call agy asks about is judged by the channel's access level and the agent's tools, with the same approval cards, **Allow in this thread** and **Always allow** as on Claude Code and Codex ([Access levels](threads.md#access-levels)). To make an agent such as the Writer read only on Antigravity, set its access to Read only (`access: read`).
+
+Until a live check proves that `agy` asks before every tool that changes things, Antigravity runs only at Full access and for agents with full tools, as Hermes does. Below Full access, or for an agent with limited tools, the picker shows it as not allowed there. If agy runs an edit or a command without asking in such a thread, Omni stops the turn and names the tool.
+
+### Usage
+
+- Each finished turn shows its token counts. The context meter shows how full the context window is when agy reports it, and nothing when it does not.
+- When your Google AI plan refuses a turn at its limit, the thread gets a limit stop, with the reset time when agy gives one.
+- The Usage card shows no Antigravity allowances for now: Omni does not read agy's stored Google sign-in to fetch them (#982, not planned). `/usage` in a terminal `agy` shows them.
+
+### Skills
+
+`agy` reads skills from its own folder, `~/.gemini/antigravity-cli/skills`, and from 1.5.16 also from `~/.agents/skills`, where Codex and Cursor read them. On an older `agy`, link the two once per machine:
+
+```bash
+ln -s ../../.agents/skills ~/.gemini/antigravity-cli/skills
+```
+
+Settings > Models shows a hint on the Antigravity row when you have skills in `~/.agents/skills` that agy cannot see. It is a hint only: threads still run.
 
 ## Cursor Cloud
 
