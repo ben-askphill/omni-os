@@ -3,6 +3,7 @@ import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { config, paths } from '../config.ts';
 import { gateFor } from './approvals.ts';
 import { channelAccess, harnessRefusal } from '../access.ts';
+import { toolLimitRefusal } from './tool-limits.ts';
 import { channels, events, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { commandsFolder, worktreeProblem, writeDesignSystem } from '../sandbox.ts';
@@ -136,6 +137,9 @@ async function spawnLive(live: Live, thread: Thread) {
   // Checked here as well as at start and switch: a channel's level can change under a thread that already exists.
   const unenforced = harnessRefusal(thread.harness, channelAccess(channel, role?.access));
   if (unenforced) return refuseUnenforced(live, unenforced);
+  // A limited agent or a read-only thread on a harness whose own tools Omni cannot limit (Antigravity until #980): a role or workspace can change under a thread too.
+  const limited = toolLimitRefusal(thread.harness, role, thread);
+  if (limited) return refuseUnenforced(live, limited);
 
   // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
   const remote = isProviderHarness(thread.harness);

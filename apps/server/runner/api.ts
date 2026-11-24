@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { channelAccess, harnessRefusal } from '../access.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource, type ThreadWorkspace } from '../db.ts';
-import { crewForNewThread, listCrew, localDelegateOnlyRefusal, localToolsRefusal, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
+import { crewForNewThread, listCrew, localDelegateOnlyRefusal, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { threadDir } from '../config.ts';
 import { capture } from '../analytics.ts';
@@ -22,6 +22,7 @@ import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import { isRemoteAgentHarness } from '@omni/shared/remote-agent.ts';
 import { isRemoteAgent, localCatalog, remoteAgentFor } from '../remote-agents.ts';
 import { offMachineHarness } from '../thread-files.ts';
+import { toolLimitRefusal } from './tool-limits.ts';
 import { capabilitiesOf, harnessName, providerWhere } from '../harness/registry.ts';
 import { profileOf } from '../harness/profile.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
@@ -270,12 +271,12 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
   // A harness Omni cannot hold to tool limits (a remote one runs its own tools) cannot run a delegate-only role.
   if (role?.delegateOnly && !capabilitiesOf(harness)?.toolLimits) throw new Error(capabilitiesOf(harness)?.remote === false ? localDelegateOnlyRefusal(role.name, harnessName(harness)) : remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
-  // The same for an agent without file edits and for a quick ask, whose read-only tools Omni takes away per harness.
-  if (role?.tools === 'no-edits' && !capabilitiesOf(harness)?.toolLimits && capabilitiesOf(harness)?.remote === false) throw refusal(localToolsRefusal(`${role.name} runs without file edits, which`, harnessName(harness)), 400);
-  if (input.quick && !capabilitiesOf(harness)?.toolLimits && capabilitiesOf(harness)?.remote === false) throw refusal(localToolsRefusal('A quick ask runs read only, which', harnessName(harness)), 400);
   // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
   const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
   if (unenforced) throw refusal(unenforced, 400);
+  // A harness whose own tools Omni cannot limit cannot run a limited agent or a quick ask (a new thread is read only only as a quick ask).
+  const limited = toolLimitRefusal(harness, role, { quick: input.quick ? 1 : 0 });
+  if (limited) throw refusal(limited, 400);
   // Its tools are taken away on this machine (harness adapters), which Hermes and Cursor Cloud do not run on.
   if (input.quick && isProviderHarness(harness)) throw refusal(quickAskRemoteRefusal(providerWhere(harness)), 409);
   // A team's lead gives out the parts with an Omni tool (runner/team.ts), which a harness on another server never gets.

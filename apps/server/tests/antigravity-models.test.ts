@@ -122,6 +122,18 @@ describe('what Omni cannot hold agy to yet', () => {
   });
 });
 
+describe('the same limits at spawn and switch', () => {
+  it('refuses a read-only thread and a limited agent on every path', async () => {
+    const { toolLimitRefusal } = await import('../runner/tool-limits.ts');
+    expect(toolLimitRefusal('antigravity', null, { quick: 1 })).toMatch(/read only/);
+    expect(toolLimitRefusal('antigravity', null, { workspace: 'read' })).toMatch(/read only/);
+    expect(toolLimitRefusal('antigravity', { name: 'Trim', delegateOnly: false, tools: 'no-edits' }, {})).toMatch(/without file edits/);
+    expect(toolLimitRefusal('antigravity', { name: 'Router', delegateOnly: true, tools: 'delegate-only' }, {})).toMatch(/only routes work/);
+    expect(toolLimitRefusal('antigravity', null, {})).toBeNull();
+    expect(toolLimitRefusal('claude-code', null, { quick: 1 })).toBeNull();
+  });
+});
+
 describe('list_harnesses for agents', () => {
   it('carries each model\'s note, so a brief sees the billing', async () => {
     const h = await checkNow();
