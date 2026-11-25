@@ -107,6 +107,43 @@ describe('a turn', () => {
     ]);
   });
 
+  it("shows agy's own step checklist (update_steps) as the thread's steps", async () => {
+    const first = [{ status: 'in_progress', title: 'Look around' }, { status: 'pending', title: 'Write notes' }, { status: 'pending', title: 'Wrap up' }];
+    const second = [{ status: 'done', title: 'Look around' }, { status: 'skipped', title: 'Write notes' }, { status: 'failed', title: 'Wrap up' }];
+    const t = await H.start(`STEPS ${JSON.stringify(first)}\nSTEPS ${JSON.stringify(second)}`, agy);
+    await H.untilResults(t.id, 1);
+    const uses = H.byKind(t.id, 'tool_use');
+    expect(uses.some((e: Ev) => /update_steps/.test(e.p.name))).toBe(false);
+    // A skipped step is settled; a failed one is not done.
+    expect(uses.filter((e: Ev) => e.p.name === 'TodoWrite').map((e: Ev) => e.p.input.todos)).toEqual([
+      [{ content: 'Look around', status: 'in_progress' }, { content: 'Write notes', status: 'pending' }, { content: 'Wrap up', status: 'pending' }],
+      [{ content: 'Look around', status: 'completed' }, { content: 'Write notes', status: 'completed' }, { content: 'Wrap up', status: 'pending' }],
+    ]);
+    const { buildItems } = await import('@omni/shared/transcript-fold.ts');
+    const { turnSteps, stepProgress } = await import('@omni/shared/steps.ts');
+    const view = turnSteps(buildItems(H.db.events.since(t.id)).items, { live: false });
+    expect(view?.source).toBe('plan');
+    expect(view?.steps.map((s) => [s.title, s.state])).toEqual([['Look around', 'done'], ['Write notes', 'done'], ['Wrap up', 'pending']]);
+    expect(stepProgress(view)).toMatchObject({ count: 3, done: 2 });
+  });
+
+  it("carries a delegated thread's update_steps list to its parent's delegation card, as set_steps does", { timeout: 30_000 }, async () => {
+    const { progressField } = await import('../step-line.ts');
+    const parent = await H.start('SAY hand it off', agy);
+    await H.untilResults(parent.id, 1);
+    const at = (current: number) => JSON.stringify(['Find candidate apps', 'Read the reviews', 'Compare prices'].map((title, k) => ({ title, status: k < current ? 'done' : k === current ? 'in_progress' : 'pending' })));
+    const child = await H.start(`STEPS:1500 ${at(0)}\nSTEPS:1500 ${at(1)}\nSTEPS ${at(3)}`, { ...agy, parent_id: parent.id });
+    const brief = () => progressField(H.thread(child.id)).progress;
+    await H.until('step 1 on the card', () => brief()?.at === 1 && brief()?.live);
+    expect(brief()).toMatchObject({ count: 3, done: 0, at: 1, state: 'active', title: 'Find candidate apps', live: true });
+    await H.until('step 2 on the card', () => brief()?.at === 2);
+    expect(brief()).toMatchObject({ count: 3, done: 1, title: 'Read the reviews', live: true });
+    await H.untilResults(child.id, 1);
+    // Done: the whole list, nothing it does now, as a Claude Code thread's set_steps list ends (step-line.test.ts).
+    expect(brief()).toMatchObject({ count: 3, done: 3, at: 0, now: null, live: false });
+    expect(progressField(H.thread(parent.id))).toEqual({});
+  });
+
   it('keeps agy\'s private reasoning out of the transcript', async () => {
     const t = await H.start('THINK then answer', agy);
     await H.untilResults(t.id, 1);

@@ -13,8 +13,8 @@
 //   Full access, since agy does not ask about their own calls. Anything else is an unknown tool, which the
 //   gate treats as one that may change things.
 // - The tripwire: any call but a read, search or think that ends (completed or failed) with no request before it ran on
-//   agy's own say-so, a read-only shell command aside.
-import { commandOf, mcpName, pathOf, type AcpToolCall } from './normalize.ts';
+//   agy's own say-so, a read-only shell command and agy's own checklist (update_steps, which never asks) aside.
+import { commandOf, mcpName, pathOf, STEPS_TOOL, type AcpToolCall } from './normalize.ts';
 import { OMNI_SERVERS } from '@omni/shared/access.ts';
 import { readOnlyCommand } from '../../access.ts';
 
@@ -66,6 +66,9 @@ export function needsAsk(call: AcpToolCall, servers: readonly string[] = []): st
   }
   if (kind === 'read' || kind === 'search' || kind === 'think') return null;
   if (kind === 'fetch') return 'WebFetch';
+  // agy's own checklist only shows the thread's steps (a plan call, which the gate allows at every level). Read from
+  // agy's call name, never the title.
+  if (str(call.name) === STEPS_TOOL) return null;
   const asked = callOf(call, servers);
   if (asked.type === 'subagent') return 'a sub-agent';
   // The gate allows Omni's own tools at every level, so running one unasked changes nothing.

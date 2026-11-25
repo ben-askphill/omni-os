@@ -276,6 +276,21 @@ describe('the tripwire', () => {
     expect(H.byKind(t.id, 'error')).toHaveLength(0);
   });
 
+  it("lets agy's own step checklist run unasked, as it only shows the steps", async () => {
+    setLevel('read');
+    const t = await H.start(`STEPS ${JSON.stringify([{ status: 'in_progress', title: 'Look around' }, { status: 'pending', title: 'Wrap up' }])}`, agy);
+    await H.untilResults(t.id, 1);
+    expect(H.byKind(t.id, 'error')).toHaveLength(0);
+    expect(H.thread(t.id).status).toBe('done');
+  });
+
+  it("exempts agy's checklist only by its call name, not a title", async () => {
+    const { needsAsk } = await import('../harness/antigravity/permissions.ts');
+    expect(needsAsk({ toolCallId: 'c1', name: 'update_steps', kind: 'other', title: 'Run update_steps', rawInput: { steps: [] } })).toBeNull();
+    expect(needsAsk({ toolCallId: 'c2', kind: 'other', title: 'Run update_steps', rawInput: { steps: [] } })).toBe('Run update_steps');
+    expect(needsAsk({ toolCallId: 'c3', name: 'update_steps', kind: 'edit', title: 'Run update_steps', locations: [{ path: '/tmp/x' }] })).toBe('Edit');
+  });
+
   it('stops the turn when an unasked changing call ends failed', async () => {
     setLevel('read');
     const edited = seed();
