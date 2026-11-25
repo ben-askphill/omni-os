@@ -152,3 +152,35 @@ describe('Phone Usage card', () => {
     expect(markup).not.toContain('data-testid="usage-reset"');
   });
 });
+
+describe('Antigravity model groups', () => {
+  const gemini = { name: 'Gemini', five_hour: { utilization: 0.06, resetsAt: at(13, 50) }, seven_day: { utilization: 0.03, resetsAt: at(21, 57, 21) } };
+  const third = { name: 'Claude and GPT', five_hour: { utilization: 0.4, resetsAt: at(16, 49) }, seven_day: { utilization: 0.1, resetsAt: at(9, 49, 22) } };
+  const agy = () => {
+    state.accounts = view(
+      [{ ...signedIn('antigravity', 'agy-user@example.com'), plan: 'Google AI Pro' }],
+      [{ ...reading('antigravity', 'agy-user@example.com', { five_hour: gemini.five_hour, seven_day: gemini.seven_day, pools: [gemini, third] }), plan: 'Google AI Pro' }],
+    );
+  };
+
+  it('gives each group its own line with its windows and resets on the desktop card', () => {
+    agy();
+    const markup = card();
+    expect(markup.match(/data-testid="usage-pool"/g)).toHaveLength(2);
+    expect(markup).toContain('title="Antigravity: Gemini models"');
+    expect(markup).toContain('title="Antigravity: Claude and GPT models"');
+    expect(markup).toContain('title="Antigravity Gemini 5h: 6% used. Resets in 1h 50m, today 13:50."');
+    expect(markup).toContain('title="Antigravity Claude and GPT 5h: 40% used. Resets in 4h 49m, today 16:49."');
+    expect(markup).toContain('aria-label="Antigravity Claude and GPT week resets in 5d 21h, Sun 22 Nov, 09:49"');
+    expect(markup.slice(markup.indexOf('aria-label="Antigravity"'))).not.toContain('no data');
+  });
+
+  it('names each group on the phone card', () => {
+    agy();
+    const markup = html(createElement(UsageCard, { phone: true }));
+    for (const text of ['agy-user@example.com · Google AI Pro, on omarchy', 'Gemini 5-hour window', '6% used', 'Gemini weekly window', 'Claude and GPT 5-hour window', '40% used', 'Claude and GPT weekly window']) {
+      expect(markup).toContain(text);
+    }
+    expect(markup.slice(markup.indexOf('aria-label="Antigravity"'))).not.toContain('No data');
+  });
+});

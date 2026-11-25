@@ -48,6 +48,7 @@ const { watchSteps } = await import('./step-line.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startMergeRisk } = await import('./merge-risk/gate.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
+const { startAntigravityUsage } = await import('./antigravity-usage.ts');
 const { flushSync, startSync } = await import('./sync/worker.ts');
 const { startConnect, stopConnect } = await import('./connect/service.ts');
 const { stopGithubLogin } = await import('./github-auth.ts');
@@ -119,6 +120,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   // Rates each PR a builder thread opens in Omni's own repo: one comment and one label, never a merge. Off with OMNI_MERGE_RISK=0.
   startMergeRisk();
   startCatalogRefresh();
+  // Antigravity's allowances, through agy's own /usage, once the catalog's check finds it ready (antigravity-usage.ts).
+  startAntigravityUsage();
   // With this Mac's retention policy on (Settings > Worktrees), removes idle worktrees that hold nothing unsaved, now and daily.
   startWorktreeRetention();
   // Warns in the log, the sidebar and on the phone before the data disk or the temp folder's quota fills (disk-space.ts).

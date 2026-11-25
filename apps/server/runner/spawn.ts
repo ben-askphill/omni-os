@@ -17,6 +17,7 @@ import { recordUsage } from '../usage.ts';
 import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
+import { afterAntigravityTurn } from '../antigravity-usage.ts';
 import { beforeResume, type ResumeOutcome } from '../sync/files.ts';
 import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import { missingHarness, runsApiTarget } from '../harness/registry.ts';
@@ -236,6 +237,8 @@ async function spawnLive(live: Live, thread: Thread) {
       record: (rec) => {
         // Claude chooses its id before spawning. Its user replay confirms that the session accepted input.
         if (adapter.profile.confirmsByReplay && rec.kind === 'replay') sessionStarted(live);
+        // An Antigravity turn ended, done or stopped by its quota: its allowances are read again.
+        if (thread.harness === 'antigravity' && (rec.kind === 'result' || rec.kind === 'limit')) afterAntigravityTurn();
         onRecord(live, rec);
       },
       usage: (u, opts) => recordUsage(thread.harness as HarnessId, u, { partial: opts?.partial }),

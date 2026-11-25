@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_USAGE_FEED, isAccountsMessage, mergeUsageMessage, nearlyFull, parsePlanUsage, usageRecords, usageRows, withAccountUsage, withHarnessUsage, type AccountUsage, type PlanUsage } from '../account-usage.ts';
+import { EMPTY_USAGE_FEED, isAccountsMessage, mergeUsageMessage, nearlyFull, parsePlanUsage, peakUsage, planPools, planWindows, usageRecords, usageRows, withAccountUsage, withHarnessUsage, type AccountUsage, type PlanUsage, type UsageRow } from '../account-usage.ts';
 import type { AccountsView, HarnessAccountView, MachineAccounts } from '../harness-accounts.ts';
 
 const H = ['claude-code', 'codex', 'cursor', 'hermes'];
@@ -154,5 +154,36 @@ describe('the Usage card on the feed', () => {
     for (const m of [null, 'usage', { type: 'thread' }, { type: 'account_usage', usage: { harness: 'codex' } }]) expect(mergeUsageMessage(feed, m)).toBe(feed);
     expect(isAccountsMessage({ type: 'accounts' })).toBe(true);
     expect(isAccountsMessage({ type: 'account_usage' })).toBe(false);
+  });
+});
+
+describe('a plan split into model groups (Antigravity)', () => {
+  const gemini = { name: 'Gemini', five_hour: { utilization: 0.06, resetsAt: 100 }, seven_day: { utilization: 0.03, resetsAt: 200 } };
+  const third = { name: 'Claude and GPT', five_hour: { utilization: 0.95, resetsAt: 300 }, seven_day: { utilization: 0.4, resetsAt: 400 } };
+  const usage: PlanUsage = { five_hour: gemini.five_hour, seven_day: gemini.seven_day, pools: [gemini, third] };
+
+  it('keeps each named group with its windows from a synced record, and drops one with neither', () => {
+    const parsed = parsePlanUsage({ ...usage, pools: [gemini, { name: 'Empty', five_hour: { utilization: 'x' } }, { five_hour: gemini.five_hour }, third, 'junk'] });
+    expect(parsed).toEqual(usage);
+  });
+
+  it('lists each group\'s windows by name on the phone and in the iOS app', () => {
+    expect(planWindows(usage).map((w) => [w.label, w.fraction, w.resetsAt])).toEqual([
+      ['Gemini 5-hour window', 0.06, 100],
+      ['Gemini weekly window', 0.03, 200],
+      ['Claude and GPT 5-hour window', 0.95, 300],
+      ['Claude and GPT weekly window', 0.4, 400],
+    ]);
+  });
+
+  it('shows a lone group as the plan\'s own windows', () => {
+    const one: PlanUsage = { five_hour: gemini.five_hour, pools: [gemini] };
+    expect(planPools(one)).toEqual([]);
+    expect(planWindows(one).map((w) => w.label)).toEqual(['5-hour window']);
+  });
+
+  it('counts every group in the collapsed card\'s busiest window', () => {
+    const row: UsageRow = { key: 'a', harness: 'antigravity', account: null, usage, several: false, waiting: false };
+    expect(peakUsage([row])).toBe(0.95);
   });
 });
