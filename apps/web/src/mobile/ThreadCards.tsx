@@ -228,19 +228,18 @@ function KidPill({ k }: { k: Thread }) {
 
 /** The threads a Conductor turn delegated, each opening its thread, with Needs you's answer under one that waits. */
 /** `answers`: reports shown in place (ReportP `shown`), by the thread that sent them, each under its row. */
-/** `asked`: who the turn's Asks went to, when every row is an Ask's thread: the card names them, as the desktop's does. */
-export function Delegation({ kids, answers, asked }: { kids: Thread[]; answers?: Record<string, ReportP>; asked?: { name: string; remote: string | null } }) {
+export function Delegation({ kids, answers, label, asked }: { kids: Thread[]; answers: Record<string, ReportP>; label: string; asked?: { remote: string | null } }) {
   const shell = useShell();
   const { needsYou, channel } = useApp();
   const now = useNow(60_000);
   const waiting = new Map((needsYou?.items ?? []).map((i) => [i.thread.id, i]));
   return (
     <div className="flex flex-col gap-0.5 rounded-[20px] bg-surface px-2 pt-3 pb-2">
-      <div className="flex items-center gap-2 px-2 pb-1.5 text-[13px] leading-none font-medium">
-        <Icon name={asked ? 'message' : 'delegate'} size={15} />
-        {asked ? `Asked ${asked.name}` : `Delegated ${plural(kids.length, 'task')}`}
+      <header className="flex items-center gap-2 px-2 pb-1.5 text-[13px] leading-none font-medium">
+        {asked ? <Icon name="message" size={15} /> : <Icon name="delegate" size={16} className="text-fg-3" />}
+        {label}
         {asked?.remote != null && <RemoteMark host={asked.remote || undefined} />}
-      </div>
+      </header>
       {kids.map((k) => {
         const item = waiting.get(k.id);
         const card = item && item.blockers.length ? needsCard(item, channel(k.channel_id), harnessLabel, now) : null;

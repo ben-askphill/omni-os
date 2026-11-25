@@ -208,7 +208,7 @@ export function ThreadScreen() {
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
   // The Conductor answers in its channel's look in any thread it is seated in, as on the desktop.
   const conductorChannel = channel(CONDUCTOR_CHANNEL);
-  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, agents: roles, ch, changes, pr, now, shell, status, turn, mark: own.mark };
+  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, team: s.team, agents: roles, ch, changes, pr, now, shell, status, turn, mark: own.mark };
 
   const openFromCard = (tab: PanelTab) => {
     setQuick(false);

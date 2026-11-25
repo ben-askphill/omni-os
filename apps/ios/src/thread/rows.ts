@@ -13,7 +13,7 @@ import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { conductorChannelLook, type FaceAgent, type FaceShows } from '@omni/shared/agent-avatar.ts';
 import { laneShows } from '@omni/shared/crew-eyes.ts';
 import { glyphFor, markOf, type Mark } from '@omni/shared/status.ts';
-import { isBrief, lanePlan, lockedReply, outcomeLine, promptCaption, promptRecipients, replyShows, thinkingLabel, turnLive, type LaneFile, type LaneTab } from '@omni/shared/turn-plan.ts';
+import { delegationGroups, isBrief, lanePlan, lockedReply, outcomeLine, promptCaption, promptRecipients, replyShows, thinkingLabel, turnLive, type DelegationGroup, type LaneFile, type LaneTab } from '@omni/shared/turn-plan.ts';
 
 import { harnessLabel } from './format';
 
@@ -63,7 +63,7 @@ type RowOf =
   | { kind: 'cloud'; key: string; p: CloudAgentP }
   | { kind: 'prose'; key: string; text: string; clipped: number | null }
   /** `answers`: reports shown in place from the kids, by thread (TurnView `answers`), each under its kid. */
-  | { kind: 'delegation'; key: string; kids: Thread[]; answers: Record<string, ReportP> }
+  | ({ kind: 'delegation'; answers: Record<string, ReportP> } & DelegationGroup<Thread>)
   | { kind: 'artifact'; key: string; a: Artifact }
   /** The turn's calls ("12 actions"), opening them under it. */
   | { kind: 'steps'; key: string; turn: number; steps: number; failed: number; live: boolean; open: boolean }
@@ -143,6 +143,7 @@ export interface RowsInput {
   thread: Thread;
   artifacts: Artifact[];
   children: Thread[];
+  team?: Thread[];
   atStart: boolean;
   conductor?: boolean;
   /** The Conductor's channel, for its saved icon and background on the turns it answered. */
@@ -253,6 +254,9 @@ function* replyRows(t: IosTurn, { live, asking, label }: { live: boolean; asking
 
   const open = disclosure.turns.has(t.key);
   const steps = (): ThreadRow => ({ kind: 'steps', key: `s${t.key}`, turn: t.key, steps: t.steps, failed: t.failed, live, open });
+  const delegations = delegationGroups(t, input.team).map((card): ThreadRow => ({
+    ...card, kind: 'delegation', key: `d${t.key}.${card.key}`, answers: t.answers,
+  }));
   if (live) {
     // As phone web: the thinking line stays up for the whole turn, tool calls included, and gives way to a question.
     if (t.status === 'queued') yield { kind: 'now', key: `now${t.key}`, now: { verb: 'Waiting for a free slot', target: '' }, meta: null };
@@ -260,7 +264,7 @@ function* replyRows(t: IosTurn, { live, asking, label }: { live: boolean; asking
     if (showsSteps(t.progress)) yield progressRow(t.key, t.progress);
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };
-    if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children, answers: t.answers };
+    yield* delegations;
     if (t.steps > 0) yield steps();
   } else {
     // A finished Conductor answer introduces what it delegated: its author line says who wrote it, with no outcome
@@ -278,7 +282,7 @@ function* replyRows(t: IosTurn, { live, asking, label }: { live: boolean; asking
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };
     if (lockedReply(t, input.agents, input.channel)) yield { kind: 'lock', key: `lk${t.key}`, channel: input.channel?.name ?? input.thread.channel_id };
-    if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children, answers: t.answers };
+    yield* delegations;
     for (const a of t.artifacts) yield { kind: 'artifact', key: `f${t.key}.${a.id}`, a };
     if (t.steps > 0) yield steps();
   }

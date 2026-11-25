@@ -1,6 +1,6 @@
 import type { Mark, TurnPhase } from '@omni/shared/status.ts';
 import { agentLook, conductorChannelLook, type FaceShows } from '@omni/shared/agent-avatar.ts';
-import { isBrief, lanePlan, lockedReply, promptCaption, promptRecipients, replyShows, thinkingLabel, turnLive } from '@omni/shared/turn-plan.ts';
+import { delegationGroups, isBrief, lanePlan, lockedReply, promptCaption, promptRecipients, replyShows, thinkingLabel, turnLive } from '@omni/shared/turn-plan.ts';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { laneShows } from '@omni/shared/crew-eyes.ts';
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -65,6 +65,7 @@ export type TurnCtx = {
   /** The Conductor's channel, for its saved icon and background on the turns it answered. */
   conductorChannel: Channel | undefined;
   crew: Thread[];
+  team?: Thread[];
   ch: Channel | undefined;
   changes: ReturnType<typeof useBranchChanges>;
   pr: ReturnType<typeof useThreadPR>[0];
@@ -80,16 +81,6 @@ export type TurnCtx = {
   mark: Mark;
 };
 
-/** Who a turn's Asks went to, when each thread it started came from one: one role by name, several by count. */
-function askedOf(t: TurnView): { name: string; remote: string | null } | undefined {
-  const asks = new Map(t.asks.map((a) => [a.thread_id, a]));
-  if (!t.children.length || !t.children.every((k) => asks.has(k.id))) return undefined;
-  const sent = t.children.map((k) => asks.get(k.id)!);
-  const names = new Set(sent.map((a) => a.name));
-  if (names.size > 1) return { name: `${names.size} roles`, remote: null };
-  return { name: sent[0].name, remote: sent[0].remote ? sent[0].harness_name : null };
-}
-
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
   const { conductor, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
@@ -103,7 +94,9 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
     const delegated = (asked.length > 0 || t.children.length > 0) && (
       <>
         {asked}
-        {t.children.length > 0 && <Delegation kids={t.children} answers={t.answers} asked={askedOf(t)} />}
+        {delegationGroups(t, c.team).map(({ key, kids, label, asked }) => (
+          <Delegation key={key} kids={kids} label={label} asked={asked} answers={t.answers} />
+        ))}
       </>
     );
     if (turnLive(t)) {

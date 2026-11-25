@@ -45,6 +45,23 @@ function allOpen(c: Case): { disclosure: NonNullable<RowsInput['disclosure']> } 
 
 const of = (rows: ThreadRow[], kind: RowKind) => rows.filter((r) => r.kind === kind);
 
+it('draws separate headers for a Builder turn’s delegated tasks and legacy team', () => {
+  const created_at = '2026-11-02T09:00:00Z';
+  const child = (id: string, parent_id = 't') => thread('done', { id, parent_id, created_at });
+  const { rows } = threadRows(input({
+    name: 'Builder delegates',
+    events: [{ kind: 'user', payload: '{"text":"Check the release"}', created_at }],
+  }, {
+    thread: thread('done', { role: 'builder' }),
+    children: [child('task'), child('lead')],
+    team: [child('one', 'lead'), child('two', 'lead')],
+  }));
+  expect(rows.filter((row) => row.kind === 'delegation').map((row) => [row.label, row.kids.map((kid) => kid.id)])).toEqual([
+    ['Delegated 1 task', ['task']],
+    ['Team of 2', ['lead', 'one', 'two']],
+  ]);
+});
+
 describe('threadRows covers every item the shared fold produces', () => {
   for (const c of [...corpus.cases, ...local]) {
     it(c.name, () => {
