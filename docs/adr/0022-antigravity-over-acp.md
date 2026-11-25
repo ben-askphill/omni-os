@@ -53,7 +53,7 @@ Google's Antigravity CLI, `agy`, has the whole agent loop (tools, MCP, skills, s
 ### Usage, with no allowances for now
 
 - Per-turn tokens come from the prompt answer's `usage` (input plus cached reads, output plus thought tokens). The context meter reads `usage_update` when agy sends it, and shows nothing rather than a guessed window when it does not. A refusal, or `QUOTA_EXHAUSTED` in agy's error text, becomes a limit stop with the reset time agy gives.
-- **Allowances are deferred** (#982, closed as not planned). The only known reader, T3 Code's, takes the Google sign-in agy keeps in its profile, makes an access token and calls Google's internal quota endpoint. Omni has never used a harness's own credential, and Ben decided not to start here. So `usage` is `none`, the Usage card shows no Antigravity rows, and Auto reads no Antigravity window. #982 keeps the design if it is reopened.
+- **Allowances are deferred** (#982, closed as not planned). The only known reader, T3 Code's, takes the Google sign-in agy keeps in its profile, makes an access token and calls Google's internal quota endpoint. Omni has never used a harness's own credential, and Ben decided not to start here. So `usage` is `none`, the Usage card's Antigravity row says no data (shown since Settings > Usage panel, 2026-11-25), and Auto reads no Antigravity window. #982 keeps the design if it is reopened.
 
 ## Not proven yet
 
@@ -81,5 +81,5 @@ The spec was written before any `agy` was at hand. `agy` 1.5.16 is now installed
 - A thread on Antigravity is held to the channel's access level like Claude Code and Codex threads, but only after #980's proof passes. Until then it runs only at Full access, for agents with full tools.
 - ACP's stop reasons, permission requests and plan updates now have a second reader in the server besides the Cursor command probe, which can move onto the new client.
 - A handoff to another machine starts a new agy session there with a handover, because agy keeps its conversations in each machine's own Antigravity home.
-- The Usage card has no Antigravity rows. Ben sees a turn's tokens and a limit stop's reset time, not how much Neon is left in the window.
+- The Usage card's Antigravity row has no numbers. Ben sees a turn's tokens and a limit stop's reset time, not how much Neon is left in the window.
 - The harnesses guide, the routing doc's "Not given a lane" list and the glossary's Harness entry name Antigravity.

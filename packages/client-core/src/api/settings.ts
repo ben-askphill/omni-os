@@ -1,6 +1,7 @@
 import type { ServerOptionsState, SetupState, UserConfigPatch } from '@omni/shared/settings.ts';
 import type { CleanupState, RetentionPolicy } from '@omni/shared/worktree-cleanup.ts';
 import type { DisplayPrefs } from '@omni/shared/display.ts';
+import type { UsagePanelPrefs } from '@omni/shared/usage-panel.ts';
 import type { AnalyticsState } from '@omni/shared/analytics.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
@@ -40,6 +41,10 @@ export function settingsApi(http: HttpClient) {
     display: () => http.request<DisplayPrefs>('GET', apiPath`/display`),
     /** Sets either switch and answers with both. */
     setDisplay: (patch: Partial<DisplayPrefs>) => http.request<DisplayPrefs>('PUT', apiPath`/display`, { body: patch }),
+    /** Settings > Usage panel: the rows' order and which show, shared by every client (apps/server/usage-panel.ts). */
+    usagePanel: () => http.request<UsagePanelPrefs>('GET', apiPath`/usage-panel`),
+    /** Replaces the whole value and answers with it. */
+    setUsagePanel: (prefs: UsagePanelPrefs) => http.request<UsagePanelPrefs>('PUT', apiPath`/usage-panel`, { body: prefs }),
     /** Usage analytics to PostHog: the switch, shared by every machine, and whether the server has a project key (apps/server/analytics.ts). */
     analytics: () => http.request<AnalyticsState>('GET', apiPath`/analytics`),
     setAnalytics: (enabled: boolean) => http.request<AnalyticsState>('PUT', apiPath`/analytics`, { body: { enabled } }),

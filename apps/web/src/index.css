@@ -1323,6 +1323,22 @@
 /* Markdown and the helper classes sit in the components layer, under Tailwind's utilities, so a class passed with
    them (the phone's `text-[15px] leading-[1.6]` on a reply) wins as it reads. */
 @layer components {
+  /* A list reordered by a handle (components/ui/sortable-list.ts): ui-sdk writes --drag-x and --drag-y on the item a
+     pointer drags, so it follows the pointer while the rest make room. */
+  [data-slot="sortable-list-item"][data-dragging] {
+    position: relative;
+    z-index: 1;
+    transform: translate(var(--drag-x, 0), var(--drag-y, 0));
+    box-shadow: var(--shadow-card);
+  }
+  [data-slot="sortable-list-handle"] {
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+  }
+  [data-slot="sortable-list"][data-moving] [data-slot="sortable-list-handle"] {
+    cursor: grabbing;
+  }
   /* The composer's text box (components/composer/MessageEditor.tsx): a ui-sdk Token Input, so its placeholder is the
      editor's `aria-placeholder`, drawn while it is empty. */
   .message-editor {

@@ -33,6 +33,7 @@ export const SETTING_NAMES = [
   'display.shopify',
   'display.openItems',
   'model-visibility',
+  'usage-panel',
   'config.user',
   'config.workspace',
   'config.integrations',

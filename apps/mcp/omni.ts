@@ -1473,12 +1473,19 @@ server.registerTool('settings', {
     'server_options: the .env options (models, threads, worktrees, port), each with its value, default and source (env or default). ' +
     'display: Show technical details (technical), the Shopify add-on (shopify) and the Open items card (openItems), shared by every client. ' +
     'analytics: Usage analytics to PostHog (enabled, the switch in Settings > About; configured, whether a project key is set), shared by every machine. ' +
+    'usage_panel: Settings > Usage panel, the Usage panel rows in order (an account is <harness>:<hash>, a harness its id) and the rows switched on or off; empty until changed, when Hermes is off. ' +
     `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets, and set_secret saves one here or on another synced machine.`,
   inputSchema: {},
 }, async () => {
-  const [setup, server, display, analytics] = await Promise.all([call('/setup'), call('/setup/server'), call('/display').catch(() => null), call('/analytics').catch(() => null)]);
+  const [setup, server, display, analytics, usagePanel] = await Promise.all([
+    call('/setup'),
+    call('/setup/server'),
+    call('/display').catch(() => null),
+    call('/analytics').catch(() => null),
+    call('/usage-panel').catch(() => null),
+  ]);
   const { automations: _automations, ...config } = setup.config;
-  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options, display, analytics });
+  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options, display, analytics, usage_panel: usagePanel });
 });
 
 server.registerTool('signed_in_devices', {

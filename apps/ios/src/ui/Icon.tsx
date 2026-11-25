@@ -13,7 +13,7 @@ export function Icon({ name, size = 18, color, strokeWidth = 1.75 }: { name: Ico
   const ink = color ?? colors.fg;
   if (drawing === 'grok') return <Svg width={size} height={size} viewBox="25 25 168 168" accessible={false}><Path d={GROK_BOT_PATH} fill={ink} fillRule="evenodd" /></Svg>;
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth={drawing === 'more' ? 3 : strokeWidth} strokeLinecap="round" strokeLinejoin="round" accessible={false}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth={drawing === 'more' || drawing === 'grip' ? 3 : strokeWidth} strokeLinecap="round" strokeLinejoin="round" accessible={false}>
       <Path d={ICON_PATHS[drawing]} />
     </Svg>
   );

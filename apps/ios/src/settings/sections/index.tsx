@@ -5,6 +5,7 @@ import { ChannelsSection, WorkspaceSection, WorktreesSection } from './CodeSecti
 import { AccessSection, MachinesSection, SyncSection } from './ConnectionSections';
 import { ExtrasSection } from './ExtrasSection';
 import { AboutSection, AppearanceSection, GeneralSection } from './OmniSections';
+import { UsagePanelSection } from './UsagePanelSection';
 
 /**
  * Each catalog section's body on the phone. Notifications and Secrets open screens of their own (sections-model.ts); the
@@ -15,6 +16,7 @@ const SECTIONS: Partial<Record<SettingsSectionId, () => React.JSX.Element>> = {
   appearance: AppearanceSection,
   models: ModelsSection,
   accounts: AccountsSection,
+  usage: UsagePanelSection,
   threads: ThreadsSection,
   channels: ChannelsSection,
   workspace: WorkspaceSection,

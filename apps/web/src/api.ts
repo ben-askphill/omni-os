@@ -522,6 +522,8 @@ export type FeedEvent =
   | { type: 'memory'; channel_id: string | null; role?: string | null }
   /** Show technical details or the Shopify add-on changed, here or on another machine: refetch GET /api/display. */
   | { type: 'display' }
+  /** Settings > Usage panel changed, here or on another machine: refetch GET /api/usage-panel. */
+  | { type: 'usage_panel' }
   /** The update check or Update moved on: refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed. Refetch the list once `refreshing` is false. */

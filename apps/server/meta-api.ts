@@ -17,6 +17,8 @@ import { markHidden, modelVisibility, setHarnessModelPrefs } from './harness/mod
 import { parseHarnessPrefs } from '@omni/shared/model-visibility.ts';
 import { parseDisplayPatch } from '@omni/shared/display.ts';
 import { displayPrefs, setDisplayPrefs } from './display.ts';
+import { parseUsagePanelBody } from '@omni/shared/usage-panel.ts';
+import { setUsagePanelPrefs, usagePanelPrefs } from './usage-panel.ts';
 import { capture } from './analytics.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { HARNESS_INSTALL, isHarnessId, type HarnessInfo } from './harness/types.ts';
@@ -78,6 +80,15 @@ metaApi.put('/display', async (c) => {
   if (!patch) return c.json({ error: 'Send { technical, shopify, openItems } as booleans.' }, 400);
   for (const [k, v] of Object.entries(patch)) capture('settings_changed', { setting: `display.${k}`, value: v });
   return c.json(setDisplayPrefs(patch));
+});
+
+// Settings > Usage panel (usage-panel.ts): the rows' order and which show. A PUT replaces the whole value.
+metaApi.get('/usage-panel', (c) => c.json(usagePanelPrefs()));
+metaApi.put('/usage-panel', async (c) => {
+  const next = parseUsagePanelBody(await c.req.json().catch(() => null));
+  if (!next) return c.json({ error: 'Send { order: string[], visible: { [key]: boolean } }.' }, 400);
+  capture('settings_changed', { setting: 'usage-panel' });
+  return c.json(setUsagePanelPrefs(next));
 });
 
 /** The other synced Macs a thread can be handed to, with whether Tailscale sees each up. Empty while sync is off. */
