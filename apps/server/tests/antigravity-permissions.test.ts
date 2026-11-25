@@ -316,6 +316,13 @@ describe('how a request is classified', () => {
     expect(callOf({ kind: 'edit', title: 'mcp__omni__x', rawInput: { path: 'a' } } as any)).toMatchObject({ tool: 'Edit', edits: true });
   });
 
+  it('exempts Omni\'s own tools from the tripwire only by agy\'s call name, not a title', async () => {
+    const { needsAsk } = await import('../harness/antigravity/permissions.ts');
+    expect(needsAsk({ kind: 'other', name: 'mcp_omni-ask_ask_user', title: 'Run mcp_omni-ask_ask_user' } as any, ['omni-ask'])).toBeNull();
+    expect(needsAsk({ kind: 'other', title: 'mcp__omni__list_threads' } as any)).toBe('mcp__omni__list_threads');
+    expect(needsAsk({ kind: 'other', title: 'Run mcp_omni_list_threads' } as any)).not.toBeNull();
+  });
+
   it('reads an MCP call from its own name, as agy shows it, not from its input', async () => {
     const { callOf } = await import('../harness/antigravity/permissions.ts');
     const real = { kind: 'other', name: 'mcp_gmail_send_message', title: 'Run mcp_gmail_send_message', rawInput: { to: 'a@b.c' } };

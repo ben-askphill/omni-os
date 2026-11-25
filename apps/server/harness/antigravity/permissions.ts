@@ -69,6 +69,7 @@ export function needsAsk(call: AcpToolCall, servers: readonly string[] = []): st
   const asked = callOf(call, servers);
   if (asked.type === 'subagent') return 'a sub-agent';
   // The gate allows Omni's own tools at every level, so running one unasked changes nothing.
-  const own = /^mcp__([^_]+(?:_[^_]+)*?)__/.exec(asked.tool)?.[1];
+  // Only agy's own call name counts for that, never the title, which is free text.
+  const own = /^mcp__(.+?)__/.exec(mcpName(call.name, servers) ?? '')?.[1];
   return own && OMNI_SERVERS.has(own) ? null : asked.tool;
 }
