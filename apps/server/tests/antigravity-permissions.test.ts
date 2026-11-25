@@ -258,6 +258,32 @@ describe('the tripwire', () => {
     expect(H.byKind(t.id, 'error')).toHaveLength(0);
   });
 
+  it('stops the turn when an MCP call or a fetch runs without asking', async () => {
+    setLevel('ask');
+    const m = await H.start('MCPCALL gmail send_message RUNFREE', agy);
+    await H.untilResults(m.id, 1);
+    expect(H.byKind(m.id, 'error').some((e: Ev) => /ran mcp__gmail__send_message without asking Omni first/.test(e.p.text))).toBe(true);
+    expect(H.thread(m.id).status).toBe('failed');
+    const f = await H.start('FETCH https://example.com/ RUNFREE', agy);
+    await H.until('the fetch tripwire', () => H.byKind(f.id, 'error').length > 0);
+    expect(H.byKind(f.id, 'error').some((e: Ev) => /ran WebFetch without asking Omni first/.test(e.p.text))).toBe(true);
+  });
+
+  it('lets Omni\'s own tools run unasked, as the gate always allows them', async () => {
+    setLevel('read');
+    const t = await H.start('MCPCALL omni list_threads RUNFREE', agy);
+    await H.untilResults(t.id, 1);
+    expect(H.byKind(t.id, 'error')).toHaveLength(0);
+  });
+
+  it('stops the turn when an unasked changing call ends failed', async () => {
+    setLevel('read');
+    const edited = seed();
+    const t = await H.start(`EDIT ${edited} RUNFREE FAILED`, agy);
+    await H.until('the tripwire', () => H.byKind(t.id, 'error').length > 0);
+    expect(H.byKind(t.id, 'error').some((e: Ev) => /ran Edit without asking Omni first/.test(e.p.text))).toBe(true);
+  });
+
   it('does not trip at Full access', async () => {
     setLevel('full');
     const edited = seed();
@@ -288,5 +314,18 @@ describe('how a request is classified', () => {
     expect(callOf(call as any)).toMatchObject({ tool: 'Bash' });
     expect(callOf({ title: 'rm -rf x', rawInput: { server: 'omni', tool: 'list_threads', CommandLine: 'rm -rf x' } } as any)).toMatchObject({ tool: 'Bash' });
     expect(callOf({ kind: 'edit', title: 'mcp__omni__x', rawInput: { path: 'a' } } as any)).toMatchObject({ tool: 'Edit', edits: true });
+  });
+
+  it('reads an MCP call from its own name, as agy shows it, not from its input', async () => {
+    const { callOf } = await import('../harness/antigravity/permissions.ts');
+    const real = { kind: 'other', name: 'mcp_gmail_send_message', title: 'Run mcp_gmail_send_message', rawInput: { to: 'a@b.c' } };
+    expect(callOf(real as any)).toMatchObject({ tool: 'mcp__gmail__send_message', input: { to: 'a@b.c' } });
+    // Input that happens to carry server and tool fields is only input.
+    expect(callOf({ ...real, rawInput: { server: 'omni', tool: 'list_threads' } } as any)).toMatchObject({ tool: 'mcp__gmail__send_message' });
+    expect(callOf({ kind: 'other', title: 'Run something', rawInput: { server: 'omni', tool: 'list_threads' } } as any)).not.toMatchObject({ tool: expect.stringMatching(/^mcp__/) });
+    // A name only the request carries still reads: the title's last word is the same name.
+    expect(callOf({ kind: 'other', title: 'Run mcp_gmail_send_message', rawInput: {} } as any)).toMatchObject({ tool: 'mcp__gmail__send_message' });
+    // Omni's own server has dashes in its name, and the session's server names split it.
+    expect(callOf({ kind: 'other', name: 'mcp_omni-ask_ask_user', rawInput: {} } as any, ['omni-ask'])).toMatchObject({ tool: 'mcp__omni-ask__ask_user' });
   });
 });

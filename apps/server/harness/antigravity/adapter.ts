@@ -211,7 +211,7 @@ export const antigravityAdapter: HarnessAdapter = {
             // A call Omni refused ends with Omni's reason, not agy's own words about it.
             const why = refused.get(id);
             emit(why ? toolResult(id, why, true) : end);
-            if (!why && String(call.status) === 'completed') trip(id, call);
+            if (!why && ['completed', 'failed'].includes(String(call.status))) trip(id, call);
           }
           break;
         }
@@ -233,7 +233,7 @@ export const antigravityAdapter: HarnessAdapter = {
      * it ran on agy's own say-so. The turn stops, names the tool, and the failure is recorded for triage.
      */
     function trip(id: string, call: AcpToolCall) {
-      const tool = held && !asked.has(id) ? needsAsk(call) : null;
+      const tool = held && !asked.has(id) ? needsAsk(call, serverNames()) : null;
       if (!tool || tripped) return;
       tripped = `Antigravity ran ${tool} without asking Omni first, so this thread's access level was not held. The turn was stopped.`;
       emit({ kind: 'error', payload: { text: tripped } });
@@ -272,7 +272,7 @@ export const antigravityAdapter: HarnessAdapter = {
     /** Omni's answer for one call: Full access with full tools allows it, anything else is the gate's to judge. */
     async function judgeRequest(raw: AcpToolCall): Promise<{ allow: true } | { allow: false; message: string }> {
       if (!held) return { allow: true };
-      const asked = callOf(raw);
+      const asked = callOf(raw, serverNames());
       if (asked.type === 'subagent') return { allow: false, message: `Omni refused this: ${asked.summary} cannot run here, because sub-agents run on Antigravity only at Full access. Do the work yourself.` };
       if (noEdits && asked.edits) return { allow: false, message: 'Omni refused this: this agent works without file edits. Do not try another way; say what you would have changed instead.' };
       if (limited) {
