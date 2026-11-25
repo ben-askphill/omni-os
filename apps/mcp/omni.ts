@@ -165,6 +165,15 @@ server.registerTool(
 
 const crewId = z.string().trim().min(1).max(64).describe('Agent id: lowercase letters, digits and dashes. Use list_crew.');
 
+/** The agent id a call names. Agents are called agents everywhere else (seat_agents, message_thread's `agents`), so a
+ *  tool whose own field is `id` or `role` also takes `agent` (and `role` for `id`) rather than refuse the call. */
+function namedAgent(...ids: (string | undefined)[]): string {
+  const id = ids.map((v) => v?.trim()).find(Boolean);
+  if (!id) throw new Error('Name the agent: pass its id (use list_crew).');
+  return id;
+}
+const crewIdAlias = (main: string) => z.string().trim().min(1).max(64).optional().describe(`Same as ${main}.`);
+
 /** What an agent's avatar draws, as agentFace() decides it for every client (ADR 0021, D1). */
 const FACE_SHOWS = { image: 'photo', icon: 'icon', character: 'character' } as const;
 
@@ -232,9 +241,9 @@ server.registerTool(
       'avatar says what its avatar shows (photo, icon or character) and its crew character\'s shape and color, the ones its id picks when none is set, so you can say what it looks like ("a droplet in Sky"). ' +
       `charters.built_in is the shipped charter (null for an agent of ${USER}'s own), charters.own the text of ${USER}'s file (their whole agent, or their addition to or replacement of a built-in) ` +
       'and charters.effective the charter its threads run with. Agents list_crew leaves out (the Conductor, usage-scan, hidden ones) are here by id.',
-    inputSchema: { id: crewId },
+    inputSchema: { id: crewId.optional(), role: crewIdAlias('id'), agent: crewIdAlias('id') },
   },
-  async ({ id }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}`))),
+  async ({ id, role, agent }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(namedAgent(id, role, agent))}`))),
 );
 
 server.registerTool(
@@ -382,7 +391,8 @@ server.registerTool(
       'picks the harness, model and effort for it, and the result says why in auto_reason. Use list_harnesses for valid ids.',
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "acme". Use list_channels.'),
-      role: z.string().describe('Agent id, e.g. "researcher". Use list_crew.'),
+      role: z.string().optional().describe('Agent id, e.g. "researcher". Use list_crew.'),
+      agent: z.string().optional().describe('Same as role.'),
       prompt: z.string().describe('The task brief (there is no `brief` parameter; the brief goes here): Goal, Done when and Proof back. It cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
@@ -447,7 +457,8 @@ server.registerTool(
         ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device, owner, members }) => {
+  async ({ channel, role: asRole, agent, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device, owner, members }) => {
+    const role = namedAgent(asRole, agent);
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const machine = await pickDevice(device);
     const t = await call('/threads', {
