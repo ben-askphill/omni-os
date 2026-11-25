@@ -4,10 +4,10 @@ import { useFeed } from './store.tsx';
 
 // The templates the menus offer (GET /api/templates, apps/server/templates.ts), fresh when the Shopify add-on is turned
 // on or off here or on another machine. The `/` menu gets them inside the command list; the New flows and Settings
-// read them here.
+// read them here. `on: false` skips the request (Overview's composer shows no chips).
 
-export function useTemplates() {
-  const res = useApi<TemplateList>('/templates');
+export function useTemplates(on = true) {
+  const res = useApi<TemplateList>(on ? '/templates' : null);
   useFeed((e) => {
     if (e.type === 'display' || e.type === 'reconnect') res.reload();
   });
@@ -15,9 +15,8 @@ export function useTemplates() {
 }
 
 /**
- * The template chips under an empty new-thread box, in the look of Home's "Start in" chips: quick ones first. A tap
- * puts `/<name> ` in the box (`onPick`), so what is typed next becomes the template's input. `touch`: the phone's
- * taller chips.
+ * The template chips under an empty new-thread box: quick ones first. A tap puts `/<name> ` in the box (`onPick`), so
+ * what is typed next becomes the template's input. `touch`: the phone's taller chips.
  */
 export function TemplateChips({
   templates,

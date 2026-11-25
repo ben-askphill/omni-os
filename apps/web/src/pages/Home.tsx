@@ -6,7 +6,7 @@ import { NewThreadComposer } from '../components/Composer.tsx';
 import { EmptyNote, NeedsYouRow } from '../components/NeedsYou.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
 import { OmniWordmark } from '../components/brand.tsx';
-import { AutomationsCard, BusiestCard, ChannelAvatar, KpiTiles, LIST_TITLE, NeedsYouCard, PRsCard, type ListKind } from '../components/dashboard/Cards.tsx';
+import { AutomationsCard, BusiestCard, KpiTiles, LIST_TITLE, NeedsYouCard, PRsCard, type ListKind } from '../components/dashboard/Cards.tsx';
 import { UsageSection } from '../components/dashboard/UsageSection.tsx';
 import { MachineTiles } from '../components/dashboard/MachineTiles.tsx';
 import { useMachines } from '../app/useMachines.ts';
@@ -193,7 +193,6 @@ export function HomePage() {
     writePref('home.range', r);
     setRangeState(r);
   };
-  const [startIn, setStartIn] = useState<string | null>(null);
   // New thread with the Inbox up leaves a preset for this composer (router.ts openNewThread): remount to read it.
   const presetSeq = usePresetSeq();
   const { kind: open, machine } = useOpenList();
@@ -201,7 +200,6 @@ export function HomePage() {
   const insights = useInsights(range);
   const data = insights.data?.range === range ? insights.data : undefined;
   const split = needsYou ? splitNeeds(needsYou.items) : null;
-  const chips = data?.channels.slice(0, 4) ?? [];
   const inbox = useInbox();
   const working = inbox.loaded ? inbox.working.count : null;
   const workingIds = useMemo(() => new Set(inbox.working.threads.map((t) => t.id)), [inbox.working.threads]);
@@ -237,23 +235,7 @@ export function HomePage() {
           </ErrorNote>
         )}
 
-        <NewThreadComposer key={`${startIn ?? 'default'}:${presetSeq}`} defaultChannel={startIn ?? undefined} big />
-        {chips.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
-            <span className="caption">Start in</span>
-            {chips.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setStartIn(c.id)}
-                aria-pressed={startIn === c.id}
-                className={`press inline-flex h-7 items-center gap-1.5 rounded-full pr-3 pl-1 text-[12px] ${startIn === c.id ? 'bg-fg text-on-ink' : 'bg-surface text-fg-2 hover:text-fg'}`}
-              >
-                <ChannelAvatar id={c.id} name={c.name} icon={c.icon} size={20} />#{c.name}
-              </button>
-            ))}
-          </div>
-        )}
+        <NewThreadComposer key={presetSeq} big templateChips={false} />
 
         <div className="mt-8">
           <KpiTiles needs={split?.needs ?? null} unread={split?.unread.length ?? null} working={working} done={data?.done ?? null} open={machine ? null : open} />
