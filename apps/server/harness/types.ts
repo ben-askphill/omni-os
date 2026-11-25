@@ -84,10 +84,10 @@ export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
   // Images go up with the prompt, but the runner's attachment notes stay paths. Usage is Cursor's, not a plan window.
   'cursor-cloud': { warmProcess: false, steer: false, interrupt: true, inlineImages: false, usage: 'none', remote: true, toolLimits: false, switchable: false },
   // One warm `agy acp` per session. It cannot take a message mid-turn, so one waits for the next turn, and Stop sends
-  // session/cancel. Images go as ACP image blocks. Omni reads no Google AI allowances (#982). Omni answers what agy
+  // session/cancel. Images go as ACP image blocks. Its Google AI allowances come from agy's /usage (antigravity-usage.ts). Omni answers what agy
   // asks about through the channel's gate, but the real agy does not ask before file edits or sub-agents, so a Read only
   // level is not a promise there. That is accepted: it is selectable below Full access and for limited agents.
-  antigravity: { warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'none', ...LOCAL },
+  antigravity: { warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'five-hour-week', ...LOCAL },
 };
 
 /** One model a harness offers. */

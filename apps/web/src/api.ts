@@ -3,6 +3,7 @@ import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import type { DiskLevel } from '@omni/shared/disk-space.ts';
 import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
 import type { MachineStats } from '@omni/shared/machines.ts';
+import type { PlanPool } from '@omni/shared/account-usage.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { apiBase, apiUrl, movedSince, rememberApiBase } from './api-base.ts';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
@@ -87,6 +88,8 @@ export interface Usage {
   five_hour?: UsageWindow;
   seven_day?: UsageWindow;
   monthly?: MonthlyUsage;
+  /** Model groups with their own windows (Antigravity). The first is the default model's, as are the top-level windows. */
+  pools?: PlanPool[];
   status?: string;
   updated_at?: string;
 }

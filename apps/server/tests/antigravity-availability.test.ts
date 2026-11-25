@@ -86,7 +86,7 @@ describe('the harness list', () => {
   it('lists Antigravity, billing the Google AI plan, ready on a signed-in agy', async () => {
     const h = await checkNow();
     expect(h).toMatchObject({ name: 'Antigravity', plan: 'Google AI plan', available: true });
-    expect(h.capabilities).toMatchObject({ warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'none', remote: false, toolLimits: true, switchable: true });
+    expect(h.capabilities).toMatchObject({ warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'five-hour-week', remote: false, toolLimits: true, switchable: true });
     expect(h.cap).toBe(12);
     expect(h.fix).toBeUndefined();
     expect(h.models[0]).toMatchObject({ id: 'gemini-4-neon', label: 'Gemini 4 Neon', default: true });

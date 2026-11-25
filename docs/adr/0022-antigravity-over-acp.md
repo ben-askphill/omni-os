@@ -50,10 +50,10 @@ Google's Antigravity CLI, `agy`, has the whole agent loop (tools, MCP, skills, s
 - **Notion** reaches an Antigravity thread through `OMNI_NOTION_TOKEN`, as on every local harness. Gmail, Calendar, Drive and Slack stay claude.ai connectors that only Claude Code loads.
 - **Skills are agent-config's job.** One link per machine, `~/.gemini/antigravity-cli/skills` to `~/.agents/skills`, made by Ben's agent-config sync. The state reader shows a hint, never an unavailable state, when agy cannot see those skills.
 
-### Usage, with no allowances for now
+### Usage
 
 - Per-turn tokens come from the prompt answer's `usage` (input plus cached reads, output plus thought tokens). The context meter reads `usage_update` when agy sends it, and shows nothing rather than a guessed window when it does not. A refusal, or `QUOTA_EXHAUSTED` in agy's error text, becomes a limit stop with the reset time agy gives.
-- **Allowances are deferred** (#982, closed as not planned). The only known reader, T3 Code's, takes the Google sign-in agy keeps in its profile, makes an access token and calls Google's internal quota endpoint. Omni has never used a harness's own credential, and Ben decided not to start here. So `usage` is `none`, the Usage card's Antigravity row says no data (shown since Settings > Usage panel, 2026-11-25), and Auto reads no Antigravity window. #982 keeps the design if it is reopened.
+- **Allowances come from agy's own `/usage`** (2026-11-25). #982's design, T3 Code's reader, took the Google sign-in agy keeps in its profile, made an access token and called Google's internal quota endpoint. Omni has never used a harness's own credential, so #982 was closed as not planned. agy 1.5.16 answers `agy -p /usage --output-format json` with each model group's 5-hour and weekly buckets, reading its own sign-in, with no model call, no tokens and no conversation. `apps/server/antigravity-usage.ts` runs that command, files the numbers under the account agy's log names, and never touches the credential. `usage` is `five-hour-week`. Each group (Gemini, and Claude and GPT) gets its own windows on the Usage card, and the Gemini group's are the top-level ones. Auto still has no Antigravity lane (see Rejected alternatives).
 
 ## Not proven yet
 
@@ -73,8 +73,8 @@ The spec was written before any `agy` was at hand. `agy` 1.5.16 is now installed
 - **T3 Code's managed install and private profile.** T3 Code downloads its own `agy` and signs it in with its own Google profile. That means an in-app sign-in flow, a second sign-in per machine and an updater of Omni's own. Bring your own `agy` is one install and one sign-in, the state reader leaves room for a managed install later, and neither is built.
 - **Porting T3 Code's Effect packages.** Omni's ACP needs are a small JSON-RPC client over stdio, which it already writes by hand for Codex. Adopting Effect for one harness would bring a second programming model into the server.
 - **`session/load`.** It replays the whole history's tool calls into the thread on every resume. `session/resume` continues without replaying, and a handover covers a failed resume.
-- **Reading agy's stored Google sign-in for allowances.** See Usage: deferred with #982.
-- **An Auto lane.** Nothing in a brief says Neon would do better than the lanes Auto has, and its allowances are not read, so Auto could not skip it when the plan is spent.
+- **Reading agy's stored Google sign-in for allowances.** #982, not planned. See Usage: agy's own `/usage` reads them instead.
+- **An Auto lane.** Nothing in a brief says Neon would do better than the lanes Auto has.
 
 ## Consequences
 

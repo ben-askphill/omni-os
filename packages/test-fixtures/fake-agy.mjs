@@ -52,7 +52,34 @@ const agyLog = (line) => logFile && appendFileSync(logFile, `I1124 21:36:07.5565
 
 log({ kind: 'spawn', argv: args, cwd: process.cwd(), envKeys: Object.keys(env).sort(), GEMINI_HOME: env.GEMINI_HOME ?? null, envValues: Object.fromEntries((env.FAKE_AGY_LOG_ENV ?? '').split(',').filter(Boolean).map((k) => [k, env[k] ?? null])), BROWSER: env.BROWSER ?? null, SSL_CERT_FILE: env.SSL_CERT_FILE ?? null });
 
-if (args[0] !== 'acp') {
+const LINK = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=fake&redirect_uri=http%3A%2F%2F127.0.0.1%3A43111%2F&response_type=code&state=fake-state';
+
+// Print mode, as Omni's usage reader runs it: `agy -p /usage --output-format json [--log-file <path>]` prints the
+// real agy 1.5.16's answer (antigravity/usage-1.5.16.json) after the sign-in line in the log. FAKE_AGY_USAGE: `ok`
+// (default), `malformed` (not JSON), `fail` (an error on stderr, exit 1), `hang` (never answers), `link` (asks the
+// system opener on PATH to open a sign-in link, then exits 1), `api-key` (exit 2, as agy does when an API key has no
+// account quota). FAKE_AGY_USAGE_FILE is a JSON file that replaces the answer.
+if (args[0] === '-p' && args[1] === '/usage') {
+  const mode = env.FAKE_AGY_USAGE ?? 'ok';
+  if (mode === 'hang') setInterval(() => {}, 1 << 30);
+  else if (mode === 'link') {
+    openLink();
+    setTimeout(() => process.exit(1), 200);
+  } else if (mode === 'fail') {
+    process.stderr.write('Error: could not load your quota\n');
+    process.exit(1);
+  } else if (mode === 'api-key') {
+    process.stderr.write('/usage is not available when you connect with an API key\n');
+    process.exit(2);
+  } else {
+    const email = env.FAKE_AGY_EMAIL ?? 'agy-user@example.com';
+    if (email) agyLog(`server_oauth.go:226] OAuth: authenticated successfully as ${email}`);
+    const answer = JSON.parse(readFileSync(env.FAKE_AGY_USAGE_FILE ?? join(import.meta.dirname, 'antigravity', 'usage-1.5.16.json'), 'utf8'));
+    delete answer._source;
+    process.stdout.write(mode === 'malformed' ? 'Gemini Models\tWeekly Limit Remaining\t97%\n' : `${JSON.stringify(answer)}\n`);
+    process.exit(0);
+  }
+} else if (args[0] !== 'acp') {
   process.stderr.write(`fake agy: only the acp subcommand is scripted, got ${args.join(' ')}\n`);
   process.exit(2);
 }
@@ -63,7 +90,6 @@ delete recorded._source;
 const send = (o) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...o }) + '\n');
 const reply = (id, result) => send({ id, result });
 const fail = (id, code, message, data) => send({ id, error: { code, message, ...(data !== undefined && { data }) } });
-const LINK = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=fake&redirect_uri=http%3A%2F%2F127.0.0.1%3A43111%2F&response_type=code&state=fake-state';
 
 function openLink() {
   const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';

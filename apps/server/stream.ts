@@ -2,6 +2,7 @@
 // small set of records Omni stores and renders. No I/O here so it is testable.
 import { usageTokens } from '@omni/shared/context-meter.ts';
 import { goalCheck, goalReply, type GoalSignal } from '@omni/shared/goal.ts';
+import type { PlanPool } from '@omni/shared/account-usage.ts';
 
 export type Record =
   | { kind: 'init'; payload: { model: string; cwd: string; tools: number; mcp: string[] } }
@@ -183,6 +184,8 @@ export interface Usage {
   five_hour?: { utilization: number; resetsAt: number };
   seven_day?: { utilization: number; resetsAt: number };
   monthly?: MonthlyUsage;
+  /** Model groups with their own windows (Antigravity, antigravity-usage.ts). The first is the default model's. */
+  pools?: PlanPool[];
   status?: string;
   updated_at: string;
   /** Read through a login that may not be the harness's account (Cursor's IDE session): no account's row falls back to it. */

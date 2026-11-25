@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { accountTitle, HARNESS_ROWS, nearlyFull, peakUsage, planWindows, usageRecords, usageRows, waitingTitle, withAccountUsage, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
+import { accountTitle, HARNESS_ROWS, nearlyFull, peakUsage, planPools, planWindows, usageRecords, usageRows, waitingTitle, withAccountUsage, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
 import { panelEntries, panelRows, panelSlots, type PanelEntry } from '@omni/shared/usage-panel.ts';
 import { type MonthlyUsage, type UsageWindow } from '../../api.ts';
 import { useAccounts } from '../../accounts.ts';
@@ -82,13 +82,15 @@ function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
 
 /**
  * One account's row: the 5-hour and weekly windows, a monthly cycle (Cursor), "no reading yet" when that account has
- * none of its own yet, or "no data" when its reading went stale. A harness with several accounts names each under its
- * row; one with a single account keeps the plain row, with the account on hover.
+ * none of its own yet, or "no data" when its reading went stale. A plan split into model groups (Antigravity) gets a
+ * line per group under the harness's name. A harness with several accounts names each under its row; one with a
+ * single account keeps the plain row, with the account on hover.
  */
 function UsageRowView({ row }: { row: UsageRow }) {
   useNow(60_000);
   const name = NAMES[row.harness] ?? row.harness;
   const usage = row.usage;
+  const pools = planPools(usage);
   const windows = !!usage && (!!usage.five_hour || !!usage.seven_day);
   const noData = !windows && !usage?.monthly;
   const who = row.account && accountTitle(row.account);
@@ -107,6 +109,8 @@ function UsageRowView({ row }: { row: UsageRow }) {
           </span>
         ) : noData ? (
           <span className="flex-1 text-[10.5px] text-fg-3">no data</span>
+        ) : pools.length ? (
+          <span className="flex-1" />
         ) : !windows ? (
           <MonthCell m={usage!.monthly! as MonthlyUsage} name={label} />
         ) : (
@@ -116,6 +120,16 @@ function UsageRowView({ row }: { row: UsageRow }) {
           </>
         )}
       </div>
+      {pools.map((p) => (
+        <div key={p.name} className="flex items-start gap-2 pt-1" data-testid="usage-pool">
+          {/* A long group name takes the second line its row has for the reset times, rather than being cut. */}
+          <span className="line-clamp-2 w-[80px] shrink-0 pl-[18px] text-[10.5px] leading-[13px] text-fg-3" title={`${name}: ${p.name} models`}>
+            {p.name}
+          </span>
+          <WindowCell w={p.five_hour} label={`${label} ${p.name} 5h`} />
+          <WindowCell w={p.seven_day} label={`${label} ${p.name} week`} />
+        </div>
+      ))}
       {row.several && row.account && (
         <div className="flex min-w-0 items-center gap-1 pl-[18px] pt-0.5 text-[10px] leading-tight text-fg-3" title={who ?? undefined} data-testid="usage-account">
           <span className="min-w-0 truncate">{row.account.label}</span>

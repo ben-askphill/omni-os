@@ -330,11 +330,28 @@ const NEW_MS = () => checkMs(30_000);
 
 let last: AntigravityState | null = null;
 let running: Promise<AntigravityState> | null = null;
+const listeners = new Set<(s: AntigravityState) => void>();
+
+/** Hear every check's reading as it is kept (antigravity-usage.ts reads the allowances once agy is ready). */
+export function onAntigravityChecked(fn: (s: AntigravityState) => void): () => void {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
 
 /** Check now and keep the reading. A call while a check runs joins it. */
 export function refreshAntigravity(opts: CheckOptions = {}): Promise<AntigravityState> {
   running ??= checkAntigravity(opts)
-    .then((s) => (last = s))
+    .then((s) => {
+      last = s;
+      for (const fn of listeners) {
+        try {
+          fn(s);
+        } catch (err) {
+          console.error('[antigravity] a check listener failed:', (err as Error).message);
+        }
+      }
+      return s;
+    })
     .finally(() => {
       running = null;
     });

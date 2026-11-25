@@ -21,10 +21,25 @@ export interface MonthlyPlanUsage extends PlanWindow {
   bonusCents?: number;
 }
 
+/**
+ * One group of models that share a 5-hour and a weekly window (Antigravity's Gemini models, and its Claude and GPT
+ * models). The name is the harness's own, without a trailing "models".
+ */
+export interface PlanPool {
+  name: string;
+  five_hour?: PlanWindow;
+  seven_day?: PlanWindow;
+}
+
 export interface PlanUsage {
   five_hour?: PlanWindow;
   seven_day?: PlanWindow;
   monthly?: MonthlyPlanUsage;
+  /**
+   * A plan whose models are split into groups, each with its own windows (Antigravity). The first is the default
+   * model's group, and the top-level windows are a copy of its own, so a reader that knows no pools still sees them.
+   */
+  pools?: PlanPool[];
   status?: string;
   updated_at?: string;
   /** The per-harness reading came through a login that may not be the harness's account (Cursor's IDE session). */
@@ -161,14 +176,29 @@ export function parsePlanUsage(v: unknown): PlanUsage | null {
       if (n !== undefined) out.monthly[k] = n;
     }
   }
+  const pools = Array.isArray(u.pools) ? u.pools.flatMap(poolOf).slice(0, MAX_POOLS) : [];
+  if (pools.length) out.pools = pools;
   if (typeof u.status === 'string') out.status = u.status.slice(0, 40);
   if (typeof u.updated_at === 'string') out.updated_at = u.updated_at.slice(0, 40);
   return out;
 }
 
+/** More groups than any plan has: a record that says more is cut there. */
+const MAX_POOLS = 6;
+
+function poolOf(v: unknown): PlanPool[] {
+  const p = v as Record<string, unknown> | null;
+  const name = typeof p?.name === 'string' ? p.name.trim().slice(0, 40) : '';
+  if (!p || !name) return [];
+  const five = windowOf(p.five_hour);
+  const week = windowOf(p.seven_day);
+  if (!five && !week) return [];
+  return [{ name, ...(five && { five_hour: five }), ...(week && { seven_day: week }) }];
+}
+
 /**
  * Each harness with the short name usage rows give it, in the order they list until Settings > Usage panel orders
- * them (usage-panel.ts). Antigravity reads no allowances yet (#982), so its account row says "no data".
+ * them (usage-panel.ts).
  */
 export const HARNESS_ROWS = [
   { id: 'claude-code', name: 'Claude' },
@@ -269,7 +299,8 @@ export const isAccountsMessage = (message: unknown): boolean => typeOf(message) 
 export function peakUsage(rows: readonly UsageRow[]): number | null {
   let peak: number | null = null;
   for (const { usage } of rows) {
-    for (const window of [usage?.five_hour, usage?.seven_day, usage?.monthly]) {
+    const pooled = usage?.pools?.flatMap((p) => [p.five_hour, p.seven_day]) ?? [];
+    for (const window of [usage?.five_hour, usage?.seven_day, usage?.monthly, ...pooled]) {
       const pct = windowPct(window);
       if (pct !== null && (peak === null || pct > peak)) peak = pct;
     }
@@ -310,13 +341,25 @@ interface PlanWindowView {
   detail?: string;
 }
 
-/** The desktop card uses short windows when present, and the monthly cycle otherwise. */
+/** The pools a reading names, when it has more than one: a single pool is the plan's own windows. */
+export const planPools = (usage: PlanUsage | null | undefined): PlanPool[] => (usage?.pools && usage.pools.length > 1 ? usage.pools : []);
+
+/**
+ * The windows a phone row lists: the 5-hour and weekly windows when present (each pool's, named by its pool, when
+ * the plan has several), and the monthly cycle otherwise.
+ */
 export function planWindows(usage: PlanUsage | null): PlanWindowView[] {
-  const windows = [
-    { label: '5-hour window', window: usage?.five_hour },
-    { label: 'Weekly window', window: usage?.seven_day },
-  ];
-  if (usage?.monthly && !usage.five_hour && !usage.seven_day) {
+  const pools = planPools(usage);
+  const windows = pools.length
+    ? pools.flatMap((p) => [
+        { label: `${p.name} 5-hour window`, window: p.five_hour },
+        { label: `${p.name} weekly window`, window: p.seven_day },
+      ])
+    : [
+        { label: '5-hour window', window: usage?.five_hour },
+        { label: 'Weekly window', window: usage?.seven_day },
+      ];
+  if (usage?.monthly && !usage.five_hour && !usage.seven_day && !pools.length) {
     return [{ label: 'Monthly cycle', fraction: windowPct(usage.monthly)!, resetsAt: usage.monthly.resetsAt, detail: monthlyDetails(usage.monthly) }];
   }
   return windows.flatMap(({ label, window }) => window ? [{ label, fraction: windowPct(window)!, resetsAt: window.resetsAt }] : []);
