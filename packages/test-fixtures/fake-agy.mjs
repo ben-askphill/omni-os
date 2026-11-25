@@ -21,7 +21,8 @@
 //   `EDIT <path>`, `ASK` (a multiple-choice question as an interaction_ permission request), `USAGE` (a usage_update
 //   with a window), `NOUSAGE` (a prompt answer with no usage), `SLOW <ms>`, `HANG` (waits for session/cancel),
 //   `HANG-DEAF` (never answers a cancel), `CRASH`, `SIGNIN` (asks the system opener to open a link, then waits),
-//   `QUOTA` (a quota error as a chat message), `REFUSE` (stopReason refusal), `RUNFREE` (runs an edit without asking).
+//   `QUOTA` (a quota error as a chat message), `REFUSE` (stopReason refusal), `RUNFREE` (runs an edit without asking),
+//   `STEPS[:<ms>] <json list>` on a line of its own (agy's own update_steps checklist call, which never asks).
 //   `MCP <server> <tool> [<json arguments>]` (#981): call a tool on one of the stdio MCP servers session/new gave, as
 //   the real agy does (probed on 1.5.16): it starts the server with the entry's command, args and env pairs, shows a
 //   tool_call named `mcp_<server>_<tool>` (kind other), asks permission, calls the tool and shows what came back.
@@ -308,6 +309,16 @@ async function turn(s, params) {
   if (/\bTHINK\b/.test(body)) update(s, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'private reasoning that must stay private' } });
   if (/\bPLAN\b/.test(body))
     update(s, { sessionUpdate: 'plan', entries: [{ content: 'Scaffold', priority: 'medium', status: 'completed' }, { content: 'Wire adapter', priority: 'medium', status: 'in_progress' }, { content: 'Test', priority: 'medium', status: 'pending' }] });
+  // STEPS[:<ms>] <json list>, one per line: agy's own checklist tool as the real agy 1.5.17 shows it (probed
+  // 2026-11-25): a call named update_steps, kind other, its {title, status} list as both args and rawInput, run with no
+  // permission request. `:<ms>` waits that long after the call.
+  for (const m of body.matchAll(/^STEPS(?::(\d+))? (\[.*\])$/gm)) {
+    const steps = JSON.parse(m[2]);
+    const call = { toolCallId: `call_${++counter}`, name: 'update_steps', args: { steps }, status: 'in_progress', kind: 'other', title: 'Run update_steps', rawInput: { steps } };
+    update(s, { sessionUpdate: 'tool_call', ...call });
+    update(s, { sessionUpdate: 'tool_call_update', ...call, status: 'completed' });
+    if (m[1]) await pause(Number(m[1]));
+  }
   if (/\bUSAGE\b/.test(body)) update(s, { sessionUpdate: 'usage_update', used: 54000, size: 1000000 });
   const slow = /\bSLOW (\d+)/.exec(body);
   if (slow) await pause(Number(slow[1]));

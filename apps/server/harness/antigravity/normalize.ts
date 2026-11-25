@@ -3,7 +3,8 @@
 //
 // - A tool call is a row: a command is `Bash`, a file change `Edit`, a read `Read`. A call with no kind is a command.
 //   agy names the command's field in four casings (CommandLine, command_line, commandLine, command).
-// - A plan is a TodoWrite row, which drives the thread's checklist.
+// - A plan is a TodoWrite row, which drives the thread's checklist. So is a call to agy's own checklist tool
+//   (update_steps), which agy's prompt has the agent keep its steps in.
 // - Reasoning (agent_thought_chunk) is never kept: the adapter only reads that it arrived, for the thinking line.
 // - A turn ends by its stop reason: end_turn is done, cancelled is stopped, refusal is a limit stop, anything else
 //   fails the turn. An agent message that names QUOTA_EXHAUSTED is a limit stop with the reset time agy gave.
@@ -66,6 +67,20 @@ export function mcpName(raw: unknown, servers: readonly string[] = []): string |
   return at > 0 && at < rest.length - 1 ? `mcp__${rest.slice(0, at)}__${rest.slice(at + 1)}` : null;
 }
 
+/**
+ * agy's own checklist tool (1.5.17, probed 2026-11-25): a call named `update_steps` (kind other, title "Run
+ * update_steps") whose input is the whole list as `{title, status}` steps. agy asks for no permission to run it. Its
+ * own prompt tells the agent to keep its steps there, so an agent on agy often does instead of calling set_steps.
+ */
+export const STEPS_TOOL = 'update_steps';
+
+/** update_steps statuses as TodoWrite's. A skipped step is settled; a failed one is not done. */
+const STEP_STATUS: Record<string, 'pending' | 'in_progress' | 'completed'> = { pending: 'pending', in_progress: 'in_progress', done: 'completed', skipped: 'completed' };
+
+/** An update_steps list as TodoWrite's todos. */
+const stepTodos = (steps: unknown) =>
+  (Array.isArray(steps) ? steps : []).map((s) => ({ content: str(obj(s).title), status: STEP_STATUS[str(obj(s).status)] ?? 'pending' })).filter((t) => t.content);
+
 /** The row a tool call opens. Null for a call that is only agy thinking out loud. `servers` names the session's MCP servers. */
 export function toolUse(call: AcpToolCall, servers: readonly string[] = []): StreamRecord | null {
   const id = str(call.toolCallId);
@@ -74,6 +89,8 @@ export function toolUse(call: AcpToolCall, servers: readonly string[] = []): Str
   const kind = str(call.kind);
   const use = (name: string, input: unknown): StreamRecord => ({ kind: 'tool_use', payload: { id, name, input, parent: null } });
   if (kind === 'think') return null;
+  // agy's checklist is the thread's step list, as a plan is: read from agy's own call name only, never the title.
+  if (str(call.name) === STEPS_TOOL) return use('TodoWrite', { todos: stepTodos(obj(call.rawInput ?? call.args).steps) });
   const mcp = mcpName(call.name, servers);
   if (mcp) {
     // agy adds a one-line summary of its own to an MCP call's input; the server never saw it.
