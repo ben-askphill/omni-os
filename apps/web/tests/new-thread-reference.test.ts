@@ -184,7 +184,10 @@ describe.each([false, true])('referencing a thread from the new-thread composer,
 
 describe('the Home composer, whose channel can change after a pick', () => {
   it('sends each reference as cross-channel or not for the channel the thread starts in', async () => {
-    await act(async () => root.render(createElement(NewThreadComposer, { defaultChannel: 'shop' })));
+    await act(async () => root.render(createElement(NewThreadComposer, { templateChips: false })));
+    // It opens on the Conductor: start it in Shop first.
+    await click(host.querySelector('button[aria-label^="Channel:"]'));
+    await click([...host.querySelectorAll('[role="option"]')].find((o) => o.textContent?.includes('Shop')));
     await click(button('Reference a thread'));
     await settle();
     expect(searches.at(-1)).toBe('/api/thread-references?channel=shop&q=&scope=channel');

@@ -58,17 +58,20 @@ export { AttachmentStrip, useAttachments };
 const drafts = new Map<string, string>();
 
 
-/** Starts a new thread. `channelId` fixes the channel (channel page); otherwise a picker is shown. */
+/**
+ * Starts a new thread. `channelId` fixes the channel (channel page); otherwise a picker is shown, on the Conductor.
+ * `templateChips={false}` leaves out the template chips under an empty box (Overview); the `/` menu still has them.
+ */
 export function NewThreadComposer({
   channelId,
-  defaultChannel = 'conductor',
   big,
   placeholder,
+  templateChips = true,
 }: {
   channelId?: string;
-  defaultChannel?: string;
   big?: boolean;
   placeholder?: string;
+  templateChips?: boolean;
 }) {
   const { channels, crew } = useApp();
   const key = `new:${channelId ?? '*'}`;
@@ -83,8 +86,8 @@ export function NewThreadComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset]);
   const [text, setText] = useState(() => preset?.prompt ?? drafts.get(key) ?? '');
-  const [channel, setChannel] = useState(channelId ?? preset?.channel ?? defaultChannel);
-  const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? preset?.channel ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
+  const [channel, setChannel] = useState(channelId ?? preset?.channel ?? 'conductor');
+  const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? preset?.channel ?? 'conductor') === 'conductor' ? 'conductor' : ''));
   const [picked, setPicked] = useState<DraftRun | null>(() => preset?.choice ? { choice: preset.choice, effort: preset.effort ?? '' } : null);
   // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
   const [folder, setFolder] = useState(preset?.folder ?? null);
@@ -157,7 +160,7 @@ export function NewThreadComposer({
   };
 
   const { commands, hint } = useNewThreadCommands({ text, choice, channel });
-  const templates = useTemplates();
+  const templates = useTemplates(templateChips);
 
   /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
   const sendToGrok = async (prompt: string) => {
