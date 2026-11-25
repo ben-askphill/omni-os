@@ -7,6 +7,7 @@ import { parseAccountUsage } from '../../harness/accounts-parse.ts';
 import { noteSynced } from '../../machine-stats.ts';
 import { claim, registerHandler } from '../apply.ts';
 import { DISPLAY_KEY } from '../../display.ts';
+import { USAGE_PANEL_KEY } from '../../usage-panel.ts';
 
 // kv: last writer wins per key, the value as JSON. sync.* keys (machine id, cursor, switches, path map) belong to
 // one Mac: they never go out, and one that arrives anyway is ignored.
@@ -52,6 +53,8 @@ registerHandler('kv', {
     if (read) publishThread(change.entity_id.slice(CONTEXT_PREFIX.length), { kind: 'context', context: read });
     // Show technical details or the Shopify add-on changed on another machine (display.ts).
     if (change.entity_id === DISPLAY_KEY) publishFeed({ type: 'display' });
+    // Settings > Usage panel changed on another machine (usage-panel.ts).
+    if (change.entity_id === USAGE_PANEL_KEY) publishFeed({ type: 'usage_panel' });
     // Another machine's CPU and memory, or its ask for this machine's while it shows the machine tiles (machine-stats.ts).
     if (change.entity_id.startsWith('machine-')) noteSynced(change.entity_id, (change.data as { value?: unknown } | null)?.value);
   },

@@ -29,7 +29,7 @@ describe('settings catalog', () => {
   it('groups sections as Assistant, Spaces, Devices, Developer and Extras', () => {
     expect(SETTINGS_GROUPS.map((g) => g.title)).toEqual(['', 'Assistant', 'Spaces', 'Connections', 'Developer', 'Extras', '']);
     const group = (id: string) => SETTINGS_SECTION_DEFS.filter((s) => s.group === id).map((s) => s.id);
-    expect(group('assistant')).toEqual(['models', 'crew', 'accounts', 'threads']);
+    expect(group('assistant')).toEqual(['models', 'crew', 'accounts', 'usage', 'threads']);
     expect(group('spaces')).toEqual(['channels', 'workspace']);
     expect(group('developer')).toEqual(['worktrees', 'secrets']);
   });

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { accountTitle, HARNESS_ROWS, nearlyFull, peakUsage, planWindows, slotSummary, usageRecords, usageRows, waitingTitle, withAccountUsage, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
+import { accountTitle, HARNESS_ROWS, nearlyFull, peakUsage, planWindows, usageRecords, usageRows, waitingTitle, withAccountUsage, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
+import { panelEntries, panelRows, panelSlots, type PanelEntry } from '@omni/shared/usage-panel.ts';
 import { type MonthlyUsage, type UsageWindow } from '../../api.ts';
 import { useAccounts } from '../../accounts.ts';
 import { resetAt, resetAtShort, resetIn, resetSentence } from '@omni/shared/usage-reset.ts';
 import { monthlyTitle, windowPct } from '../../format.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../../store.tsx';
+import { useUsagePanel } from '../../usage-panel.ts';
 import { HarnessLogo } from '../brand.tsx';
 import { Icon, Ticks } from '../ui.tsx';
 
@@ -95,7 +97,7 @@ function UsageRowView({ row }: { row: UsageRow }) {
   return (
     <div>
       <div className="flex items-start gap-2">
-        <span className="caption inline-flex h-[14px] w-[66px] shrink-0 items-center gap-1.5 text-fg-2" title={who ?? undefined}>
+        <span className="caption inline-flex h-[14px] w-[80px] shrink-0 items-center gap-1.5 text-fg-2" title={who ?? undefined}>
           <span className="text-fg"><HarnessLogo harness={row.harness} size={12} /></span>
           {name}
         </span>
@@ -126,28 +128,37 @@ function UsageRowView({ row }: { row: UsageRow }) {
 }
 
 /**
- * The card's rows: one per signed-in account (GET /api/accounts), each with its own reading. Readings that come in on
- * the feed replace the listed one for that account until the list loads again.
+ * Every row the panel can show, in the order Settings > Usage panel gives, each with whether it shows: one per
+ * signed-in account (GET /api/accounts) with its own reading, and each harness with none. Readings that come in on the
+ * feed replace the listed one for that account until the list loads again.
  */
-export function useUsageRows(): UsageRow[] {
+export function usePanelEntries(): PanelEntry[] {
   const { usage } = useApp();
   const accounts = useAccounts();
+  const prefs = useUsagePanel();
   const [live, setLive] = useState<Record<string, AccountUsage>>({});
   useFeed((e) => {
     if (e.type === 'account_usage') setLive((prev) => withAccountUsage(prev, e.usage));
   });
   const view = accounts.data;
-  return useMemo(() => usageRows(HARNESS_IDS, view, usageRecords(view, live), usage), [view, live, usage]);
+  return useMemo(() => panelEntries(usageRows(HARNESS_IDS, view, usageRecords(view, live), usage), prefs), [view, live, usage, prefs]);
+}
+
+/** The rows the panel shows, in its order. */
+export function useUsageRows(): UsageRow[] {
+  const entries = usePanelEntries();
+  return useMemo(() => panelRows(entries), [entries]);
 }
 
 /** Plan usage per harness. Collapsed by default to one row with the live dot and the busiest window; click to open. */
 export function UsageCard({ phone = false }: { phone?: boolean }) {
   const { status, feedLive } = useApp();
-  const rows = useUsageRows();
+  const entries = usePanelEntries();
+  const rows = useMemo(() => panelRows(entries), [entries]);
   const pref = phone ? 'usage.phone.open' : 'usage.open';
   const [open, setOpen] = useState(() => readPref(pref, false));
   const toggle = () => setOpen((o) => { writePref(pref, !o); return !o; });
-  const footer = slotSummary(status?.slots);
+  const footer = panelSlots(status?.slots, entries);
   const peak = peakUsage(rows);
   return (
     <div className="rounded-[20px] bg-bg/70 shadow-[var(--shadow-card)]">
@@ -179,7 +190,7 @@ export function UsageCard({ phone = false }: { phone?: boolean }) {
           ) : (
             <>
               <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-3">
-                <span className="w-[66px] shrink-0" />
+                <span className="w-[80px] shrink-0" />
                 <span className="flex-1">5h</span>
                 <span className="flex-1">Week</span>
               </div>

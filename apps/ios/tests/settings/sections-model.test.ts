@@ -10,7 +10,7 @@ import { catalog } from '../thread/fixtures';
 describe('Settings sections on the phone', () => {
   it('lists the catalog in its order, without the desktop app', () => {
     const ids = settingsGroups().flatMap((g) => g.rows.map((r) => r.id));
-    expect(ids).toEqual(['general', 'appearance', 'notifications', 'models', 'accounts', 'threads', 'channels', 'workspace', 'machines', 'sync', 'access', 'worktrees', 'secrets', 'extras', 'about']);
+    expect(ids).toEqual(['general', 'appearance', 'notifications', 'models', 'accounts', 'usage', 'threads', 'channels', 'workspace', 'machines', 'sync', 'access', 'worktrees', 'secrets', 'extras', 'about']);
     expect(settingsGroups().map((g) => g.title)).toEqual(['Omni', 'Assistant', 'Spaces', 'Connections', 'Developer', 'Extras', 'App']);
   });
 

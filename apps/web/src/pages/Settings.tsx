@@ -29,6 +29,7 @@ import { NotificationsCard } from './SettingsNotifications.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { CrewSection } from './SettingsCrew.tsx';
 import { AccountsSection } from './SettingsAccounts.tsx';
+import { UsagePanelSection } from './SettingsUsagePanel.tsx';
 import { StorageSection } from './Storage.tsx';
 import { useTemplates } from '../templates.tsx';
 import { sortTemplates } from '@omni/shared/templates.ts';
@@ -131,6 +132,8 @@ function SectionBody({ section }: { section: SettingsSection }) {
       return <CrewSection />;
     case 'accounts':
       return <AccountsSection />;
+    case 'usage':
+      return <UsagePanelSection />;
     case 'threads':
       return <ThreadsSection />;
     case 'channels':

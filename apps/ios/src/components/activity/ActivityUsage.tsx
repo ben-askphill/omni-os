@@ -1,5 +1,6 @@
 import { OmniHttpError, type OmniApi } from '@omni/client-core';
-import { accountTitle, EMPTY_USAGE_FEED, HARNESS_ROWS, isAccountsMessage, mergeUsageMessage, nearlyFull, planWindows, slotSummary, usageRecords, usageRows, waitingTitle } from '@omni/shared/account-usage.ts';
+import { accountTitle, EMPTY_USAGE_FEED, HARNESS_ROWS, isAccountsMessage, mergeUsageMessage, nearlyFull, planWindows, usageRecords, usageRows, waitingTitle } from '@omni/shared/account-usage.ts';
+import { DEFAULT_USAGE_PANEL, isUsagePanelMessage, panelEntries, panelRows, panelSlots, parseUsagePanel } from '@omni/shared/usage-panel.ts';
 import { resetSentence } from '@omni/shared/usage-reset.ts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -17,6 +18,9 @@ const harnessIds = HARNESS_ROWS.map(({ id }) => id);
 const names: Record<string, string> = Object.fromEntries(HARNESS_ROWS.map(({ id, name }) => [id, name]));
 
 const loadStatus = (api: OmniApi) => api.status();
+
+// Settings > Usage panel. An older server has none, so its panel keeps the built-in order with Hermes off.
+const loadPanel = async (api: OmniApi) => parseUsagePanel(await api.usagePanel().catch(() => DEFAULT_USAGE_PANEL));
 
 const loadAccounts = async (api: OmniApi) => ({
   view: await api.accounts().catch((err: unknown) => {
@@ -52,28 +56,33 @@ function UsageDetails() {
   const now = useMinuteClock();
   const status = useRemote(loadStatus);
   const accounts = useRemote(loadAccounts);
+  const panel = useRemote(loadPanel);
   const { reload: reloadStatus } = status;
   const { reload: reloadAccounts } = accounts;
+  const { reload: reloadPanel } = panel;
   // What the feed brought since the last load, merged in as the web store does: no refetch per reading.
   const [feed, setFeed] = useState(EMPTY_USAGE_FEED);
   const reload = useCallback(() => {
     setFeed(EMPTY_USAGE_FEED);
     void reloadStatus();
     void reloadAccounts();
-  }, [reloadStatus, reloadAccounts]);
+    void reloadPanel();
+  }, [reloadStatus, reloadAccounts, reloadPanel]);
   useEffect(() => {
     if (link === 'live' && previousLink.current !== 'live') reload();
     previousLink.current = link;
   }, [link, reload]);
   useEffect(() => hub.watchFeed((message) => {
     if (isAccountsMessage(message)) void reloadAccounts();
+    else if (isUsagePanelMessage(message)) void reloadPanel();
     else setFeed((prev) => mergeUsageMessage(prev, message));
-  }), [hub, reloadAccounts]);
+  }), [hub, reloadAccounts, reloadPanel]);
   const data = useMemo(() => {
     if (!status.data || !accounts.data) return null;
     const view = accounts.data.view;
-    return { rows: usageRows(harnessIds, view, usageRecords(view, feed.live), { ...status.data.usage, ...feed.harness }), slots: slotSummary(status.data.slots) };
-  }, [status.data, accounts.data, feed]);
+    const entries = panelEntries(usageRows(harnessIds, view, usageRecords(view, feed.live), { ...status.data.usage, ...feed.harness }), panel.data ?? DEFAULT_USAGE_PANEL);
+    return { rows: panelRows(entries), slots: panelSlots(status.data.slots, entries) };
+  }, [status.data, accounts.data, panel.data, feed]);
   const error = status.error ?? accounts.error;
 
   return (

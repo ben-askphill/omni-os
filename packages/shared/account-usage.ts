@@ -166,16 +166,20 @@ export function parsePlanUsage(v: unknown): PlanUsage | null {
   return out;
 }
 
-/** Each harness with the short name usage rows give it, in the order they list. */
+/**
+ * Each harness with the short name usage rows give it, in the order they list until Settings > Usage panel orders
+ * them (usage-panel.ts). Antigravity reads no allowances yet (#982), so its account row says "no data".
+ */
 export const HARNESS_ROWS = [
   { id: 'claude-code', name: 'Claude' },
   { id: 'codex', name: 'Codex' },
   { id: 'cursor', name: 'Cursor' },
+  { id: 'antigravity', name: 'Antigravity' },
   { id: 'hermes', name: 'Hermes' },
 ] as const;
 
-/** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud and Antigravity, which report no usage of their own. */
-export const SLOT_ROWS = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }, { id: 'antigravity', name: 'Antigravity' }] as const;
+/** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud, which has no usage row. */
+export const SLOT_ROWS = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }] as const;
 
 /** How full a usage window is, whether the harness reports a fraction or a percent. */
 export function windowPct(w?: { utilization: number }): number | null {
@@ -271,13 +275,6 @@ export function peakUsage(rows: readonly UsageRow[]): number | null {
     }
   }
   return peak;
-}
-
-export function slotSummary(slots: Partial<Record<string, { running: number; cap: number }>> = {}): string {
-  return SLOT_ROWS.flatMap(({ id, name }) => {
-    const slot = slots[id];
-    return slot ? [`${name} ${slot.running}/${slot.cap}`] : [];
-  }).join(' · ');
 }
 
 /** The full account identity, including the machines that reported it. */

@@ -75,6 +75,13 @@
       "blurb": "Which account each harness is signed in to, on each of your machines."
     },
     {
+      "id": "usage",
+      "group": "assistant",
+      "title": "Usage panel",
+      "icon": "gauge",
+      "blurb": "Which harnesses and accounts the Usage panel shows, and in what order."
+    },
+    {
       "id": "threads",
       "group": "assistant",
       "title": "Threads",
@@ -435,6 +442,30 @@
         "codex",
         "cursor",
         "devices"
+      ]
+    },
+    {
+      "id": "usage-panel",
+      "section": "usage",
+      "title": "Usage panel rows and order",
+      "keywords": [
+        "usage",
+        "usage card",
+        "plan",
+        "limits",
+        "5h",
+        "week",
+        "reorder",
+        "order",
+        "drag",
+        "hide",
+        "show",
+        "accounts",
+        "claude",
+        "codex",
+        "cursor",
+        "antigravity",
+        "hermes"
       ]
     },
     {
@@ -1026,7 +1057,8 @@
       "surface": "web",
       "expected": [
         "limits",
-        "concurrency"
+        "concurrency",
+        "usage-panel"
       ]
     },
     {
