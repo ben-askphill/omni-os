@@ -8,16 +8,18 @@
 // agy asks about, and the tripwire below stops a turn whose changing call ran unasked.
 //
 // - read, search, think and fetch only look: they run. edit, delete and move are file edits of their paths. execute is a
-//   shell command. An MCP call is `mcp__<server>__<tool>`, so connector levels apply. A sub-agent launch runs only at
+//   shell command. An MCP call is read from agy's own call name (`mcp_<server>_<tool>`) as `mcp__<server>__<tool>`, so
+//   connector levels apply. A sub-agent launch runs only at
 //   Full access, since agy does not ask about their own calls. Anything else is an unknown tool, which the
 //   gate treats as one that may change things.
-// - The tripwire: a changing call that finishes with no request before it ran on agy's own say-so.
-import { commandOf, pathOf, type AcpToolCall } from './normalize.ts';
+// - The tripwire: any call but a read, search or think that ends (completed or failed) with no request before it ran on
+//   agy's own say-so, a read-only shell command aside.
+import { commandOf, mcpName, pathOf, type AcpToolCall } from './normalize.ts';
+import { OMNI_SERVERS } from '@omni/shared/access.ts';
 import { readOnlyCommand } from '../../access.ts';
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
-const first = (o: Record<string, unknown>, keys: string[]) => keys.map((k) => str(o[k])).find(Boolean) ?? '';
 
 /** The tool call a request names. */
 export function requestedCall(params: unknown): AcpToolCall {
@@ -28,18 +30,21 @@ export type Asked =
   | { type: 'call'; tool: string; input: Record<string, unknown>; edits: boolean }
   | { type: 'subagent'; summary: string };
 
-/** A request as the gate's call, or a sub-agent launch. */
-export function callOf(call: AcpToolCall): Asked {
+/** An MCP call's `mcp__<server>__<tool>` name, from agy's own call name (the title's last word when a request has no name). */
+const mcpOf = (call: AcpToolCall, servers: readonly string[]): string | null =>
+  mcpName(call.name, servers) ?? mcpName(str(call.title).trim().split(/\s+/).at(-1), servers);
+
+/** A request as the gate's call, or a sub-agent launch. `servers` names the session's MCP servers. */
+export function callOf(call: AcpToolCall, servers: readonly string[] = []): Asked {
   const kind = str(call.kind);
   const title = str(call.title).trim();
   const raw = obj(call.rawInput);
   if (/\b(start|invoke)_subagent\b/.test(title) || 'subagents' in raw) return { type: 'subagent', summary: title || 'a sub-agent' };
-  // A changing kind is never an MCP call, whatever fields its input carries.
+  // A changing kind is never an MCP call, whatever its name or input says. An MCP call is read from its own name:
+  // its input is the tool's arguments, which may carry any field.
   const changing = !kind || kind === 'edit' || kind === 'delete' || kind === 'move' || kind === 'execute';
-  const server = first(raw, ['server', 'ServerName', 'server_name', 'serverName']);
-  const tool = first(raw, ['tool', 'ToolName', 'tool_name', 'toolName']);
-  if (!changing && server && tool) return { type: 'call', tool: `mcp__${server}__${tool}`, input: raw, edits: false };
-  if (!changing && /^mcp__[^_]+/.test(title)) return { type: 'call', tool: title, input: raw, edits: false };
+  const mcp = changing ? null : mcpOf(call, servers);
+  if (mcp) return { type: 'call', tool: mcp, input: raw, edits: false };
   if (kind === 'read' || kind === 'search' || kind === 'think') return { type: 'call', tool: 'Read', input: { file_path: pathOf(call) }, edits: false };
   if (kind === 'fetch') return { type: 'call', tool: 'WebFetch', input: raw, edits: false };
   if (kind === 'edit' || kind === 'delete' || kind === 'move') return { type: 'call', tool: 'Edit', input: { file_path: pathOf(call) || title }, edits: true };
@@ -47,8 +52,11 @@ export function callOf(call: AcpToolCall): Asked {
   return { type: 'call', tool: title || 'Tool', input: raw, edits: false };
 }
 
-/** The tool a finished call should have asked about, or null when running it unasked is no concern. */
-export function needsAsk(call: AcpToolCall): string | null {
+/**
+ * The tool a finished call should have asked about, or null when running it unasked is no concern: file edits, shell
+ * commands that may change things, MCP calls, fetches and any other tool. Only reading and thinking run free.
+ */
+export function needsAsk(call: AcpToolCall, servers: readonly string[] = []): string | null {
   const kind = str(call.kind);
   if (kind === 'edit' || kind === 'delete' || kind === 'move') return 'Edit';
   if (!kind || kind === 'execute') {
@@ -56,5 +64,12 @@ export function needsAsk(call: AcpToolCall): string | null {
     const command = commandOf(call.rawInput) ?? str(call.title);
     return readOnlyCommand(command) ? null : 'Bash';
   }
-  return null;
+  if (kind === 'read' || kind === 'search' || kind === 'think') return null;
+  if (kind === 'fetch') return 'WebFetch';
+  const asked = callOf(call, servers);
+  if (asked.type === 'subagent') return 'a sub-agent';
+  // The gate allows Omni's own tools at every level, so running one unasked changes nothing.
+  // Only agy's own call name counts for that, never the title, which is free text.
+  const own = /^mcp__(.+?)__/.exec(mcpName(call.name, servers) ?? '')?.[1];
+  return own && OMNI_SERVERS.has(own) ? null : asked.tool;
 }

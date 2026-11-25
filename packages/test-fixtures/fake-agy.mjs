@@ -26,8 +26,9 @@
 //   the real agy does (probed on 1.5.16): it starts the server with the entry's command, args and env pairs, shows a
 //   tool_call named `mcp_<server>_<tool>` (kind other), asks permission, calls the tool and shows what came back.
 //   The call gives up after FAKE_AGY_MCP_TIMEOUT_MS (default: never).
-//   `DELETE <path>`, `MOVE <from> <to>`, `MCPCALL <server> <tool>` and `SUBAGENT` (each asks first, as EDIT does, and
-//   RUNFREE skips the ask for any of them). CMD really runs its command in the session's folder once allowed, EDIT,
+//   `DELETE <path>`, `MOVE <from> <to>`, `MCPCALL <server> <tool>` (named `mcp_<server>_<tool>`, its input empty, as the
+//   real agy shows it), `FETCH <url>` and `SUBAGENT` (each asks first, as EDIT does, and
+//   RUNFREE skips the ask for any of them, and FAILED ends a changing call as failed instead of completed). CMD really runs its command in the session's folder once allowed, EDIT,
 //   DELETE and MOVE really change the disk, so a test can prove a refused call left it alone. `WAITASK` asks to run a command and
 //   waits for the answer without cancelling, for a session that ends while an approval waits.
 //   Anything else is answered `ack: <text>`.
@@ -234,12 +235,12 @@ async function guarded(s, toolCall, run) {
 }
 
 /** A tool call that changes something: announced, asked about, and done only on an allow (or at once with RUNFREE). */
-async function change(s, body, { id, kind, title, paths, raw }, run) {
-  const call = { toolCallId: id, title, kind, status: 'pending', ...(paths && { locations: paths.map((path) => ({ path })) }), rawInput: raw ?? (paths ? { TargetFile: paths[0] } : {}) };
+async function change(s, body, { id, kind, title, name, paths, raw }, run) {
+  const call = { toolCallId: id, title, kind, ...(name && { name }), status: 'pending', ...(paths && { locations: paths.map((path) => ({ path })) }), rawInput: raw ?? (paths ? { TargetFile: paths[0] } : {}) };
   update(s, { sessionUpdate: 'tool_call', ...call });
   const done = async () => {
     run();
-    update(s, { sessionUpdate: 'tool_call_update', toolCallId: id, status: 'completed' });
+    update(s, { sessionUpdate: 'tool_call_update', toolCallId: id, status: /\bFAILED\b/.test(body) ? 'failed' : 'completed' });
   };
   if (/\bRUNFREE\b/.test(body)) await done();
   else await guarded(s, call, done);
@@ -319,7 +320,7 @@ async function turn(s, params) {
     update(s, { sessionUpdate: 'tool_call', ...call });
     const write = async () => {
       writeFileSync(path, 'edited by fake agy\n');
-      update(s, { sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'completed' });
+      update(s, { sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: /\bFAILED\b/.test(body) ? 'failed' : 'completed' });
     };
     if (/\bRUNFREE\b/.test(body)) await write();
     else await guarded(s, call, write);
@@ -330,8 +331,13 @@ async function turn(s, params) {
   if (del) await change(s, body, { id: `d${++counter}`, kind: 'delete', title: `Delete ${del[1]}`, paths: [join(s.cwd, del[1])] }, () => rmSync(join(s.cwd, del[1]), { force: true }));
   const move = /\bMOVE (\S+) (\S+)/.exec(body);
   if (move) await change(s, body, { id: `m${++counter}`, kind: 'move', title: `Move ${move[1]}`, paths: [join(s.cwd, move[1])], raw: { from: join(s.cwd, move[1]), to: join(s.cwd, move[2]) } }, () => renameSync(join(s.cwd, move[1]), join(s.cwd, move[2])));
+  // MCPCALL <server> <tool>: an MCP call as the real agy announces it (name `mcp_<server>_<tool>`, kind other, the
+  // arguments alone as rawInput), asked about and done (nothing) on an allow.
   const mcpc = /\bMCPCALL (\S+) (\S+)/.exec(body);
-  if (mcpc) await change(s, body, { id: `p${++counter}`, kind: 'other', title: `${mcpc[1]}: ${mcpc[2]}`, raw: { server: mcpc[1], tool: mcpc[2] } }, () => {});
+  if (mcpc) await change(s, body, { id: `p${++counter}`, kind: 'other', title: `Run mcp_${mcpc[1]}_${mcpc[2]}`, name: `mcp_${mcpc[1]}_${mcpc[2]}`, raw: {} }, () => {});
+  // FETCH <url>: a web fetch (kind fetch), asked about like any change.
+  const fetchc = /\bFETCH (\S+)/.exec(body);
+  if (fetchc) await change(s, body, { id: `f${++counter}`, kind: 'fetch', title: `Fetch ${fetchc[1]}`, raw: { Url: fetchc[1] } }, () => {});
   if (/\bSUBAGENT\b/.test(body))
     await change(s, body, { id: `a${++counter}`, kind: 'other', title: 'Run invoke_subagent', raw: { subagents: [{ role: 'helper', prompt: 'do the thing' }] } }, () => {});
   if (/\bWAITASK\b/.test(body)) {
@@ -358,7 +364,7 @@ async function turn(s, params) {
     text(s, `${say[1].slice(0, 40)} `);
     await pause(5);
     text(s, 'and the rest');
-  } else if (!cmd && !edit && !del && !move && !mcp && !mcpc && !/\b(ASK|SUBAGENT|WAITASK)\b/.test(body)) {
+  } else if (!cmd && !edit && !del && !move && !mcp && !mcpc && !fetchc && !/\b(ASK|SUBAGENT|WAITASK)\b/.test(body)) {
     text(s, `ack: ${body.split('\n').pop()}`);
   }
   return done();
