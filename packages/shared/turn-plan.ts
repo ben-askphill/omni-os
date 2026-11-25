@@ -14,6 +14,40 @@ import type { Prompt, TurnStatus, TurnView } from './thread-view.ts';
 /** A turn still being written: running, or queued for a slot. */
 export const turnLive = (t: Pick<TurnView, 'status'>): boolean => t.status === 'running' || t.status === 'queued';
 
+export interface DelegationGroup<C> {
+  key: string;
+  kids: C[];
+  label: string;
+  asked?: { remote: string | null };
+}
+
+/** The turn's delegation cards on phone web and iOS. Older teams have a thread for each part under their lead. */
+export function delegationGroups<C extends { id: string; parent_id?: string | null }>(
+  turn: { children: readonly C[]; asks: TurnView['asks'] },
+  team: readonly C[] = [],
+): DelegationGroup<C>[] {
+  const cards: DelegationGroup<C>[] = [];
+  const kids: C[] = [];
+  for (const child of turn.children) {
+    const members = team.filter((member) => member.parent_id === child.id);
+    if (members.length) cards.push({ key: child.id, kids: [child, ...members], label: `Team of ${members.length}` });
+    else kids.push(child);
+  }
+  if (!kids.length) return cards;
+
+  const asks = new Map(turn.asks.map((ask) => [ask.thread_id, ask]));
+  const sent = kids.flatMap((kid) => asks.get(kid.id) ?? []);
+  if (sent.length === kids.length) {
+    const names = new Set(sent.map((ask) => ask.name));
+    const name = names.size > 1 ? `${names.size} roles` : sent[0].name;
+    const remote = names.size === 1 && sent[0].remote ? sent[0].harness_name : null;
+    cards.unshift({ key: 'delegated', kids, label: `Asked ${name}`, asked: { remote } });
+  } else {
+    cards.unshift({ key: 'delegated', kids, label: `Delegated ${kids.length} ${kids.length === 1 ? 'task' : 'tasks'}` });
+  }
+  return cards;
+}
+
 /** The thread's first message, when a thread delegated it and its start is loaded: a brief, which folds. */
 export const isBrief = (thread: { parent_id?: string | null }, o: { first: boolean; index: number; atStart: boolean }): boolean =>
   o.first && o.index === 0 && !!thread.parent_id && o.atStart;

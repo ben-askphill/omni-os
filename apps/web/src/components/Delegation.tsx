@@ -128,7 +128,7 @@ export function DelegationCard({
   lead?: Branch;
   team?: boolean;
   agents?: ReactNode[];
-  /** The header's words and mark, in place of "Delegated 1 task" and the Conductor's: an Ask names the role asked. */
+  /** An Ask supplies its own header label and mark. */
   label?: ReactNode;
   mark?: ReactNode;
   /** Crew reports the thread has not read yet, by the thread that reported: shown on that thread's row. */
@@ -136,7 +136,6 @@ export function DelegationCard({
   /** Reports shown in place, by the thread that sent them: each shows under its row, a lead's under the card. */
   answers?: Record<string, ReportP>;
 }) {
-  const conductor = useAgent('conductor');
   if (!branches.length && !agents.length && !lead) return null;
   const n = branches.length + agents.length;
   // Every member has reported and the lead is still at it: it is writing the combined answer.
@@ -145,7 +144,9 @@ export function DelegationCard({
   return (
     <section aria-label={typeof label === 'string' ? label : what} className="rounded-[20px] px-3.5 pt-3.5 pb-3 shadow-[inset_0_0_0_1px_var(--line)]">
       <header className="mb-2 flex min-w-0 items-center gap-2.5 px-1 text-[13.5px]">
-        {mark ?? (conductor && <AgentAvatar agent={conductor} size={16} />)}
+        <span className="flex size-4 shrink-0 items-center justify-center">
+          {mark ?? <Icon name="delegate" size={16} className="text-fg-3" />}
+        </span>
         <span className="inline-flex shrink-0 items-center gap-2 font-medium text-fg">{label ?? what}</span>
         {lead && (
           <a href={href.thread(lead.id)} className="min-w-0 truncate text-fg-3 hover:text-fg" title="Open the lead thread">

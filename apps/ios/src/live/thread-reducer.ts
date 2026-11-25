@@ -13,6 +13,7 @@ export interface ThreadView {
   channel: Channel | null;
   parent: Thread | null;
   children: Thread[];
+  team: Thread[];
   artifacts: Artifact[];
   /**
    * The newest files and screenshots of the threads it delegated to, at any depth, newest first, as the server sends them
@@ -61,6 +62,7 @@ export function emptyThreadView(threadId: string): ThreadView {
     channel: null,
     parent: null,
     children: [],
+    team: [],
     artifacts: [],
     crewArtifacts: [],
     pending: [],
@@ -94,6 +96,7 @@ export function withDetail(view: ThreadView, detail: Partial<ThreadDetail>): Thr
     channel: detail.channel ?? null,
     parent: detail.parent ?? null,
     children: detail.children ?? view.children,
+    team: detail.team ?? view.team,
     artifacts: detail.artifacts ?? view.artifacts,
     crewArtifacts: detail.crew_artifacts ?? view.crewArtifacts,
     pending: detail.pending ?? [],
@@ -132,6 +135,7 @@ export function reduceThread(view: ThreadView, message: unknown): ThreadView {
   if (t.id === view.threadId) return fromStream ? withOwnThread(view, t, message) : view;
   let next = view;
   if (isDelegatedTo(t, view.threadId)) next = { ...next, children: upsert(next.children, t) };
+  if (t.source === 'team' && next.children.some((child) => child.id === t.parent_id)) next = { ...next, team: upsert(next.team, t) };
   if (next.parent && next.parent.id === t.id) next = { ...next, parent: t };
   return next;
 }

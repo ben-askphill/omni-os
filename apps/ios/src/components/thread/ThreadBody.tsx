@@ -47,6 +47,7 @@ function useThreadRows(view: ThreadView, disclosure: Disclosure, mark: Mark | nu
         thread,
         artifacts: view.artifacts,
         children: view.children,
+        team: view.team,
         atStart: !view.hasOlder,
         conductor,
         // The Conductor answers in its channel's look in any thread it is seated in, as on the Web UI.
@@ -58,7 +59,7 @@ function useThreadRows(view: ThreadView, disclosure: Disclosure, mark: Mark | nu
       },
       prev.current,
     ).rows;
-  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure, agents, channel, mark]);
+  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.team, view.hasOlder, disclosure, agents, channel, mark]);
   useEffect(() => {
     prev.current = rows;
   }, [rows]);

@@ -186,7 +186,10 @@ export function DelegationRow({ row }: Of<'delegation'>) {
   const { openThread } = useRowActions();
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, paddingHorizontal: space.s4 }]}>
-      <Text style={[styles.cardTitle, { color: colors.fg, paddingHorizontal: space.s4 }]}>{`Delegated ${plural(row.kids.length, 'task')}`}</Text>
+      <View style={[styles.line, { paddingHorizontal: space.s4 }]}>
+        <Icon name={row.asked ? 'message' : 'delegate'} size={16} color={row.asked ? colors.fg : colors.fg3} />
+        <Text style={[styles.cardTitle, { color: colors.fg, flexShrink: 1 }]}>{row.label}</Text>
+      </View>
       {row.kids.map((k) => (
         <View key={k.id}>
         <Pressable
