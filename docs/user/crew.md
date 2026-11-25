@@ -189,7 +189,7 @@ Like the automation guard, it holds every path Omni gives a thread: its MCP serv
 
 The Conductor writes agents with its own tools, which go through that guard:
 
-- `get_crew_role` reads an agent by id, the Conductor and usage-scan included: its fields, powers, locks and charters as written (`charters.built_in`, `own`, `effective`), and its `avatar`: what it shows (`photo`, `icon` or `character`) and its character's `shape` and `color`, the ones its id picks when its file names none (`{ shows: character, shape: squircle, color: Amber }` for Builder). A color from the agent palette comes by name, any other as its hex.
+- `get_crew_role` reads an agent by id (as `id`, `role` or `agent`), the Conductor and usage-scan included: its fields, powers, locks and charters as written (`charters.built_in`, `own`, `effective`), and its `avatar`: what it shows (`photo`, `icon` or `character`) and its character's `shape` and `color`, the ones its id picks when its file names none (`{ shows: character, shape: squircle, color: Amber }` for Builder). A color from the agent palette comes by name, any other as its hex.
 - `save_crew_role` creates an agent of your own (`create: true`) or edits one. On a built-in it writes your overlay, adding to the charter unless it says `replace`. Its `charter` is the whole text of your file for the agent, so the Conductor starts from `get_crew_role`. `fields.avatar` restyles the agent's character: `shape`, one of the 16 crew shapes, and `bg`, a hex or an agent palette color by name (Sky is saved as `#52cdfe`); an empty string removes either, so the default comes back. An unknown shape or color is refused with the ones Omni knows. Icons, emoji and photos stay yours to set, in Settings > Agents, and show instead of the character.
 - `reset_crew_role` drops your edit of a built-in.
 
@@ -205,6 +205,7 @@ The conductor does not review a PR by itself. When a builder reports one, it rel
 - Work any other model wrote (GPT, Composer, Grok, Gemini) is reviewed on Claude Code, on `claude-opus-5-5` at `xhigh`.
 - Those runs are pinned. When this machine's catalog lacks the model, or the model lacks the effort, the review is refused (409): Omni never runs it on Codex's default or the nearest model or effort instead.
 - A run the delegation names is kept when it is on the other family. The same family is refused, and so is a thread whose run does not say its family (Cursor's own `auto`, a runtime Omni does not know), or a review whose harness is not available here. The Conductor then asks you.
+- `delegate` takes the agent id as `role` or `agent`.
 - `review_of` needs a review agent. It is on `POST /api/threads` and on the Conductor's `delegate` tool.
 
 A thread as a review agent (`review: true`: the shipped reviewer, or an agent of your own with Reviews work on) on a GPT model (Codex, or a `gpt-*` model on Cursor) always runs at `high` effort. Omni sets it when the thread is made, switched to another run or continued, even when `xhigh` or no effort was asked for. Claude reviewers keep the effort they were given.
