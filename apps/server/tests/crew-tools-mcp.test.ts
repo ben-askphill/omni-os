@@ -281,3 +281,28 @@ describe('the Conductor crew tools', () => {
     expect((await tool(client, 'get_crew_role', { id: 'store-migrations' })).body.avatar).toEqual({ shows: 'photo', shape: 'droplet', color: 'Sun' });
   });
 });
+
+// Agents are "agents" in every other tool (seat_agents, message_thread's `agents`), so Conductors called delegate with
+// `agent` and get_crew_role with `role` and got a schema error back (tool-failure triage, 2026-11-25). Both now take it.
+describe('the agent id under the name a Conductor reaches for', () => {
+  const conductor = thread('conductor');
+
+  it('get_crew_role reads the agent from id, role or agent, and asks for one when none is given', T, async () => {
+    const client = await connect(conductor);
+    for (const args of [{ id: 'builder' }, { role: 'builder' }, { agent: 'builder' }]) {
+      const res = await tool(client, 'get_crew_role', args);
+      expect(res.isError, JSON.stringify(args)).toBe(false);
+      expect(res.body.id).toBe('builder');
+    }
+    expect(await tool(client, 'get_crew_role', {})).toMatchObject({ isError: true, body: expect.stringMatching(/Name the agent/) });
+  });
+
+  it('delegate runs the thread as the agent passed as agent, as it does for role', T, async () => {
+    const client = await connect(conductor);
+    const made = await tool(client, 'delegate', { channel: 'scratch', agent: 'builder', prompt: 'Goal: say hi. Done when: you said it. Proof back: the word.' });
+    expect(made.isError, JSON.stringify(made.body)).toBe(false);
+    expect(made.body.role).toBe('builder');
+    expect(h.db.threads.get(made.body.thread_id)?.role).toBe('builder');
+    expect(await tool(client, 'delegate', { channel: 'scratch', prompt: 'Goal: nothing.' })).toMatchObject({ isError: true, body: expect.stringMatching(/Name the agent/) });
+  });
+});
