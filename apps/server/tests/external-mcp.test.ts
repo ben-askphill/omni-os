@@ -123,6 +123,8 @@ describe('/mcp: the tools', () => {
     expect((await tool('list_channels')).body.map((c: any) => c.id)).toContain('scratch');
     expect((await tool('list_threads', { channel: 'scratch' })).body.map((x: any) => x.id)).toContain(t.id);
     expect((await tool('list_pull_requests')).body).toEqual({ prs: [], failed: [] });
+    expect((await tool('list_pull_requests', { channel: 'scratch' })).body).toEqual({ prs: [], failed: [] });
+    expect(await tool('list_pull_requests', { channel: 'no-such-channel' })).toMatchObject({ isError: true, raw: expect.stringContaining('No channel with this id.') });
   });
 
   it('reads a thread conversation a page at a time, and says not found for an unknown thread', T, async () => {

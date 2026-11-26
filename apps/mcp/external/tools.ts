@@ -150,7 +150,8 @@ export function registerExternalTools(server: McpServer, call: Call) {
   server.registerTool(
     'list_pull_requests',
     { description: PR_LIST_DESCRIPTION, inputSchema: prListInput, annotations: { readOnlyHint: true } },
-    async ({ search }) => text(prList(await call('/prs'), search)),
+    async ({ search, state, channel, limit }) =>
+      text(prList(await call(channel ? `/prs?channel=${encodeURIComponent(channel)}` : '/prs'), { search, state, limit })),
   );
 
   server.registerTool(

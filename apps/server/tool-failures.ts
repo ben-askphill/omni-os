@@ -100,6 +100,12 @@ export const toolFailures = {
       t.status, t.guidance, t.updated_at FROM tool_failures f JOIN tool_failure_triage t USING (group_id)
       WHERE (? IS NULL OR t.status = ?) GROUP BY f.group_id ORDER BY occurrences DESC, last_seen DESC LIMIT 200`).all(status ?? null, status ?? null);
   },
+  group(group: string) {
+    return db.prepare(`SELECT f.group_id, f.harness, f.tool, f.category, f.detail,
+      COUNT(*) AS occurrences, MIN(f.created_at) AS first_seen, MAX(f.created_at) AS last_seen,
+      t.status, t.guidance, t.updated_at FROM tool_failures f JOIN tool_failure_triage t USING (group_id)
+      WHERE f.group_id = ? GROUP BY f.group_id`).get(group) ?? null;
+  },
   occurrences(group: string, before = Number.MAX_SAFE_INTEGER) {
     return db.prepare(`SELECT rowid AS cursor, * FROM tool_failures WHERE group_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT 100`).all(group, before);
   },
