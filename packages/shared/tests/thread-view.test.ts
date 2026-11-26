@@ -140,6 +140,27 @@ describe('threadView', () => {
     expect(v.turns[1].reports.map((r) => r.text)).toEqual(['From further back.']);
   });
 
+  it("keeps the pages a delegated thread showed on its card, once each, after a later answer", () => {
+    const page = (name: string, title: string, from = 'r') => ({ thread_id: from, name, title });
+    const chart = page('chart-000001.html', 'Chart');
+    const table = page('table-000002.html', 'Table', 'g');
+    const events = [
+      user('Ask the researcher', 0),
+      text('On it.', 1),
+      result(2),
+      ev('crew_report', { text: 'First answer.', thread_id: 'r', shown: true, renders: [chart] }, 3),
+      // A follow-up's answer with a page from further down, and the chart again: it shows once.
+      ev('crew_report', { text: 'Second answer.', thread_id: 'r', shown: true, renders: [chart, table] }, 4),
+      // A report that started a turn shows its pages on its own card.
+      ev('crew_report', { text: 'Woke it.', thread_id: 'b', renders: [page('flow-000003.html', 'Flow', 'b')] }, 5),
+      text('Noted.', 6),
+      result(7),
+    ];
+    const v = threadView({ events, thread: thread('done'), artifacts: [], children: [child('r', 1)] });
+    expect(v.turns[0].answers.r).toMatchObject({ text: 'Second answer.', renders: [chart, table] });
+    expect(v.turns[1].reports.map((r) => r.renders?.map((p) => p.title))).toEqual([['Flow']]);
+  });
+
   it('shows a run switch under the turn it followed, not as a step', () => {
     const claude = { harness: 'claude', model: '', effort: '', harnessName: 'Claude Code', modelLabel: 'Opus' };
     const codex = { harness: 'codex', model: '', effort: '', harnessName: 'Codex', modelLabel: 'GPT-5.5' };

@@ -80,6 +80,7 @@ import { fixChecksPrompt } from './fix-checks.ts';
 import { shellAllowed } from './request-guard.ts';
 import { capture } from './analytics.ts';
 import { harnessToken } from '@omni/shared/analytics.ts';
+import { reportRenderRows } from './report-renders.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
 /** A thread under an automation or a usage scan acts only on threads under the same one (automation-guard.ts lineageRefusal). */
@@ -307,6 +308,7 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const shown = <T extends Thread>(list: T[]) => list.map((x) => withDelegating(x, ids, names));
   const children = threads.cards(t.id);
   const parent = t.parent_id ? threads.get(t.parent_id) : null;
+  const renders = reportRenderRows(t.id);
   const detail = {
     thread: withDelegating(t, ids, names),
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
@@ -316,6 +318,8 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     // The newest files and screenshots of the threads it delegated to, at any depth, each with its thread's title.
     // New ones come on the stream as crew_artifact (artifacts.ts announceArtifact).
     crew_artifacts: artifacts.crew(t.id, CREW_ARTIFACTS_MAX),
+    // The files of the pages its crew reports carry (report-renders.ts), drawn with each report: only when it has some.
+    ...(renders.length && { report_renders: renders }),
     // The threads on its delegation cards: the ones it delegated, and the work its seated agents opened.
     children: shown(children),
     // Members of the teams this thread started, so its delegation cards can show their state.

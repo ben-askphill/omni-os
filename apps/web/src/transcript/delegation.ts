@@ -2,7 +2,7 @@
 // any thread's own run launched with the harness's Agent tool.
 import type { BackgroundTask, Thread } from '../api.ts';
 import type { StepProgress } from '@omni/shared/steps.ts';
-import { str, type Item, type ReportP, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
+import { cardAnswer, str, type Item, type ReportP, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
 
 /** One delegated thread as a card row. Live fields come from the thread itself once it is known. */
 export interface Branch {
@@ -142,7 +142,7 @@ export function shownAnswers(items: readonly Item[]): Map<string, ReportP> {
     }
   }
   const out = new Map<string, ReportP>();
-  for (const it of items) if (it.type === 'report' && it.p.shown && onCards.has(it.p.thread_id)) out.set(it.p.thread_id, it.p);
+  for (const it of items) if (it.type === 'report' && it.p.shown && onCards.has(it.p.thread_id)) out.set(it.p.thread_id, cardAnswer(out.get(it.p.thread_id), it.p));
   return out;
 }
 

@@ -43,6 +43,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   // The files and screenshots of the threads it delegated to, newest first (packages/shared/crew-artifacts.ts).
   const [crewArtifacts, setCrewArtifacts] = useState<ArtifactWithThread[]>([]);
+  // The files of the pages its crew reports carry, which the newest crew artifacts may no longer hold.
+  const [reportRenders, setReportRenders] = useState<ArtifactWithThread[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [ready, setReady] = useState(false);
@@ -120,6 +122,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setArtifacts(d.artifacts);
     d.artifacts.forEach((a) => artifactIds.current.add(a.id));
     setCrewArtifacts(d.crew_artifacts ?? []);
+    setReportRenders(d.report_renders ?? []);
   }, [streamed]);
 
   const load = useCallback(
@@ -274,7 +277,10 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);
   const crew = useMemo(() => crewShown(artifacts, crewArtifacts), [artifacts, crewArtifacts]);
-  const selectedArtifact = files.find((a) => a.id === selected) ?? crew.files.find((a) => a.id === selected) ?? files[files.length - 1] ?? crew.files[0];
+  // Every file a crew report's page can be (components/thread/ReportPages.tsx).
+  const pageRows = useMemo(() => [...crewArtifacts, ...reportRenders], [crewArtifacts, reportRenders]);
+  const selectedArtifact =
+    files.find((a) => a.id === selected) ?? crew.files.find((a) => a.id === selected) ?? reportRenders.find((a) => a.id === selected) ?? files[files.length - 1] ?? crew.files[0];
 
   return {
     thread,
@@ -291,6 +297,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     shots,
     /** The crew's files and screenshots, less any this thread lists itself. */
     crew,
+    /** The files its crew reports' pages can be: its crew's newest and those its detail sent for its reports. */
+    pageRows,
     selectedArtifact,
     setSelected,
     panelTab,

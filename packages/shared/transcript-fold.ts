@@ -8,6 +8,7 @@ import type { PRWakeItem } from './pr-watch.ts';
 import type { SlashRecord } from './slash.ts';
 import { spanIndex, type Clipped, type Span } from './history.ts';
 import { shortPath } from './short-path.ts';
+import { unseenRenders, type ReportRender } from './report-pages.ts';
 import type { OutputMeta } from './tool-output.ts';
 import { collisionsIn, type Collision } from './collisions.ts';
 import { MERGE_RISK_EVENT, readMergeRisk, type MergeRiskP } from './merge-risk.ts';
@@ -118,7 +119,16 @@ export interface ReportP {
   /** An Ask Ben sent from this thread (ask.ts); `quiet` when he picked "Just show it". */
   ask?: boolean;
   quiet?: boolean;
+  /** Pages the thread (or one under it) showed with html_render, drawn above the report. Each shows once per transcript. */
+  renders?: ReportRender[];
 }
+
+/**
+ * A thread's newest report shown in place, as its delegation card shows it: with the pages its earlier shown reports
+ * carried before it, so a follow-up's answer does not take them away.
+ */
+export const cardAnswer = (prev: ReportP | undefined, next: ReportP): ReportP =>
+  prev?.renders?.length ? { ...next, renders: [...prev.renders, ...(next.renders ?? [])] } : next;
 
 /** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */
 export interface CloudAgentP {
@@ -315,6 +325,8 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   let seg = Number.NaN;
   // Mod lines join the run before them only from this item on.
   let modFloor = 0;
+  // The pages crew reports carried so far: a later report that carries one again leaves it out.
+  const reportPages = new Set<string>();
 
   for (const e of events) {
     const s = segOf(e.id);
@@ -400,10 +412,13 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         items.push({ type: 'collision', key: e.id, at: e.created_at, c });
         break;
       }
-      case 'crew_report':
+      case 'crew_report': {
         group = null;
-        items.push({ type: 'report', key: e.id, at: e.created_at, p: payload<ReportP>(e) });
+        const p = payload<ReportP>(e);
+        const renders = unseenRenders(p.renders, reportPages);
+        items.push({ type: 'report', key: e.id, at: e.created_at, p: renders === p.renders ? p : { ...p, renders } });
         break;
+      }
       case 'ask': {
         const p = payload<Partial<AskP>>(e);
         if (!str(p.thread_id) || !str(p.question)) break;

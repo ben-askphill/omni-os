@@ -56,6 +56,7 @@ import { FindTargetCtx } from '../transcript/find-target.ts';
 import { tailId } from '@omni/shared/history.ts';
 import { isRemoteAgentHarness, TALKS_ONLY } from '@omni/shared/remote-agent.ts';
 import { CommitSheet } from '../components/thread/CommitButton.tsx';
+import { ReportPagesProvider } from '../components/thread/ReportPages.tsx';
 
 /** The phone follows no bottom: a find has nothing to let go of. */
 const STAYS = () => {};
@@ -312,6 +313,7 @@ export function ThreadScreen() {
         <div ref={scroll} className="mo-scroll h-full min-h-0 overflow-y-auto px-4 pt-2 pb-4 [overflow-anchor:none]">
           <HistoryCtx.Provider value={history}>
             <FindTargetCtx.Provider value={find.target}>
+            <ReportPagesProvider rows={s.pageRows} open={viewer}>
             <div className="flex flex-col gap-4">
               <MoContinueLinks links={s.links} onOpen={(id) => shell.open(href.thread(id))} />
               {view.turns.map((t, i) => {
@@ -367,6 +369,7 @@ export function ThreadScreen() {
               )}
               {actionError && <ErrorNote>{actionError}</ErrorNote>}
             </div>
+            </ReportPagesProvider>
             </FindTargetCtx.Provider>
           </HistoryCtx.Provider>
         </div>

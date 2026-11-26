@@ -555,12 +555,13 @@ export function DetailsScreen() {
 /** One file, full screen. Share hands over the published page, else the file itself. */
 export function ViewerScreen({ route }: { route: Route }) {
   const shell = useShell();
-  const { thread, files, shots, crew } = useThread();
+  const { thread, files, shots, crew, pageRows } = useThread();
   const { channel, crew: roles } = useApp();
   const id = route.name === 'thread' ? route.artifact : undefined;
   // A delegated thread's file or screenshot opens here too, from the Details list.
   const mine = files.find((f) => f.id === id) ?? shots.find((f) => f.id === id);
-  const theirs = mine ? undefined : (crew.files.find((f) => f.id === id) ?? crew.shots.find((f) => f.id === id));
+  // A crew report's page (ReportPages) can be older than the crew files the detail lists.
+  const theirs = mine ? undefined : (crew.files.find((f) => f.id === id) ?? crew.shots.find((f) => f.id === id) ?? pageRows.find((f) => f.id === id));
   const a = mine ?? theirs;
   const from = theirs ? theirs.thread_title || 'Untitled' : null;
   const share = async () => {

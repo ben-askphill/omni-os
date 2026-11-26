@@ -2,6 +2,7 @@
 // then each part the agent wrote under a heading as a section that folds, its pull requests as chips, and what it said
 // while it worked (`notes`) folded last. Tables become stacked rows, so nothing squeezes into columns on a phone.
 // It reads the report's Markdown, so it works the same for every harness and for reports saved before notes existed.
+import type { ReportRender } from './report-pages.ts';
 
 /**
  * A crew report as the server saves it: the `crew_report` event's payload, and the request row that carries it to the
@@ -29,6 +30,13 @@ export type CrewReport = {
   quiet?: true;
   /** Shown on the parent's delegation card with no turn of its own (queue.ts showsInPlace). */
   shown?: true;
+  /**
+   * Pages it showed with html_render since its last report, and pages the reports it got in that time carried
+   * (apps/server/report-renders.ts). The parent shows them with the report; its harness reads only their titles.
+   */
+  renders?: ReportRender[];
+  /** When it reported: where its next report's pages start. */
+  through?: string;
 };
 
 /** A report another machine sent (apps/server/run-on.ts) or a saved row, when it has what a parent reads. */

@@ -194,6 +194,9 @@ const NAMES = [
   // A delegated thread that kept a plan, as its parent's detail lists it: its list in brief (`progress`), which the
   // delegation card's bar and step line read (@omni/shared/steps.ts StepProgress). Last, so the ids before it stay put.
   'delegated-progress.json',
+  // A crew report that carries a page the delegated thread showed with html_render (`renders`), and its parent's detail
+  // with that page's file (`report_renders`), which the report's card draws (@omni/shared/report-pages.ts ReportRender).
+  'report-renders.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -1050,6 +1053,20 @@ async function scenario() {
   const brief = ((await get(`/threads/${conductor.id}`)).children as { id: string; progress?: unknown }[]).filter((c) => c.id === planner.id);
   expect(brief[0]?.progress).toMatchObject({ count: 3, done: 3, live: false });
   keep('delegated-progress.json', brief);
+
+  // A page a delegated thread showed rides on its report (apps/server/report-renders.ts). The page is posted the way
+  // html_render posts it, while the child runs, so the fixture needs no omni-mcp build.
+  const pageParent = (await call('POST', '/threads', { channel: 'acme', prompt: 'Chart the sales', title: 'Chart the sales' })) as Thread;
+  await eventually(async () => (await detail(pageParent.id)).thread.status === 'done', 'the charting parent to finish');
+  const pageChild = (await call('POST', '/threads', { channel: 'acme', prompt: 'THINK:1500 chart them', title: 'Chart them', parent_id: pageParent.id, task_id: 'T-PAGE' })) as Thread;
+  await call('POST', `/threads/${pageChild.id}/renders`, { title: 'Sales by week', html: '<!doctype html><p>Sales</p>' });
+  const withPage = await eventually(async () => {
+    const d = (await get(`/threads/${pageParent.id}`)) as { events: { kind: string; payload: string }[]; report_renders?: unknown[] };
+    const report = d.events.find((e) => e.kind === 'crew_report');
+    return report && d.report_renders?.length ? { report: JSON.parse(report.payload) as { renders?: unknown }, report_renders: d.report_renders } : null;
+  }, 'the report with its page');
+  expect(withPage.report.renders).toEqual([{ thread_id: pageChild.id, name: expect.stringMatching(/^sales-by-week-[0-9a-f]{6}\.html$/), title: 'Sales by week' }]);
+  keep('report-renders.json', withPage);
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

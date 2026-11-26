@@ -5,11 +5,13 @@ import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { useFindOpens } from '../../transcript/find-target.ts';
 import { Icon } from '../ui.tsx';
 import { Markdown } from '../Markdown.tsx';
+import { ReportPages } from './ReportPages.tsx';
 
 /**
- * A crew report's body, on desktop and the phone layout: the outcome first, its pull requests as chips, then each part
- * the agent wrote under a heading folded, and what it said while it worked folded last (report-shape.ts). `event`: the
- * report's row, so the find bar opens every section when its match is in this report. `phone`: the phone's prose size.
+ * A crew report's body, on desktop and the phone layout: the pages it carries (ReportPages), then the outcome, its pull
+ * requests as chips, each part the agent wrote under a heading folded, and what it said while it worked folded last
+ * (report-shape.ts). `event`: the report's row, so the find bar opens every section when its match is in this report.
+ * `phone`: the phone's prose size.
  */
 export function ReportBody({ r, event, phone = false }: { r: ReportP; event?: number; phone?: boolean }) {
   const shape = useMemo(() => reportShape(r.text || '(no reply)', r.notes), [r.text, r.notes]);
@@ -22,6 +24,7 @@ export function ReportBody({ r, event, phone = false }: { r: ReportP; event?: nu
   const prose = phone ? 'text-[15px] leading-[1.6] text-pretty' : '';
   return (
     <div className="flex flex-col gap-3">
+      <ReportPages renders={r.renders} />
       {shape.lead && <Markdown text={shape.lead} className={prose} />}
       {shape.prs.length > 0 && (
         <div data-find-skip className="flex flex-wrap gap-1.5">

@@ -43,6 +43,9 @@
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   TELL:<agent>=<part>  a team lead's message_members call (one per line, the part runs to the end of the line), as the
 //                     real CLI calls an MCP tool: start the omni-team server from --mcp-config and call it, before the answer
+//   DELEGATE:<channel>[/<agent>]=<brief>  a Conductor's delegate call (a line of its own, the brief runs to the end of
+//                     the line), through the omni server from --mcp-config, before the answer. The line's directives run
+//                     in the thread it starts, not in this one
 //   RENDER:<title>    before the answer, show inline-page.html (an interactive chart) with Omni's html_render, as the real
 //                     CLI calls an MCP tool: start the omni-render server from --mcp-config and call it. Dashes in the title are spaces
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
@@ -527,6 +530,9 @@ async function renderPage(title) {
   }
 }
 
+/** DELEGATE:<channel>[/<agent>]=<brief>, a line of its own. */
+const DELEGATE_LINE = /^DELEGATE:([^=\s/]+)(?:\/([^=\s]+))?=(.+)$/gm;
+
 /** One call of a tool on an Omni MCP server from --mcp-config, as html_render above, answered in the transcript. */
 async function callTool(serverName, tool, input) {
   const id = `toolu_fake_${++seq}`;
@@ -649,6 +655,7 @@ async function runTurn() {
   const publishes = [];
   const renders = [];
   const tells = [];
+  const delegations = [];
   const scripts = [];
   /** WRITE and CMD: tool calls that change something, each asked for first under --permission-prompt-tool. */
   const actions = [];
@@ -676,30 +683,33 @@ async function runTurn() {
         emit({ type: 'user', message: { role: 'user', content: m.content }, parent_tool_use_id: null, uuid: m.uuid, timestamp: now(), isReplay: true });
       }
       seen.push(m.text);
-      for (const x of m.text.matchAll(/TOOL:(\d+)/g)) tools.push(Number(x[1]));
-      for (const x of m.text.matchAll(/CTX:(\d+)/g)) contextTokens = Number(x[1]);
-      for (const x of m.text.matchAll(/THINK:(\d+)/g)) think += Number(x[1]);
-      for (const x of m.text.matchAll(/BG:(\d+)/g)) startBackground(Number(x[1]));
-      if (m.text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
-      if (m.text.includes('ORPHAN')) leaveOrphan();
-      if (m.text.includes('RICH')) rich = true;
-      if (m.text.includes('MODS')) mods = true;
-      if (m.text.includes('MOD_CLEAR')) modClear = true;
-      const lim = m.text.match(/LIMIT(?::(\d+))?/);
+      // A DELEGATE line is the brief of the thread it starts: its directives run there, not here.
+      for (const x of m.text.matchAll(DELEGATE_LINE)) delegations.push({ channel: x[1], ...(x[2] && { agent: x[2] }), prompt: x[3].trim() });
+      const text = m.text.replace(DELEGATE_LINE, '');
+      for (const x of text.matchAll(/TOOL:(\d+)/g)) tools.push(Number(x[1]));
+      for (const x of text.matchAll(/CTX:(\d+)/g)) contextTokens = Number(x[1]);
+      for (const x of text.matchAll(/THINK:(\d+)/g)) think += Number(x[1]);
+      for (const x of text.matchAll(/BG:(\d+)/g)) startBackground(Number(x[1]));
+      if (text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
+      if (text.includes('ORPHAN')) leaveOrphan();
+      if (text.includes('RICH')) rich = true;
+      if (text.includes('MODS')) mods = true;
+      if (text.includes('MOD_CLEAR')) modClear = true;
+      const lim = text.match(/LIMIT(?::(\d+))?/);
       if (lim) limit = { resetsAt: lim[1] ? Number(lim[1]) : null };
-      if (m.text.includes('FULLMETER')) fullMeter = true;
-      const asks = m.text.match(/\bASK(_ONE)?\b/);
+      if (text.includes('FULLMETER')) fullMeter = true;
+      const asks = text.match(/\bASK(_ONE)?\b/);
       if (asks) ask = asks[1] ? QUESTIONS.slice(0, 1) : QUESTIONS;
-      for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
-      for (const x of m.text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
-      for (const x of m.text.matchAll(/^TELL:([^=\s]+)=(.+)$/gm)) tells.push({ to: [x[1]], message: x[2].trim() });
-      for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
-      for (const x of m.text.matchAll(/WRITE:(\S+)/g)) actions.push({ name: 'Write', input: { file_path: resolvePath(process.cwd(), x[1]), content: 'written by fake-claude' } });
-      for (const x of m.text.matchAll(/CMD:(\S+)/g)) actions.push({ name: 'Bash', input: { command: x[1].replace(/_/g, ' '), description: 'Fake command' } });
-      for (const x of m.text.matchAll(/NEEDS_TASK:(\S+)/g)) needsTask = x[1].replace(/-/g, ' ');
-      const plan = m.text.match(/STEPS:(\d+)/);
+      for (const x of text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
+      for (const x of text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
+      for (const x of text.matchAll(/^TELL:([^=\s]+)=(.+)$/gm)) tells.push({ to: [x[1]], message: x[2].trim() });
+      for (const x of text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
+      for (const x of text.matchAll(/WRITE:(\S+)/g)) actions.push({ name: 'Write', input: { file_path: resolvePath(process.cwd(), x[1]), content: 'written by fake-claude' } });
+      for (const x of text.matchAll(/CMD:(\S+)/g)) actions.push({ name: 'Bash', input: { command: x[1].replace(/_/g, ' '), description: 'Fake command' } });
+      for (const x of text.matchAll(/NEEDS_TASK:(\S+)/g)) needsTask = x[1].replace(/-/g, ' ');
+      const plan = text.match(/STEPS:(\d+)/);
       if (plan) stepMs = Number(plan[1]);
-      if (/\bCONNECTORS\b/.test(m.text)) stepConnectors = true;
+      if (/\bCONNECTORS\b/.test(text)) stepConnectors = true;
     }
     return true;
   };
@@ -794,6 +804,10 @@ async function runTurn() {
     steps++;
     await callTool('omni-team', 'message_members', input);
   }
+  for (const input of delegations.splice(0)) {
+    steps++;
+    await callTool('omni', 'delegate', input);
+  }
   if (stepMs !== null) {
     steps += await postSteps(t, stepMs, stepConnectors);
     stepMs = null;
@@ -885,7 +899,7 @@ async function runTurn() {
     }
     if (think && !(await pause(t, think))) break;
     steps++;
-    const said = /\bSAY:([^\n]+)/.exec(seen.join('\n'))?.[1]?.trim();
+    const said = /\bSAY:([^\n]+)/.exec(seen.join('\n').replace(DELEGATE_LINE, ''))?.[1]?.trim();
     finalText = said || (needsTask ? `TASK: ${needsTask}\nIt has to change files, which a quick ask cannot do.` : `ack: ${[...seen, ...answers].join(' | ')}`);
     assistant(`msg_fake_${++seq}`, [{ type: 'text', text: finalText }]);
     if (goal && goalMisses > 0) {
