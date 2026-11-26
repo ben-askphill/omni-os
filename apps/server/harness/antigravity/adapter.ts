@@ -40,7 +40,8 @@ import { allowOption, interaction, isRateLimit, normalizeCommands, planRecords, 
 import { callOf, needsAsk, requestedCall } from './permissions.ts';
 import { antigravityProfile } from './profile.ts';
 import { antigravityEnv, FIX, GOOGLE_METHOD, markSignedOut, writeOpeners } from './state.ts';
-import { parseEfforts } from './models.ts';
+import { lastModels, parseEfforts } from './models.ts';
+import { omniEffort } from './effort.ts';
 
 /** agy prints this on stdout, then the link, when it wants a sign-in it cannot do itself. */
 const LINK_PREFIX = 'Open the following link to authenticate the ACP server: ';
@@ -329,11 +330,16 @@ export const antigravityAdapter: HarnessAdapter = {
       };
     }
 
-    /** Select the thread's model and effort on the open session. A model agy refuses fails the turn with agy's words. */
+    /**
+     * Select the thread's model and effort on the open session. A model agy refuses fails the turn with agy's words.
+     * A thread that names no effort runs at Omni's pick for its model (effort.ts), when there is one.
+     */
     async function select(): Promise<void> {
       if (model) await client.request('session/set_config_option', { sessionId, configId: 'model', value: model }, OPEN_MS);
-      if (thread.effort) {
-        const r = await client.request('session/set_config_option', { sessionId, configId: 'thought_level', value: thread.effort }, OPEN_MS).catch(() => null);
+      const listed = lastModels().find((m) => m.id === model);
+      const effort = thread.effort || (listed ? omniEffort(listed) : '');
+      if (effort) {
+        const r = await client.request('session/set_config_option', { sessionId, configId: 'thought_level', value: effort }, OPEN_MS).catch(() => null);
         void parseEfforts(r);
       }
     }

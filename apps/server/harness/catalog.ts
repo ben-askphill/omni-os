@@ -8,6 +8,7 @@ import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
 import { claudeModelLabel, stripClaudeModelSuffixes } from '@omni/shared/claude-model-label.ts';
 import { parseClaudeStatus } from './accounts-parse.ts';
 import type { AntigravityState } from './antigravity/state.ts';
+import { omniEffort } from './antigravity/effort.ts';
 
 // ---------- Claude Code ----------
 // A bundled list, then whatever else Claude Code itself reports (its `initialize` answer, as T3 Code reads it), so a
@@ -325,7 +326,7 @@ export function antigravityHarness(s: AntigravityState | null, cap: number): Har
         label: m.label,
         note: gemini ? note : ANTIGRAVITY_OTHER_NOTE,
         efforts: m.efforts,
-        defaultEffort: m.defaultEffort,
+        defaultEffort: omniEffort(m) || m.defaultEffort,
         ...(m.id === first.id && { default: true }),
         ...(!gemini && { hiddenUntilOn: true }),
       };

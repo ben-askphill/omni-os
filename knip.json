@@ -5,7 +5,8 @@
     "scutil",
     "ioreg",
     "pgrep",
-    "mkfifo"
+    "mkfifo",
+    "agy"
   ],
   "ignore": [
     ".claude/**",

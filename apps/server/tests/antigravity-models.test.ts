@@ -50,7 +50,8 @@ describe('the list agy gives', () => {
   it('is the account\'s models, Gemini 4 Neon first as the default, with each model\'s own effort levels', async () => {
     const h = await checkNow();
     expect(h.models.map((m: any) => m.id)).toEqual(['gemini-4-neon', 'gemini-4-carbon', 'claude-opus-5-5', 'gpt-oss-120b']);
-    expect(h.models[0]).toMatchObject({ default: true, efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'high' });
+    // agy picks high for Neon; Omni runs it at medium unless the thread asks (models.ts NEON_EFFORT).
+    expect(h.models[0]).toMatchObject({ default: true, efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' });
     expect(h.models[1]).toMatchObject({ efforts: [] });
   });
 
