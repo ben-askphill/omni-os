@@ -122,7 +122,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'run-on', section: 'threads', title: 'Run new threads on', keywords: ['machine', 'device', 'where', 'remote', 'other mac'] },
   { id: 'keep-alive', section: 'threads', title: 'Keep sessions warm', keywords: ['keepalive', 'idle', 'process', 'background agents', 'interrupt'] },
   { id: 'limits', section: 'threads', title: 'Usage-limit recovery', keywords: ['rate limit', 'usage limit', 'reset', 'continue', 'resume', 'grace'] },
-  { id: 'thread-features', section: 'threads', title: 'Reply suggestions, turn snapshots, browser and uploads', keywords: ['suggestions', 'haiku', 'snapshots', 'this turn', 'diff', 'browser', 'playwright', 'chrome', 'uploads', 'attachments', 'mods', 'plugins'] },
+  { id: 'thread-features', section: 'threads', title: 'Reply suggestions, turn snapshots, browser and uploads', keywords: ['suggestions', 'haiku', 'snapshots', 'this turn', 'diff', 'browser', 'playwright', 'chrome', 'uploads', 'attachments', 'mods', 'plugins', 'compact', 'compaction', 'conductor', 'context'] },
   { id: 'open-items', section: 'threads', title: 'Open items card', keywords: ['open items', 'questions', 'decisions', 'blockers', 'answers', 'send answers', 'card', 'after a turn', 'distracting'] },
   { id: 'templates', section: 'threads', title: 'Templates', keywords: ['template', 'templates', 'skills', 'cro', 'audit', 'agenda', 'meeting', 'recall', 'proposal', 'ticket', 'adr', 'decision', 'client question', 'data/templates'] },
   { id: 'automations', section: 'threads', title: 'Automations', keywords: ['scheduled', 'schedule', 'cron', 'webhook', 'tasks', 'recurring'] },

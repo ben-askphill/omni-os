@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
@@ -10,6 +11,7 @@ import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
 import { ADMIN_SERVER } from '@omni/shared/access.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { STEPS_SERVER } from '@omni/shared/steps.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { ROOT, config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
@@ -47,9 +49,35 @@ export function plannedWorktree(threadId: string): { cwd: string; branch: string
   return { cwd: join(paths.worktrees, threadId), branch: `omni/${threadId.slice(0, 8)}` };
 }
 
+/** The files Claude Code and Cursor Agent read as project rules from the cwd and every folder above it, and Codex from the repo root down. */
+const RULE_FILES = ['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md'];
+
+/** The first rules file in dir or a folder above it, or null when none of them holds one. */
+export function rulesFileAbove(dir: string): string | null {
+  for (let at = resolve(dir); ; at = dirname(at)) {
+    for (const name of RULE_FILES) if (existsSync(join(at, name))) return join(at, name);
+    if (dirname(at) === at) return null;
+  }
+}
+
+/**
+ * A #conductor thread's folder: one with no CLAUDE.md or AGENTS.md in it or above it, so no harness loads project
+ * rules into a thread that only routes work (#1013). Cursor Agent reads them from its cwd up to / whatever the git root,
+ * with no flag or setting to stop it (checked against cursor-agent 2026.11.22), so the workspace's own were in every
+ * Cursor routing turn. The thread's folder when nothing above it holds one. A data folder inside a checkout (a dev
+ * install's data/) has the checkout's above it, so the thread then runs in a folder of its own under ~/.cache.
+ */
+export function conductorWorkdir(threadId: string, spare = join(homedir(), '.cache', 'omni-os', 'conductor', threadId)): string {
+  const own = threadDir(threadId);
+  if (!rulesFileAbove(own) || rulesFileAbove(spare)) return own;
+  mkdirSync(spare, { recursive: true });
+  return spare;
+}
+
 /**
  * Where a thread's agent runs, for a thread that needs no worktree (needsWorktree is false):
  * - Hermes or Cursor Cloud: the thread's own data folder; it runs off this Mac
+ * - #conductor, unless a quick ask: conductorWorkdir, never the workspace
  * - repo channel, worktrees off: the repo itself
  * - otherwise: the channel's base dir, falling back to the brain (phillbert) so skills and context load
  * A worktree thread gets plannedWorktree's folder, which prepareWorktree makes before anything runs there.
@@ -62,10 +90,9 @@ export async function prepareWorkdir(channel: Channel, threadId: string, opts?: 
   if (opts?.remote) return { cwd: threadDir(threadId), branch: null };
   // A quick ask only reads, so it reads the channel's own folder and never gets a worktree.
   if (needsWorktree(channel, { workspace: opts?.quick ? 'read' : null })) return plannedWorktree(threadId);
-
-  // #conductor threads run in their thread folder, not the workspace or a repo root, so Cursor does not load the
-  // workspace CLAUDE.md from an ancestor (docs/reviews/2026-11-22-cursor-cli-capabilities.md).
-  if (channel.id === 'conductor' && !needsWorktree(channel, opts)) return { cwd: threadDir(threadId), branch: null };
+  // Not the workspace or a repo root, so no harness loads their CLAUDE.md (docs/reviews/2026-11-22-cursor-cli-capabilities.md).
+  // A quick ask still reads the workspace: that is what it is for.
+  if (channel.id === CONDUCTOR_CHANNEL && !opts?.quick) return { cwd: conductorWorkdir(threadId), branch: null };
 
   if (channel.repo_path && existsSync(channel.repo_path)) return { cwd: channel.repo_path, branch: null };
   if (channel.base_dir && existsSync(channel.base_dir)) return { cwd: channel.base_dir, branch: null };

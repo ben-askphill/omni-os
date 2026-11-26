@@ -54,7 +54,8 @@ export function permissionArgs(gated: boolean): string[] {
 
 /**
  * The workspace's own CLAUDE.md files, which a #conductor thread does not load: it routes work and pays for none of the
- * project knowledge they hold (#1013). Its cwd is the workspace, so Claude Code would read them as project memory.
+ * project knowledge they hold (#1013). A new one runs outside the workspace (sandbox.ts conductorWorkdir), but one
+ * started before that still has the workspace as its cwd, so Claude Code would read them as project memory.
  * `claudeMdExcludes` takes absolute paths and globs (checked against claude 2.1.330). Other channels keep them.
  */
 export function workspaceClaudeMd(dir = config.brainDir): string[] {

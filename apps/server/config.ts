@@ -43,7 +43,7 @@ export const config = {
   port: Number(env.OMNI_PORT ?? 4747),
   host: env.OMNI_HOST ?? '127.0.0.1',
   /**
-   * The workspace folder: cwd of non-repo threads, added to every Claude thread with its CLAUDE.md, except #conductor's (harness/claude/adapter.ts workspaceClaudeMd). From the user
+   * The workspace folder: cwd of non-repo threads, added to every Claude thread with its CLAUDE.md, except #conductor's, which run in a folder of their own (sandbox.ts conductorWorkdir). From the user
    * config (data/omni.config.json, apps/server/user-config.ts), OMNI_BRAIN_DIR still wins. Read live, so onboarding
    * applies without a restart.
    */
@@ -88,6 +88,11 @@ export const config = {
    * beside the Conductor's own (agent-router/shadow.ts). Changes nothing the user sees. Off until '1'.
    */
   shadowRouter: env.OMNI_SHADOW_ROUTER === '1',
+  /**
+   * A #conductor thread whose context passes this many tokens compacts between turns, keeping its routing state
+   * (runner/conductor-compact.ts). 0 turns it off.
+   */
+  conductorCompactAt: Number(env.OMNI_CONDUCTOR_COMPACT_AT ?? 110_000),
   /** TypeSafe's API, for the shadow router's Jev call. Set only to point Omni at a fake for tests or QA. The key is the secret JEV_API_KEY. */
   jevApiUrl: env.OMNI_JEV_API_URL ?? 'https://api.typesafe.ai',
   /** Save a worktree thread's checkout before and after every turn, for its This turn diff (apps/server/turns.ts). */

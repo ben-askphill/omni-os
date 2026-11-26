@@ -23,7 +23,7 @@ describe('shortTime', () => {
 });
 
 describe('compactHarnesses', () => {
-  it('hoists shared efforts/default_effort, deduplicates repeated model notes, and omits default capabilities', () => {
+  it('hoists shared efforts/default_effort, deduplicates repeated model notes, and keeps available and #1006 capability booleans', () => {
     const out = compactHarnesses([
       {
         id: 'claude-code',
@@ -71,9 +71,9 @@ describe('compactHarnesses', () => {
 
     const [claude, agy, cloud] = out as any[];
     expect(claude).not.toHaveProperty('name');
-    expect(claude).not.toHaveProperty('available');
+    expect(claude.available).toBe(true);
     expect(claude).not.toHaveProperty('running');
-    expect(claude).not.toHaveProperty('capabilities');
+    expect(claude.capabilities).toEqual({ steer: true, interrupt: true, tool_limits: true });
     expect(claude.efforts).toEqual(['low', 'medium', 'high']);
     expect(claude.default_effort).toBe('high');
     expect(claude.models).toEqual([
@@ -82,8 +82,9 @@ describe('compactHarnesses', () => {
       { id: 'claude-haiku-4-5', efforts: [] },
     ]);
 
+    expect(agy.available).toBe(true);
     expect(agy.running).toBe(2);
-    expect(agy.capabilities).toEqual({ steer: false, tool_limits: false });
+    expect(agy.capabilities).toEqual({ steer: false, interrupt: true, tool_limits: false });
     expect(agy.notes).toEqual({
       '1': "agy's current model. Bills your Google AI plan.",
       '2': 'Bills your Google AI plan, not your Claude or ChatGPT plan.',
@@ -96,6 +97,8 @@ describe('compactHarnesses', () => {
       note: '2',
     });
 
+    expect(cloud.available).toBe(true);
+    expect(cloud.capabilities).toEqual({ steer: false, interrupt: true, remote: true, tool_limits: false });
     expect(cloud.note).toBe("Runs on Cursor's Linux cloud. Bills your Cursor plan.");
     expect(cloud.models).toEqual([
       { id: 'default', label: 'Cursor default', default: true },
@@ -105,22 +108,23 @@ describe('compactHarnesses', () => {
 });
 
 describe('compactThreads', () => {
-  it('omits status: done and echoed filter fields while keeping active/failed states and non-defaults', () => {
+  it('keeps status on every row including done while omitting echoed channel filter and trimming timestamps', () => {
     const rows = [
       { id: 't1', title: 'Running', channel_id: 'omni-os', role: 'builder', status: 'running', delegating: true, task_id: 'T-1', updated_at: '2026-11-26T08:00:00.000Z', members: [{ name: 'Lead' }, { name: 'Builder' }] },
       { id: 't2', title: 'Done', channel_id: 'omni-os', role: null, status: 'done', delegating: false, task_id: null, updated_at: '2026-11-26T07:55:00.000Z' },
     ];
     expect(compactThreads(rows)).toEqual([
       { id: 't1', title: 'Running', channel: 'omni-os', role: 'builder', status: 'running', delegating: true, task_id: 'T-1', updated_at: '2026-11-26T08:00Z', members: ['Lead', 'Builder'] },
-      { id: 't2', title: 'Done', channel: 'omni-os', updated_at: '2026-11-26T07:55Z' },
+      { id: 't2', title: 'Done', channel: 'omni-os', status: 'done', updated_at: '2026-11-26T07:55Z' },
     ]);
-    expect(compactThreads(rows, { channel: 'omni-os', status: 'running' })[0]).not.toHaveProperty('channel');
-    expect(compactThreads(rows, { channel: 'omni-os', status: 'running' })[0]).not.toHaveProperty('status');
+    const filtered = compactThreads(rows, { channel: 'omni-os', status: 'running' });
+    expect(filtered[0]).not.toHaveProperty('channel');
+    expect(filtered[0].status).toBe('running');
   });
 });
 
 describe('compactAutomations', () => {
-  it('omits enabled: true, default runs_on/source, default run trigger/status, and caps prompts at 120 chars', () => {
+  it('keeps enabled on every row while omitting default runs_on/source, default run trigger/status, and capping prompts', () => {
     const out = compactAutomations([
       {
         id: 'daily-brief',
@@ -152,7 +156,7 @@ describe('compactAutomations', () => {
     ]) as any[];
 
     expect(out[0]).not.toHaveProperty('name');
-    expect(out[0]).not.toHaveProperty('enabled');
+    expect(out[0].enabled).toBe(true);
     expect(out[0]).not.toHaveProperty('runs_on');
     expect(out[0]).not.toHaveProperty('source');
     expect(out[0].next).toBe('2026-11-27T07:00Z');
@@ -168,7 +172,7 @@ describe('compactAutomations', () => {
 });
 
 describe('compactSettings', () => {
-  it('omits defaults and UI hint prose while keeping every non-default setting and env override', () => {
+  it('omits defaults and UI hint prose while keeping analytics.enabled, non-default settings, and env overrides', () => {
     const out = compactSettings({
       setup: {
         path: '~/.omni/omni.config.json',
@@ -207,6 +211,7 @@ describe('compactSettings', () => {
       resolved: { timezone: 'Europe/Amsterdam', workspaceRoot: '~/ws', reposDir: '~/repos' },
       server_options: [{ env: 'OMNI_MODS', value: 'On', default: 'Off' }],
       display: { technical: true },
+      analytics: { enabled: true },
     });
   });
 });

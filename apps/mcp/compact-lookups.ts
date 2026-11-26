@@ -53,9 +53,8 @@ function mostFrequent<T>(items: readonly T[], keyOf: (item: T) => string): { val
 
 /**
  * Compact `GET /api/harnesses` rows for Conductor tool calls:
- * - Omit `available: true` (default) and `running: 0` (default); keep `available: false` + `fix` and `running > 0`.
+ * - Keep `available` (true and false) and the #1006 capability booleans (`steer`, `interrupt`, `tool_limits`, plus `remote: true`); omit `running: 0`.
  * - Omit `name` / model `label` when its tokens already appear in order in `id` (keeps codenames like "GPT-6.1 Sol").
- * - Omit default local capabilities (`steer: true`, `interrupt: true`, `remote: false`, `tool_limits: true`) and drop `capabilities` when empty.
  * - Hoist `efforts` and `default_effort` to the harness when repeated across 2+ models; a model with no efforts keeps `efforts: []` when the harness has a default.
  * - Hoist a single note shared by all models (2+) to harness `note`, or alias any note repeated on 2+ models into harness `notes` (`{"1": "..."}`).
  */
@@ -63,12 +62,7 @@ export function compactHarnesses(list: readonly any[]): Record<string, unknown>[
   return list.map((h) => {
     const caps = h.capabilities
       ? compactRow(
-          {
-            steer: h.capabilities.steer === false ? false : undefined,
-            interrupt: h.capabilities.interrupt === false ? false : undefined,
-            remote: h.capabilities.remote === true ? true : undefined,
-            tool_limits: h.capabilities.toolLimits === false ? false : undefined,
-          },
+          { steer: h.capabilities.steer, interrupt: h.capabilities.interrupt, remote: h.capabilities.remote, tool_limits: h.capabilities.toolLimits },
           ['steer', 'interrupt', 'tool_limits'],
         )
       : undefined;
@@ -145,11 +139,11 @@ export function compactHarnesses(list: readonly any[]): Record<string, unknown>[
         id: h.id,
         name: redundantLabel(h.id, h.name) ? undefined : h.name,
         plan: h.plan || undefined,
-        available: h.available === false ? false : undefined,
+        available: h.available,
         fix: h.available ? undefined : h.fix,
         cap: h.cap ?? undefined,
         running: typeof h.running === 'number' && h.running > 0 ? h.running : undefined,
-        capabilities: caps && Object.keys(caps).length > 0 ? caps : undefined,
+        capabilities: caps,
         efforts: sharedEfforts,
         default_effort: sharedDefaultEffort,
         note: allSameNote,
@@ -165,7 +159,7 @@ export function compactHarnesses(list: readonly any[]): Record<string, unknown>[
 
 /**
  * Compact `GET /api/threads` rows:
- * - Omit `status` when `'done'` (default completed state) or when it matches the caller's `status` filter.
+ * - Keep `status` on every row (including `'done'`).
  * - Omit `channel` when it matches the caller's `channel` filter.
  * - Trim `updated_at` to minute precision.
  * - Drop null/false/empty defaults (`role`, `delegating: false`, `task_id`, empty `members`).
@@ -177,7 +171,7 @@ export function compactThreads(list: readonly any[], filter: { channel?: string;
       title: t.title,
       channel: filter.channel && t.channel_id === filter.channel ? undefined : t.channel_id,
       role: t.role,
-      status: t.status === 'done' || (filter.status && t.status === filter.status) ? undefined : t.status,
+      status: t.status,
       delegating: t.delegating,
       task_id: t.task_id,
       updated_at: shortTime(t.updated_at),
@@ -193,7 +187,7 @@ const AUTOMATION_PROMPT_CAP = 120;
 
 /**
  * Compact `GET /api/automations` rows:
- * - Omit `enabled: true` (default); keep `enabled: false`.
+ * - Keep `enabled` on every row (true and false).
  * - Omit `name` when redundant with `id`, `source: 'own'` (default), and `runs_on` when running on this machine without a `machine:` pin.
  * - Collapse whitespace and cap `prompt` preview at 120 chars (`get_automation` returns the full YAML/prompt).
  * - Trim `next` and `last_runs[].at` to minute precision; omit default `trigger` (`'cron'` or `'event'`) and default `status: 'done'` on each run.
@@ -214,7 +208,7 @@ export function compactAutomations(list: readonly any[]): Record<string, unknown
       {
         id: a.id,
         name: redundantLabel(a.id, a.name) ? undefined : a.name,
-        enabled: a.enabled === false ? false : undefined,
+        enabled: a.enabled,
         ...(a.on ? { on: a.on } : { cron: a.cron, timezone: a.timezone, next: shortTime(a.next) ?? null }),
         channel: a.channel,
         ...(a.machine && { machine: a.machine }),
@@ -274,7 +268,7 @@ function compactObject(obj: unknown): Record<string, unknown> | undefined {
  * - Omit schema `version: 1`, empty strings, and `SETTING_FIELDS` defaults (`pronouns: 'they/them'`, `syncSignatures: 'actions'`).
  * - Omit empty `runOn`, `crew`, `env_overrides`, `usage_panel`, and default worktree retention/slim policies.
  * - Strip UI-only `label`, `hint`, `section` from `server_options` and keep only env-set or non-default options.
- * - Omit default `display` flags (`false`) and default `analytics` (`enabled: true`, `configured: false`).
+ * - Omit false `display` flags and `analytics.configured: false`, while keeping `analytics.enabled` (defaults to true).
  */
 export function compactSettings(input: {
   setup: any;
@@ -328,15 +322,10 @@ export function compactSettings(input: {
     : [];
 
   const displayCompact = display && typeof display === 'object' ? compactRow(display) : undefined;
+  // analytics.enabled defaults to true, so keep it (true and false) while dropping configured: false.
   const analyticsCompact =
     analytics && typeof analytics === 'object'
-      ? compactRow(
-          {
-            enabled: analytics.enabled === false ? false : undefined,
-            configured: analytics.configured === true ? true : undefined,
-          },
-          ['enabled'],
-        )
+      ? compactRow({ enabled: analytics.enabled, configured: analytics.configured }, ['enabled'])
       : undefined;
 
   const usagePanelCompact =
