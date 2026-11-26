@@ -503,7 +503,7 @@ fn a_call_that_reuses_a_running_id_does_not_stop_the_first() {
     ))
     .unwrap();
     let ran = run(&scenario).unwrap();
-    let answer = r#"{"result":{"content":[{"type":"text","text":"{\n  \"state\": \"ok\"\n}"}]},"jsonrpc":"2.0","id":7}"#;
+    let answer = r#"{"result":{"content":[{"type":"text","text":"{\"state\":\"ok\"}"}]},"jsonrpc":"2.0","id":7}"#;
     assert_eq!(ran.responses, [answer, answer]);
 }
 

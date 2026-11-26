@@ -32,7 +32,7 @@ pub fn tool() -> Tool {
 
 fn unavailable(message: JsString) -> Outcome {
     let state = JsValue::object([("state", JsValue::str("unavailable")), ("message", JsValue::String(message))]);
-    Outcome::Refused(JsString::from(js::stringify_pretty(&state)))
+    Outcome::Refused(JsString::from(js::stringify(&state)))
 }
 
 pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
@@ -53,7 +53,7 @@ pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
         Ok(page) => {
             let text = match &page {
                 JsValue::String(text) => text.clone(),
-                other => JsString::from(js::stringify_pretty(other)),
+                other => JsString::from(js::stringify(other)),
             };
             if page.get("state").and_then(JsValue::as_js_string).is_some_and(|state| state.eq_str("ok")) {
                 Outcome::Text(text)

@@ -1,5 +1,6 @@
 // list_pull_requests for the Conductor (omni.ts) and the external MCP (external/tools.ts): GET /api/prs, narrowed by the
 // search the PRs page takes.
+import { compactRow } from '@omni/shared/mcp-compact.ts';
 import { DEFAULT_PR_QUERY, queryPRs, type ListedPR } from '@omni/shared/pr-query.ts';
 import { z } from 'zod';
 
@@ -18,7 +19,9 @@ export function prList(all: { prs: (ListedPR & { url: string })[]; failed: unkno
   const prs = queryPRs(all.prs, { ...DEFAULT_PR_QUERY, search }, null).flatMap((g) => g.prs);
   const state = (p: ListedPR) => (p.state === 'OPEN' && p.isDraft ? 'DRAFT' : p.state);
   return {
-    prs: prs.map((p) => ({ repo: p.repo, number: p.number, title: p.title, author: p.author?.login ?? null, state: state(p), labels: p.labels ?? [], url: p.url, updated_at: p.updatedAt })),
+    prs: prs.map((p) =>
+      compactRow({ repo: p.repo, number: p.number, title: p.title, author: p.author?.login ?? null, state: state(p), labels: p.labels ?? [], url: p.url, updated_at: p.updatedAt }),
+    ),
     failed: all.failed,
   };
 }
