@@ -114,9 +114,11 @@ const createSchema = z.object({
   base: basePick.nullish(),
   device: z.string().max(100).nullish(),
   /**
-   * Thread references and machine mentions on the first message (the new-thread composer's chips and pills), checked
-   * by parseContexts and stamped by stampNewThreadReferences and stampMachineMentions. No other kind: the rest point
-   * into the thread they are written in. A machine mention never picks where the thread starts: `device` does.
+   * Thread references, machine mentions and agent mentions on the first message (the new-thread composer's chips and
+   * pills), checked by parseContexts and stamped by stampNewThreadReferences, stampMachineMentions and
+   * stampAgentMentions. No other kind: the rest point into the thread they are written in. A machine mention never
+   * picks where the thread starts: `device` does. An agent mention seats that agent and the first message goes to the
+   * agents it names, as a reply naming them would (runner/api.ts createThread).
    */
   context: z.unknown().optional(),
   /** A quick ask (packages/shared/quick-ask.ts): answered in place, out of the lists but Recent asks. */
@@ -199,8 +201,15 @@ threadRoutesApi.post('/', async (c) => {
   // channel is the one openThread will make the thread in.
   const referenced = stampNewThreadReferences(body.channel || getCrew(body.role)?.channel || 'inbox', parsed.value);
   if (!referenced.ok) return c.json({ error: referenced.error }, 400);
-  const stamped = await stampMachineMentions(referenced.value);
+  const machines = await stampMachineMentions(referenced.value);
+  if (!machines.ok) return c.json({ error: machines.error }, 400);
+  const stamped = stampAgentMentions(machines.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
+  // An agent mention seats that agent, so it is checked like `members` (Q45).
+  if (mentionedAgents(stamped.value).length) {
+    const no = seatingRefusal(c, { channel: newThreadChannel({ ...body, context: undefined }), parent_id: body.parent_id });
+    if (no) return c.json({ error: no }, 403);
+  }
   const caller = callerOf(c);
   const pinned = caller ? members.bySession(caller)?.device : null;
   if (pinned && body.quick) return c.json({ error: 'Open a client-channel thread for machine-pinned work.' }, 400);

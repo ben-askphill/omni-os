@@ -329,10 +329,13 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 
-/** The agents a new thread seats, each once, refused before anything is made when one cannot be seated. */
+/**
+ * The agents a new thread seats, each once, refused before anything is made when one cannot be seated. Its first
+ * message's agent mentions seat their agents too, when it is sent (startThread), so a quick ask refuses them alike.
+ */
 function seatsFor(input: CreateThreadInput): string[] {
   const agents = [...new Set((input.members ?? []).map((a) => a.trim()).filter(Boolean))];
-  if (agents.length && input.quick) throw refusal('A quick ask starts with no members. Seat agents in it once it has started.', 400);
+  if ((agents.length || mentionedAgents(input.context).length) && input.quick) throw refusal('A quick ask starts with no members. Seat agents in it once it has started.', 400);
   for (const a of agents) {
     const refused = seatRefusal(a);
     if (refused) throw refusal(refused, a === 'conductor' ? 409 : 400);
@@ -348,7 +351,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // The first message's records (thread references, machine mentions) go with it to the machine the chip picked: a
   // machine mention says where a task in it should run, never where the thread itself starts.
   const context = input.context?.length ? input.context : undefined;
-  if (route && seats.length) throw refusal(`A thread with members runs here, not on ${route.to.name}. Seat them once it runs there.`, 409);
+  if (route && (seats.length || mentionedAgents(context).length)) throw refusal(`A thread with members runs here, not on ${route.to.name}. Seat them once it runs there.`, 409);
   if (route) {
     // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
     const bodies = await Promise.all((input.files ?? []).map(async (f) => new Uint8Array(await f.arrayBuffer())));
@@ -389,6 +392,14 @@ async function startThread(thread: Thread, harness: string, folder: string, inpu
     saveStart(thread, input.prompt, attachments, context);
     if (!input.title) void generateTitle(thread.id, input.prompt);
     void setUpThread(thread.id);
+    return threads.get(thread.id)!;
+  }
+  // A first message naming agents goes to them, as a reply naming them does (members.ts routeNamed): saved like a
+  // worktree thread's, then sent down the reply's path. A lead it does not name starts at the first message to it.
+  if (mentionedAgents(context).length) {
+    saveStart(thread, input.prompt, attachments, context);
+    if (!input.title) void generateTitle(thread.id, input.prompt);
+    await wakePrepared(messageRequests.byRequestId(thread.id, START_REQUEST)!);
     return threads.get(thread.id)!;
   }
   await warmCommands(harness, folder, input.prompt);
@@ -604,6 +615,12 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
       // A new brief from the Conductor replaces the seat's pin. Ben's follow-ups keep it.
       const device = r.source === 'conductor' && thread.channel_id === 'conductor' ? r.seat_device : undefined;
       routeNamed(r.thread_id, named, { request: r, prompt: r.prompt, source: r.source, attachments: r.attachments ?? undefined, context: r.context ?? undefined }, device);
+      // A new thread's first message to other agents only: its lead has nothing to run yet, so it does not wait as queued.
+      const now = threads.get(r.thread_id);
+      if (r.request_id === START_REQUEST && !named.includes(now?.role ?? '') && now?.status === 'queued' && !runsHere(r.thread_id)) {
+        threads.update(r.thread_id, { status: 'done' });
+        emitThread(r.thread_id);
+      }
       return;
     }
     await warmCommands(ready.harness, ready.cwd, r.prompt, r.thread_id);

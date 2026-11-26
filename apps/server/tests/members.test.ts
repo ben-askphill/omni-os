@@ -2,7 +2,10 @@
 // each one answers there in a session of its own. A message with no mention goes to the lead; one with mentions goes
 // only to the agents it names, which run at once (slice 3, parallel-members.test.ts). Each agent's turn opens with the messages
 // since its last turn that it did not write, without tool calls; a new member's first opens with a small-model catch-up.
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 import { CALLER_HEADER as CALLER } from '../caller-header.ts';
@@ -198,6 +201,69 @@ describe('seating by agent mention', () => {
     expect((await say(t.id, 'hi', ['conductor', 'Conductor'])).status).toBe(400);
     expect((await say(t.id, 'hi', ['nobody', 'Nobody'])).status).toBe(400);
     expect(H.byKind(t.id, 'user')).toHaveLength(1);
+  });
+});
+
+describe('an agent mention on a new thread', () => {
+  const create = (body: Record<string, unknown>, headers: Record<string, string> = {}) =>
+    call('/threads', { ...json('POST', { channel: 'scratch', role: 'lead', ...body }), headers: { 'content-type': 'application/json', ...headers } });
+
+  it('seats the named agent, which alone answers the first message; the lead starts at the next plain message', T, async () => {
+    const res = await create({ prompt: 'polish the copy', context: [mention('designer', 'Designer')] });
+    expect(res.status).toBe(200);
+    const id = res.json.id as string;
+    await untilIdle(id, 1);
+
+    expect(H.db.members.seated(id).map((m) => [m.agent, m.lead])).toEqual([['lead', 1], ['designer', 0]]);
+    const users = H.byKind(id, 'user');
+    expect(users.map((u) => [u.p.text, u.p.to])).toEqual([['polish the copy', ['designer']]]);
+    expect(users[0].p.context).toEqual([expect.objectContaining({ kind: 'agent_mention', body: { agent: 'designer', name: 'Designer' } })]);
+    expect(replies(id).map(([a]) => a)).toEqual(['designer']);
+    // The lead has not run: the thread does not wait as queued for it.
+    expect(readBy(id, 'lead')).toEqual([]);
+    expect(H.thread(id).status).toBe('done');
+
+    expect((await call(`/threads/${id}/messages`, json('POST', { prompt: 'now the lead' }))).status).toBe(200);
+    await untilIdle(id, 2);
+    expect(readBy(id, 'lead')).toEqual([expect.stringContaining('now the lead')]);
+    expect(replies(id).at(-1)?.[0]).toBe('lead');
+  });
+
+  it('in a worktree channel, sends the first message to the named agent once the worktree is ready', T, async () => {
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=t', '-C', cwd, ...args], { encoding: 'utf8' });
+    const dir = join(H.tmp, 'repo-mention');
+    mkdirSync(dir);
+    git(dir, 'init', '-q', '-b', 'main');
+    writeFileSync(join(dir, 'a.txt'), 'a\n');
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-q', '-m', 'start');
+    H.db.channels.create({ id: 'repo-mention', name: 'repo-mention', repo_path: dir, use_worktree: 1 });
+    const res = await create({ channel: 'repo-mention', prompt: 'review the start', context: [mention('critic', 'Critic')] });
+    expect(res.status).toBe(200);
+    const id = res.json.id as string;
+    await untilIdle(id, 1);
+    expect(H.byKind(id, 'user').map((u) => u.p.to)).toEqual([['critic']]);
+    expect(replies(id).map(([a]) => a)).toEqual(['critic']);
+    expect(readBy(id, 'lead')).toEqual([]);
+    expect(H.thread(id)).toMatchObject({ status: 'done', setup: null });
+  });
+
+  it('naming the lead with a member sends the first message to both', T, async () => {
+    const res = await create({ prompt: 'both of you', context: [mention('lead', 'Lead'), mention('critic', 'Critic')] });
+    expect(res.status).toBe(200);
+    await untilIdle(res.json.id, 2);
+    expect(replies(res.json.id).map(([a]) => a).sort()).toEqual(['critic', 'lead']);
+  });
+
+  it('refuses the Conductor, a quick ask, and an agent thread outside its own delegations, making no thread', T, async () => {
+    const before = H.db.threads.byChannel('scratch').length;
+    expect((await create({ prompt: 'hi', context: [mention('conductor', 'Conductor')] })).status).toBe(400);
+    expect((await create({ prompt: 'hi', context: [mention('nobody', 'Nobody')] })).status).toBe(400);
+    expect((await create({ prompt: 'hi', quick: true, context: [mention('designer', 'Designer')] })).status).toBe(400);
+    const parent = await groupThread('plain start');
+    const other = await create({ prompt: 'hi', context: [mention('designer', 'Designer')] }, { [CALLER]: parent.id });
+    expect(other.status).toBe(403);
+    expect(H.db.threads.byChannel('scratch').length).toBe(before + 1);
   });
 });
 
