@@ -22,7 +22,7 @@ export interface AdapterContext {
   systemPrompt: string;
   /**
    * The system prompt's `## Reply` block, heading first (runner/prompts.ts replyBlock), for a harness that sends it again
-   * when it resumes a chat (resume-rules.ts). Unset: it sends the tool-failure policy alone.
+   * when it resumes a chat (resume-rules.ts). Unset: it sends nothing again.
    */
   replyRules?: string[];
   /**

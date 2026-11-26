@@ -125,13 +125,14 @@ describe('Hermes adapter', () => {
     expect(second[1].idempotencyKey).toBe('m2');
   });
 
-  it('omits instructions when the session is already running', async () => {
+  it('omits instructions and the tool-failure policy when the session is already running', async () => {
     const s = boot({ resume: true, sessionId: 'omni-tid' });
     s.user('later', 'm9');
     await waitFor(() => resultOf(s.records).length === 1, 'resumed result');
     expect(s.session()).toBeNull();
     expect((posts()[0].body as { instructions?: string }).instructions).toBeUndefined();
-    expect((posts()[0].body as { input: string }).input).toContain('Omni records tool failures reported by your harness automatically.');
+    // The session has the policy from its first run: a resume does not pin it to the next message again (#1013).
+    expect((posts()[0].body as { input: string }).input).toBe('later');
     s.user('again', 'm10');
     await waitFor(() => resultOf(s.records).length === 2, 'second resumed result');
     expect((posts()[1].body as { input: string }).input).toBe('again');

@@ -35,6 +35,24 @@ export type CrewReport = {
 export const isCrewReport = (v: unknown): v is CrewReport =>
   !!v && typeof v === 'object' && typeof (v as CrewReport).text === 'string' && typeof (v as CrewReport).thread_id === 'string';
 
+/** The most of a report its parent's harness reads (apps/server/runner/queue.ts reportText). The card shows all of it. */
+export const REPORT_MAX_CHARS = 8000;
+/** The most of each report the user has already seen that goes in front of the parent's next message (queue.ts withShownReports). */
+export const SHOWN_REPORT_MAX_CHARS = 1500;
+
+/**
+ * `text` cut to at most `max` characters, with a marker that says how much it shows and, with `rest`, where to read the
+ * rest. Text that fits comes back as it is.
+ */
+export function capText(text: string, max: number, rest?: string): string {
+  if (text.length <= max) return text;
+  let end = max;
+  // Never leave half of a surrogate pair at the cut.
+  const code = text.charCodeAt(end - 1);
+  if (code >= 0xd800 && code <= 0xdbff) end -= 1;
+  return `${text.slice(0, end).trimEnd()}\n\n[cut: ${end} of ${text.length} characters shown${rest ? `; ${rest}` : ''}]`;
+}
+
 export interface ReportSection {
   /** A stable key for the section within its report, for folding state. */
   key: string;

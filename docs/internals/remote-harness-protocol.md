@@ -26,7 +26,7 @@ Rules the server can rely on:
 - **Retries.** The message's uuid is the `Idempotency-Key`. A 429 (the server's own concurrency cap) is retried with backoff (250 ms to 2 s) on the same key, so a retry never starts a second run. A run that still gets 429 fails with "at its concurrent run cap".
 - **Instructions.** A 400 whose body mentions `instructions` means the server takes no system prompt. Omni then sends the prompt in front of the first message instead, under a new key (`<uuid>:text`).
 - **Tools.** A 400 whose body mentions `tools` means the server takes no client-side tools. Omni sends the run again without them, under a new key (`<uuid>:notools`), and offers none again in that session.
-- **Tool-failure policy.** A resumed session gets Omni's tool-failure policy in front of its first input, since its instructions were sent in an earlier session.
+- **Resume.** A resumed session gets nothing sent again: its instructions, the tool-failure policy among them, came with an earlier session.
 - **Attachments** are described in the message text ("not transferred"). No bytes are uploaded.
 - **Reconnect.** When the event stream drops, Omni reconnects once and skips events whose `seq` it has seen. If that also ends without a terminal event, it reads `GET /v1/runs/{id}` up to three times, then fails the turn and stops the run.
 
