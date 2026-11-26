@@ -345,6 +345,19 @@ describe('seating a machine-pinned agent in #conductor', () => {
     expect(a.db.assignments.get(child.body.id)?.machine).toBe('mac-a');
   });
 
+  it('re-briefs a working seat on this machine whether the brief names it or leaves the device out', T, async () => {
+    const pinned = await seatBuilder('TOOL:3000 work here', 'mac-a');
+    expect(pinned.isError, pinned.raw).toBe(false);
+    expect(builder().device).toBe('mac-a');
+    const unpinned = await seatBuilder('TOOL:3000 change of plan');
+    expect(unpinned.isError, unpinned.raw).toBe(false);
+    expect(builder().device).toBeNull();
+    const moved = await seatBuilder('work on Box B', 'box-b');
+    expect(moved.isError).toBe(true);
+    expect(moved.raw).toContain('Builder is still working in this thread');
+    expect(builder().device).toBeNull();
+  });
+
   it('refuses a remote machine that announced it paused sync', T, async () => {
     expect((await b.json('/sync/disable', { body: {} })).status).toBe(200);
     await a.sync();
