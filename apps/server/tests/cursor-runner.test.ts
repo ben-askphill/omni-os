@@ -101,10 +101,14 @@ describe('cursor tracer', () => {
     expect(ts.every((r: any) => r.resume === chatId)).toBe(true); // every turn resumes the chat
   });
 
-  it('sends a resumed chat the current reply rules once, since its context came in an earlier session, and not the tool-failure policy', async () => {
+  it('sends a resumed chat the reply rules again only once they changed, and never the tool-failure policy', async () => {
     const t = await H.start('HANG forever', cursor);
     await H.until('chat id', () => H.thread(t.id).session_id.startsWith('chat_'));
     await H.until('turn running', () => turns(t.id).length >= 1);
+    // The new chat read the rules in its context: the thread keeps their fingerprint (#1015).
+    expect(H.db.kv.get<string>(`chat-rules:${t.id}`)).toMatch(/^[0-9a-f]{16}$/);
+    // Say the Reply block changed since: the chat read an older version.
+    H.db.kv.set(`chat-rules:${t.id}`, 'an-older-version');
     H.runner.interruptThread(t.id);
     await H.untilStatus(t.id, 'stopped');
     H.runner.sendMessage(t.id, 'CMD carry on');
@@ -123,6 +127,15 @@ describe('cursor tracer', () => {
     expect(resumed).toContain('Pick the form by what the answer holds');
     expect(resumed.endsWith('\n\n---\n\nCMD carry on')).toBe(true);
     expect(next).toBe('and then this');
+
+    // Resumed again with the same rules: the chat has them, so the ~2.1K-character block is not paid for again.
+    H.runner.sendMessage(t.id, 'HANG again');
+    await H.until('third turn', () => turns(t.id).length >= 3);
+    H.runner.interruptThread(t.id);
+    await H.untilStatus(t.id, 'stopped');
+    H.runner.sendMessage(t.id, 'CMD resumed with the same rules');
+    await H.until('fourth turn', () => turns(t.id).length >= 4, 12000);
+    expect(turns(t.id).at(-1).prompt).toBe('CMD resumed with the same rules');
   });
 
   it('queues a steer instead of rejecting it, running it as the next turn', async () => {

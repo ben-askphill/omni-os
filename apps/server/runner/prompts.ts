@@ -5,7 +5,8 @@
 import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
-import { artifacts, events, memories, threads, type Channel, type Thread } from '../db.ts';
+import { artifacts, events, kv, memories, threads, type Channel, type Thread } from '../db.ts';
+import { chatRules, resumeRules, type ChatRules } from '../harness/resume-rules.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import { doesOwnWork, getCrew, type CrewRole } from '../crew.ts';
 import { crewRoleName, isConductor } from '@omni/shared/crew-role.ts';
@@ -325,12 +326,18 @@ function teamLeadLines(name: string): string[] {
 /** Pages with html_render: every local thread but one that only reads (replyLines). */
 const rendersPages = (thread: Thread) => !isProviderHarness(thread.harness) && !readsOnly(thread);
 
-/**
- * The thread's `## Reply` block, as its system prompt has it. A harness that takes the system prompt only with a new
- * chat sends it again when it resumes one (AdapterContext.replyRules, harness/resume-rules.ts).
- */
+/** The thread's `## Reply` block, as its system prompt has it. */
 export function replyBlock(thread: Thread): string[] {
   return replyLines(userName(), rendersPages(thread), reportsUp(thread));
+}
+
+/**
+ * What a harness that takes the system prompt only with a new chat sends again when it resumes one: the Reply block,
+ * once per change, with the fingerprint of what the chat last read kept in kv (AdapterContext.chatRules).
+ */
+export function threadChatRules(thread: Thread): ChatRules {
+  const key = `chat-rules:${thread.id}`;
+  return chatRules(resumeRules(replyBlock(thread)), { get: () => kv.get<string>(key), set: (print) => kv.set(key, print) });
 }
 
 /**

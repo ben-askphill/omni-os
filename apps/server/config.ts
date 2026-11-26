@@ -88,6 +88,11 @@ export const config = {
    * beside the Conductor's own (agent-router/shadow.ts). Changes nothing the user sees. Off until '1'.
    */
   shadowRouter: env.OMNI_SHADOW_ROUTER === '1',
+  /**
+   * A #conductor thread whose context passes this many tokens compacts between turns, keeping its routing state
+   * (runner/conductor-compact.ts). 0 turns it off.
+   */
+  conductorCompactAt: Number(env.OMNI_CONDUCTOR_COMPACT_AT ?? 110_000),
   /** TypeSafe's API, for the shadow router's Jev call. Set only to point Omni at a fake for tests or QA. The key is the secret JEV_API_KEY. */
   jevApiUrl: env.OMNI_JEV_API_URL ?? 'https://api.typesafe.ai',
   /** Save a worktree thread's checkout before and after every turn, for its This turn diff (apps/server/turns.ts). */

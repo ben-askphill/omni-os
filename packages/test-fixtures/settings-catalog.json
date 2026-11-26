@@ -521,7 +521,11 @@
         "uploads",
         "attachments",
         "mods",
-        "plugins"
+        "plugins",
+        "compact",
+        "compaction",
+        "conductor",
+        "context"
       ]
     },
     {

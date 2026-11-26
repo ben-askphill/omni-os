@@ -32,7 +32,6 @@ import type { Record as StreamRecord } from '../../stream.ts';
 import { AcpClient, AcpError } from '../acp/client.ts';
 import { threadTokenEnv } from '../env-guard.ts';
 import { mcpInput } from '../mcp-input.ts';
-import { resumeRules } from '../resume-rules.ts';
 import { processSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
@@ -362,9 +361,11 @@ export const antigravityAdapter: HarnessAdapter = {
         const current = obj(opened?.models).currentModelId;
         if (typeof current === 'string') model = current;
       }
-      // Context ahead of the first message when agy has no system prompt to hold it; a resumed session gets the rules that change.
+      // Context ahead of the first message when agy has no system prompt to hold it; a resumed session gets the rules
+      // that changed since, once (resume-rules.ts). A new session has them in its system prompt or in that context.
       const context = takesSystemPrompt ? '' : ctx.systemPrompt;
-      const rules = resume && !context && !handover ? resumeRules(ctx.replyRules) : '';
+      const rules = resume && !context && !handover ? (ctx.chatRules?.resend() ?? '') : '';
+      if (!resume || context || rules) ctx.chatRules?.sent();
       lead = [context, handover, rules].filter(Boolean).join('\n\n---\n\n');
       await select();
     }

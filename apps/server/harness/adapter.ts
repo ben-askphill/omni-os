@@ -7,6 +7,7 @@ import type { PermissionGate } from '../runner/approvals.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import type { ThreadSkills } from '../skills.ts';
+import type { ChatRules } from './resume-rules.ts';
 import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
 import type { Attachment } from '../uploads.ts';
@@ -21,10 +22,10 @@ export interface AdapterContext {
   /** Omni's context (channel facts, role charter, artifacts, secrets note). */
   systemPrompt: string;
   /**
-   * The system prompt's `## Reply` block, heading first (runner/prompts.ts replyBlock), for a harness that sends it again
-   * when it resumes a chat (resume-rules.ts). Unset: it sends nothing again.
+   * The rules a harness that takes the system prompt only with a new chat sends again when it resumes one, once per
+   * change (resume-rules.ts): the system prompt's `## Reply` block. Unset: a resume sends nothing again.
    */
-  replyRules?: string[];
+  chatRules?: ChatRules;
   /**
    * What this harness loads of the role's skills (skills.ts): the system prompt already says it, and Codex also sends
    * each skill it lists with the session's first turn. Unset when the role loads none here.

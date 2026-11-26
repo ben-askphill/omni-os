@@ -91,6 +91,10 @@ export async function prepareWorkdir(channel: Channel, threadId: string, opts?: 
   // A quick ask still reads the workspace: that is what it is for.
   if (channel.id === CONDUCTOR_CHANNEL && !opts?.quick) return { cwd: conductorWorkdir(threadId), branch: null };
 
+  // #conductor threads run in their thread folder, not the workspace or a repo root, so Cursor does not load the
+  // workspace CLAUDE.md from an ancestor (docs/reviews/2026-11-22-cursor-cli-capabilities.md).
+  if (channel.id === 'conductor' && !needsWorktree(channel, opts)) return { cwd: threadDir(threadId), branch: null };
+
   if (channel.repo_path && existsSync(channel.repo_path)) return { cwd: channel.repo_path, branch: null };
   if (channel.base_dir && existsSync(channel.base_dir)) return { cwd: channel.base_dir, branch: null };
   if (existsSync(config.brainDir)) return { cwd: config.brainDir, branch: null };

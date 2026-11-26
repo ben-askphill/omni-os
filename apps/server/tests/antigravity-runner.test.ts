@@ -247,6 +247,19 @@ describe('Stop, the queue and the session', () => {
     const set = calls('session/set_config_option', sid).filter((r) => r.params.configId === 'model').map((r) => r.params.value);
     expect(set.filter((m) => m === 'gemini-4-carbon').length).toBeGreaterThanOrEqual(2);
     expect(sessionOf(t.id)).toBe(sid);
+    // The session read the Reply block in its system prompt, so the resume does not send it again (#1015).
+    expect(promptText(calls('session/prompt', sid).at(-1))).not.toContain('## Reply');
+    // Once it changed, the next resume sends it, once.
+    H.db.kv.set(`chat-rules:${t.id}`, 'an-older-version');
+    for (const [i, text] of ['SAY third', 'SAY fourth'].entries()) {
+      await H.runner.releaseForHandoff(t.id);
+      await H.until('closed', () => !H.runner.isLive(t.id));
+      H.runner.sendMessage(t.id, text);
+      await H.untilResults(t.id, 3 + i);
+    }
+    const [third, fourth] = calls('session/prompt', sid).slice(-2).map(promptText);
+    expect(third).toMatch(/^## Reply\nThese are the current reply rules/);
+    expect(fourth).not.toContain('## Reply');
   });
 
   it('starts a new session with a handover when agy cannot resume the stored one', async () => {

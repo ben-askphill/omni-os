@@ -25,7 +25,7 @@ import { profileOf } from '../harness/profile.ts';
 import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
-import { buildSystemPrompt, replyBlock } from './prompts.ts';
+import { buildSystemPrompt, threadChatRules } from './prompts.ts';
 import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
 import { adapterFor, addEvent, browserHolder, cliLabel, crash, deliver, emitThread, lives, omniUrl, track, type Live, type Msg } from './state.ts';
@@ -215,7 +215,7 @@ async function spawnLive(live: Live, thread: Thread) {
     channel,
     role,
     systemPrompt: buildSystemPrompt(thread, channel, role, threads.team(thread.id).length > 0, Object.keys(secretEnv), skills),
-    replyRules: replyBlock(thread),
+    chatRules: threadChatRules(thread),
     skills,
     secretEnv,
     browserBusy,

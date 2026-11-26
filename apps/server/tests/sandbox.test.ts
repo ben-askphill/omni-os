@@ -340,6 +340,18 @@ describe('prepareWorkdir', () => {
     expect(needsWorktree(channel({ repo_path: null, use_worktree: 1 }))).toBe(false);
     expect(needsWorktree(channel({ repo_path: '/r', use_worktree: 1 }), { remote: true })).toBe(false);
   });
+
+  it('runs #conductor threads in the thread folder, not the workspace or repo, so Cursor skips ancestor CLAUDE.md', async () => {
+    const id = 'conductor-wd-abcdef12';
+    const repo = mkdtempSync(join(tmpdir(), 'omni-conductor-repo-'));
+  try {
+      const ch = channel({ id: 'conductor', repo_path: repo, use_worktree: 0 });
+      expect(await prepareWorkdir(ch, id)).toEqual({ cwd: threadDir(id), branch: null });
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(threadDir(id), { recursive: true, force: true });
+    }
+  });
 });
 
 describe('writeCursorDenyConfig', () => {

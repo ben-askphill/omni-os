@@ -148,9 +148,9 @@ describe('Conductor automation tools', () => {
     expect(isError).toBe(false);
     expect(requests).toEqual([{ method: 'GET', url: '/api/automations', body: undefined }]);
     const [brief, pr] = body;
-    expect(brief).toMatchObject({ id: 'daily-brief', enabled: true, cron: '0 8 * * 1-5', next: '2026-11-16T07:00:00.000Z', role: 'researcher' });
-    expect(brief.prompt).toHaveLength(201);
-    expect(brief.last_runs).toEqual([1, 2, 3].map((i) => ({ thread_id: `t${i}`, trigger: 'cron', at: `2026-11-1${i}`, status: 'done' })));
+    expect(brief).toMatchObject({ id: 'daily-brief', enabled: true, cron: '0 8 * * 1-5', next: '2026-11-16T07:00Z', role: 'researcher' });
+    expect(brief.prompt).toHaveLength(121);
+    expect(brief.last_runs).toEqual([1, 2, 3].map((i) => ({ thread_id: `t${i}`, at: `2026-11-1${i}` })));
     expect(brief).not.toHaveProperty('file');
     expect(brief).not.toHaveProperty('deliveries');
     expect(pr).toMatchObject({ id: 'pr-fix', enabled: false, on: { event: 'pr_checks_failed' }, error: 'unknown harness' });
