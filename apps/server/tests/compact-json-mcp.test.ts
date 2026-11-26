@@ -345,10 +345,11 @@ describe('compact JSON across Conductor and external MCP tools (#1006)', () => {
     expect(search.body[1]).not.toHaveProperty('event_id');
     expect(search.body.every((h: any) => typeof h.snippet === 'string' && h.snippet.length > 0)).toBe(true);
 
-    // list_harnesses keeps available: false and non-default false capabilities (steer, interrupt, tool_limits),
-    // omits default capabilities and model defaults, and hoists shared efforts to the harness (#1006, #1011).
+    // list_harnesses keeps available and capability booleans that default to true (steer, interrupt, tool_limits),
+    // drops remote: false and model defaults, and hoists shared efforts to the harness (#1006, #1011).
     const claude = harnesses.body.find((h: any) => h.id === 'claude-code');
-    expect(claude).not.toHaveProperty('capabilities');
+    expect(claude.available).toBe(true);
+    expect(claude.capabilities).toEqual({ steer: true, interrupt: true, tool_limits: true });
     expect(claude.efforts).toEqual(['low', 'medium', 'high']);
     expect(claude.models[1]).not.toHaveProperty('default');
     expect(claude.models[1]).not.toHaveProperty('hidden');
@@ -357,9 +358,9 @@ describe('compact JSON across Conductor and external MCP tools (#1006)', () => {
     expect(claude.models[2].efforts).toEqual([]);
     expect(claude.models[2]).not.toHaveProperty('default_effort');
     const agy = harnesses.body.find((h: any) => h.id === 'antigravity');
-    expect(agy.capabilities).toEqual({ tool_limits: false });
+    expect(agy.capabilities.tool_limits).toBe(false);
     const cursor = harnesses.body.find((h: any) => h.id === 'cursor');
-    expect(cursor.capabilities).toEqual({ steer: false });
+    expect(cursor.capabilities.steer).toBe(false);
     const cloud = harnesses.body.find((h: any) => h.id === 'cursor-cloud');
     expect(cloud.available).toBe(false);
     expect(cloud.capabilities).toEqual({ steer: false, interrupt: false, remote: true, tool_limits: false });
