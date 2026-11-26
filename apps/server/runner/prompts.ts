@@ -340,13 +340,19 @@ export function replyBlock(thread: Thread): string[] {
 const getsToolFailurePolicy = (role?: CrewRole) => !role?.delegateOnly;
 
 /**
- * The thread's delegation rules, for an agent with the conductor tools. The Conductor gets none: its charter
- * (crew/conductor.md), which its prompt carries in full, states each of them (seat first, briefs, teams, seating,
- * warmth, reports), and saying them twice cost every Conductor thread ~1K tokens and let the copies drift (#1013).
- * A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
+ * Whether the role's charter is the shipped Conductor charter (crew/conductor.md), which states every delegation rule
+ * (seat first, briefs, teams, seating, warmth, reports): as shipped, or with the user's text after it (`charter_mode:
+ * append`). An overlay that replaces it may predate those rules, so that one keeps the prompt's copy.
+ */
+const chartersDelegation = (role: CrewRole) => isConductor(role.id) && role.charterMode !== 'replace';
+
+/**
+ * The thread's delegation rules, for an agent with the conductor tools. The Conductor gets none where its charter
+ * carries them (chartersDelegation): saying them twice cost every Conductor thread ~1K tokens and let the copies drift
+ * (#1013). A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
  */
 function delegationLines(role: CrewRole | undefined, name: string): string[] {
-  if (!role?.mcp.includes('omni') || role.id === SCAN_ROLE || isConductor(role.id)) return [];
+  if (!role?.mcp.includes('omni') || role.id === SCAN_ROLE || chartersDelegation(role)) return [];
   return [
     '',
     '## Thread delegation',

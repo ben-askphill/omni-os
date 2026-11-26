@@ -105,6 +105,20 @@ describe('the Conductor prompt', () => {
     expect(role.charter).toContain('`wake_cold: true`');
   });
 
+  it('keeps the delegation rules for a Conductor whose own charter replaces the shipped one', async () => {
+    const t = await r.start('THINK:1');
+    await r.untilResults(t.id, 1);
+    const channel = r.db.channels.get('scratch')!;
+    const shipped = getCrew('conductor')!;
+    // An overlay that adds to the shipped charter still carries its rules; one that replaces it may predate them.
+    const appended = buildSystemPrompt(r.thread(t.id), channel, { ...shipped, kind: 'edited', charterMode: 'append' });
+    expect(appended).not.toContain('## Thread delegation');
+    const replaced = buildSystemPrompt(r.thread(t.id), channel, { ...shipped, kind: 'edited', charterMode: 'replace', charter: 'Route work to the crew.' });
+    expect(replaced).toContain('## Thread delegation');
+    expect(replaced).toContain("check get_thread's session.warm");
+    expect(replaced).toContain('delegate_team makes one thread in the channel');
+  });
+
   it('leaves out the tool-failure policy, which a delegate-only agent has no shell or subagent to apply', async () => {
     const t = await r.start('THINK:1');
     await r.untilResults(t.id, 1);
