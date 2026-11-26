@@ -54,6 +54,7 @@ export const projectMachineMention: Projector<MachineMention> = (b) => {
       `Machine mention: ${userName()} wrote @${name} for the machine "${name}" (device id ${defang(b.machine)})` +
       `${self ? ', the machine you run on' : ''}. When ${userName()} sent this message at ${b.captured_at}, ${state(b)}. ` +
       `Run the task ${userName()} wrote next to @${name} there: pass device "${defang(b.machine)}" to seat_agents in your own #conductor thread, or to delegate or continue_thread when using those tools. ` +
+      `Without those tools, an agent ${userName()} named in #conductor next to this one machine has its seat pinned there: start the work with omni new in the client channel, and Omni runs it on that machine. ` +
       `If that machine cannot take it (offline, or sync is off), say so to ${userName()} and leave the task; never run it on another machine instead`,
   };
 };

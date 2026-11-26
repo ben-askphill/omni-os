@@ -97,6 +97,13 @@ const readMention = (r: unknown): Read | null => {
   return null;
 };
 
+/** The one machine `records` (read leniently) mention, by id. Null when they mention none, or more than one. */
+export function onlyMentionedMachine(records: unknown): string | null {
+  if (!Array.isArray(records)) return null;
+  const ids = new Set(records.map((r) => readMention(r)).flatMap((m) => (m?.kind === 'machine' ? [m.mention.machine] : [])));
+  return ids.size === 1 ? [...ids][0] : null;
+}
+
 /**
  * Every `@<name>` in `text` that one of `records` (read leniently: anything not a list holds none) is the mention of,
  * in text order. Where two names overlap ("@Mac" and "@Mac mini"), the longer one wins.

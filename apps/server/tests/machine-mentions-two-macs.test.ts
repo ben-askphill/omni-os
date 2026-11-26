@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { newContext, type MessageContext } from '@omni/shared/message-context.ts';
 import { machineMention, mentionBody } from '@omni/shared/message-context-machine.ts';
+import { agentMention, agentMentionBody } from '@omni/shared/message-context-agent.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
@@ -270,6 +271,67 @@ describe('a mentioned machine that cannot take the task', () => {
   });
 });
 
+
+// Ben @mentions an agent and a machine himself. The agent has no seat_agents or delegate to pass the machine on, so
+// his mention pins its seat, as the Conductor's seat_agents device does.
+describe("Ben's @agent @machine message in #conductor", () => {
+  const researcher = () => a.db.members.of(CONDUCTOR, 'researcher');
+  const agent = newContext(agentMention, agentMentionBody({ id: 'researcher', name: 'Researcher' }), '');
+  const send = async (prompt: string, machines: any[]) => {
+    const res = await a.json(`/threads/${CONDUCTOR}/messages`, { body: { prompt, context: [agent, ...machines.map(mention)] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    await sentEvent(prompt);
+  };
+  // Researcher answered its `n`th message and is idle again.
+  const settled = async (n: number) => {
+    const seat = researcher()!.session_thread;
+    const handed = () => (a.db.db.prepare('SELECT COUNT(*) AS n FROM message_requests WHERE thread_id = ?').get(seat) as { n: number }).n;
+    await waitFor(() => handed() >= n && !a.runner.isLive(seat) && a.thread(seat).status === 'done', `the seated Researcher to answer message ${n}`, 25_000);
+  };
+
+  it('pins the seat to the machine he mentioned, and the thread it opens runs there', T, async () => {
+    const [, box] = await machineRows(CONDUCTOR);
+    const prompt = '@Researcher @Box B THINK:300 compare the disk usage';
+    await send(prompt, [box]);
+    expect(researcher()).toMatchObject({ device: 'box-b' });
+    // The agent reads that the pin, not a tool it lacks, is how the work gets there.
+    expect(harnessText(prompt, (await sentEvent(prompt)).context, a.thread(CONDUCTOR))).toContain('has its seat pinned there: start the work with omni new');
+    const seat = researcher()!.session_thread;
+    const res = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${memberToken(seat)}` },
+      // What omni new sends from the seat's session.
+      body: JSON.stringify({ parent_id: seat, channel: 'shop', role: 'researcher', harness: 'claude-code', source: 'conductor', prompt: 'THINK:300 check the disk on Box B' }),
+    });
+    const child = (await res.json()) as any;
+    expect(res.status, JSON.stringify(child)).toBe(200);
+    expect(a.db.assignments.get(child.id)).toMatchObject({ machine: 'box-b', routed: true });
+    expect(a.runner.isLive(child.id)).toBe(false);
+    await settled(1);
+  });
+
+  it('keeps the pin on a follow-up that names no machine, or two', T, async () => {
+    await send('@Researcher THINK:300 and the logs too', []);
+    expect(researcher()).toMatchObject({ device: 'box-b' });
+    await settled(2);
+    const [here, box] = await machineRows(CONDUCTOR);
+    await send('@Researcher THINK:300 compare @Box B with @Mac A', [box, here]);
+    expect(researcher()).toMatchObject({ device: 'box-b' });
+    await settled(3);
+  });
+
+  it('moves the pin when he mentions another machine', T, async () => {
+    const [here] = await machineRows(CONDUCTOR);
+    await send('@Researcher @Mac A THINK:300 now look here', [here]);
+    expect(researcher()).toMatchObject({ device: 'mac-a' });
+    await settled(4);
+  });
+
+  // Builder's seat tests below expect it alone in the Conductor.
+  afterAll(async () => {
+    if (researcher() && !researcher()!.removed_at) await a.json(`/threads/${CONDUCTOR}/members/researcher`, { method: 'DELETE' });
+  });
+});
 
 describe('seating a machine-pinned agent in #conductor', () => {
   const seatBuilder = (prompt: string, device?: string) => {
