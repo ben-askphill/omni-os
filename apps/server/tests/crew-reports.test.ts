@@ -82,6 +82,66 @@ describe('crew reports', () => {
     expect(H.claudeTexts(parent.id).at(-1)).toContain('Now the README.\n\nWhat it said before that:\n\nEditing the docs.');
   });
 
+  // Audit finding 2 (#1012): a report is the child's final reply, capped, and get_thread need not repeat it.
+  const narrate = (childId: string, final: string) => {
+    const add = (kind: string, payload: unknown) => H.db.events.add(childId, kind, payload);
+    add('user', { text: 'do the long job' });
+    for (let i = 0; i < 12; i++) {
+      add('assistant_text', { text: `Step ${i}: ${'reading files and running checks. '.repeat(40)}` });
+      add('tool_use', { id: `n${i}`, name: 'Bash', input: {} });
+    }
+    add('assistant_text', { text: final });
+  };
+
+  it('reports only the final reply of a child that narrated at length, and cuts a reply over the cap with a marker', T, async () => {
+    const parent = await H.start('builder waiting on a long job');
+    await H.untilResults(parent.id, 1);
+    const child = await H.start('long child', { parent_id: parent.id, role: 'builder' });
+    await H.untilResults(child.id, 1);
+    await H.untilResults(parent.id, 2);
+
+    narrate(child.id, 'Done: PR #12 is open.');
+    expect(H.db.events.lastRun(child.id).text.length).toBeGreaterThan(15_000);
+    H.runner.reportToParent(child.id, 'done', H.db.events.lastRun(child.id).report);
+    await H.untilResults(parent.id, 3);
+    const short = H.claudeTexts(parent.id).at(-1)!;
+    expect(short).toContain('Done: PR #12 is open.');
+    expect(short).not.toContain('Step 0:');
+    expect(short).not.toContain('[cut:');
+    expect(short.length).toBeLessThan(1_000);
+
+    // A final reply over the cap: the parent's harness reads its first 8,000 characters and a marker; the card keeps it all.
+    const long = `## Findings\n${'- one more finding that matters\n'.repeat(600)}`;
+    narrate(child.id, long);
+    H.runner.reportToParent(child.id, 'done', H.db.events.lastRun(child.id).report);
+    await H.untilResults(parent.id, 4);
+    const cut = H.claudeTexts(parent.id).at(-1)!;
+    expect(cut).toContain(`[cut: 8000 of ${long.length} characters shown; get_thread on ${child.id} with a higher reply_max_chars reads its final reply]`);
+    expect(cut.length).toBeLessThan(9_000);
+    expect(H.byKind(parent.id, 'crew_report').at(-1)!.p).toMatchObject({ text: long });
+    // The card still folds what it said while it worked.
+    expect(H.byKind(parent.id, 'crew_report').at(-1)!.p.notes).toHaveLength(12);
+  });
+
+  it("get_thread's summary carries the final reply, leaves it out with reply=0 and cuts it at reply_max", T, async () => {
+    const { threadRoutesApi } = await import('../thread-routes-api.ts');
+    const summary = async (id: string, q = '') => (await (await threadRoutesApi.request(`/${id}/summary${q}`)).json()) as Record<string, unknown>;
+    const t = await H.start('summarised');
+    await H.untilResults(t.id, 1);
+    narrate(t.id, 'All done.');
+    expect(await summary(t.id)).toMatchObject({ last_reply: 'All done.' });
+
+    const warmth = await summary(t.id, '?reply=0');
+    expect(warmth).not.toHaveProperty('last_reply');
+    expect(warmth).toMatchObject({ id: t.id, status: 'done', session: { warm: true } });
+
+    narrate(t.id, 'x'.repeat(5_000));
+    expect((await summary(t.id, '?reply_max=1000')).last_reply).toBe(
+      `${'x'.repeat(1_000)}\n\n[cut: 1000 of 5000 characters shown; get_thread with a higher reply_max_chars reads more]`,
+    );
+    expect((await summary(t.id)).last_reply).toBe('x'.repeat(5_000));
+  });
+
   it('keeps a report for a parent Ben stopped, held for Resume, and Resume delivers it once', T, async () => {
     const parent = await H.start('TOOL:30000 conductor at work');
     await H.untilTool(parent.id);
@@ -156,6 +216,26 @@ describe('crew reports', () => {
     H.runner.sendMessage(parent.id, 'thanks');
     await H.untilResults(parent.id, 3);
     expect(H.claudeTexts(parent.id).at(-1)).not.toContain('[crew report]');
+  });
+
+  it('puts a shown report in front of the next message as a preview of at most 1,500 characters', T, async () => {
+    const parent = await conductor('route the long one');
+    await H.untilResults(parent.id, 1);
+    const child = await H.start('long quiet child', { parent_id: parent.id, source: 'conductor', role: 'researcher' });
+    await H.untilResults(child.id, 1);
+    await H.until('report shown', () => (reports(parent.id)[0]?.state === 'shown' ? true : null));
+    // The report Ben saw was long: what the harness reads with his next message is its preview.
+    narrate(child.id, `${'Detail the user already read. '.repeat(200)}`);
+    H.runner.reportToParent(child.id, 'done', H.db.events.lastRun(child.id).report);
+    await H.until('second report shown', () => (reports(parent.id).filter((r) => r.state === 'shown').length === 2 ? true : null));
+
+    H.runner.sendMessage(parent.id, 'anything new?');
+    await H.untilResults(parent.id, 2);
+    const last = H.claudeTexts(parent.id).at(-1)!;
+    expect(last).toContain('ack: long quiet child');
+    expect(last).toContain(`[cut: 1500 of ${'Detail the user already read. '.repeat(200).length} characters shown`);
+    expect(last.length).toBeLessThan(2 * 1_500 + 1_000);
+    expect(last.endsWith('anything new?')).toBe(true);
   });
 
   it('wakes the Conductor when the delegation asked for follow_up', T, async () => {

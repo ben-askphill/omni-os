@@ -1,8 +1,8 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
 // so delegated threads are ordinary threads the user can open, search and continue.
 import { randomUUID } from 'node:crypto';
-import { accessLevelOf, accessSummary, connectorAccessOf } from '@omni/shared/access.ts';
 import { agentColor, agentFace, agentShape, type FaceAgent } from '@omni/shared/agent-avatar.ts';
+import { skillRows } from '@omni/shared/agent-skills.ts';
 import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { CREW_SHAPE_IDS } from '@omni/shared/crew-shapes.ts';
@@ -16,11 +16,14 @@ import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/mach
 import type { MachinePick } from '@omni/shared/machine-pick.ts';
 import { compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
 import { ApiError, call, SELF, text } from './api.ts';
+import { channelDetail, channelIndexRow, LIST_CHANNELS_DESCRIPTION, listChannelsInput } from './channels.ts';
 import { compactAutomations, compactHarnesses, compactSettings, compactThreads } from './compact-lookups.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
+import { formatSearchHits, SEARCH_DEFAULT_LIMIT, searchInput, searchPath } from './search.ts';
 import { resolveDevice } from './device-pick.ts';
 import { threadId } from './thread-id.ts';
+import { replyInput, replyQuery } from './thread-reply.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -39,10 +42,6 @@ const basePick = (base?: string) => {
   if (!name) return undefined;
   return name === 'head' || name === 'remote-default' ? { kind: name } : { kind: 'ref', ref: name };
 };
-
-/** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
-const folderSummary = (folders: any[] = []) =>
-  folders.map((f: any) => compactRow({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t: any) => t.title) }));
 
 /**
  * The folder `name` names in the channel, by id or name ignoring case. With `create` a name no folder has is fine:
@@ -63,31 +62,14 @@ async function checkFolder(channel: string, name: string, create?: boolean) {
 server.registerTool(
   'list_channels',
   {
-    description:
-      'List Omni channels (one per client or project) with repo, store, running thread count, sidebar folders and, when set, what new worktrees copy or share from the main checkout. ' +
-      'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in. ' +
-      '`access` says what agents there may do without a yes (Read only, Ask first, Full access, and any account set apart). Only the user changes it, in Channel settings.',
+    description: LIST_CHANNELS_DESCRIPTION,
+    inputSchema: listChannelsInput,
   },
-  async () => {
+  async ({ channel }) => {
+    const id = channel?.trim();
+    if (id) return text(channelDetail(await call(`/channels/${encodeURIComponent(id)}`)));
     const list = await call('/channels');
-    return text(
-      list.map((c: any) =>
-        compactRow({
-          id: c.id,
-          name: c.name,
-          kind: c.kind,
-          store: c.store_domain,
-          repo: c.github_repo,
-          running: c.running,
-          notes: c.notes,
-          // What each new worktree gets from the main checkout beyond the repo's .worktreeinclude: copied files, linked folders.
-          ...(c.worktree_include ? { copy_into_worktrees: c.worktree_include.split('\n') } : {}),
-          ...(c.worktree_shared ? { shared_directories: c.worktree_shared.split('\n') } : {}),
-          folders: folderSummary(c.folders),
-          access: accessSummary(accessLevelOf(c.access_level ?? c.access_default), connectorAccessOf(c.connector_access)),
-        }),
-      ),
-    );
+    return text(list.map(channelIndexRow));
   },
 );
 
@@ -325,15 +307,29 @@ server.registerTool(
   'list_skills',
   {
     description:
-      "The skills this machine's harnesses list (Claude Code, Codex, Cursor Agent), to pick an agent's skills for save_crew_role: each one's name, what it does, where it comes from and the harnesses that have it. " +
+      "The skills this machine's harnesses list (Claude Code, Codex, Cursor Agent), to pick an agent's skills for save_crew_role: each one's name and a one-line description. " +
       'An agent loads the skills it names in every thread, on those harnesses. Hermes, Cursor Cloud and remote agents run elsewhere and load none. ' +
-      "channel: list that channel's project skills too.",
-    inputSchema: { channel: z.string().max(100).optional().describe('A channel id, for its repo skills. Use list_channels.') },
+      "Pass query to narrow by name, plugin or description, limit to cap rows (default 50), and channel to include that channel's repo skills.",
+    inputSchema: {
+      channel: z.string().max(100).optional().describe('A channel id, for its repo skills. Use list_channels.'),
+      query: z.string().max(200).optional().describe('Filter skills by words matching name, plugin or full description.'),
+      limit: z.number().int().min(1).max(500).optional().describe('Max skills to return. Default 50.'),
+    },
   },
-  async ({ channel }) => {
+  async ({ channel, query, limit }) => {
     const r = await call(`/skills${channel ? `?channel=${encodeURIComponent(channel)}` : ''}`);
+    const matched = skillRows(r, [], query ?? '').flatMap((row) => (row.entry ? [row.entry] : []));
+    const sliced = matched.slice(0, limit ?? 50);
+    const oneLine = (s: string | undefined) => {
+      const clean = (s ?? '').replace(/\s+/g, ' ').trim();
+      return clean.length > 120 ? `${clean.slice(0, 119).trimEnd()}…` : clean;
+    };
     return text({
-      skills: r.skills.map((s: any) => compactRow({ name: s.name, description: s.description, source: s.plugin ? `plugin ${s.plugin}` : s.source, harnesses: s.harnesses })),
+      skills: sliced.map((s) => {
+        const description = oneLine(s.description);
+        return compactRow({ name: s.name, description: description || undefined });
+      }),
+      ...(matched.length > sliced.length && { total: matched.length }),
       ...(r.loading.length && { still_loading: r.loading }),
     });
   },
@@ -912,10 +908,11 @@ server.registerTool(
       'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
       'its last model activity and the minutes since. `waits_for_sign_in`, when present, says which account it needs signed in before it starts. `open_items`, when present, lists what its last turn left for the user to resolve ' +
       '(questions, decisions with options, blockers), only while the Open items card setting is on. `members`, on a group thread, lists its agents: ' +
-      'the lead, the others seated in it, and each one\'s run and state. `collisions` lists files two of its agents both edited, while the flags are up. Only the user seats or removes an agent. Reading it never wakes the thread.',
-    inputSchema: { thread_id: z.string() },
+      'the lead, the others seated in it, and each one\'s run and state. `collisions` lists files two of its agents both edited, while the flags are up. Only the user seats or removes an agent. Reading it never wakes the thread. ' +
+      '`last_reply` is its last run\'s final message, cut at `reply_max_chars` (default 8,000). Pass `include_reply: false` when you only need its status or warmth.',
+    inputSchema: { thread_id: z.string(), ...replyInput },
   },
-  async ({ thread_id }) => text(await call(`/threads/${await threadId(thread_id)}/summary`)),
+  async ({ thread_id, include_reply, reply_max_chars }) => text(await call(`/threads/${await threadId(thread_id)}/summary?${replyQuery(include_reply, reply_max_chars)}`)),
 );
 
 server.registerTool(
@@ -937,7 +934,8 @@ server.registerTool(
 server.registerTool(
   'list_pull_requests',
   { description: PR_LIST_DESCRIPTION, inputSchema: prListInput },
-  async ({ search }) => text(prList(await call('/prs'), search)),
+  async ({ search, state, channel, limit }) =>
+    text(prList(await call(channel ? `/prs?channel=${encodeURIComponent(channel)}` : '/prs'), { search, state, limit })),
 );
 
 server.registerTool(
@@ -1271,8 +1269,11 @@ server.registerTool(
 
 server.registerTool(
   'search_history',
-  { description: `Full-text search across every thread ${USER} has run.`, inputSchema: { query: z.string() } },
-  async ({ query }) => text(compactRows(await call(`/search?q=${encodeURIComponent(query)}`))),
+  {
+    description: `Full-text search across threads ${USER} has run. Returns at most ${SEARCH_DEFAULT_LIMIT} hits by default; pass channel or limit to narrow or widen.`,
+    inputSchema: searchInput,
+  },
+  async ({ query, channel, limit }) => text(formatSearchHits(await call(searchPath({ query, channel, limit })), limit ?? SEARCH_DEFAULT_LIMIT)),
 );
 
 /** A refused delivery action is an answer for the conductor to read, not a crash: the server says why in `error`. */
@@ -1533,19 +1534,48 @@ server.registerTool('omni_connect_set', {
 registerReferencedThread(server);
 
 server.registerTool('tool_failures', {
-  description: 'Inspect machine-local tool failures grouped by harness, tool and category, most frequent first. With group_id, list occurrences with thread/call references. No raw arguments or error bodies. Use before for older occurrences.',
-  inputSchema: { group_id: z.string().optional(), status: z.enum(['open', 'investigating', 'fixed', 'avoid', 'replacement']).optional(), before: z.number().int().positive().optional() },
-}, async ({ group_id, status, before }) => text(compactRows(await call(group_id
-  ? `/tool-failures/${encodeURIComponent(group_id)}/occurrences${before ? `?before=${before}` : ''}`
-  : `/tool-failures${status ? `?status=${status}` : ''}`))));
+  description:
+    'Inspect machine-local tool failures grouped by harness, tool and category, most frequent first. ' +
+    'Without group_id, returns compact group summaries without guidance prose (filter with status, cap with limit, default 20; has_guidance marks groups with saved guidance). ' +
+    'With group_id, returns that group with its full guidance and recent occurrences (use before and limit to page). No raw arguments or error bodies.',
+  inputSchema: {
+    group_id: z.string().optional().describe('Return this one group with its full guidance and recent occurrences.'),
+    status: z.enum(['open', 'investigating', 'fixed', 'avoid', 'replacement']).optional(),
+    limit: z.number().int().min(1).max(200).optional().describe('Max groups (default 20, max 200) or occurrences (default 20, max 100).'),
+    before: z.number().int().positive().optional().describe('With group_id, cursor for older occurrences.'),
+  },
+}, async ({ group_id, status, limit, before }) => {
+  if (group_id) {
+    const max = Math.min(limit ?? 20, 100);
+    const [group, occ] = await Promise.all([
+      call(`/tool-failures/${encodeURIComponent(group_id)}`),
+      call(`/tool-failures/${encodeURIComponent(group_id)}/occurrences${before ? `?before=${before}` : ''}`),
+    ]);
+    const sliced = occ.slice(0, max);
+    return text({
+      group: compactRow(group),
+      occurrences: compactRows(sliced),
+      ...(occ.length > sliced.length && { has_more: true }),
+    });
+  }
+  const rows: any[] = await call(`/tool-failures${status ? `?status=${status}` : ''}`);
+  const sliced = rows.slice(0, limit ?? 20);
+  return text({
+    groups: sliced.map(({ guidance, ...rest }) => compactRow({ ...rest, has_guidance: Boolean(guidance) })),
+    ...(rows.length > sliced.length && { total: rows.length }),
+  });
+});
 
 server.registerTool('insights', {
   description: "The Inbox dashboard's numbers for a range: tokens and cost per harness, model and day from the local session logs (and Cursor's billing), threads marked done, busiest channels, open PRs and today's automation runs. usage.complete is false while the first log scan still runs.",
   inputSchema: { range: z.enum(['today', '7d', '30d']).default('30d') },
-}, async ({ range }) => text(await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`)));
+}, async ({ range }) => {
+  const data = await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`);
+  return text(Array.isArray(data?.channels) ? { ...data, channels: data.channels.map(({ icon: _icon, ...c }: Record<string, unknown>) => c) } : data);
+});
 
 server.registerTool('triage_tool_failure', {
-  description: 'Record tool failure remediation status and safe human-written fix/replacement/avoidance guidance. Never include raw errors, arguments, private data or credentials. Does not disable tools. A later failure reopens a fixed group.',
+  description: 'Record tool failure remediation status and safe human-written fix/replacement/avoidance guidance. Call tool_failures with group_id first to read existing guidance. Never include raw errors, arguments, private data or credentials. Does not disable tools. A later failure reopens a fixed group.',
   inputSchema: { group_id: z.string(), status: z.enum(['open', 'investigating', 'fixed', 'avoid', 'replacement']), guidance: z.string().max(1000) },
 }, async ({ group_id, ...body }) => text(await call(`/tool-failures/${encodeURIComponent(group_id)}`, { method: 'PATCH', body: JSON.stringify(body) })));
 

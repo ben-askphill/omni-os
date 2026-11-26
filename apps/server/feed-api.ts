@@ -85,7 +85,14 @@ feedApi.get('/mods', (c) => c.json(activeMods()));
 feedApi.get('/recent', (c) => c.json(allWithDelegating(threads.recent(Number(c.req.query('limit') ?? 60)))));
 /** The sidebar's Pinned section: pinned threads in every channel, the latest pin first. Archived ones drop out. */
 feedApi.get('/pinned', (c) => c.json(allWithDelegating(threads.pinned())));
-feedApi.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));
+feedApi.get('/search', (c) => {
+  const rawLimit = c.req.query('limit');
+  const limit = rawLimit !== undefined ? Number(rawLimit) : undefined;
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+    return c.json({ error: 'limit must be an integer from 1 to 100' }, 400);
+  }
+  return c.json(search(c.req.query('q') ?? '', limit, c.req.query('channel') || undefined));
+});
 
 /**
  * Needs you: unread results and blockers across every thread that is not archived, newest first. `channel` keeps
