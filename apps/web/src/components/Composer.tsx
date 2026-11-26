@@ -16,11 +16,11 @@ import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { useCommands } from './composer/use-commands.ts';
-import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
+import { agentMention, mentionedAgents } from '@omni/shared/message-context-agent.ts';
 import { replyTo, routingHint } from '@omni/shared/members.ts';
 import { isRemoteAgentHarness, remoteLeadPlaceholder } from '@omni/shared/remote-agent.ts';
 import { CommitButton } from './thread/CommitButton.tsx';
-import { useThreadAgents } from '../thread-agents.ts';
+import { newThreadAgents, useThreadAgents } from '../thread-agents.ts';
 import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
@@ -159,8 +159,13 @@ export function NewThreadComposer({
     drafts.set(key, v);
   };
 
-  const { commands, hint } = useNewThreadCommands({ text, choice, channel });
+  const { commands, hint: commandHint } = useNewThreadCommands({ text, choice, channel });
   const templates = useTemplates(templateChips);
+  // The `@` menu's Agents tab, as in a thread (ADR 0019): every agent but the lead and the Conductor, which the first
+  // message seats and goes to. Once an `@` is typed, the line under the box says who gets it.
+  const agents = useMemo(() => newThreadAgents(crew, role), [crew, role]);
+  const named = useMemo(() => mentionedAgents(refs).map((a) => ({ agent: a.agent, name: a.name })), [refs]);
+  const routing = toGrok ? null : routingHint(text, { agent: agents.lead.id, name: agents.lead.name }, named, []);
 
   /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
   const sendToGrok = async (prompt: string) => {
@@ -211,8 +216,8 @@ export function NewThreadComposer({
   };
 
   /** Ask: a quick ask in this channel, on the picked run, answered right here with read-only tools. */
-  // It runs here and delegates nothing, so a machine mention stays out of it.
-  const quickRefs = refs.filter((r) => r.kind !== machineMention.kind);
+  // It runs here, delegates nothing and starts with no members, so machine and agent mentions stay out of it.
+  const quickRefs = refs.filter((r) => r.kind !== machineMention.kind && r.kind !== agentMention.kind);
   const ask = async () => {
     const prompt = text.trim();
     if (!prompt || busy || toGrok) return;
@@ -258,6 +263,7 @@ export function NewThreadComposer({
           records={refs}
           // `@` a machine: the Conductor (or a role with the omni tools) starts the task there.
           mentions={newThreadScope(channel, role)}
+          agents={toGrok ? undefined : agents}
           commands={{ ...commands, where: 'new-thread' }}
           // Near the top of the page, so the menus open downward.
           below
@@ -322,7 +328,14 @@ export function NewThreadComposer({
           </div>
         </div>
         {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-        <div aria-live="polite">{hint && !menuOpen && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+        <div aria-live="polite">
+          {commandHint && !menuOpen && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{commandHint}</div>}
+          {!commandHint && routing && (
+            <div data-routing-hint className="px-4 pb-2.5 text-[12px] text-fg-3">
+              {routing}
+            </div>
+          )}
+        </div>
         {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
         {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
         {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}

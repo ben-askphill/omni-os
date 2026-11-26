@@ -22,15 +22,17 @@ export function stampThreadReferences(threadId: string, records: readonly Messag
 
 /**
  * The same for the first message of a thread not made yet, which will be made in `channel`: the new-thread composer's
- * references. Only thread references may go there (every other kind points into the thread it is written in), so a
- * record of another kind is refused rather than passed on.
+ * references. Only thread references, machine mentions and agent mentions may go there (every other kind points into
+ * the thread it is written in), so a record of another kind is refused rather than passed on.
  */
 export function stampNewThreadReferences(channel: string, records: readonly MessageContext[], at: Date = new Date()): Stamped {
-  // Machine mentions are stamped by the route after this (machine-mention.ts stampMachineMentions).
-  const other = records.find((r) => r.kind !== 'thread_reference' && r.kind !== 'machine_mention');
-  if (other) return { ok: false, error: `${other.label}: a new thread's first message can carry thread references and machine mentions only. Add it in a reply once the thread has started.` };
+  // Machine and agent mentions are stamped by the route after this (stampMachineMentions, stampAgentMentions).
+  const other = records.find((r) => r.kind !== 'thread_reference' && r.kind !== 'machine_mention' && r.kind !== 'agent_mention');
+  if (other) return { ok: false, error: `${other.label}: ${NEW_THREAD_KINDS}` };
   return stamp(null, channels.get(channel) ? channel : null, records, at);
 }
+
+const NEW_THREAD_KINDS ="a new thread's first message can carry thread references, machine mentions and agent mentions only. Add it in a reply once the thread has started.";
 
 type Stamped = { ok: true; value: MessageContext[] } | { ok: false; error: string };
 

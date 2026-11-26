@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
@@ -15,6 +15,9 @@ import { clearDraftContext, removeDraftContext, useDraftContext } from '../messa
 import { referencesFor } from '../message-context/thread-picker.ts';
 import { MessageEditor, newThreadScope, type MessageEditorHandle } from '../components/composer/MessageEditor.tsx';
 import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
+import { agentMention, mentionedAgents } from '@omni/shared/message-context-agent.ts';
+import { routingHint } from '@omni/shared/members.ts';
+import { newThreadAgents } from '../thread-agents.ts';
 import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote, Segmented } from '../components/ui.tsx';
@@ -123,6 +126,10 @@ export function NewSheet({ channel: initial, prompt: first, run: preset }: { cha
   const close = () => shell.sheet(null);
   // The `/` menu: the commands the picked harness lists for the channel, and why a command would stay text.
   const { commands, hint } = useNewThreadCommands({ text, choice: run?.choice ?? AUTO_CHOICE, channel: target });
+  // A task's `@` menu lists the agents its first message seats and goes to, as the desktop composer's does. An Ask
+  // starts with no members, so it lists none.
+  const agents = useMemo(() => newThreadAgents(crew, role), [crew, role]);
+  const named = useMemo(() => mentionedAgents(refs).map((a) => ({ agent: a.agent, name: a.name })), [refs]);
   const [menuOpen, setMenuOpen] = useState(false);
   // Grok Bot takes the text alone: the model and the base do not apply, and attachments stop the send.
   const toGrok = runOn.grokBot;
@@ -140,13 +147,14 @@ export function NewSheet({ channel: initial, prompt: first, run: preset }: { cha
   };
 
   const asking = mode === 'ask' && !toGrok;
+  const routing = asking || toGrok ? null : routingHint(text, { agent: agents.lead.id, name: agents.lead.name }, named, []);
   const send = async () => {
     const prompt = text.trim();
     if (!prompt || busy) return;
     if (toGrok) return sendToGrok(prompt);
     if (asking) {
-      // A quick ask runs here and delegates nothing, so a machine mention stays out of it.
-      const quickRefs = refs.filter((r) => r.kind !== machineMention.kind);
+      // A quick ask runs here, delegates nothing and starts with no members, so machine and agent mentions stay out of it.
+      const quickRefs = refs.filter((r) => r.kind !== machineMention.kind && r.kind !== agentMention.kind);
       setBusy(true);
       setError(null);
       try {
@@ -253,6 +261,7 @@ export function NewSheet({ channel: initial, prompt: first, run: preset }: { cha
             // Files, and for a task the Conductor starts, the machine each task goes to, as on the desktop. An Ask
             // runs here with read-only tools, so it lists no machines.
             mentions={mentions}
+            agents={asking || toGrok ? undefined : agents}
             commands={toGrok ? undefined : { ...commands, where: 'new-thread' }}
             // Upward: the sheet ends near the box, and the phone keyboard sits under it.
             anchor={frame}
@@ -335,7 +344,14 @@ export function NewSheet({ channel: initial, prompt: first, run: preset }: { cha
           </div>
         )}
         {(att.error || error) && <ErrorNote className="mx-3 mt-2">{att.error ?? error}</ErrorNote>}
-        <div aria-live="polite">{hint && !menuOpen && !toGrok && <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">{hint}</p>}</div>
+        <div aria-live="polite">
+          {hint && !menuOpen && !toGrok && <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">{hint}</p>}
+          {!hint && routing && (
+            <p data-routing-hint className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
+              {routing}
+            </p>
+          )}
+        </div>
         <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
           {toGrok
             ? GROK_BOT_NOTE
