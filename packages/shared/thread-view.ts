@@ -7,7 +7,7 @@ import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
 import { connectorOf, isOutsideConnector, type Connector } from './connectors.ts';
 import { turnSteps, type StepsView } from './steps.ts';
-import { authorOf, buildItems, isAsking, isReply, seatedDelegationsAt, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
+import { authorOf, buildItems, cardAnswer, isAsking, isReply, seatedDelegationsAt, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
 import { laneFold, type LaneState } from './lanes.ts';
 import type { Collision } from './collisions.ts';
 import type { SeatedDelegation, ThreadMember } from './members.ts';
@@ -341,7 +341,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     for (const r of shown) {
       const t = turns.find((t) => t.children.some((c) => c.id === r.thread_id)) ??
         laneTurns.find((t) => t.children.some((c) => c.id === r.thread_id)) ?? turns[turns.length - 1];
-      if (t.children.some((c) => c.id === r.thread_id)) t.answers[r.thread_id] = r;
+      if (t.children.some((c) => c.id === r.thread_id)) t.answers[r.thread_id] = cardAnswer(t.answers[r.thread_id], r);
       else t.reports.push(r);
     }
   }

@@ -145,6 +145,8 @@ export interface ThreadDetail {
    * Older servers leave it out.
    */
   crew_artifacts?: ArtifactWithThread[];
+  /** The files of the pages its crew reports carry (apps/server/report-renders.ts). Left out when there are none. */
+  report_renders?: ArtifactWithThread[];
   children: Thread[];
   /** Members of the teams among `children`. Older servers leave it out. */
   team?: Thread[];

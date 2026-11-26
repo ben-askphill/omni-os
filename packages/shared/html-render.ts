@@ -2,6 +2,7 @@
 // table or mockup that sits in the transcript above the reply. The server saves each one as an artifact under
 // artifacts/renders/, so it syncs and stays in the Library like any file, and serves it with `?frame=1` to the frame.
 // packages/test-fixtures/html-render.json holds the call parsing's cases.
+import type { ReportRender } from './report-pages.ts';
 
 export const RENDER_SERVER = 'omni-render';
 export const RENDER_MAX_BYTES = 512_000;
@@ -22,6 +23,30 @@ export interface Rendered {
 /** What html_render answers. `renderedFrom` reads the artifact id back out of it. */
 export const renderedText = (r: Rendered) =>
   `Shown inline in the thread as "${r.title}" (artifact ${r.artifact}). Do not restate or describe the page: say what it means, or nothing.`;
+
+/** The title an html_render answer names, or null for any other text. */
+export const renderedTitle = (text: string) => /^Shown inline in the thread as "(.*)" \(artifact \d+\)/.exec(text)?.[1] ?? null;
+
+/** The start of a rendered page's file name: the title in lowercase words (apps/server/renders-api.ts adds a suffix). */
+export const renderSlug = (title: string) =>
+  title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page';
+
+/** A title read back from a page's file name, for a page whose html_render call is not at hand. */
+export const titleFromName = (name: string) => {
+  const words = name.replace(/(?:-[0-9a-f]{6})?\.html?$/i, '').replace(/-+/g, ' ').trim() || 'Page';
+  return words[0].toUpperCase() + words.slice(1);
+};
+
+/** What finding a report's page reads of an artifact row. */
+export interface RenderRow {
+  thread_id: string;
+  name: string;
+  path: string;
+}
+
+/** The artifact row a report's page is saved as, among `rows`, or undefined until it is known here. */
+export const reportRenderRow = <A extends RenderRow>(r: ReportRender, rows: readonly A[]): A | undefined =>
+  rows.find((a) => a.thread_id === r.thread_id && a.name === r.name && isRenderPath(a.path));
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 

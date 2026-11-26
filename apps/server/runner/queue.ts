@@ -18,6 +18,7 @@ import { heldElsewhere, lostTo } from '../ownership.ts';
 import { machineName, wakeBlocked } from '../sync/guard.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 import { notifyCrewReport } from '../push-sender.ts';
+import { reportRenders } from '../report-renders.ts';
 import {
   capFor,
   deliveryPhase,
@@ -229,6 +230,8 @@ export function reportToParent(childId: string, status: string, said: string | {
     status,
     ...(remote && { harness: child.harness, harness_name: harnessName(child.harness), remote: true }),
     ...(ask && { ask: true, ...(ask.wake === false && { quiet: true }) }),
+    // The pages it showed since its last report, and those its own crew's reports brought it (report-renders.ts).
+    ...reportRenders(child.id, parent.id),
   };
   // A lead that has not run yet waits for its whole team, then runs once with every report.
   const waitingLead = child.source === 'team' && !parent.has_run && !lives.has(parent.id) && !waiting.includes(parent.id);
@@ -254,7 +257,8 @@ const reportText = (r: CrewReport, max = REPORT_MAX_CHARS) => {
   const notes = r.status !== 'done' ? (r.notes ?? []) : [];
   const before = notes.length ? `\n\nWhat it said before that:\n\n${notes.join('\n\n')}` : '';
   const body = capText(`${r.text}${before}`, max, `get_thread on ${r.thread_id} with a higher reply_max_chars reads its final reply`);
-  return `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'}${r.remote ? ` on ${r.harness_name ?? r.harness} (remote)` : ''} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${body}`;
+  const pages = r.renders?.length ? `\n\nPages shown with this report, which ${userName()} sees: ${r.renders.map((p) => `"${p.title}"`).join(', ')}. Do not describe them again.` : '';
+  return `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'}${r.remote ? ` on ${r.harness_name ?? r.harness} (remote)` : ''} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${body}${pages}`;
 };
 
 /**

@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
+import { unseenRenders } from '../report-pages.ts';
 import { join } from 'node:path';
-import { INLINE_MAX_HEIGHT, isRenderPath, readFrameHeight, RENDER_COLORS, RENDER_MAX_BYTES, RENDER_MAX_TITLE, RENDER_OTHER, renderedFrom, renderedText, RENDER_NARROW_CSS, withFrameScript, withNarrowSheet } from '../html-render.ts';
+import { INLINE_MAX_HEIGHT, isRenderPath, readFrameHeight, RENDER_COLORS, RENDER_MAX_BYTES, RENDER_MAX_TITLE, RENDER_OTHER, renderedFrom, renderedText, renderedTitle, renderSlug, RENDER_NARROW_CSS, reportRenderRow, titleFromName, withFrameScript, withNarrowSheet } from '../html-render.ts';
 
 const cases = JSON.parse(readFileSync(fixture('html-render.json'), 'utf8')) as {
   case: string;
@@ -24,6 +25,39 @@ describe('renderedFrom', () => {
 
   it('needs a result', () => {
     expect(renderedFrom('mcp__omni-render__html_render', { title: 'T' }, undefined)).toBeNull();
+  });
+});
+
+describe('a page a crew report carries', () => {
+  it('reads its title back from what html_render answered, or from its file name', () => {
+    expect(renderedTitle(renderedText({ artifact: 3, title: 'Signups "by week"' }))).toBe('Signups "by week"');
+    expect(renderedTitle('ok')).toBeNull();
+    expect(renderSlug('PRs by repo, Q3!')).toBe('prs-by-repo-q3');
+    expect(renderSlug('???')).toBe('page');
+    expect(titleFromName('commits-by-package-9c29b6.html')).toBe('Commits by package');
+    expect(titleFromName('report.html')).toBe('Report');
+  });
+
+  it('finds its file by thread and name, and only a rendered page', () => {
+    const page = { thread_id: 't2', name: 'chart-a1b2c3.html', title: 'Chart' };
+    const rows = [
+      { id: 1, thread_id: 't1', name: 'chart-a1b2c3.html', path: '/d/threads/t1/artifacts/renders/chart-a1b2c3.html' },
+      { id: 2, thread_id: 't2', name: 'chart-a1b2c3.html', path: '/d/threads/t2/artifacts/chart-a1b2c3.html' },
+      { id: 3, thread_id: 't2', name: 'chart-a1b2c3.html', path: '/d/threads/t2/artifacts/renders/chart-a1b2c3.html' },
+    ];
+    expect(reportRenderRow(page, rows)?.id).toBe(3);
+    expect(reportRenderRow(page, rows.slice(0, 2))).toBeUndefined();
+  });
+
+  it('shows each page once per transcript, and hands back the same list when nothing was dropped', () => {
+    const seen = new Set<string>();
+    const a = { thread_id: 't', name: 'a-000000.html', title: 'A' };
+    const b = { thread_id: 't', name: 'b-000000.html', title: 'B' };
+    const first = [a];
+    expect(unseenRenders(first, seen)).toBe(first);
+    expect(unseenRenders([a, b], seen)).toEqual([b]);
+    expect(unseenRenders([b], seen)).toEqual([]);
+    expect(unseenRenders(undefined, seen)).toBeUndefined();
   });
 });
 

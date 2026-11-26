@@ -44,6 +44,7 @@ import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
 import { useThreadPanel } from './useThreadPanel.ts';
 import { useThreadPresence } from './useThreadPresence.ts';
 import { useThreadSession } from './useThreadSession.ts';
+import { ReportPagesProvider } from '../components/thread/ReportPages.tsx';
 import { useTranscriptScroll } from './useTranscriptScroll.ts';
 import { useReveal } from './useReveal.ts';
 import { useThreadFind } from './useThreadFind.ts';
@@ -73,6 +74,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     files,
     shots,
     crew,
+    pageRows,
     selectedArtifact,
     setSelected,
     panelTab,
@@ -268,7 +270,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
                     <FindTargetCtx.Provider value={find.target}>
-                      <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} seats={thread.members} running={turnInProgress} mark={mark} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                      <ReportPagesProvider rows={pageRows}>
+                        <Transcript threadId={id} channelId={thread.channel_id} code={code} events={events} lead={thread.role} harness={thread.harness} model={thread.model || init?.model} seats={thread.members} running={turnInProgress} mark={mark} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                      </ReportPagesProvider>
                     </FindTargetCtx.Provider>
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>

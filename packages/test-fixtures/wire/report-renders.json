@@ -1,0 +1,36 @@
+{
+  "report": {
+    "text": "ack: THINK:1500 chart them",
+    "notes": [],
+    "task_id": "T-PAGE",
+    "thread_id": "00000000-0000-4000-8000-000000000093",
+    "title": "Chart them",
+    "role": null,
+    "channel": "acme",
+    "status": "done",
+    "renders": [
+      {
+        "thread_id": "00000000-0000-4000-8000-000000000093",
+        "name": "sales-by-week-5bc6b3.html",
+        "title": "Sales by week"
+      }
+    ],
+    "through": "2026-01-05T09:00:00.000Z"
+  },
+  "report_renders": [
+    {
+      "id": 3,
+      "thread_id": "00000000-0000-4000-8000-000000000093",
+      "path": "/tmp/omni-fixtures/data/threads/00000000-0000-4000-8000-000000000093/artifacts/renders/sales-by-week-5bc6b3.html",
+      "name": "sales-by-week-5bc6b3.html",
+      "kind": "html",
+      "size": 27,
+      "url": null,
+      "description": null,
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "updated_at": "2026-01-05T09:00:00.000Z",
+      "thread_title": "Chart them",
+      "channel_id": "acme"
+    }
+  ]
+}

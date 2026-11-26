@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { Hono } from 'hono';
-import { RENDER_MAX_BYTES, RENDER_MAX_TITLE } from '@omni/shared/html-render.ts';
+import { RENDER_MAX_BYTES, RENDER_MAX_TITLE, renderSlug } from '@omni/shared/html-render.ts';
 import { register } from './artifacts.ts';
 import { artifactsDir, paths } from './config.ts';
 import { threads } from './db.ts';
@@ -12,8 +12,7 @@ import { threads } from './db.ts';
 export const rendersApi = new Hono();
 
 /** A file name from the title: lowercase words, then a random suffix, so two pages with one title never collide. */
-const fileName = (title: string) =>
-  `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page'}-${randomBytes(3).toString('hex')}.html`;
+const fileName = (title: string) => `${renderSlug(title)}-${randomBytes(3).toString('hex')}.html`;
 
 /** `{ title, html }` in, `{ artifact }` out. A 400 says what to fix, and the agent reads it. */
 rendersApi.post('/:id/renders', async (c) => {

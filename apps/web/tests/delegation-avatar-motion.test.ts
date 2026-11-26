@@ -7,7 +7,8 @@ import { branchShows } from '@omni/shared/crew-eyes.ts';
 // A delegated thread's avatar on the Delegation card follows the thread's live status without opening the thread: eyes
 // from the status, and the working loop while it runs (ADR 0021, D29). Idle once it finishes, fails or is stopped.
 const crew = vi.hoisted(() => ({ roles: [{ id: 'builder', name: 'builder' }] as { id: string; name: string }[] }));
-vi.mock('../src/store.tsx', () => ({ useCrewRoles: () => crew.roles, useNow: () => Date.now() }));
+// The rest of the store stays real: the card reaches the report body and the pages it draws.
+vi.mock('../src/store.tsx', async (real) => ({ ...(await real<object>()), useCrewRoles: () => crew.roles, useNow: () => Date.now() }));
 
 import { BranchFace } from '../src/components/Delegation.tsx';
 
