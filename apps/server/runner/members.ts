@@ -354,9 +354,13 @@ export function routeNamed(
 ): void {
   if (device !== undefined) {
     const pending = pendingAgents(threadId);
+    // No pin runs on this machine, so a pin to this machine is no move: a brief that leaves the device out, or names
+    // this machine, still reaches a seat that is working.
+    const here = outbox.machineId();
+    const machine = (d: string | null) => d ?? here;
     for (const a of named) {
       const current = members.of(threadId, a);
-      if (current && !current.removed_at && current.device !== device && (pending.has(a) || memberWorking(current))) {
+      if (current && !current.removed_at && machine(current.device) !== machine(device) && (pending.has(a) || memberWorking(current))) {
         throw refusal(`${agentName(a)} is still working in this thread. Wait until the agent is idle to change its machine.`, 409);
       }
     }
