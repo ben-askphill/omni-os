@@ -43,7 +43,7 @@ export const config = {
   port: Number(env.OMNI_PORT ?? 4747),
   host: env.OMNI_HOST ?? '127.0.0.1',
   /**
-   * The workspace folder: cwd of non-repo threads, added to every Claude thread with its CLAUDE.md. From the user
+   * The workspace folder: cwd of non-repo threads, added to every Claude thread with its CLAUDE.md, except #conductor's (harness/claude/adapter.ts workspaceClaudeMd). From the user
    * config (data/omni.config.json, apps/server/user-config.ts), OMNI_BRAIN_DIR still wins. Read live, so onboarding
    * applies without a restart.
    */

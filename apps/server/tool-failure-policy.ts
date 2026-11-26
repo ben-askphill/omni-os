@@ -1,4 +1,4 @@
-/** Included in every Omni system prompt, regardless of role, source or harness. */
+/** In every Omni system prompt, whatever the source or harness, except a delegate-only agent's (runner/prompts.ts), which runs no shell or subagent. Sent once per session, never again on a resume. */
 export const TOOL_FAILURE_POLICY = [
   '## Tool failures',
   'Omni records tool failures reported by your harness automatically. Treat a failure as evidence to triage, never as a reason to disable a tool after one occurrence.',
