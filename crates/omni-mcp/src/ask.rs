@@ -120,7 +120,7 @@ pub async fn run(api: &Api, arguments: &JsValue) -> Outcome {
                 }
                 return match answer.get("text") {
                     Some(JsValue::String(text)) => Outcome::Text(text.clone()),
-                    Some(other) => Outcome::Text(JsString::from(js::stringify_pretty(other))),
+                    Some(other) => Outcome::Text(JsString::from(js::stringify(other))),
                     None => Outcome::Broken,
                 };
             }

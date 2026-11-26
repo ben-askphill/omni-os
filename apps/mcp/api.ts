@@ -1,6 +1,7 @@
 // The local Omni API as Omni's stdio MCP servers (omni.ts, ask.ts) reach it, with the URL, token and thread id
 // Omni hands each thread's server (apps/server/sandbox.ts buildMcpConfig).
 import { readFileSync } from 'node:fs';
+import { compactJson } from '@omni/shared/mcp-compact.ts';
 
 const BASE = process.env.OMNI_URL ?? 'http://127.0.0.1:4747';
 /**
@@ -60,4 +61,4 @@ export async function call(path: string, init?: RequestInit) {
   return body;
 }
 
-export const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
+export const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: compactJson(v) }] });
