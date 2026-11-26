@@ -101,12 +101,17 @@ describe('GET /api/threads/:id/events/:eventId', () => {
 });
 
 describe('GET /api/search', () => {
-  it('names the event of a body hit, and none for a thread only its title matched', async () => {
+  it('names the event and body snippet of a body hit, keeps body snippet on title+body hits, and supports limit and channel', async () => {
     const hits = (await call('/search?q=pelican')).body as any[];
-    expect(hits).toEqual([expect.objectContaining({ thread_id: 'b', event_id: other })]);
+    expect(hits).toEqual([expect.objectContaining({ thread_id: 'b', event_id: other, snippet: expect.stringContaining('<mark>pelican</mark>') })]);
     const both = (await call('/search?q=albatross')).body as any[];
-    expect(both).toEqual([expect.objectContaining({ thread_id: 'a', event_id: first, snippet: '' })]);
+    expect(both).toEqual([expect.objectContaining({ thread_id: 'a', event_id: first, snippet: expect.stringContaining('<mark>albatross</mark>') })]);
     const titled = (await call('/search?q=notes')).body as any[];
     expect(titled).toEqual([expect.objectContaining({ thread_id: 'a', event_id: null, snippet: '' })]);
+    const filtered = (await call('/search?q=albatross&channel=scratch&limit=1')).body as any[];
+    expect(filtered).toHaveLength(1);
+    expect((await call('/search?q=albatross&channel=other-channel')).body).toEqual([]);
+    expect((await call('/search?q=albatross&limit=0')).status).toBe(400);
+    expect((await call('/search?q=albatross&limit=101')).status).toBe(400);
   });
 });

@@ -123,15 +123,19 @@ describe('/mcp: the tools', () => {
     expect((await tool('list_channels')).body.map((c: any) => c.id)).toContain('scratch');
     expect((await tool('list_threads', { channel: 'scratch' })).body.map((x: any) => x.id)).toContain(t.id);
     expect((await tool('list_pull_requests')).body).toEqual({ prs: [], failed: [] });
+    expect((await tool('list_pull_requests', { channel: 'scratch' })).body).toEqual({ prs: [], failed: [] });
+    expect(await tool('list_pull_requests', { channel: 'no-such-channel' })).toMatchObject({ isError: true, raw: expect.stringContaining('No channel with this id.') });
   });
 
   it('reads a thread conversation a page at a time, and says not found for an unknown thread', T, async () => {
     const t = make('Talky');
     for (let i = 0; i < 60; i++) h.db.events.add(t.id, i % 2 ? 'assistant_text' : 'user', { text: `line ${i}` });
     const page = await tool('read_thread', { thread_id: t.id });
-    expect(page.body.rows).toHaveLength(40);
+    expect(page.body.rows).toHaveLength(15);
+    expect(page.body.limits).toEqual({ rows: 15, page_chars: 20_000, row_chars: 3_000 });
     expect(page.body.rows.at(-1).text).toBe('line 59');
-    const older = await tool('read_thread', { thread_id: t.id, before: page.body.older });
+    const older = await tool('read_thread', { thread_id: t.id, before: page.body.older, limit: 50 });
+    expect(older.body.rows).toHaveLength(45);
     expect(older.body.rows[0].text).toBe('line 0');
     expect(older.body.older).toBeNull();
     const missing = await tool('read_thread', { thread_id: randomUUID() });

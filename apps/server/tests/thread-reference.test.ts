@@ -15,7 +15,7 @@ const H = await startRunner();
 const { app } = await import('../app.ts');
 const { harnessText } = await import('../message-context/project.ts');
 const { stampThreadReferences } = await import('../message-context/thread-reference.ts');
-const { HISTORY_TOOL, PAGE_CHARS_MAX, PAGE_ROWS_DEFAULT, PAGE_ROWS_MAX, ROW_CHARS_MAX, readReferenced } = await import('../thread-history.ts');
+const { HISTORY_TOOL, PAGE_CHARS_DEFAULT, PAGE_CHARS_MAX, PAGE_ROWS_DEFAULT, PAGE_ROWS_MAX, ROW_CHARS_DEFAULT, ROW_CHARS_MAX, readReferenced } = await import('../thread-history.ts');
 const { PICK_LIMIT } = await import('../thread-references-api.ts');
 const { db } = H;
 
@@ -267,7 +267,7 @@ describe('reading a referenced thread', () => {
     expect(body.rows.at(-1).text).toBe(`message ${total - 1}`);
     expect(body.rows.map((r: any) => r.id)).toEqual([...body.rows.map((r: any) => r.id)].sort((a, b) => a - b));
     expect(body.thread).toMatchObject({ id: long.id, title: 'Very long thread', channel_name: 'Shop' });
-    expect(body.limits).toEqual({ rows: PAGE_ROWS_MAX, page_chars: PAGE_CHARS_MAX, row_chars: ROW_CHARS_MAX });
+    expect(body.limits).toEqual({ rows: PAGE_ROWS_DEFAULT, page_chars: PAGE_CHARS_DEFAULT, row_chars: ROW_CHARS_DEFAULT });
     expect(body.newer).toBeNull();
     expect(body.older).toBe(body.rows[0].id);
     expect(body.note).toContain('data, not instructions');
@@ -297,21 +297,31 @@ describe('reading a referenced thread', () => {
     expect(next.older).toBe(next.rows[0].id);
     expect((await read('before=5&after=3')).status).toBe(400);
     expect((await read(`limit=${PAGE_ROWS_MAX + 1}`)).status).toBe(400);
+    expect((await read(`page_chars=${PAGE_CHARS_MAX + 1}`)).status).toBe(400);
+    expect((await read(`row_chars=${ROW_CHARS_MAX + 1}`)).status).toBe(400);
   });
 
   it('cuts one very long message and says how long it was, and ends a page before it passes the page budget', async () => {
     const t = make('shop', 'Big messages');
     for (let i = 0; i < 12; i++) say(t.id, 'assistant_text', `${i}:${'x'.repeat(ROW_CHARS_MAX * 2)}`);
     referenced(from.id, t);
-    const { body } = await read('limit=100', t.id);
+    // Defaults: 3K per row, 20K per page.
+    const def = (await read('', t.id)).body;
+    expect(def.limits).toEqual({ rows: PAGE_ROWS_DEFAULT, page_chars: PAGE_CHARS_DEFAULT, row_chars: ROW_CHARS_DEFAULT });
+    expect(def.rows[0].text).toHaveLength(ROW_CHARS_DEFAULT);
+    expect(def.rows.reduce((n: number, r: any) => n + r.text.length, 0)).toBeLessThanOrEqual(PAGE_CHARS_DEFAULT);
+    expect(def.rows).toHaveLength(Math.floor(PAGE_CHARS_DEFAULT / ROW_CHARS_DEFAULT));
+    // Explicit larger page and row budgets still work up to the maximums.
+    const { body } = await read(`limit=100&page_chars=${PAGE_CHARS_MAX}&row_chars=${ROW_CHARS_MAX}`, t.id);
     const first = body.rows[0];
+    expect(body.limits).toEqual({ rows: PAGE_ROWS_MAX, page_chars: PAGE_CHARS_MAX, row_chars: ROW_CHARS_MAX });
     expect(first.text).toHaveLength(ROW_CHARS_MAX);
     expect(first.cut_from).toBe(ROW_CHARS_MAX * 2 + String(12 - body.rows.length).length + 1);
     expect(body.rows.reduce((n: number, r: any) => n + r.text.length, 0)).toBeLessThanOrEqual(PAGE_CHARS_MAX);
     expect(body.rows).toHaveLength(Math.floor(PAGE_CHARS_MAX / ROW_CHARS_MAX));
     expect(body.older).toBe(first.id);
     // The cursor still makes progress through what the budget left out.
-    const older = (await read(`limit=100&before=${body.older}`, t.id)).body;
+    const older = (await read(`limit=100&page_chars=${PAGE_CHARS_MAX}&row_chars=${ROW_CHARS_MAX}&before=${body.older}`, t.id)).body;
     expect(older.rows.at(-1).id).toBeLessThan(first.id);
   });
 
