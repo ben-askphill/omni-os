@@ -72,7 +72,10 @@ async function connect(threadId: string) {
 }
 const callTool = async (client: McpClient, args: Record<string, unknown>) => {
   const r = (await client.request('tools/call', { name: 'read_referenced_thread', arguments: args })) as { isError?: boolean; content: { type: string; text: string }[] };
-  return { isError: !!r.isError, body: JSON.parse(r.content[0].text) as any };
+  const raw = r.content[0].text;
+  const body = JSON.parse(raw) as any;
+  expect(raw).toBe(JSON.stringify(body));
+  return { isError: !!r.isError, body };
 };
 
 describe.skipIf(!hasMcpBuild)('read_referenced_thread', () => {

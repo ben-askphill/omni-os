@@ -9,6 +9,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { prList, prListInput, PR_LIST_DESCRIPTION } from '../pull-requests.ts';
+import { compactRow, compactRows, text } from '../compact.ts';
 import { isConductor } from '@omni/shared/crew-role.ts';
 
 /** One /api request: `path` without the /api prefix. Resolves to the JSON body, throws with the API's error otherwise. */
@@ -23,8 +24,6 @@ export const callOver =
     if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
     return body;
   };
-
-const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
 
 /** A thread in these states has not answered yet. */
 const ACTIVE = new Set(['queued', 'running']);
@@ -55,7 +54,7 @@ const thread = (t: any) => ({
   updated_at: t.updated_at,
 });
 
-const folder = (f: any) => ({ id: f.id, name: f.name, channel: f.channel_id, threads: f.count, running: f.running, recent: (f.threads ?? []).slice(0, 5).map((t: any) => t.title) });
+const folder = (f: any) => compactRow({ id: f.id, name: f.name, channel: f.channel_id, threads: f.count, running: f.running, recent: (f.threads ?? []).slice(0, 5).map((t: any) => t.title) });
 
 /** The folder `name` names in `channel`, by id or name ignoring case and spacing. Null when none does. */
 async function findFolder(call: Call, channel: string, name: string): Promise<{ id: string; name: string } | null> {
@@ -73,16 +72,18 @@ export function registerExternalTools(server: McpServer, call: Call) {
     },
     async () =>
       text(
-        (await call('/channels')).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          kind: c.kind,
-          repo: c.github_repo,
-          store: c.store_domain,
-          running: c.running,
-          notes: c.notes,
-          folders: (c.folders ?? []).map((f: any) => ({ id: f.id, name: f.name, threads: f.count })),
-        })),
+        (await call('/channels')).map((c: any) =>
+          compactRow({
+            id: c.id,
+            name: c.name,
+            kind: c.kind,
+            repo: c.github_repo,
+            store: c.store_domain,
+            running: c.running,
+            notes: c.notes,
+            folders: (c.folders ?? []).map((f: any) => compactRow({ id: f.id, name: f.name, threads: f.count })),
+          }),
+        ),
       ),
   );
 
@@ -90,7 +91,7 @@ export function registerExternalTools(server: McpServer, call: Call) {
     'list_crew',
     { description: 'List the agents a thread can run as (conductor, builder, researcher and so on), with what each is for.', annotations: { readOnlyHint: true } },
     // Hidden roles are left out by the API. The Conductor stays: a client may start a thread as it. usage-scan, which only Omni starts, does not.
-    async () => text((await call('/crew')).filter((r: any) => r.delegatable || isConductor(r.id)).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+    async () => text((await call('/crew')).filter((r: any) => r.delegatable || isConductor(r.id)).map((r: any) => compactRow({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
   );
 
   server.registerTool(
@@ -104,14 +105,19 @@ export function registerExternalTools(server: McpServer, call: Call) {
     },
     async ({ channel }) =>
       text(
-        (await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses')).map((h: any) => ({
-          id: h.id,
-          name: h.name,
-          available: h.available,
-          fix: h.available ? undefined : h.fix,
-          running: h.running,
-          models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default: m.default })),
-        })),
+        (await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses')).map((h: any) =>
+          compactRow(
+            {
+              id: h.id,
+              name: h.name,
+              available: h.available,
+              fix: h.available ? undefined : h.fix,
+              running: h.running,
+              models: (h.models ?? []).map((m: any) => compactRow({ id: m.id, label: m.label, efforts: m.efforts, default: m.default })),
+            },
+            ['available'],
+          ),
+        ),
       ),
   );
 
@@ -130,7 +136,7 @@ export function registerExternalTools(server: McpServer, call: Call) {
       const q = new URLSearchParams({ limit: String(limit ?? 20) });
       if (channel) q.set('channel', channel);
       if (status) q.set('status', status);
-      return text((await call(`/threads?${q}`)).map(thread));
+      return text((await call(`/threads?${q}`)).map((t: any) => compactRow(thread(t))));
     },
   );
 
@@ -143,7 +149,7 @@ export function registerExternalTools(server: McpServer, call: Call) {
   server.registerTool(
     'search_threads',
     { description: 'Full-text search across every Omni thread: titles and what was said.', inputSchema: { query: z.string().min(1) }, annotations: { readOnlyHint: true } },
-    async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
+    async ({ query }) => text(compactRows(await call(`/search?q=${encodeURIComponent(query)}`))),
   );
 
   server.registerTool(
@@ -363,17 +369,22 @@ export function registerExternalTools(server: McpServer, call: Call) {
     },
     async () =>
       text(
-        (await call('/automations')).map((a: any) => ({
-          id: a.id,
-          name: a.name,
-          enabled: a.enabled,
-          channel: a.channel,
-          schedule: a.cron || null,
-          on: a.on ?? null,
-          next: a.next ?? null,
-          error: a.error ?? null,
-          last_runs: (a.runs ?? []).map((r: any) => ({ thread_id: r.thread_id, title: r.title, status: r.status, trigger: r.trigger, at: r.created_at })),
-        })),
+        (await call('/automations')).map((a: any) =>
+          compactRow(
+            {
+              id: a.id,
+              name: a.name,
+              enabled: a.enabled,
+              channel: a.channel,
+              schedule: a.cron || null,
+              on: a.on ?? null,
+              next: a.next ?? null,
+              error: a.error ?? null,
+              last_runs: (a.runs ?? []).map((r: any) => compactRow({ thread_id: r.thread_id, title: r.title, status: r.status, trigger: r.trigger, at: r.created_at })),
+            },
+            ['enabled'],
+          ),
+        ),
       ),
   );
 

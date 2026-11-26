@@ -60,4 +60,4 @@ export async function call(path: string, init?: RequestInit) {
   return body;
 }
 
-export const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
+export { text } from './compact.ts';
