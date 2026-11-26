@@ -101,10 +101,10 @@ const KNOWN: { re: RegExp; id: string; name: string; icon?: string }[] = [
 export const OMNI_CONNECTOR: Connector = { id: 'omni', name: 'Omni', mark: { type: 'omni' }, kind: 'omni' };
 
 /**
- * Omni's own servers: `omni` (the Conductor's tools) and the per-thread `omni-ask`, `omni-steps`, `omni-render`,
+ * Omni's own servers: `omni` and `omni-admin` (the Conductor's tools) and the per-thread `omni-ask`, `omni-steps`, `omni-render`,
  * `omni-threads`, `omni-memory` and `omni-team`.
  */
-const OMNI_SERVER = /^omni([-_](ask|steps|render|threads|memory|team))?$/;
+const OMNI_SERVER = /^omni([-_](admin|ask|steps|render|threads|memory|team))?$/;
 
 /** The connector behind a server, or null for a browser server, which is not one. */
 export function connectorFor(server: string): Connector | null {

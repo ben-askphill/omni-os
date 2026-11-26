@@ -2,14 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { createInterface } from 'node:readline';
-import { join } from 'node:path';
+import { OmniMcp } from './omni-mcp.ts';
 
 // The Conductor's rerun_failed_checks tool (apps/mcp/omni.ts, #684), started the way a harness starts the omni server,
 // against a fake API that records each request and answers with canned bodies.
-
-const ROOT = join(import.meta.dirname, '../../..');
 const seen: { method: string; url: string; body: any }[] = [];
 
 const channels = [
@@ -25,34 +21,7 @@ function answer(method: string, url: string): [number, unknown] {
 }
 
 let api: Server;
-let omni: McpClient;
-
-/** Just enough of an MCP client over stdio (newline-delimited JSON-RPC) to call a tool. */
-class McpClient {
-  private id = 0;
-  private waiting = new Map<number, (r: any) => void>();
-  constructor(private child: ChildProcess) {
-    createInterface({ input: child.stdout! }).on('line', (line) => {
-      const msg = JSON.parse(line);
-      this.waiting.get(msg.id)?.(msg);
-    });
-  }
-  request(method: string, params: unknown = {}): Promise<any> {
-    const id = ++this.id;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`no answer to ${method}`)), 20_000);
-      this.waiting.set(id, (msg) => {
-        clearTimeout(timer);
-        if (msg.error) reject(new Error(msg.error.message));
-        else resolve(msg.result);
-      });
-      this.child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
-    });
-  }
-  close() {
-    this.child.kill('SIGTERM');
-  }
-}
+let omni: OmniMcp;
 
 const tool = async (args: Record<string, unknown>) => {
   seen.length = 0;
@@ -80,12 +49,7 @@ beforeAll(async () => {
   api.listen(0, '127.0.0.1');
   await once(api, 'listening');
   const base = `http://127.0.0.1:${(api.address() as AddressInfo).port}`;
-  omni = new McpClient(
-    spawn(join(ROOT, 'node_modules/.bin/tsx'), [join(ROOT, 'apps/mcp/omni.ts')], {
-      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', OMNI_URL: base, OMNI_TOKEN: 'test-token', OMNI_USER: 'Ben' },
-      stdio: ['pipe', 'pipe', 'inherit'],
-    }),
-  );
+  omni = await OmniMcp.start({ PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', OMNI_URL: base, OMNI_TOKEN: 'test-token', OMNI_USER: 'Ben' });
   await omni.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
 }, 30_000);
 

@@ -302,6 +302,7 @@ describe('plain words', () => {
     expect(plainCall({ name: 'mcp__acme_crm__lookup', input: {} })).toMatchObject({ title: 'Using Acme crm', now: 'Using Acme crm', connector: { id: 'mcp:acme_crm', mark: { type: 'generic' } } });
     expect(plainCall({ name: 'mcp__0b5e2a40-1111-4222-8333-944455556666__run', input: {} }).title).toBe('Using a connected app');
     expect(plainCall({ name: 'mcp__omni__delegate', input: { role: 'researcher' } }).now).toBe('Handing it to Researcher');
+    expect(plainCall({ name: 'mcp__omni-admin__list_automations', input: {} })).toEqual({ phase: 'omni', title: 'Checking on the work', now: 'Checking Omni' });
     expect(plainCall({ name: 'TaskStop', input: {} }).title).toBe('Running commands');
     expect(plainCall({ name: 'SomethingNew', input: {} }).title).toBe('Working on it');
   });

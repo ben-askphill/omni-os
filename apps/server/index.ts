@@ -32,7 +32,7 @@ const { capture, flushAnalytics, saveCrash, sendSavedCrash } = await import('./a
 // Usage analytics (analytics.ts): an error that kills the server is written down for the next start to report. The
 // monitor only watches, so Node still exits as it would.
 process.on('uncaughtExceptionMonitor', (err) => saveCrash(err));
-const { prepareBrowserMcp } = await import('./sandbox.ts');
+const { prepareAdminMcp, prepareBrowserMcp } = await import('./sandbox.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
 const { stopAllRuns } = await import('./actions.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
@@ -128,6 +128,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startDiskWatch();
   // From here on a thread's browser MCP starts at its first browser call, where this install can do that (lazy-mcp.ts).
   void prepareBrowserMcp();
+  // The same for omni-admin, the conductor tools past the routing core: it starts at a thread's first call to one.
+  void prepareAdminMcp();
   // Alerts go out only when the APNs key is set (push-sender.ts); otherwise this logs why and nothing is sent.
   void startPush();
   // The Mac stays awake while the server runs, as the old LaunchAgent's caffeinate kept it: phones reach it over the

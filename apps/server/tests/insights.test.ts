@@ -321,7 +321,8 @@ describe('insights MCP tool (#1010)', () => {
     api.listen(0, '127.0.0.1');
     await once(api, 'listening');
     const base = `http://127.0.0.1:${(api.address() as AddressInfo).port}`;
-    child = spawn(join(ROOT, 'node_modules/.bin/tsx'), [join(ROOT, 'apps/mcp/omni.ts')], {
+    // insights is on omni-admin (apps/mcp/core-tools.ts).
+    child = spawn(join(ROOT, 'node_modules/.bin/tsx'), [join(ROOT, 'apps/mcp/omni.ts'), 'admin'], {
       env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', OMNI_URL: base, OMNI_TOKEN: 'test-token', OMNI_USER: 'Ben', OMNI_THREAD_ID: 'conductor-thread' },
       stdio: ['pipe', 'pipe', 'inherit'],
     });

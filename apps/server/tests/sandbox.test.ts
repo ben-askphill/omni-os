@@ -239,7 +239,9 @@ describe('buildMcpConfig: omni conductor server', () => {
       // The token file's path, never the token: mcp.json and Cursor's plugin folder hold no secret value.
       env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
     });
-    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
+    // The rest of the conductor tools, from the same script, with the same thread env. No front is proven here, so it starts directly.
+    expect(cfg.mcpServers['omni-admin']).toEqual({ ...cfg.mcpServers['omni'], args: [paths.mcpOmni, 'admin'] });
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-admin', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
   });
 
   it('is absent without a role or when the role lists other servers', () => {
@@ -277,7 +279,7 @@ describe('buildMcpConfig: omni conductor server', () => {
   it('still works with the browser off', () => {
     config.browser = false;
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: true, omniUrl: OMNI_URL });
-    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-render', 'omni-steps']);
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-admin', 'omni-ask', 'omni-render', 'omni-steps']);
   });
 });
 

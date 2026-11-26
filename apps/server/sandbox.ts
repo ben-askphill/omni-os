@@ -1,14 +1,16 @@
 import { execFile } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
 import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
+import { ADMIN_SERVER } from '@omni/shared/access.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { STEPS_SERVER } from '@omni/shared/steps.ts';
-import { config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
+import { ROOT, config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
 import { CURSOR_PLUGIN_FOLDER } from './harness/cursor/normalize.ts';
@@ -258,6 +260,23 @@ export async function prepareBrowserMcp(): Promise<void> {
   await prepareLazy({ name: BROWSER_MCP, version, probe: { command: process.execPath, args: [bin, '--headless', '--isolated'], env: nodeChildEnv } });
 }
 
+/**
+ * Lets omni-admin start at a thread's first admin call (lazy-mcp.ts). Run once at server start. Its tool list depends on
+ * the MCP sources and the user's name in the descriptions, so both go into the record's version.
+ */
+export async function prepareAdminMcp(): Promise<void> {
+  const version = createHash('sha256').update(mcpSources()).update(userName()).digest('hex').slice(0, 12);
+  await prepareLazy({ name: ADMIN_SERVER, version, probe: { command: paths.mcpRunner, args: [paths.mcpOmni, 'admin'], env: { OMNI_USER: userName(), ...nodeChildEnv } } });
+}
+
+/** What the conductor tools' answers to tools/list come from: the server script, and in a checkout the files it imports. */
+function mcpSources(): string {
+  const dirs = [dirname(paths.mcpOmni), ...(paths.mcpOmni.endsWith('.ts') ? [join(ROOT, 'packages', 'shared')] : [])];
+  return dirs
+    .flatMap((dir) => readdirSync(dir).filter((f) => /\.(ts|mjs)$/.test(f)).sort().map((f) => `${f}\0${readFileSync(join(dir, f), 'utf8')}`))
+    .join('\0');
+}
+
 /** The server with ask_user_question (crates/omni-mcp). Harnesses name its tool `mcp__omni-ask__ask_user_question`. */
 export const ASK_SERVER = 'omni-ask';
 /** The server with read_referenced_thread alone (crates/omni-mcp), for threads that do not get `omni`, which has it too. */
@@ -324,6 +343,10 @@ export function buildMcpConfig(input: McpInput) {
 
   if (input.role?.mcp.includes('omni')) {
     servers['omni'] = { command: paths.mcpRunner, args: [paths.mcpOmni], env: api };
+    // The rest of the conductor tools (apps/mcp/core-tools.ts), behind the front where this install has proven it, so a
+    // thread that never calls one never starts a second server.
+    const admin = { command: paths.mcpRunner, args: [paths.mcpOmni, 'admin'] };
+    servers[ADMIN_SERVER] = { ...(lazyCommand(ADMIN_SERVER, admin) ?? admin), env: api };
   } else {
     helper(THREADS_SERVER, 'threads');
     // remember: a role whose threads may propose lessons for its later threads (memory-api.ts). A quick ask only reads.

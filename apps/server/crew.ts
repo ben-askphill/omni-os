@@ -65,7 +65,7 @@ export interface CrewRole {
   model?: string;
   effort?: string;
   channel?: string;
-  /** Extra MCP servers this role gets. "omni" = the conductor tools. */
+  /** Extra MCP servers this role gets. "omni" = the conductor tools, on the omni and omni-admin servers. */
   mcp: string[];
   /**
    * `access:`, the most this role may do in any channel (read, ask or full; packages/shared/access.ts). A channel set
