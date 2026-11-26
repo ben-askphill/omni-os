@@ -159,6 +159,51 @@ describe('opening and closing by itself', () => {
   });
 });
 
+describe("a finished job's row on the Inbox", () => {
+  // The Conductor job from the Finished shelf: its turn ended, and so did all three threads it delegated.
+  const finishedJob = t('finished-job', 'done', { channel_id: 'conductor' });
+  const handedOut = [t('note', 'done'), t('facts', 'done'), t('card', 'done')];
+  const source = treeIndex([{ parent: finishedJob, children: handedOut }]);
+  const nodes = buildTree('finished-job', source, NO_FLAGS);
+  const phase = treePhase(finishedJob, nodes);
+
+  it('has a tree, and a thread that delegated nothing has none', () => {
+    expect(nodes.map((x) => x.thread.id)).toEqual(['card', 'facts', 'note']);
+    // No tree, no toggle: the row shows only its own line.
+    expect(buildTree('plain', source, NO_FLAGS)).toEqual([]);
+  });
+
+  it('starts closed, with only the tally showing what sits under it', () => {
+    expect(phase).toBe('finished');
+    expect(treeOpen(phase, null)).toBe(false);
+    expect(treeRows(nodes, false)).toMatchObject({ rows: [] });
+    expect(treeTally(nodes)).toEqual({ needs: 0, failed: 0, running: 0, done: 3 });
+  });
+
+  it("opens on Ben's toggle to every thread under it, each with its done mark, and closes again", () => {
+    const opened: SavedOpen = { open: true, phase };
+    expect(treeOpen(phase, keptChoice(opened, phase))).toBe(true);
+    const shown = treeRows(nodes, true);
+    expect(shown.rows.map((x) => [x.thread.id, x.state])).toEqual([
+      ['card', 'done'],
+      ['facts', 'done'],
+      ['note', 'done'],
+    ]);
+    expect(shown.more).toEqual([]);
+    expect(treeOpen(phase, keptChoice({ open: false, phase }, phase))).toBe(false);
+  });
+
+  it('stays open while it is finished, and closes by itself after it runs again', () => {
+    const opened: SavedOpen = { open: true, phase: 'finished' };
+    // A reload or another render in the same phase keeps it open.
+    expect(treeOpen('finished', keptChoice(opened, 'finished'))).toBe(true);
+    // Ben sends it a follow-up: the next run opens on its own, then it finishes closed.
+    const rerun = keptChoice(opened, 'running');
+    expect(treeOpen('running', rerun)).toBe(true);
+    expect(treeOpen('finished', keptChoice(rerun, 'finished'))).toBe(false);
+  });
+});
+
 describe('marking the job done', () => {
   it('asks first while anything under it runs, failed or waits on Ben', () => {
     expect(doneNeedsConfirm(buildTree('job', index, flags))).toBe(true);
