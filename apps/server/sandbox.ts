@@ -1,14 +1,18 @@
 import { execFile } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
 import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
+import { ADMIN_SERVER } from '@omni/shared/access.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { STEPS_SERVER } from '@omni/shared/steps.ts';
-import { config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
+import { ROOT, config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
 import { CURSOR_PLUGIN_FOLDER } from './harness/cursor/normalize.ts';
@@ -45,9 +49,35 @@ export function plannedWorktree(threadId: string): { cwd: string; branch: string
   return { cwd: join(paths.worktrees, threadId), branch: `omni/${threadId.slice(0, 8)}` };
 }
 
+/** The files Claude Code and Cursor Agent read as project rules from the cwd and every folder above it, and Codex from the repo root down. */
+const RULE_FILES = ['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md'];
+
+/** The first rules file in dir or a folder above it, or null when none of them holds one. */
+export function rulesFileAbove(dir: string): string | null {
+  for (let at = resolve(dir); ; at = dirname(at)) {
+    for (const name of RULE_FILES) if (existsSync(join(at, name))) return join(at, name);
+    if (dirname(at) === at) return null;
+  }
+}
+
+/**
+ * A #conductor thread's folder: one with no CLAUDE.md or AGENTS.md in it or above it, so no harness loads project
+ * rules into a thread that only routes work (#1013). Cursor Agent reads them from its cwd up to / whatever the git root,
+ * with no flag or setting to stop it (checked against cursor-agent 2026.11.22), so the workspace's own were in every
+ * Cursor routing turn. The thread's folder when nothing above it holds one. A data folder inside a checkout (a dev
+ * install's data/) has the checkout's above it, so the thread then runs in a folder of its own under ~/.cache.
+ */
+export function conductorWorkdir(threadId: string, spare = join(homedir(), '.cache', 'omni-os', 'conductor', threadId)): string {
+  const own = threadDir(threadId);
+  if (!rulesFileAbove(own) || rulesFileAbove(spare)) return own;
+  mkdirSync(spare, { recursive: true });
+  return spare;
+}
+
 /**
  * Where a thread's agent runs, for a thread that needs no worktree (needsWorktree is false):
  * - Hermes or Cursor Cloud: the thread's own data folder; it runs off this Mac
+ * - #conductor, unless a quick ask: conductorWorkdir, never the workspace
  * - repo channel, worktrees off: the repo itself
  * - otherwise: the channel's base dir, falling back to the brain (phillbert) so skills and context load
  * A worktree thread gets plannedWorktree's folder, which prepareWorktree makes before anything runs there.
@@ -60,6 +90,9 @@ export async function prepareWorkdir(channel: Channel, threadId: string, opts?: 
   if (opts?.remote) return { cwd: threadDir(threadId), branch: null };
   // A quick ask only reads, so it reads the channel's own folder and never gets a worktree.
   if (needsWorktree(channel, { workspace: opts?.quick ? 'read' : null })) return plannedWorktree(threadId);
+  // Not the workspace or a repo root, so no harness loads their CLAUDE.md (docs/reviews/2026-11-22-cursor-cli-capabilities.md).
+  // A quick ask still reads the workspace: that is what it is for.
+  if (channel.id === CONDUCTOR_CHANNEL && !opts?.quick) return { cwd: conductorWorkdir(threadId), branch: null };
 
   if (channel.repo_path && existsSync(channel.repo_path)) return { cwd: channel.repo_path, branch: null };
   if (channel.base_dir && existsSync(channel.base_dir)) return { cwd: channel.base_dir, branch: null };
@@ -254,6 +287,23 @@ export async function prepareBrowserMcp(): Promise<void> {
   await prepareLazy({ name: BROWSER_MCP, version, probe: { command: process.execPath, args: [bin, '--headless', '--isolated'], env: nodeChildEnv } });
 }
 
+/**
+ * Lets omni-admin start at a thread's first admin call (lazy-mcp.ts). Run once at server start. Its tool list depends on
+ * the MCP sources and the user's name in the descriptions, so both go into the record's version.
+ */
+export async function prepareAdminMcp(): Promise<void> {
+  const version = createHash('sha256').update(mcpSources()).update(userName()).digest('hex').slice(0, 12);
+  await prepareLazy({ name: ADMIN_SERVER, version, probe: { command: paths.mcpRunner, args: [paths.mcpOmni, 'admin'], env: { OMNI_USER: userName(), ...nodeChildEnv } } });
+}
+
+/** What the conductor tools' answers to tools/list come from: the server script, and in a checkout the files it imports. */
+function mcpSources(): string {
+  const dirs = [dirname(paths.mcpOmni), ...(paths.mcpOmni.endsWith('.ts') ? [join(ROOT, 'packages', 'shared')] : [])];
+  return dirs
+    .flatMap((dir) => readdirSync(dir).filter((f) => /\.(ts|mjs)$/.test(f)).sort().map((f) => `${f}\0${readFileSync(join(dir, f), 'utf8')}`))
+    .join('\0');
+}
+
 /** The server with ask_user_question (crates/omni-mcp). Harnesses name its tool `mcp__omni-ask__ask_user_question`. */
 export const ASK_SERVER = 'omni-ask';
 /** The server with read_referenced_thread alone (crates/omni-mcp), for threads that do not get `omni`, which has it too. */
@@ -320,6 +370,10 @@ export function buildMcpConfig(input: McpInput) {
 
   if (input.role?.mcp.includes('omni')) {
     servers['omni'] = { command: paths.mcpRunner, args: [paths.mcpOmni], env: api };
+    // The rest of the conductor tools (apps/mcp/core-tools.ts), behind the front where this install has proven it, so a
+    // thread that never calls one never starts a second server.
+    const admin = { command: paths.mcpRunner, args: [paths.mcpOmni, 'admin'] };
+    servers[ADMIN_SERVER] = { ...(lazyCommand(ADMIN_SERVER, admin) ?? admin), env: api };
   } else {
     helper(THREADS_SERVER, 'threads');
     // remember: a role whose threads may propose lessons for its later threads (memory-api.ts). A quick ask only reads.

@@ -6,6 +6,7 @@
 // Pure, on top of the transcript fold.
 import { isQuestionTool } from './question.ts';
 import { str, type Item, type ToolCall } from './transcript-fold.ts';
+import { ADMIN_SERVER } from './access.ts';
 import { BROWSER_SERVER, connectorFor, type Connector } from './connectors.ts';
 
 /** html_render, as html-render.ts names it. Not imported from there: that module holds the frame's script, and the fold must stay free of browser globals for iOS (tests/transcript-portable.test.ts). */
@@ -335,7 +336,7 @@ export function plainCall(c: Pick<ToolCall, 'name' | 'input'>): Plain {
   if (m) {
     const [, server, tool] = m;
     if (BROWSER_SERVER.test(server)) return { phase: 'browser', title: BROWSER, now: browserNow(tool, i) };
-    if (server === 'omni') return omniPlain(tool, i);
+    if (server === 'omni' || server === ADMIN_SERVER) return omniPlain(tool, i);
     if (/^omni[-_]threads$/.test(server)) return { phase: 'omni', title: OMNI, now: 'Reading the thread you pointed to' };
     // message_members: a team thread's lead gives its members their parts (apps/server/runner/team.ts).
     if (/^omni[-_]team$/.test(server)) return { phase: 'omni', title: OMNI, now: 'Giving the members their parts' };

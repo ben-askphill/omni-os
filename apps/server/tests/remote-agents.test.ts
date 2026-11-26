@@ -291,7 +291,9 @@ describe('a remote agent seated as a member', () => {
       expect(sent.clientContext).toMatch(/You talk only: the local agents seated here change the files/);
       expect(sent.clientContext).not.toMatch(/branch of your own/);
       if (closed) expect(sent.message).toMatch(/^what do you make of it\?\n\n<omni-context>/);
-      else expect(sent.message).toMatch(/^\[Catch-up\] You are Nomos, a remote agent seated in this thread\. Lead leads it\. You talk only[^]*\n---\n\nwhat do you make of it\?/);
+      // Its role is in that prompt, so the catch-up does not say it again (#1015).
+      else expect(sent.message).toMatch(/^\[Catch-up\] Omni wrote this summary[^]*\n---\n\nwhat do you make of it\?/);
+      expect(sent.message).not.toContain('You are Nomos');
       // Its reply lands in the group thread as Nomos.
       expect(H.db.events.since(t.id).filter((r) => r.kind === 'assistant_text').map((r) => r.agent)).toContain('nomos');
     }

@@ -11,6 +11,7 @@ import './runner/limits.ts';
 import './runner/switch.ts';
 import './runner/questions.ts';
 import './runner/fresh-context.ts';
+import './runner/conductor-compact.ts';
 
 export type { ActiveTask, ModStatus, Msg, PendingMsg, SendMode } from './runner/state.ts';
 export type { Acceptance, CreateThreadInput, PostedThread } from './runner/api.ts';

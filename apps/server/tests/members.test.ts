@@ -110,6 +110,23 @@ describe('seating by agent mention', () => {
     expect(H.db.threads.children(t.id).map((x) => x.id)).not.toContain(sid);
   });
 
+  it('tells only a lead who it is: a member’s system prompt already seats it (#1015)', T, async () => {
+    const t = await groupThread();
+    await say(t.id, 'have a look', ['designer', 'Designer']);
+    await untilIdle(t.id, 2);
+    const sid = sessionOf(t.id, 'designer');
+    const spawned = H.spawns(sid)[0];
+    const prompt = spawned.args[spawned.args.indexOf('--append-system-prompt') + 1] as string;
+    expect(prompt).toContain('## Group thread');
+    expect(prompt).toMatch(/Lead leads this thread/);
+    // Designer said something; the lead's next turn opens with it, and with who the lead is, which its prompt lacks.
+    await call(`/threads/${t.id}/messages`, json('POST', { prompt: 'and now?' }));
+    await untilIdle(t.id, 3);
+    const lead = readBy(t.id, 'lead').at(-1)!;
+    expect(lead).toMatch(/^\[Group thread\] You are Lead, the lead of this thread\./);
+    expect(lead).toContain('### Designer');
+  });
+
   it('opens a new member with a small-model catch-up, then the messages since its last turn without tool calls', T, async () => {
     const t = await groupThread();
     await say(t.id, 'first look', ['designer', 'Designer']);
@@ -127,7 +144,10 @@ describe('seating by agent mention', () => {
     await say(t.id, 'what do you think now', ['designer', 'Designer']);
     await untilIdle(t.id, 4);
     const second = readBy(t.id, 'designer')[1];
-    expect(second).toMatch(/^\[Group thread\]/);
+    // Designer's system prompt seats it (Group thread), so the preamble does not say who it is again (#1015).
+    expect(second).toMatch(/^\[Group thread\] The messages since your last turn/);
+    expect(first).not.toMatch(/You are Designer|an agent seated in this thread/);
+    expect(second).not.toMatch(/You are Designer|an agent seated in this thread/);
     expect(second).toContain('### Lead');
     expect(second).toContain('### the user\n\nRICH carry on');
     // The lead's turn ran tools (RICH): none of them, nor their output, reaches Designer.

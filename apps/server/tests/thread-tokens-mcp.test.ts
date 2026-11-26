@@ -97,7 +97,7 @@ describe("the Conductor's omni server on its thread's token", () => {
 
   it('under an automation: saving an automation and rotating the install token are refused', T, async () => {
     const run = thread('conductor', { automation: 'nightly' });
-    const tool = await connect(run, 'omni');
+    const tool = await connect(run, 'omni-admin');
     const saved = await tool('save_automation', { create: true, fields: { name: 'From the run', enabled: true, cron: '0 9 * * 1-5', channel: 'scratch', prompt: 'Check the shop.' } });
     expect(saved.isError).toBe(true);
     expect(saved.body).toMatch(/automation "nightly"/);

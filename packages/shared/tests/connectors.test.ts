@@ -42,7 +42,7 @@ describe('connector brands', () => {
   });
 
   it("treats Omni's own servers as Omni and the browser as no connector", () => {
-    for (const s of ['omni', 'omni-ask', 'omni-steps', 'omni_render', 'omni-threads', 'omni-memory', 'omni-team']) expect(connectorFor(s)).toMatchObject({ id: 'omni', kind: 'omni', mark: { type: 'omni' } });
+    for (const s of ['omni', 'omni-admin', 'omni-ask', 'omni-steps', 'omni_render', 'omni-threads', 'omni-memory', 'omni-team']) expect(connectorFor(s)).toMatchObject({ id: 'omni', kind: 'omni', mark: { type: 'omni' } });
     expect(connectorOf('mcp__omni-browser__browser_click')).toBeNull();
     expect(connectorOf('mcp__plugin_playwright_playwright__browser_navigate')).toBeNull();
     expect(connectorOf('mcp__chrome-devtools__take_screenshot')).toBeNull();

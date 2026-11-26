@@ -19,6 +19,7 @@ import { applyQueued, handedOver, queuedRun } from './switch.ts';
 import {
   activeTasks,
   addEvent,
+  autoCompacting,
   cliLabel,
   drop,
   emitThread,
@@ -162,7 +163,11 @@ export function onResult(live: Live, p: ResultPayload) {
   if (!live.turn) return;
   if (stopped) clearInterrupt(live);
   // Steers the CLI has not replayed yet: it starts the next turn with them on its own.
-  if (live.inflight.length) return emitThread(id);
+  if (live.inflight.length) {
+    // Another message joined the turn: it is not only Omni's compaction any more.
+    autoCompacting.delete(id);
+    return emitThread(id);
+  }
   if (limit && !p.ok && !stopped) return limitStop(live, limit.resets_at);
   const status = stopped ? 'stopped' : p.ok ? 'done' : 'failed';
   // A switch Ben queued applies now: what he sent behind the turn waits for the process on the new run.
@@ -172,6 +177,8 @@ export function onResult(live: Live, p: ResultPayload) {
   }
   const next = live.nextHeld();
   if (next) {
+    // Another message joined the turn: it is not only Omni's compaction any more.
+    autoCompacting.delete(id);
     send(live, next);
     return emitThread(id);
   }

@@ -3,12 +3,11 @@ import { once } from 'node:events';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { png } from './png.ts';
 import { startRunner } from './runner-boot.ts';
+import { OmniMcp } from './omni-mcp.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
 // The Conductor's crew tools (apps/mcp/omni.ts: get_crew_role, save_crew_role, reset_crew_role, plan slice S7) as the
@@ -36,40 +35,13 @@ ship('reviewer', '---\nname: Reviewer\nmodel: auto\nreview: true\n---\nReview th
 ship('builder', '---\nname: Builder\ndescription: Writes code.\nmodel: auto\n---\nYou write and ship code.\n');
 const ownPath = (id: string) => join(h.paths.personalCrew, `${id}.md`);
 
-const clients: McpClient[] = [];
+const clients: OmniMcp[] = [];
 afterAll(() => {
   for (const c of clients) c.close();
   server.close();
   server.closeAllConnections();
 });
 const T = { timeout: 30_000 };
-
-/** Just enough of an MCP client over stdio (newline-delimited JSON-RPC) to list tools and call one. */
-class McpClient {
-  private id = 0;
-  private waiting = new Map<number, (r: any) => void>();
-  constructor(private child: ChildProcess) {
-    createInterface({ input: child.stdout! }).on('line', (line) => {
-      const msg = JSON.parse(line);
-      this.waiting.get(msg.id)?.(msg);
-    });
-  }
-  request(method: string, params: unknown = {}): Promise<any> {
-    const id = ++this.id;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`no answer to ${method}`)), 20_000);
-      this.waiting.set(id, (msg) => {
-        clearTimeout(timer);
-        if (msg.error) reject(new Error(msg.error.message));
-        else resolve(msg.result);
-      });
-      this.child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
-    });
-  }
-  close() {
-    this.child.kill('SIGTERM');
-  }
-}
 
 let n = 0;
 /** A thread as a role, with the first message Ben sent it. */
@@ -83,19 +55,17 @@ function thread(role: string, o: { automation?: string } = {}) {
 }
 const benAgrees = (id: string) => events.add(id, 'user', { text: 'Yes, make it.', source: 'ben' });
 
-/** The omni server the thread's role gets, started the way a harness starts it (apps/server/sandbox.ts). */
+/** The omni and omni-admin servers the thread's role gets, started the way a harness starts them (apps/server/sandbox.ts). */
 async function connect(threadId: string) {
   const role = getCrew(h.db.threads.get(threadId)!.role);
   const cfg = buildMcpConfig({ threadId, channel: h.db.channels.get('scratch')!, browserBusy: false, omniUrl, role });
-  const s = cfg.mcpServers['omni'];
-  if (!s) throw new Error(`role ${role?.id} gets no omni server`);
-  const client = new McpClient(spawn(s.command, s.args, { env: { ...(process.env as Record<string, string>), ...s.env }, stdio: ['pipe', 'pipe', 'inherit'] }));
+  if (!cfg.mcpServers['omni']) throw new Error(`role ${role?.id} gets no omni server`);
+  const client = await OmniMcp.launch({ omni: cfg.mcpServers['omni'], 'omni-admin': cfg.mcpServers['omni-admin'] }, process.env as Record<string, string>);
   clients.push(client);
-  await client.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
   return client;
 }
 
-const tool = async (client: McpClient, name: string, args: Record<string, unknown> = {}) => {
+const tool = async (client: OmniMcp, name: string, args: Record<string, unknown> = {}) => {
   const r = (await client.request('tools/call', { name, arguments: args })) as { isError?: boolean; content: { text: string }[] };
   const raw = r.content[0].text;
   let body: any = raw;
@@ -118,11 +88,24 @@ describe('the Conductor crew tools', () => {
   const conductor = thread('conductor');
 
   it("are in the Conductor's tool list, with no tool to delete, hide or duplicate a role", T, async () => {
-    const { tools } = (await (await connect(conductor)).request('tools/list')) as { tools: { name: string; description: string }[] };
+    const client = await connect(conductor);
+    const { tools } = (await client.request('tools/list')) as { tools: { name: string; description: string }[] };
     const names = tools.map((t) => t.name);
     for (const name of ['list_crew', 'get_crew_role', 'save_crew_role', 'reset_crew_role', 'send_to_grok_bot']) expect(names).toContain(name);
+    // list_crew routes work, so it is on omni; writing agents is admin.
+    expect(['list_crew', 'get_crew_role', 'save_crew_role', 'reset_crew_role'].map((t) => client.serverOf(t))).toEqual(['omni', 'omni-admin', 'omni-admin', 'omni-admin']);
     expect(names.filter((t) => /crew/.test(t) && /delete|hide|duplicate/.test(t))).toEqual([]);
-    expect(tools.find((t) => t.name === 'save_crew_role')!.description).toMatch(/^Create an agent or change one, only once .+ agreed in this thread/);
+    expect(tools.find((t) => t.name === 'save_crew_role')!.description).toMatch(/^Create or change an agent, only once .+ agreed in this thread/);
+  });
+
+  it('get_thread leaves the reply out for a warmth check', T, async () => {
+    const client = await connect(conductor);
+    const child = thread('builder');
+    events.add(child, 'assistant_text', { text: 'Opened PR #3.' });
+    expect((await tool(client, 'get_thread', { thread_id: child })).body).toMatchObject({ id: child, last_reply: 'Opened PR #3.' });
+    const warmth = (await tool(client, 'get_thread', { thread_id: child, include_reply: false })).body;
+    expect(warmth).toMatchObject({ id: child, status: 'done', session: { warm: expect.any(Boolean) } });
+    expect(warmth).not.toHaveProperty('last_reply');
   });
 
   it('create a role once Ben agreed, with no powers, which list_crew and Settings > Crew then show and sync sends', T, async () => {

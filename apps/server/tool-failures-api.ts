@@ -11,6 +11,11 @@ toolFailuresApi.get('/', (c) => {
   const status = z.enum(FAILURE_STATUSES).optional().parse(c.req.query('status'));
   return c.json(toolFailures.groups(status));
 });
+toolFailuresApi.get('/:group', (c) => {
+  const group = hash.parse(c.req.param('group'));
+  const row = toolFailures.group(group);
+  return row ? c.json(row) : c.json({ error: 'not found' }, 404);
+});
 toolFailuresApi.get('/:group/occurrences', (c) => {
   const group = hash.parse(c.req.param('group'));
   const before = z.coerce.number().int().positive().optional().parse(c.req.query('before'));

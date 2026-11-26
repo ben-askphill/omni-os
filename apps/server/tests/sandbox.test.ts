@@ -20,7 +20,7 @@ const DATA_DIR = vi.hoisted(() => {
   return dir;
 });
 
-import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig, writeMcpConfig } from '../sandbox.ts';
+import { buildMcpConfig, conductorWorkdir, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, rulesFileAbove, writeCursorDenyConfig, writeMcpConfig } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
 import { nativeMcpCandidate } from '../native-mcp.ts';
 import type { Channel } from '../db.ts';
@@ -239,7 +239,9 @@ describe('buildMcpConfig: omni conductor server', () => {
       // The token file's path, never the token: mcp.json and Cursor's plugin folder hold no secret value.
       env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
     });
-    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
+    // The rest of the conductor tools, from the same script, with the same thread env. No front is proven here, so it starts directly.
+    expect(cfg.mcpServers['omni-admin']).toEqual({ ...cfg.mcpServers['omni'], args: [paths.mcpOmni, 'admin'] });
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-admin', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
   });
 
   it('is absent without a role or when the role lists other servers', () => {
@@ -277,7 +279,7 @@ describe('buildMcpConfig: omni conductor server', () => {
   it('still works with the browser off', () => {
     config.browser = false;
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: true, omniUrl: OMNI_URL });
-    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-render', 'omni-steps']);
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-admin', 'omni-ask', 'omni-render', 'omni-steps']);
   });
 });
 
@@ -297,10 +299,60 @@ describe('prepareWorkdir', () => {
     }
   });
 
+  it('runs a #conductor thread in its own folder, never the workspace or a base dir, but lets a quick ask read them', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'omni-conductor-base-'));
+    const id = 'conductor-wd-123456';
+    try {
+      const ch = channel({ id: 'conductor', base_dir: base, use_worktree: 0 });
+      expect(await prepareWorkdir(ch, id)).toEqual({ cwd: threadDir(id), branch: null });
+      expect(await prepareWorkdir(ch, id, { quick: true })).toEqual({ cwd: base, branch: null });
+      // Other channels keep their base dir.
+      expect((await prepareWorkdir(channel({ base_dir: base }), id)).cwd).toBe(base);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+      rmSync(threadDir(id), { recursive: true, force: true });
+    }
+  });
+
+  it('moves a #conductor thread out of a data folder that has project rules above it, unless the spare folder has them too', () => {
+    const id = 'conductor-rules-123456';
+    const clean = mkdtempSync(join(tmpdir(), 'omni-conductor-spare-'));
+    const dirty = mkdtempSync(join(tmpdir(), 'omni-conductor-dirty-'));
+    writeFileSync(join(dirty, 'AGENTS.md'), '# checkout rules\n');
+    try {
+      expect(rulesFileAbove(threadDir(id))).toBeNull();
+      expect(conductorWorkdir(id, join(clean, id))).toBe(threadDir(id));
+
+      // A dev install: the data folder sits in a checkout whose CLAUDE.md every harness would read from the thread folder.
+      writeFileSync(join(DATA_DIR, 'CLAUDE.md'), '# checkout rules\n');
+      expect(rulesFileAbove(join(threadDir(id), 'deeper'))).toBe(join(DATA_DIR, 'CLAUDE.md'));
+      expect(conductorWorkdir(id, join(clean, id))).toBe(join(clean, id));
+      expect(existsSync(join(clean, id))).toBe(true);
+      // Nowhere clean: the thread's own folder, as before.
+      expect(conductorWorkdir(id, join(dirty, id))).toBe(threadDir(id));
+    } finally {
+      rmSync(join(DATA_DIR, 'CLAUDE.md'), { force: true });
+      rmSync(clean, { recursive: true, force: true });
+      rmSync(dirty, { recursive: true, force: true });
+    }
+  });
+
   it('needs no worktree with worktrees off, without a repo, or for a remote harness', () => {
     expect(needsWorktree(channel({ repo_path: '/r', use_worktree: 0 }))).toBe(false);
     expect(needsWorktree(channel({ repo_path: null, use_worktree: 1 }))).toBe(false);
     expect(needsWorktree(channel({ repo_path: '/r', use_worktree: 1 }), { remote: true })).toBe(false);
+  });
+
+  it('runs #conductor threads in the thread folder, not the workspace or repo, so Cursor skips ancestor CLAUDE.md', async () => {
+    const id = 'conductor-wd-abcdef12';
+    const repo = mkdtempSync(join(tmpdir(), 'omni-conductor-repo-'));
+  try {
+      const ch = channel({ id: 'conductor', repo_path: repo, use_worktree: 0 });
+      expect(await prepareWorkdir(ch, id)).toEqual({ cwd: threadDir(id), branch: null });
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(threadDir(id), { recursive: true, force: true });
+    }
   });
 });
 

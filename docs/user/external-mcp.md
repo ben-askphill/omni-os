@@ -7,7 +7,7 @@ Agents outside Omni can use it through MCP: Claude Desktop, claude.ai, ChatGPT, 
 | `list_channels`, `list_crew`, `list_harnesses` | What exists, and the valid ids for `start_thread` |
 | `list_threads`, `search_threads` | Recent threads by channel or status, and full-text search |
 | `list_pull_requests` | PRs across every channel's GitHub repo, open first, newest first, with labels. Takes the PRs page's search (`label:bug`) |
-| `get_thread` | Status and last reply. `wait_seconds` (up to 50) waits for a running thread to finish |
+| `get_thread` | Status and last reply (the last run's final message, cut at `reply_max_chars`, 8,000 by default). `include_reply: false` leaves the reply out. `wait_seconds` (up to 50) waits for a running thread to finish |
 | `read_thread` | The conversation a page at a time, without tool calls |
 | `start_thread` | A new thread in a channel, as any agent. It runs in the background |
 | `message_thread`, `stop_thread` | Steer, queue or interrupt a thread, or stop its turn |

@@ -6,8 +6,8 @@ Local agent workspace. See README.md for what it does.
 
 ### Record tool failures
 
-- Every agent and harness follows the global tool-failure policy in `apps/server/tool-failure-policy.ts`, which Omni adds to every thread's system prompt. Pass the rule to child agents whose results Omni cannot observe.
-- Omni automatically captures reported tool failures in the machine-local `tool_failures` table in `data/omni.db`. Inspect groups through the Conductor's `tool_failures` tool or `GET /api/tool-failures`. Record status and safe fix, replacement or avoidance guidance with `triage_tool_failure` or `PATCH /api/tool-failures/:group`.
+- Every agent and harness follows the global tool-failure policy in `apps/server/tool-failure-policy.ts`, which Omni adds to the system prompt of every thread that runs tools (not the delegate-only Conductor). Pass the rule to child agents whose results Omni cannot observe.
+- Omni automatically captures reported tool failures in the machine-local `tool_failures` table in `data/omni.db`. Inspect groups through the `tool_failures` tool on the Conductor's `omni-admin` server or `GET /api/tool-failures`. Record status and safe fix, replacement or avoidance guidance with `triage_tool_failure` or `PATCH /api/tool-failures/:group`.
 - Omni already records every call a harness runs, shell commands included. Report only failures it cannot see (a call inside a child agent or wrapper) through `POST /api/tool-failures` using the actual thread and call reference. Never report your own calls, the commands inside one, or expected misses (no match, an absent file, a test you are fixing). Never include arguments, raw output, credentials or private payloads. Do not recursively log logger failures. One failure never disables a tool.
 
 ### Every surface, every time

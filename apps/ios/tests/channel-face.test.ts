@@ -5,6 +5,10 @@ import { channelFace } from '../src/components/channel-face';
 import { ICON_PATHS } from '@omni/shared/icons.ts';
 
 const SVG_FILE = '<?xml version="1.0"?>\n<!-- logo -->\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><style>.a{fill:#e11}</style><circle class="a" cx="12" cy="12" r="10"/></svg>';
+const C2PA_SVG_FILE =
+  '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+  `<metadata><c2pa:manifest xmlns:c2pa="http://c2pa.org/manifest">${'B'.repeat(16_000)}</c2pa:manifest></metadata>` +
+  '<circle cx="12" cy="12" r="10" fill="#283c62"/></svg>';
 
 describe('what a channel avatar draws', () => {
   it('draws an emoji the computer saved', () => {
@@ -21,10 +25,16 @@ describe('what a channel avatar draws', () => {
     }
   });
 
-  it('draws an uploaded SVG as the server stored it, without the prolog and comments', () => {
+  it('draws an uploaded SVG as the server stored it, without the prolog, comments and metadata', () => {
     const face = channelFace('brand', readSvgIcon(SVG_FILE));
     expect(face).toEqual({ kind: 'svg', markup: expect.stringMatching(/^<svg[\s\S]*<\/svg>$/) });
     expect(face.kind === 'svg' && face.markup).not.toMatch(/<\?xml|<!--/);
+
+    const c2paFace = channelFace('brand', readSvgIcon(C2PA_SVG_FILE));
+    expect(c2paFace).toEqual({
+      kind: 'svg',
+      markup: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#283c62"/></svg>',
+    });
   });
 
   it('falls back to the monogram for no icon, an unknown icon or an SVG that could run or load', () => {
@@ -57,5 +67,8 @@ describe('on an engine without Intl.Segmenter, as Hermes on the iPhone', () => {
     expect(hermesFace('shop', '👩‍💻')).toEqual({ kind: 'emoji', text: '👩‍💻' });
     expect(hermesFace('ops', 'icon:zap')).toEqual({ kind: 'glyph', name: 'zap' });
     expect(hermesFace('brand', readSvgIcon(SVG_FILE)).kind).toBe('svg');
+    const c2pa = hermesFace('brand', readSvgIcon(C2PA_SVG_FILE));
+    expect(c2pa.kind).toBe('svg');
+    expect(c2pa.kind === 'svg' && c2pa.markup).not.toContain('<metadata');
   });
 });

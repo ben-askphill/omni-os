@@ -92,6 +92,7 @@ describe('what a thread gets', () => {
     process.env.OMNI_NATIVE_MCP = GOOD;
     const got = servers(conductor);
     expect(got['omni']).toMatchObject({ command: paths.mcpRunner, args: [paths.mcpOmni] });
+    expect(got['omni-admin']).toMatchObject({ command: paths.mcpRunner, args: [paths.mcpOmni, 'admin'] });
     expect(got['omni-ask'].command).toBe(GOOD);
     expect(got['omni-threads']).toBeUndefined();
   });
@@ -100,7 +101,7 @@ describe('what a thread gets', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     process.env.OMNI_NATIVE_MCP = script('broken', 'exit 1');
     expect(servers()).toEqual({});
-    expect(servers(conductor)).toEqual({ omni: expect.objectContaining({ args: [paths.mcpOmni] }) });
+    expect(servers(conductor)).toEqual({ omni: expect.objectContaining({ args: [paths.mcpOmni] }), 'omni-admin': expect.objectContaining({ args: [paths.mcpOmni, 'admin'] }) });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render, set_steps, read_referenced_thread, remember or message_members. Build it with npm run dev');
     expect(nativeMcpCommand('ask')).toBeNull();

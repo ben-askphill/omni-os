@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { OWNER_MAX } from '@omni/shared/thread-owner.ts';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { readOpenItems } from '@omni/shared/open-items.ts';
+import { capText } from '@omni/shared/report-shape.ts';
 import { displayPrefs } from './display.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
@@ -349,6 +350,19 @@ function memberSummary(t: Thread) {
   };
 }
 
+/**
+ * A thread's last reply for get_thread: its last run's final message, the text after its last tool call (as its crew
+ * report reads it), not everything it said while it worked. `?reply=0` leaves it out, for a warmth check; `?reply_max=N`
+ * cuts it at N characters with a marker.
+ */
+function lastReply(t: Thread, query: (k: string) => string | undefined) {
+  if (query('reply') === '0') return {};
+  const reply = events.lastRun(t.id).report.text || events.lastAssistantText(t.id);
+  const max = Number(query('reply_max'));
+  if (!reply || !Number.isInteger(max) || max <= 0) return { last_reply: reply };
+  return { last_reply: capText(reply, max, 'get_thread with a higher reply_max_chars reads more') };
+}
+
 /** Compact view for the conductor MCP. */
 threadRoutesApi.get('/:id/summary', (c) => {
   const t = threads.get(c.req.param('id'));
@@ -359,7 +373,7 @@ threadRoutesApi.get('/:id/summary', (c) => {
     harness: t.harness, model: t.model, effort: t.effort,
     // A thread it delegated, at any depth, still runs or queues: it reports back here.
     delegating: delegatingIds().has(t.id),
-    updated_at: t.updated_at, last_reply: events.lastRun(t.id).text || events.lastAssistantText(t.id),
+    updated_at: t.updated_at, ...lastReply(t, (k) => c.req.query(k)),
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),

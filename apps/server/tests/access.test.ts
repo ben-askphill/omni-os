@@ -62,6 +62,8 @@ describe('the access policy', () => {
     // A team's lead gives its members their parts, and a role proposes lessons, at every level: Omni checks both itself.
     expect(judge(at('read'), call('mcp__omni-team__message_members')).decision).toBe('allow');
     expect(judge(at('read'), call('mcp__omni-memory__remember')).decision).toBe('allow');
+    // The conductor tools past the routing core (apps/mcp/core-tools.ts): Omni's own, so no level gates them.
+    expect(judge(at('read'), call('mcp__omni-admin__save_automation')).decision).toBe('allow');
     expect(judge(at('ask', { browser: 'ask' }), call('mcp__omni-browser__browser_click')).decision).toBe('ask');
     expect(judge(at('ask'), call('mcp__omni-browser__browser_snapshot')).decision).toBe('allow');
   });

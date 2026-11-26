@@ -101,10 +101,14 @@ describe('cursor tracer', () => {
     expect(ts.every((r: any) => r.resume === chatId)).toBe(true); // every turn resumes the chat
   });
 
-  it('sends a resumed chat the current reply rules and tool-failure policy once, since its context came in an earlier session', async () => {
+  it('sends a resumed chat the reply rules again only once they changed, and never the tool-failure policy', async () => {
     const t = await H.start('HANG forever', cursor);
     await H.until('chat id', () => H.thread(t.id).session_id.startsWith('chat_'));
     await H.until('turn running', () => turns(t.id).length >= 1);
+    // The new chat read the rules in its context: the thread keeps their fingerprint (#1015).
+    expect(H.db.kv.get<string>(`chat-rules:${t.id}`)).toMatch(/^[0-9a-f]{16}$/);
+    // Say the Reply block changed since: the chat read an older version.
+    H.db.kv.set(`chat-rules:${t.id}`, 'an-older-version');
     H.runner.interruptThread(t.id);
     await H.untilStatus(t.id, 'stopped');
     H.runner.sendMessage(t.id, 'CMD carry on');
@@ -113,13 +117,25 @@ describe('cursor tracer', () => {
     await H.untilResults(t.id, 2);
     const [first, resumed, next] = turns(t.id).map((r: any) => r.prompt as string);
     expect(first).toContain('# Omni OS context');
-    // A chat made before a rule changed still gets the new one: the policy and the Reply block, said to replace the old copy.
+    // A chat made before a rule changed still gets the new Reply block, said to replace the old copy. The policy came
+    // with its first message and is not paid for again on every resume (#1013).
     expect(resumed).not.toContain('# Omni OS context');
-    expect(resumed.startsWith('## Tool failures\n')).toBe(true);
+    expect(resumed).not.toContain('## Tool failures');
+    expect(resumed).not.toContain('Omni records tool failures');
+    expect(resumed.startsWith(`## Reply\n${RESENT_REPLY}`)).toBe(true);
     expect(resumed).toContain(`## Reply\n${RESENT_REPLY}\nYour final message is what gets shown and reported.`);
     expect(resumed).toContain('Pick the form by what the answer holds');
     expect(resumed.endsWith('\n\n---\n\nCMD carry on')).toBe(true);
     expect(next).toBe('and then this');
+
+    // Resumed again with the same rules: the chat has them, so the ~2.1K-character block is not paid for again.
+    H.runner.sendMessage(t.id, 'HANG again');
+    await H.until('third turn', () => turns(t.id).length >= 3);
+    H.runner.interruptThread(t.id);
+    await H.untilStatus(t.id, 'stopped');
+    H.runner.sendMessage(t.id, 'CMD resumed with the same rules');
+    await H.until('fourth turn', () => turns(t.id).length >= 4, 12000);
+    expect(turns(t.id).at(-1).prompt).toBe('CMD resumed with the same rules');
   });
 
   it('queues a steer instead of rejecting it, running it as the next turn', async () => {
@@ -144,7 +160,7 @@ describe('cursor tracer', () => {
     await H.untilResults(t.id, 1, 12000);
     expect(H.thread(t.id).status).toBe('done');
     expect(turns(t.id).some((r: any) => r.resume === chatId)).toBe(true);
-    expect(turns(t.id).at(-1).prompt).toContain('Omni records tool failures reported by your harness automatically.');
+    expect(turns(t.id).at(-1).prompt).not.toContain('Omni records tool failures reported by your harness automatically.');
     H.runner.sendMessage(t.id, 'follow up after resume');
     await H.untilResults(t.id, 2, 12000);
     expect(turns(t.id).at(-1).prompt).toBe('follow up after resume');

@@ -8,8 +8,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
+import { channelDetail, channelIndexRow, LIST_CHANNELS_DESCRIPTION, listChannelsInput } from '../channels.ts';
 import { prList, prListInput, PR_LIST_DESCRIPTION } from '../pull-requests.ts';
+import { formatSearchHits, SEARCH_DEFAULT_LIMIT, searchInput, searchPath } from '../search.ts';
 import { isConductor } from '@omni/shared/crew-role.ts';
+import { compactJson, compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
+import { replyInput, replyQuery } from '../thread-reply.ts';
 
 /** One /api request: `path` without the /api prefix. Resolves to the JSON body, throws with the API's error otherwise. */
 export type Call = (path: string, init?: RequestInit) => Promise<any>;
@@ -24,7 +28,7 @@ export const callOver =
     return body;
   };
 
-const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
+const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: compactJson(v) }] });
 
 /** A thread in these states has not answered yet. */
 const ACTIVE = new Set(['queued', 'running']);
@@ -68,29 +72,27 @@ export function registerExternalTools(server: McpServer, call: Call) {
   server.registerTool(
     'list_channels',
     {
-      description: 'List Omni channels (one per client or project) with repo, Shopify store, notes, running thread count and sidebar folders.',
+      description: LIST_CHANNELS_DESCRIPTION,
+      inputSchema: listChannelsInput,
       annotations: { readOnlyHint: true },
     },
-    async () =>
-      text(
-        (await call('/channels')).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          kind: c.kind,
-          repo: c.github_repo,
-          store: c.store_domain,
-          running: c.running,
-          notes: c.notes,
-          folders: (c.folders ?? []).map((f: any) => ({ id: f.id, name: f.name, threads: f.count })),
-        })),
-      ),
+    async ({ channel }) => {
+      const id = channel?.trim();
+      if (id) return text(channelDetail(await call(`/channels/${encodeURIComponent(id)}`)));
+      return text((await call('/channels')).map(channelIndexRow));
+    },
   );
 
   server.registerTool(
     'list_crew',
     { description: 'List the agents a thread can run as (conductor, builder, researcher and so on), with what each is for.', annotations: { readOnlyHint: true } },
     // Hidden roles are left out by the API. The Conductor stays: a client may start a thread as it. usage-scan, which only Omni starts, does not.
-    async () => text((await call('/crew')).filter((r: any) => r.delegatable || isConductor(r.id)).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+    async () =>
+      text(
+        (await call('/crew'))
+          .filter((r: any) => r.delegatable || isConductor(r.id))
+          .map((r: any) => compactRow({ id: r.id, name: r.name, description: r.description, default_channel: r.channel })),
+      ),
   );
 
   server.registerTool(
@@ -104,14 +106,19 @@ export function registerExternalTools(server: McpServer, call: Call) {
     },
     async ({ channel }) =>
       text(
-        (await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses')).map((h: any) => ({
-          id: h.id,
-          name: h.name,
-          available: h.available,
-          fix: h.available ? undefined : h.fix,
-          running: h.running,
-          models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default: m.default })),
-        })),
+        (await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses')).map((h: any) =>
+          compactRow(
+            {
+              id: h.id,
+              name: h.name,
+              available: h.available,
+              fix: h.available ? undefined : h.fix,
+              running: h.running,
+              models: (h.models ?? []).map((m: any) => compactRow({ id: m.id, label: m.label, efforts: m.efforts, default: m.default })),
+            },
+            ['available'],
+          ),
+        ),
       ),
   );
 
@@ -130,20 +137,25 @@ export function registerExternalTools(server: McpServer, call: Call) {
       const q = new URLSearchParams({ limit: String(limit ?? 20) });
       if (channel) q.set('channel', channel);
       if (status) q.set('status', status);
-      return text((await call(`/threads?${q}`)).map(thread));
+      return text(compactRows((await call(`/threads?${q}`)).map(thread)));
     },
   );
 
   server.registerTool(
     'list_pull_requests',
     { description: PR_LIST_DESCRIPTION, inputSchema: prListInput, annotations: { readOnlyHint: true } },
-    async ({ search }) => text(prList(await call('/prs'), search)),
+    async ({ search, state, channel, limit }) =>
+      text(prList(await call(channel ? `/prs?channel=${encodeURIComponent(channel)}` : '/prs'), { search, state, limit })),
   );
 
   server.registerTool(
     'search_threads',
-    { description: 'Full-text search across every Omni thread: titles and what was said.', inputSchema: { query: z.string().min(1) }, annotations: { readOnlyHint: true } },
-    async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
+    {
+      description: `Full-text search across Omni threads: titles and what was said. Returns at most ${SEARCH_DEFAULT_LIMIT} hits by default; pass channel or limit to narrow or widen.`,
+      inputSchema: searchInput,
+      annotations: { readOnlyHint: true },
+    },
+    async ({ query, channel, limit }) => text(formatSearchHits(await call(searchPath({ query, channel, limit })), limit ?? SEARCH_DEFAULT_LIMIT)),
   );
 
   server.registerTool(
@@ -151,12 +163,13 @@ export function registerExternalTools(server: McpServer, call: Call) {
     {
       description:
         "A thread's status, last reply and artifacts. With wait_seconds, a queued or running thread is watched until it finishes " +
-        `or the time runs out (at most ${WAIT_MAX}s); call again to keep waiting. Use read_thread for the whole conversation.`,
-      inputSchema: { thread_id: z.string(), wait_seconds: z.number().int().min(0).max(WAIT_MAX).optional() },
+        `or the time runs out (at most ${WAIT_MAX}s); call again to keep waiting. Use read_thread for the whole conversation. ` +
+        '`last_reply` is its last run\'s final message, cut at `reply_max_chars`. Pass `include_reply: false` when you only need its status.',
+      inputSchema: { thread_id: z.string(), wait_seconds: z.number().int().min(0).max(WAIT_MAX).optional(), ...replyInput },
       annotations: { readOnlyHint: true },
     },
-    async ({ thread_id, wait_seconds }, extra) => {
-      const path = `/threads/${encodeURIComponent(thread_id)}/summary`;
+    async ({ thread_id, wait_seconds, include_reply, reply_max_chars }, extra) => {
+      const path = `/threads/${encodeURIComponent(thread_id)}/summary?${replyQuery(include_reply, reply_max_chars)}`;
       const until = Date.now() + (wait_seconds ?? 0) * 1000;
       let t = await call(path);
       while (ACTIVE.has(t.status) && Date.now() + POLL_MS <= until && !extra.signal.aborted) {
@@ -171,22 +184,26 @@ export function registerExternalTools(server: McpServer, call: Call) {
     'read_thread',
     {
       description:
-        "Read a thread's conversation: what the user and the agent said, without tool calls. One page of at most 100 messages and 60,000 characters, " +
-        'oldest first, each message cut at 8,000 characters (`cut_from` gives the full length). No cursor: the newest page. ' +
+        "Read a thread's conversation: what the user and the agent said, without tool calls. One page of up to 100 messages (default 15) and 60,000 characters (default 20,000), " +
+        'oldest first, each message cut at up to 8,000 characters (default 3,000; `cut_from` gives the full length). No cursor: the newest page. ' +
         'Pass `older` from a result as `before` for the page before, or `newer` as `after` for the page after.',
       inputSchema: {
         thread_id: z.string(),
         before: z.number().int().min(0).optional(),
         after: z.number().int().min(0).optional(),
-        limit: z.number().int().min(1).max(100).optional().describe('Messages in the page. Default 40.'),
+        limit: z.number().int().min(1).max(100).optional().describe('Messages in the page, 1 to 100. Default 15.'),
+        page_chars: z.number().int().min(1).max(60_000).optional().describe('Characters in the page, 1 to 60,000. Default 20,000.'),
+        row_chars: z.number().int().min(1).max(8_000).optional().describe('Characters per message before cutting, 1 to 8,000. Default 3,000.'),
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ thread_id, before, after, limit }) => {
+    async ({ thread_id, before, after, limit, page_chars, row_chars }) => {
       const q = new URLSearchParams();
       if (before !== undefined) q.set('before', String(before));
       if (after !== undefined) q.set('after', String(after));
       if (limit !== undefined) q.set('limit', String(limit));
+      if (page_chars !== undefined) q.set('page_chars', String(page_chars));
+      if (row_chars !== undefined) q.set('row_chars', String(row_chars));
       return text(await call(`/threads/${encodeURIComponent(thread_id)}/conversation?${q}`));
     },
   );
@@ -308,7 +325,7 @@ export function registerExternalTools(server: McpServer, call: Call) {
       inputSchema: { channel: z.string().describe('Channel id from list_channels.') },
       annotations: { readOnlyHint: true },
     },
-    async ({ channel }) => text(((await call(`/channels/${encodeURIComponent(channel)}`)).folders ?? []).map(folder)),
+    async ({ channel }) => text(compactRows(((await call(`/channels/${encodeURIComponent(channel)}`)).folders ?? []).map(folder))),
   );
 
   server.registerTool(
@@ -363,17 +380,22 @@ export function registerExternalTools(server: McpServer, call: Call) {
     },
     async () =>
       text(
-        (await call('/automations')).map((a: any) => ({
-          id: a.id,
-          name: a.name,
-          enabled: a.enabled,
-          channel: a.channel,
-          schedule: a.cron || null,
-          on: a.on ?? null,
-          next: a.next ?? null,
-          error: a.error ?? null,
-          last_runs: (a.runs ?? []).map((r: any) => ({ thread_id: r.thread_id, title: r.title, status: r.status, trigger: r.trigger, at: r.created_at })),
-        })),
+        (await call('/automations')).map((a: any) =>
+          compactRow(
+            {
+              id: a.id,
+              name: a.name,
+              enabled: a.enabled,
+              channel: a.channel,
+              schedule: a.cron || null,
+              on: a.on ?? null,
+              next: a.next ?? null,
+              error: a.error ?? null,
+              last_runs: (a.runs ?? []).map((r: any) => compactRow({ thread_id: r.thread_id, title: r.title, status: r.status, trigger: r.trigger, at: r.created_at })),
+            },
+            ['enabled'],
+          ),
+        ),
       ),
   );
 

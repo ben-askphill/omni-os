@@ -1,6 +1,7 @@
 // Claude Code behind the harness adapter interface: one warm `claude -p` process per thread,
 // stream-json both ways. The env strips the API auth vars, and output goes through stream.ts.
 import { readsOnly } from '@omni/shared/quick-ask.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -34,7 +35,7 @@ const CONTEXT_REQUEST = 'omni-context';
  * hook that answers "ask" for every tool makes it ask even where the user's own settings allow the tool. Checked against
  * claude 2.1.316 (ADR 0015).
  */
-export const ASK_EVERY_TOOL = JSON.stringify({
+const ASK_EVERY_TOOL = {
   hooks: {
     PreToolUse: [
       {
@@ -43,12 +44,28 @@ export const ASK_EVERY_TOOL = JSON.stringify({
       },
     ],
   },
-});
+};
 
 /** The permission flags for a thread: bypass at full access, else every call asked over stdio. */
 export function permissionArgs(gated: boolean): string[] {
   if (!gated) return ['--permission-mode', config.permissionMode];
-  return ['--permission-mode', 'default', '--permission-prompt-tool', 'stdio', '--settings', ASK_EVERY_TOOL];
+  return ['--permission-mode', 'default', '--permission-prompt-tool', 'stdio'];
+}
+
+/**
+ * The workspace's own CLAUDE.md files, which a #conductor thread does not load: it routes work and pays for none of the
+ * project knowledge they hold (#1013). A new one runs outside the workspace (sandbox.ts conductorWorkdir), but one
+ * started before that still has the workspace as its cwd, so Claude Code would read them as project memory.
+ * `claudeMdExcludes` takes absolute paths and globs (checked against claude 2.1.330). Other channels keep them.
+ */
+export function workspaceClaudeMd(dir = config.brainDir): string[] {
+  return [join(dir, 'CLAUDE.md'), join(dir, 'CLAUDE.local.md'), join(dir, '.claude', 'CLAUDE.md'), join(dir, '.claude', 'rules', '**')];
+}
+
+/** The thread's `--settings`: the ask-every-tool hook below full access, and the CLAUDE.md files #conductor skips. One flag, since the CLI keeps only one. */
+export function settingsArgs(gated: boolean, conductor: boolean): string[] {
+  const settings = { ...(gated && ASK_EVERY_TOOL), ...(conductor && { claudeMdExcludes: workspaceClaudeMd() }) };
+  return Object.keys(settings).length ? ['--settings', JSON.stringify(settings)] : [];
 }
 
 /** A `can_use_tool` request the CLI sends before a tool runs, or null for any other event. */
@@ -157,6 +174,7 @@ export const claudeAdapter: HarnessAdapter = {
     const { thread, secretEnv, systemPrompt } = ctx;
     const resume = ctx.resume || sessionOnDisk(thread);
     const model = claudeModel(thread.model, ctx.role);
+    const conductor = thread.channel_id === CONDUCTOR_CHANNEL;
 
     const args = [
       '-p',
@@ -166,11 +184,12 @@ export const claudeAdapter: HarnessAdapter = {
       '--replay-user-messages',
       '--model', model,
       ...permissionArgs(!!ctx.permission),
+      ...settingsArgs(!!ctx.permission, conductor),
       '--add-dir', threadDir(thread.id),
       '--append-system-prompt', systemPrompt,
     ];
     if (thread.effort) args.push('--effort', thread.effort);
-    if (thread.cwd !== config.brainDir && existsSync(config.brainDir)) args.push('--add-dir', config.brainDir);
+    if (!conductor && thread.cwd !== config.brainDir && existsSync(config.brainDir)) args.push('--add-dir', config.brainDir);
     args.push('--mcp-config', writeMcpConfig(mcpInput(ctx)));
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
     // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.

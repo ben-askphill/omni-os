@@ -1,5 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resetUsageLogs, scanUsageLogs, usageRecords } from '../usage-logs.ts';
@@ -7,6 +12,7 @@ import { buildTable, lookup, priceTable, resetPriceTable } from '../usage-pricin
 import { aggregateUsage, cursorRateModel, resetInsights } from '../insights.ts';
 import { app } from '../app.ts';
 import { paths } from '../config.ts';
+import { db } from '../db.ts';
 import { rangeDays, tokensOf } from '@omni/shared/insights.ts';
 
 const TZ = 'Europe/Amsterdam';
@@ -163,5 +169,195 @@ describe('GET /api/insights', () => {
     expect(body.usage.days).toHaveLength(7);
     expect(body.usage.total.sessions).toBe(1);
     expect(body.automations).toMatchObject({ total: expect.any(Number) });
+  });
+
+  it('strips <metadata> from uploaded SVG channel icons while keeping icons on HTTP /api/insights', async () => {
+    const chId = 'c2pa-icon-ch';
+    const thId = 'c2pa-icon-thread';
+    db.prepare('DELETE FROM threads WHERE id = ?').run(thId);
+    db.prepare('DELETE FROM channels WHERE id = ?').run(chId);
+    try {
+      const c2paSvg =
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+        `<metadata><c2pa:manifest xmlns:c2pa="http://c2pa.org/manifest">${'M'.repeat(16_000)}</c2pa:manifest></metadata>` +
+        '<circle cx="12" cy="12" r="10" fill="#283c62"/></svg>';
+      const expected = 'svg:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#283c62"/></svg>';
+      const create = await app.request('/api/channels', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: chId, name: 'C2PA Icon Channel', icon: `svg:${c2paSvg}` }),
+      });
+      expect(create.status).toBe(200);
+      const created = (await create.json()) as { icon: string };
+      expect(created.icon).toBe(expected);
+      expect(created.icon.length).toBeLessThan(200);
+
+      // HTTP /api/insights keeps channels[].icon for the Web UI (already stripped on upload).
+      db.prepare(`INSERT INTO threads (id, channel_id, title, status, session_id, cwd) VALUES (?, ?, ?, 'done', 's', '/tmp')`).run(
+        thId,
+        chId,
+        'Check icon',
+      );
+      resetInsights();
+      const res = await app.request(`/api/insights?range=7d&tz=${encodeURIComponent(TZ)}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { channels: { id: string; icon: string | null }[] };
+      expect(body.channels.find((c) => c.id === chId)?.icon).toBe(expected);
+    } finally {
+      db.prepare('DELETE FROM threads WHERE id = ?').run(thId);
+      db.prepare('DELETE FROM channels WHERE id = ?').run(chId);
+    }
+  });
+});
+
+describe('insights MCP tool (#1010)', () => {
+  const ROOT = join(import.meta.dirname, '../../..');
+  const makeC2paIcon = (size: number) =>
+    `svg:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><metadata><c2pa:manifest xmlns:c2pa="http://c2pa.org/manifest">${'X'.repeat(size)}</c2pa:manifest></metadata><circle cx="12" cy="12" r="10" fill="#283c62"/></svg>`;
+
+  // Audit-scale insights payload: 24 channels (two carrying ~15.8 KB C2PA SVG icons = ~31.6 KB total),
+  // 30 usage days, 12 models, 3 sources, 3 top PRs, and today's automation runs (~47 KB pretty-printed).
+  const auditInsights = {
+    range: '30d',
+    from: '2026-10-28',
+    to: '2026-11-26',
+    generated_at: '2026-11-26T08:00:00.000Z',
+    done: 84,
+    channels: Array.from({ length: 24 }, (_, i) => ({
+      id: `channel-${String(i + 1).padStart(2, '0')}`,
+      name: `Client Project ${i + 1}`,
+      icon: i < 2 ? makeC2paIcon(15_600) : i % 3 === 0 ? 'icon:terminal' : null,
+      threads: 24 - i,
+    })),
+    usage: {
+      complete: true,
+      total: { uncached: 4_200_000, cached: 95_000_000, cacheWrite: 12_500_000, output: 1_850_000, cost: 218.42, savings: 361.2, unpriced: 0, sessions: 312 },
+      sources: [
+        { source: 'claude-code', uncached: 2_500_000, cached: 70_000_000, cacheWrite: 10_000_000, output: 1_200_000, cost: 162.1, savings: 280.4, unpriced: 0, sessions: 210 },
+        { source: 'codex', uncached: 1_200_000, cached: 20_000_000, cacheWrite: 2_000_000, output: 450_000, cost: 42.12, savings: 68.5, unpriced: 0, sessions: 72 },
+        { source: 'cursor', uncached: 500_000, cached: 5_000_000, cacheWrite: 500_000, output: 200_000, cost: 14.2, savings: 12.3, unpriced: 0, sessions: 30 },
+      ],
+      models: Array.from({ length: 12 }, (_, i) => ({
+        model: `model-family-${i + 1}`,
+        source: i % 3 === 0 ? 'claude-code' : i % 3 === 1 ? 'codex' : 'cursor',
+        uncached: 300_000 - i * 10_000,
+        cached: 7_000_000 - i * 200_000,
+        cacheWrite: 900_000 - i * 30_000,
+        output: 120_000 - i * 5_000,
+        cost: Number((18.5 - i * 1.1).toFixed(2)),
+        savings: Number((28.4 - i * 1.5).toFixed(2)),
+        unpriced: 0,
+      })),
+      days: Array.from({ length: 30 }, (_, i) => ({
+        day: `2026-11-${String((i % 26) + 1).padStart(2, '0')}`,
+        tokens: { 'claude-code': 2_800_000 + i * 50_000, codex: 750_000 + i * 10_000, cursor: 190_000 + i * 5_000 },
+        cost: Number((7.25 + (i % 5) * 0.4).toFixed(2)),
+      })),
+      note: { logs: ['/home/user/.claude/projects', '/home/user/.codex/sessions'], prices: 'https://example.com/rates.json', cursor: 'read' },
+    },
+    prs: {
+      open: 29,
+      mine: 14,
+      withChecks: 22,
+      mergedFromThreads: 47,
+      top: Array.from({ length: 3 }, (_, i) => ({
+        repo: `org/project-repo-${i + 1}`,
+        channel_id: `channel-0${i + 1}`,
+        number: 500 - i,
+        title: `feat: implement improvement #${500 - i} across module`,
+        url: `https://github.com/org/project-repo-${i + 1}/pull/${500 - i}`,
+        author: 'ben-askphill',
+        state: 'OPEN',
+        isDraft: false,
+        updatedAt: '2026-11-26T07:30:00.000Z',
+        checks: { passed: 6, failed: 0, pending: 0 },
+        thread_id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      })),
+      failed: [],
+    },
+    automations: {
+      total: 14,
+      scheduled: 9,
+      onEvent: 3,
+      paused: 2,
+      today: Array.from({ length: 4 }, (_, i) => ({
+        id: `auto-${i + 1}`,
+        name: `Daily Automation ${i + 1}`,
+        channel: `channel-0${i + 1}`,
+        role: 'builder',
+        at: `2026-11-26T0${i + 6}:00:00.000Z`,
+      })),
+    },
+  };
+
+  let api: Server;
+  let child: ChildProcess;
+  let nextId = 0;
+  const waiting = new Map<number, (msg: any) => void>();
+
+  const request = (method: string, params: unknown = {}): Promise<any> => {
+    const id = ++nextId;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`no answer to ${method}`)), 20_000);
+      waiting.set(id, (msg) => {
+        clearTimeout(timer);
+        if (msg.error) reject(new Error(msg.error.message));
+        else resolve(msg.result);
+      });
+      child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    });
+  };
+
+  beforeAll(async () => {
+    api = createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        const pathname = new URL(req.url!, 'http://127.0.0.1').pathname;
+        res.statusCode = pathname === '/api/insights' ? 200 : 404;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(pathname === '/api/insights' ? auditInsights : { error: 'not found' }));
+      });
+    });
+    api.listen(0, '127.0.0.1');
+    await once(api, 'listening');
+    const base = `http://127.0.0.1:${(api.address() as AddressInfo).port}`;
+    // insights is on omni-admin (apps/mcp/core-tools.ts).
+    child = spawn(join(ROOT, 'node_modules/.bin/tsx'), [join(ROOT, 'apps/mcp/omni.ts'), 'admin'], {
+      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', OMNI_URL: base, OMNI_TOKEN: 'test-token', OMNI_USER: 'Ben', OMNI_THREAD_ID: 'conductor-thread' },
+      stdio: ['pipe', 'pipe', 'inherit'],
+    });
+    createInterface({ input: child.stdout! }).on('line', (line) => {
+      try {
+        const msg = JSON.parse(line);
+        if (msg.id !== undefined) waiting.get(msg.id)?.(msg);
+      } catch {}
+    });
+    await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
+  }, 30_000);
+
+  afterAll(() => {
+    child?.kill('SIGTERM');
+    api?.close();
+  });
+
+  it('drops channels[].icon and stays under 10K chars at audit scale', { timeout: 30_000 }, async () => {
+    const baselinePretty = JSON.stringify(auditInsights, null, 2);
+    expect(baselinePretty.length).toBeGreaterThan(45_000);
+
+    const res = (await request('tools/call', { name: 'insights', arguments: { range: '30d' } })) as { isError?: boolean; content: { text: string }[] };
+    expect(res.isError).toBeFalsy();
+    const raw = res.content[0].text;
+    const body = JSON.parse(raw);
+
+    expect(raw.length).toBeLessThan(10_000);
+    expect(raw).not.toContain('<svg');
+    expect(raw).not.toContain('c2pa');
+    expect(body.channels).toHaveLength(24);
+    for (const ch of body.channels) {
+      expect(ch).toEqual({ id: expect.any(String), name: expect.any(String), threads: expect.any(Number) });
+      expect('icon' in ch).toBe(false);
+    }
+    expect(body.usage.days).toHaveLength(30);
+    expect(body.prs.top).toHaveLength(3);
   });
 });

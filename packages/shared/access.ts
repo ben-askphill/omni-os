@@ -98,8 +98,11 @@ export function connectorAccessOf(raw: unknown): ConnectorAccess {
   return out;
 }
 
+/** The server with the conductor tools that are not routing core, beside `omni` (apps/mcp/core-tools.ts). */
+export const ADMIN_SERVER = 'omni-admin';
+
 /** Omni's own MCP servers. Their tools run at every level: Omni checks what they do itself. */
-export const OMNI_SERVERS = new Set(['omni', 'omni-ask', 'omni-render', 'omni-threads', 'omni-steps', 'omni-memory', 'omni-team', 'omni-learn']);
+export const OMNI_SERVERS = new Set(['omni', ADMIN_SERVER, 'omni-ask', 'omni-render', 'omni-threads', 'omni-steps', 'omni-memory', 'omni-team', 'omni-learn']);
 
 /** The MCP server a tool belongs to, or null for a built-in tool. Claude Code names them `mcp__<server>__<tool>`. */
 export function serverOf(tool: string): string | null {

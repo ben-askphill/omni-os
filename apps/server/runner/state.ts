@@ -209,6 +209,8 @@ export function endedTurn(threadId: string, status: ThreadStatus) {
 /** Called for every tool call a run records: (the session that ran it, its row, its payload) (runner/collisions.ts). */
 export const toolUsed: ((sessionThread: string, row: EventRow, payload: unknown) => void)[] = [];
 export const waiting: string[] = []; // thread ids waiting for a slot, FIFO
+/** Threads whose running turn is a compaction Omni started (conductor-compact.ts): it alerts nobody and starts no other. */
+export const autoCompacting = new Set<string>();
 export const waitingMsgs = new Map<string, Msg[]>();
 export const browserHolder = new Map<string, string>(); // channel id -> thread id whose process holds the profile
 

@@ -12,10 +12,10 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 
 | Piece | What |
 | --- | --- |
-| cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else your workspace folder |
-| context | your workspace folder added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
-| system prompt | channel facts (repo, notes, and the store and Portal slug while the Shopify add-on is on), artifacts and browser rules, the channel's design system file, the agent's charter |
-| MCP | `omni-browser` (`@playwright/mcp` at the exact version in `apps/server/package.json`, run by `node` from Omni's install, never `npx`; attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); `omni-ask` (the `ask_user_question` tool), `omni-render` (`html_render`) and `omni-threads` (`read_referenced_thread`), which Claude Code, Codex and Cursor threads all get from the Rust `omni-mcp` binary (`crates/omni-mcp`, [rust-port.md](rust-port.md)); conductor also gets `omni` (`apps/mcp/omni.ts`), which has `read_referenced_thread` itself |
+| cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else your workspace folder. A #conductor thread (not a quick ask) runs in its thread folder instead, or in `~/.cache/omni-os/conductor/<thread>` when a CLAUDE.md or AGENTS.md sits above that folder, so no harness loads project rules into it (`apps/server/sandbox.ts` conductorWorkdir) |
+| context | your workspace folder added with `--add-dir`, its CLAUDE.md loaded (not in #conductor threads, which neither run in it nor add it, and exclude it with `claudeMdExcludes` for threads started in it before), all your user skills and MCP servers |
+| system prompt | static first so it caches across threads: the install's rules, the agent's charter and skills, the thread's kind, then the channel's facts (repo, notes, lessons, the store and Portal slug while the Shopify add-on is on, its design system and published pages), and last the thread's own lines (id, task, branch, folders) (`apps/server/runner/prompts.ts`) |
+| MCP | `omni-browser` (`@playwright/mcp` at the exact version in `apps/server/package.json`, run by `node` from Omni's install, never `npx`; attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); `omni-ask` (the `ask_user_question` tool), `omni-render` (`html_render`) and `omni-threads` (`read_referenced_thread`), which Claude Code, Codex and Cursor threads all get from the Rust `omni-mcp` binary (`crates/omni-mcp`, [rust-port.md](rust-port.md)); conductor also gets `omni` and `omni-admin` (both `apps/mcp/omni.ts`: the routing core in `core-tools.ts`, and the rest, started lazily behind `omni-mcp lazy`); `omni` has `read_referenced_thread` itself |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, `OMNI_TOKEN` (the spawn's own thread token, never the install's; `apps/server/thread-tokens.ts`), plus global and channel secrets, after that harness's strip list (`apps/server/harness/env-guard.ts`). Claude Code never sees `ANTHROPIC_BASE_URL` or `CLAUDE_CONFIG_DIR`, so it keeps the plan login and writes transcripts under `~/.claude` |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context. A switch to another harness and back resumes it with a handover of what it missed (`apps/server/runner/switch.ts`) |
 
@@ -61,7 +61,7 @@ An npm workspaces monorepo run with Turborepo (`turbo.json`). Each app and packa
 apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/ (claude, codex, cursor,
                             hermes, cursor-cloud adapters), db/, sync/, sandbox, secrets, terminal, browser, artifacts,
                             GitHub, scheduler; scripts/ for history import and sync backfill
-apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; external/, Omni as an MCP server for other clients
+apps/mcp/                   @omni/mcp: omni.ts, the conductor tools (omni and omni-admin, split by core-tools.ts); external/, Omni as an MCP server for other clients
 apps/web/                   @omni/web: Web UI (React, Vite)
 apps/desktop/               @omni/desktop: Electron app for macOS and Linux. Shows the Web UI and runs the bundled server
 apps/ios/                   @omni/ios: Expo React Native app (pairing, live threads, Activity as Inbox, Settings, shared icons)

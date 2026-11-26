@@ -20,6 +20,7 @@ import { applyQueued } from './switch.ts';
 import { runnerPorts } from './ports.ts';
 import {
   addEvent,
+  autoCompacting,
   browserHolder,
   endedTurn,
   clearMods,
@@ -127,6 +128,7 @@ export function abortStart(live: Live, status: ThreadStatus) {
   finishTurnSnapshot(live);
   emitThread(live.threadId);
   endedTurn(live.threadId, status);
+  autoCompacting.delete(live.threadId);
   pump();
 }
 
@@ -136,6 +138,8 @@ export function abortStart(live: Live, status: ThreadStatus) {
  */
 export function endTurn(live: Live, status: ThreadStatus, more = false) {
   const id = live.threadId;
+  // A compaction Omni started (conductor-compact.ts) is housekeeping: it alerts nobody and suggests nothing.
+  const auto = autoCompacting.has(id);
   const turnFrom = live.closeTurn();
   const run = events.lastRun(id, turnFrom);
   const runText = run.text;
@@ -148,7 +152,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   settleContext(id);
   // A quick ask is read where it was asked, so it alerts nobody. The task it turns into does. A quiet automation run
   // with nothing to report alerts nobody either (automation-quiet.ts).
-  if (!more && !t?.quick && t?.source !== 'member') {
+  if (!more && !auto && !t?.quick && t?.source !== 'member') {
     if (!(status === 'done' && runnerPorts().reporting.quietRun(id, run.reply))) notifyEnded(id, status, run.reply);
   }
   applyQueued(id);
@@ -158,7 +162,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   // Even while Omni shuts down: the report is saved and parked for Resume (queue.ts), not lost.
   if (t?.parent_id && !more) reportToParent(id, status, run.report);
   if (t?.quick && status === 'done' && !more && runText) void runnerPorts().reporting.quickTurn(id, run.reply);
-  if (status === 'done' && !more && !t?.parent_id && !t?.quick && runText && !isShuttingDown()) {
+  if (status === 'done' && !more && !auto && !t?.parent_id && !t?.quick && runText && !isShuttingDown()) {
     suggestReply(id, runText);
     suggestNextThread(id, runText);
     suggestOpenItems(id, runText);
@@ -167,7 +171,9 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   // The agent may have switched to a branch of its own and opened its PR from it.
   void followBranch(id).then((moved) => moved && emitThread(id), () => {});
   armIdle(live);
+  // The hooks see the flag: a compaction's own end starts no other (conductor-compact.ts).
   if (!more) endedTurn(id, status);
+  if (auto) autoCompacting.delete(id);
   pump();
 }
 

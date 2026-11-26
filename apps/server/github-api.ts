@@ -19,10 +19,19 @@ const repoOf = (channelId: string) => {
   return ch.github_repo;
 };
 
-// Every PR across the channels with a repo set. Channels sharing a repo ask GitHub once. `viewer` is the gh login, which
-// the page groups by ("Authored", "Review requested"), or null when gh cannot say.
+// Every PR across the channels with a repo set, or one channel when `?channel=<id>` is given. Channels sharing a repo
+// ask GitHub once. `viewer` is the gh login, which the page groups by ("Authored", "Review requested"), or null when gh cannot say.
 githubApi.get('/prs', async (c) => {
-  const repos = [...new Set(channels.list().flatMap((ch) => (ch.github_repo ? [ch.github_repo] : [])))];
+  const channelId = c.req.query('channel');
+  let repos: string[];
+  if (channelId) {
+    const ch = channels.get(channelId);
+    if (!ch) return c.json({ error: 'No channel with this id.' }, 404);
+    if (!ch.github_repo) return c.json({ repos: [], prs: [], failed: [], viewer: null });
+    repos = [ch.github_repo];
+  } else {
+    repos = [...new Set(channels.list().flatMap((ch) => (ch.github_repo ? [ch.github_repo] : [])))];
+  }
   const [all, viewer] = await Promise.all([allPRs(repos), ghLogin()]);
   return c.json({ ...all, viewer });
 });
