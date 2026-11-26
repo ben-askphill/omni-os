@@ -375,7 +375,7 @@ export function settleTeam(leadId: string) {
   const replies = team.map(
     (m) =>
       `### ${m.task_id ?? m.id} · ${m.title} (${m.role ?? 'crew'}, thread ${m.id}), status: ${m.status}\n\n` +
-      (events.lastRun(m.id).text || m.last_text || '(no reply)'),
+      capText(events.lastRun(m.id).report.text || m.last_text || '(no reply)', REPORT_MAX_CHARS, `get_thread on ${m.id} with a higher reply_max_chars reads its final reply`),
   );
   const said = `All ${team.length} reports are in.`;
   const row = saveOwn(leadId, `team-settle:${leadId}`, {
