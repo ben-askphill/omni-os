@@ -47,6 +47,8 @@ describe('tool failure capture and triage', () => {
     expect(await (await send('GET', `/${first.group_id}/occurrences?before=${rows[0].cursor}`)).json()).toHaveLength(1);
     expect((await send('PATCH', `/${first.group_id}`, { status: 'replacement', guidance: 'Use Glob to find the path first.' })).status).toBe(200);
     expect(await (await send('GET', '?status=replacement')).json()).toEqual([expect.objectContaining({ group_id: first.group_id })]);
+    expect(await (await send('GET', `/${first.group_id}`)).json()).toMatchObject({ group_id: first.group_id, status: 'replacement', guidance: 'Use Glob to find the path first.', occurrences: 2 });
+    expect((await send('GET', `/${'b'.repeat(64)}`)).status).toBe(404);
   });
 
   it('stores safe categories only, with no raw arguments, output, credentials or private data', async () => {
