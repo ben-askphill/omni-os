@@ -20,7 +20,7 @@ const DATA_DIR = vi.hoisted(() => {
   return dir;
 });
 
-import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig, writeMcpConfig } from '../sandbox.ts';
+import { buildMcpConfig, conductorWorkdir, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, rulesFileAbove, writeCursorDenyConfig, writeMcpConfig } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
 import { nativeMcpCandidate } from '../native-mcp.ts';
 import type { Channel } from '../db.ts';
@@ -294,6 +294,44 @@ describe('prepareWorkdir', () => {
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(threadDir(id), { recursive: true, force: true });
+    }
+  });
+
+  it('runs a #conductor thread in its own folder, never the workspace or a base dir, but lets a quick ask read them', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'omni-conductor-base-'));
+    const id = 'conductor-wd-123456';
+    try {
+      const ch = channel({ id: 'conductor', base_dir: base, use_worktree: 0 });
+      expect(await prepareWorkdir(ch, id)).toEqual({ cwd: threadDir(id), branch: null });
+      expect(await prepareWorkdir(ch, id, { quick: true })).toEqual({ cwd: base, branch: null });
+      // Other channels keep their base dir.
+      expect((await prepareWorkdir(channel({ base_dir: base }), id)).cwd).toBe(base);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+      rmSync(threadDir(id), { recursive: true, force: true });
+    }
+  });
+
+  it('moves a #conductor thread out of a data folder that has project rules above it, unless the spare folder has them too', () => {
+    const id = 'conductor-rules-123456';
+    const clean = mkdtempSync(join(tmpdir(), 'omni-conductor-spare-'));
+    const dirty = mkdtempSync(join(tmpdir(), 'omni-conductor-dirty-'));
+    writeFileSync(join(dirty, 'AGENTS.md'), '# checkout rules\n');
+    try {
+      expect(rulesFileAbove(threadDir(id))).toBeNull();
+      expect(conductorWorkdir(id, join(clean, id))).toBe(threadDir(id));
+
+      // A dev install: the data folder sits in a checkout whose CLAUDE.md every harness would read from the thread folder.
+      writeFileSync(join(DATA_DIR, 'CLAUDE.md'), '# checkout rules\n');
+      expect(rulesFileAbove(join(threadDir(id), 'deeper'))).toBe(join(DATA_DIR, 'CLAUDE.md'));
+      expect(conductorWorkdir(id, join(clean, id))).toBe(join(clean, id));
+      expect(existsSync(join(clean, id))).toBe(true);
+      // Nowhere clean: the thread's own folder, as before.
+      expect(conductorWorkdir(id, join(dirty, id))).toBe(threadDir(id));
+    } finally {
+      rmSync(join(DATA_DIR, 'CLAUDE.md'), { force: true });
+      rmSync(clean, { recursive: true, force: true });
+      rmSync(dirty, { recursive: true, force: true });
     }
   });
 
