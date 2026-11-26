@@ -1,4 +1,7 @@
-// The system prompt handed to a harness for one thread.
+// The system prompt handed to a harness for one thread. It runs from what is the same for every thread to what is
+// this thread's own, so a harness's prompt cache reuses the longest prefix across threads (#1013): the install's
+// rules, then the agent's (its charter and skills), then the thread's kind (delegated, team, group), then the
+// channel's (notes, lessons, design system, published pages), and last the thread's lines (id, branch, folders).
 import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
@@ -99,13 +102,13 @@ function designSystemLines(thread: Thread, channel: Channel) {
   return [
     '',
     '## Design system',
-    `This channel has a design system${channel.design_system_name ? ` (${channel.design_system_name})` : ''}, a standalone HTML file at ${designSystemFile(thread.id)}.`,
+    `This channel has a design system${channel.design_system_name ? ` (${channel.design_system_name})` : ''}, a standalone HTML file: its path is the Design system line under This thread.`,
     `Read it before you write any HTML page, report, dashboard or diagram for this channel. It can be larger than one Read allows, so read it in parts or search it for the tokens and components you need. Build the page on its tokens, type, spacing, components and tone, with the CSS inline so the page stays self-contained, and do not approximate or invent a style of your own. Skip it only when ${userName()} names a different style. Never copy the file itself into the artifacts folder.`,
   ];
 }
 
-/** Where to put files and pages, and the browser: only for a role that does work itself. */
-function workspaceLines(thread: Thread, channel: Channel) {
+/** Where to put files and pages, and the browser: only for a role that does work itself. The folders' paths are this thread's own (threadLines). */
+function workspaceLines(thread: Thread) {
   const remote = isProviderHarness(thread.harness);
   const name = userName();
   return [
@@ -113,19 +116,22 @@ function workspaceLines(thread: Thread, channel: Channel) {
       '## Artifacts',
       remote
         ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
-        : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni lists files there in the thread. To show a chart, diagram, table or mockup in the thread itself, above your reply, call html_render instead. Write a page, report, dashboard or diagram as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap). A guide, how-to or note can be .md: Omni renders it like a reply. Mention the filename in your reply.`,
-      ...designSystemLines(thread, channel),
-      ...(profileOf(thread.harness).claudeAi ? publishedLines(channel.id) : []),
+        : `Write any HTML page, report, diagram, CSV or document meant for ${name} into OMNI_ARTIFACTS_DIR, the Artifacts folder under This thread.\nOmni lists files there in the thread. To show a chart, diagram, table or mockup in the thread itself, above your reply, call html_render instead. Write a page, report, dashboard or diagram as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap). A guide, how-to or note can be .md: Omni renders it like a reply. Mention the filename in your reply.`,
       ...(remote
         ? []
         : [
             '',
             '## Browser',
             config.browser
-              ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in ${browserOutDir(thread.id)} and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere. It blocks file: URLs too: to look at a local HTML file, serve its folder over http on a free port and open that. Start that server in the background and stop it by its PID: \`pkill -f\` with its command line also matches your own shell and kills it. browser_find searches for a \`text\` substring or a \`regex\`; it ignores any other argument name and then fails. browser_click, browser_type, browser_hover and browser_select_option take the snapshot ref as \`target\`, not \`ref\`. To reload or open another page, call browser_navigate: a browser_evaluate script that reloads or navigates loses its page before it returns. browser_run_code_unsafe runs Playwright page code without Node's require, fs or process, so read a file with your own tools and put its value in the script.`
+              ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in the Browser folder under This thread and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere. It blocks file: URLs too: to look at a local HTML file, serve its folder over http on a free port and open that. Start that server in the background and stop it by its PID: \`pkill -f\` with its command line also matches your own shell and kills it. browser_find searches for a \`text\` substring or a \`regex\`; it ignores any other argument name and then fails. browser_click, browser_type, browser_hover and browser_select_option take the snapshot ref as \`target\`, not \`ref\`. To reload or open another page, call browser_navigate: a browser_evaluate script that reloads or navigates loses its page before it returns. browser_run_code_unsafe runs Playwright page code without Node's require, fs or process, so read a file with your own tools and put its value in the script.`
               : '',
           ]),
   ];
+}
+
+/** The channel's pages for a thread that does its own work: its design system, and the pages it published on claude.ai. */
+function channelPageLines(thread: Thread, channel: Channel) {
+  return [...designSystemLines(thread, channel), ...(profileOf(thread.harness).claudeAi ? publishedLines(channel.id) : [])];
 }
 
 /** The secret holding the "Omni" Notion connection's integration token (docs/user/notion.md). */
@@ -328,6 +334,106 @@ export function replyBlock(thread: Thread): string[] {
 }
 
 /**
+ * Whether the thread gets the tool-failure policy. A delegate-only agent (the Conductor) runs no shell, subagent or
+ * wrapper whose failures Omni could miss, and its own calls are recorded, so the policy only costs it tokens (#1013).
+ */
+const getsToolFailurePolicy = (role?: CrewRole) => !role?.delegateOnly;
+
+/**
+ * The thread's delegation rules, for an agent with the conductor tools. The Conductor gets none: its charter
+ * (crew/conductor.md), which its prompt carries in full, states each of them (seat first, briefs, teams, seating,
+ * warmth, reports), and saying them twice cost every Conductor thread ~1K tokens and let the copies drift (#1013).
+ * A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
+ */
+function delegationLines(role: CrewRole | undefined, name: string): string[] {
+  if (!role?.mcp.includes('omni') || role.id === SCAN_ROLE || isConductor(role.id)) return [];
+  return [
+    '',
+    '## Thread delegation',
+    `${delegationRule(role, name)}First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
+    TEAM_RULE,
+    SESSION_CACHE_RULE,
+  ];
+}
+
+/** What kind of thread this is: a team member, a seated member, a delegated task or a team lead. */
+function sourceLines(thread: Thread, role: CrewRole | undefined, lead: boolean, name: string): string[] {
+  const remote = isProviderHarness(thread.harness);
+  const remoteAgent = isRemoteAgentHarness(thread.harness);
+  const lines: string[] = [];
+  if (thread.source === 'team') {
+    lines.push(
+      '',
+      '## Team task',
+      `You are one member of a team, on the task on the Thread line under This thread. Your final message is automatically reported to the team lead, who combines it with the other members' replies. Stick to your own task. Report outcomes and blockers, even if the answer is "nothing found".`,
+    );
+  } else if (thread.source === 'member') {
+    // A seated member (ADR 0019): the lead commits, and several agents edit one worktree at once (Q24). A remote agent
+    // seated here talks only, and where a remote agent leads, the user commits what the local members change (ADR 0020).
+    const leadThread = thread.parent_id ? threads.get(thread.parent_id) : undefined;
+    const leadName = crewRoleName(leadThread?.role, getCrew) ?? 'The lead';
+    const team = !!leadThread && events.teamOf(leadThread.id) !== null;
+    const committer = isRemoteAgentHarness(leadThread?.harness) ? `${leadName} is a remote agent and talks only, so ${name}` : leadName;
+    lines.push(
+      '',
+      '## Group thread',
+      `You are seated in a group thread with ${name} and other agents. ${leadName} leads this thread. Its messages go to the agents they name, and agents named in one message work at the same time in this one worktree.`,
+      ...(team ? [`This thread is a team: ${leadName} gives you your part. Stick to it, and end your turn with what you did and found: your final message goes back to ${leadName}.`] : []),
+      ...(leadThread?.channel_id === 'conductor' && !remoteAgent ? conductorSeatLines(name, role, !remote && hasOmniCommand()) : []),
+      remoteAgent
+        ? 'You talk only: the local agents seated here change the files.'
+        : leadThread?.channel_id === 'conductor'
+          ? ''
+          : remote
+          ? `You work in your own checkout on a branch of your own, not in this thread's worktree. Push your work to that branch and do not open a pull request: when you finish, ${leadName} pulls your branch into the thread's branch.`
+          : `Edit files only. ${committer} commits and opens the pull request: never run git commit, git push, git rebase, git reset, git stash or git checkout, and never open a pull request. When another agent changed a file you changed, Omni tells you which files: read them again before you edit them and keep their changes.`,
+    );
+  } else if (thread.parent_id) {
+    lines.push(
+      '',
+      '## Delegated task',
+      'The conductor handed you this task: its id is on the Thread line under This thread. Your final message is automatically reported back to it. Report outcomes and blockers, even if the answer is "nothing found".',
+      // The report card (packages/shared/report-shape.ts) leads with what comes before the first heading and folds each heading.
+      'That final message is the whole report; what you said while working is not part of it. Put the outcome in its first one to three lines, then the details under ## headings (such as Checks, Changes, Open items), as bullet lists rather than tables.',
+    );
+  }
+  if (events.teamOf(thread.id) !== null) lines.push(...teamLeadLines(name));
+  else if (lead) {
+    // A team made before one-thread teams: its members ran in threads of their own under this one.
+    lines.push(
+      '',
+      '## Team lead',
+      'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work. Their replies are all you get: read_referenced_thread cannot open member threads.',
+    );
+  }
+  return lines;
+}
+
+/**
+ * The lines that are this thread's own, last in the prompt so everything above them can cache across threads: where
+ * it runs, its task, its branch and its folders. The sections above name these lines (This thread) instead of a path.
+ */
+function threadLines(thread: Thread, channel: Channel, hands: boolean): string[] {
+  const remote = isProviderHarness(thread.harness);
+  const { shopify } = displayPrefs();
+  const local = hands && !remote;
+  return [
+    '',
+    '## This thread',
+    `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
+    // The Shopify pack (display.ts): its store and portal lines go out only while it is on.
+    shopify && channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
+    shopify && channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
+    channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
+    `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
+    !remote && thread.branch ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.` : '',
+    local ? `- Artifacts folder: ${artifactsDir(thread.id)}` : '',
+    local && config.browser ? `- Browser folder: ${browserOutDir(thread.id)}` : '',
+    local && channel.design_system ? `- Design system: ${designSystemFile(thread.id)}` : '',
+  ];
+}
+
+/**
  * `secretNames` are the names of the secrets in the thread's environment, never their values. `skills`: what the
  * thread's harness loads of its agent's skills (skills.ts), resolved when it starts.
  */
@@ -339,10 +445,12 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
   // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
   const hands = doesOwnWork(thread, role);
-  const { shopify } = displayPrefs();
+  // A remote agent gets a charter only when Ben wrote one in its file; otherwise its server's own instructions lead (Q28).
+  const charter = role ? (remoteAgent ? writtenCharter(role) : role.charter) : '';
   const lines = [
+    // The install's rules: the same for every thread of this harness and agent.
     '# Omni OS context',
-    TOOL_FAILURE_POLICY,
+    getsToolFailurePolicy(role) ? TOOL_FAILURE_POLICY : '',
     own
       ? own.intro(userPossessive())
       : remote
@@ -350,41 +458,19 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
     getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
     ...profileLines(name),
-    `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
-    `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
-    // The Shopify pack (display.ts): its store and portal lines go out only while it is on.
-    shopify && channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
-    shopify && channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
-    channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
     remoteAgent
       ? `- You talk only in this thread. Its files are in Omni's checkout on ${name}'s machine, which you cannot change from your server: local agents seated in the thread change them, and ${name} commits. Where ${name} opens a channel's work to remote agents, Omni offers you its ${READ_TOOL} tool on each turn, to list, read and search the thread's git-tracked files and read its diff; elsewhere you cannot read them. What you do with your own tools on your own server is up to you, as before.`
       : remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
-      : thread.branch
-        ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.`
-        : '',
+      : '',
     // zsh slips recur in every harness's shell calls: an unquoted glob that matches nothing, a word that starts with =.
     !remote && /zsh$/.test(process.env.SHELL ?? '')
       ? `- Shell commands run in zsh: quote glob arguments (--include='*.ts'), and never start a word with = (zsh reads echo === as a command lookup).${process.platform === 'darwin' ? ' The command-line tools are BSD, not GNU.' : ''}`
       : '',
-    channel.notes ? `- Channel notes: ${channel.notes}` : '',
-    // What the user approved as lessons for this channel (memory-api.ts). Only this channel's: one client's never reaches another's.
-    ...learningsPrompt(memories.approvedIn(channel.id)),
-    // The role's own lessons (memory-api.ts): untagged ones and this channel's.
-    ...roleMemorySection(thread, channel, role),
     ...(readsOnly(thread) ? ['', ...quickAskRule(name)] : []),
-    // A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
-    ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE
-      ? [
-          '',
-          '## Thread delegation',
-          `${delegationRule(role, name)}First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
-          TEAM_RULE,
-          SESSION_CACHE_RULE,
-        ]
-      : []),
+    ...delegationLines(role, name),
     ...noEditsLines(thread, role),
-    ...(hands ? workspaceLines(thread, channel) : []),
+    ...(hands ? workspaceLines(thread) : []),
     ...(hands ? notionLines(thread, secretNames) : []),
     ...commandLineLines(thread, role),
     '',
@@ -409,56 +495,19 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           // A Cursor model sent its progress sentences to its own thread with `omni send`, which queued them as turns.
           `Text you write between tool calls shows in the thread as you work, so a progress update is plain text in your reply. Never post one to this thread with \`omni send\` or another tool.`,
         ]),
+    // The agent's: its charter, then the skills it loads in every thread, which belong with it.
+    ...(role && charter ? ['', `## Your agent: ${role.name}`, charter] : []),
+    ...(role && skills ? skillLines(skills, role.name) : []),
+    // The thread's kind.
+    ...sourceLines(thread, role, lead, name),
+    // The channel's: its notes, what the user approved as lessons for it (memory-api.ts; only this channel's, so one
+    // client's never reaches another's), the role's own lessons (untagged ones and this channel's), and its pages.
+    ...(channel.notes ? ['', '## Channel notes', channel.notes] : []),
+    ...learningsPrompt(memories.approvedIn(channel.id)),
+    ...roleMemorySection(thread, channel, role),
+    ...(hands ? channelPageLines(thread, channel) : []),
+    // The thread's own lines, last.
+    ...threadLines(thread, channel, hands),
   ];
-  if (thread.source === 'team') {
-    lines.push(
-      '',
-      '## Team task',
-      `You are one member of a team${thread.task_id ? `, on task ${thread.task_id}` : ''}. Your final message is automatically reported to the team lead, who combines it with the other members' replies. Stick to your own task. Report outcomes and blockers, even if the answer is "nothing found".`,
-    );
-  } else if (thread.source === 'member') {
-    // A seated member (ADR 0019): the lead commits, and several agents edit one worktree at once (Q24). A remote agent
-    // seated here talks only, and where a remote agent leads, the user commits what the local members change (ADR 0020).
-    const lead = thread.parent_id ? threads.get(thread.parent_id) : undefined;
-    const leadName = crewRoleName(lead?.role, getCrew) ?? 'The lead';
-    const team = !!lead && events.teamOf(lead.id) !== null;
-    const committer = isRemoteAgentHarness(lead?.harness) ? `${leadName} is a remote agent and talks only, so ${name}` : leadName;
-    lines.push(
-      '',
-      '## Group thread',
-      `You are seated in a group thread with ${name} and other agents. ${leadName} leads this thread. Its messages go to the agents they name, and agents named in one message work at the same time in this one worktree.`,
-      ...(team ? [`This thread is a team: ${leadName} gives you your part. Stick to it, and end your turn with what you did and found: your final message goes back to ${leadName}.`] : []),
-      ...(lead?.channel_id === 'conductor' && !remoteAgent ? conductorSeatLines(name, role, !remote && hasOmniCommand()) : []),
-      remoteAgent
-        ? 'You talk only: the local agents seated here change the files.'
-        : lead?.channel_id === 'conductor'
-          ? ''
-          : remote
-          ? `You work in your own checkout on a branch of your own, not in this thread's worktree. Push your work to that branch and do not open a pull request: when you finish, ${leadName} pulls your branch into the thread's branch.`
-          : `Edit files only. ${committer} commits and opens the pull request: never run git commit, git push, git rebase, git reset, git stash or git checkout, and never open a pull request. When another agent changed a file you changed, Omni tells you which files: read them again before you edit them and keep their changes.`,
-    );
-  } else if (thread.parent_id) {
-    lines.push(
-      '',
-      '## Delegated task',
-      `The conductor handed you this task${thread.task_id ? ` as ${thread.task_id}` : ''}. Your final message is automatically reported back to it. Report outcomes and blockers, even if the answer is "nothing found".`,
-      // The report card (packages/shared/report-shape.ts) leads with what comes before the first heading and folds each heading.
-      'That final message is the whole report; what you said while working is not part of it. Put the outcome in its first one to three lines, then the details under ## headings (such as Checks, Changes, Open items), as bullet lists rather than tables.',
-    );
-  }
-  if (events.teamOf(thread.id) !== null) lines.push(...teamLeadLines(name));
-  else if (lead) {
-    // A team made before one-thread teams: its members ran in threads of their own under this one.
-    lines.push(
-      '',
-      '## Team lead',
-      'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work. Their replies are all you get: read_referenced_thread cannot open member threads.',
-    );
-  }
-  // A remote agent gets a charter only when Ben wrote one in its file; otherwise its server's own instructions lead (Q28).
-  const charter = role ? (remoteAgent ? writtenCharter(role) : role.charter) : '';
-  if (role && charter) lines.push('', `## Your agent: ${role.name}`, charter);
-  // The skills its agent loads in every thread, after the charter they belong with.
-  if (role && skills) lines.push(...skillLines(skills, role.name));
   return lines.filter((l) => l !== '').join('\n').replace(/\n## /g, '\n\n## ');
 }

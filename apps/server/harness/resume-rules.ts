@@ -1,15 +1,15 @@
 // What a resumed chat reads again when its harness takes Omni's system prompt only as a new chat's first message
-// (local Cursor, harness/cursor/adapter.ts). Claude Code and Codex get the whole prompt on every resume. A chat made
-// before Omni changed one of these rules would otherwise keep the old one: the tool-failure policy, and the Reply block
-// (runner/prompts.ts replyBlock), which says when an answer is a page and what stays text.
-import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
+// (local Cursor, harness/cursor/adapter.ts, and Antigravity without a system prompt field). Claude Code and Codex get
+// the whole prompt on every resume. A chat made before Omni changed the Reply block (runner/prompts.ts replyBlock),
+// which says when an answer is a page and what stays text, would otherwise keep the old one. The tool-failure policy
+// is not sent again: the chat has it from its first message, and resending it cost every resume ~500 tokens (#1013).
 
 /** Said under the Reply heading, so the resent rules win over the copy the chat started with. */
 export const RESENT_REPLY = 'These are the current reply rules. They replace any older version earlier in this chat.';
 
-/** The rules a resumed chat gets in front of its first input. `reply` is the thread's Reply block, heading first. */
+/** The rules a resumed chat gets in front of its first input, or '' for none. `reply` is the thread's Reply block, heading first. */
 export function resumeRules(reply: readonly string[] = []): string {
-  if (!reply.length) return TOOL_FAILURE_POLICY;
+  if (!reply.length) return '';
   const [heading, ...rest] = reply;
-  return [TOOL_FAILURE_POLICY, '', heading, RESENT_REPLY, ...rest].join('\n');
+  return [heading, RESENT_REPLY, ...rest].join('\n');
 }

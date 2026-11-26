@@ -97,12 +97,12 @@ export const cursorAdapter: HarnessAdapter = {
       // A native chat may exist even if its first prompt was rejected. Include context
       // while the switched session still needs its handover, as well as on a new chat.
       const addContext = firstTurn && (!resume || ctx.handoverPending);
-      const addPolicy = firstTurn && resume && !addContext;
+      // A resumed chat had Omni's context in an earlier session: it gets again the rules that change (resume-rules.ts).
+      const rules = firstTurn && resume && !addContext ? resumeRules(ctx.replyRules) : '';
       let prompt = m.text;
       if (m.attachments.length) prompt += `\n\n${describeAttachments(m.attachments)}`;
       if (addContext) prompt = `${ctx.systemPrompt}\n\n---\n\n${prompt}`;
-      // A resumed chat had Omni's context in an earlier session: it gets again the rules that change (resume-rules.ts).
-      else if (addPolicy) prompt = `${resumeRules(ctx.replyRules)}\n\n---\n\n${prompt}`;
+      else if (rules) prompt = `${rules}\n\n---\n\n${prompt}`;
 
       const args = ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);

@@ -41,8 +41,10 @@ describe('a delegate-only role', () => {
     // From its charter, the only place its rules are written (crew/conductor.md).
     expect(conductor).toContain('Answer quick asks yourself, in this thread.');
     expect(conductor).toContain('Never interview the user to answer a plain question.');
-    // A report shows in place and wakes it only with follow_up.
-    expect(conductor).toContain('a report wakes you only when you passed follow_up: true');
+    // A report shows in place and wakes it only with follow_up: the charter says it, and the prompt does not again.
+    expect(conductor).toContain('a report does not start a turn of yours to relay it');
+    expect(conductor).toContain('pass `follow_up: true` on `delegate`; then the report wakes you');
+    expect(conductor).not.toContain('a report wakes you only when you passed follow_up: true');
     expect(conductor).not.toContain('however small');
     expect(conductor).not.toContain('## Browser');
     expect(conductor).not.toContain('## Artifacts');
@@ -69,12 +71,11 @@ describe('a delegate-only role', () => {
     const name = userName();
     const conductorRole = getCrew('conductor')!;
     const conductor = buildSystemPrompt(thread, channel, conductorRole);
-    const delegation = section(conductor, 'Thread delegation');
 
-    // No rule of Omni's own beside the charter's, which could drift from it: the section starts with the ids.
-    expect(delegation).not.toContain("Delegate with Omni's delegate tool, before anything else");
-    expect(delegation).not.toMatch(/first action|instead of seating/);
-    expect(delegation.split('\n')[1]).toMatch(/^First call list_crew and list_channels/);
+    // No delegation section of Omni's own beside the charter's, which could drift from it (#1013).
+    expect(conductor).not.toContain('## Thread delegation');
+    expect(conductor).not.toContain("Delegate with Omni's delegate tool, before anything else");
+    expect(conductor).not.toMatch(/instead of seating/);
     // The charter says it once, and the prompt carries the charter.
     expect(conductor.match(/first action is/g)).toHaveLength(1);
     expect(conductor).toContain(

@@ -7,7 +7,6 @@
 // replay is only what Ben typed. A stable session id (`omni-<thread id>`) continues the
 // same remote conversation, which keeps its own context.
 import { randomUUID } from 'node:crypto';
-import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { detachedSession } from '../session.ts';
 import { CAPABILITIES, type AnyHarnessId, type HarnessCapabilities } from '../types.ts';
@@ -75,9 +74,9 @@ export const hermesAdapter: HarnessAdapter = {
     let runId: string | null = null;
     let runAbort: AbortController | null = null;
     let initSent = false;
-    // A resumed session already has Omni's prompt. Sending it again would pin it to the next user message.
+    // A resumed session already has Omni's prompt, the tool-failure policy included. Sending either again would pin it
+    // to the next user message on every resume (#1013).
     let sendInstructions = !ctx.resume;
-    let sendPolicy = ctx.resume;
     let client: RemoteClient | null = null;
     const seenSeq = new Set<number>();
     // Survives the turn's finally. The session's end can land after that finally cleared `runId`.
@@ -219,7 +218,6 @@ export const hermesAdapter: HarnessAdapter = {
             return;
           }
           let input = composeInput(m);
-          if (sendPolicy) input = `${TOOL_FAILURE_POLICY}\n\n---\n\n${input}`;
           let key = m.uuid || randomUUID();
           // This turn's worktree read: offered where the channel opens its work to remote agents, refused elsewhere.
           read = await openRead(thread, key);
@@ -247,7 +245,6 @@ export const hermesAdapter: HarnessAdapter = {
             }
           }
           if (instructions) sendInstructions = false;
-          sendPolicy = false;
           // An eve agent names its own session: the thread keeps that id, so the next turn and a restart continue it.
           if (created.session_id && created.session_id !== sessionId) {
             sessionId = created.session_id;
