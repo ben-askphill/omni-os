@@ -8,9 +8,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
+import { channelDetail, channelIndexRow, LIST_CHANNELS_DESCRIPTION, listChannelsInput } from '../channels.ts';
 import { prList, prListInput, PR_LIST_DESCRIPTION } from '../pull-requests.ts';
 import { isConductor } from '@omni/shared/crew-role.ts';
 import { compactJson, compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
+import { replyInput, replyQuery } from '../thread-reply.ts';
 
 /** One /api request: `path` without the /api prefix. Resolves to the JSON body, throws with the API's error otherwise. */
 export type Call = (path: string, init?: RequestInit) => Promise<any>;
@@ -69,24 +71,15 @@ export function registerExternalTools(server: McpServer, call: Call) {
   server.registerTool(
     'list_channels',
     {
-      description: 'List Omni channels (one per client or project) with repo, Shopify store, notes, running thread count and sidebar folders.',
+      description: LIST_CHANNELS_DESCRIPTION,
+      inputSchema: listChannelsInput,
       annotations: { readOnlyHint: true },
     },
-    async () =>
-      text(
-        (await call('/channels')).map((c: any) =>
-          compactRow({
-            id: c.id,
-            name: c.name,
-            kind: c.kind,
-            repo: c.github_repo,
-            store: c.store_domain,
-            running: c.running,
-            notes: c.notes,
-            folders: (c.folders ?? []).map((f: any) => compactRow({ id: f.id, name: f.name, threads: f.count })),
-          }),
-        ),
-      ),
+    async ({ channel }) => {
+      const id = channel?.trim();
+      if (id) return text(channelDetail(await call(`/channels/${encodeURIComponent(id)}`)));
+      return text((await call('/channels')).map(channelIndexRow));
+    },
   );
 
   server.registerTool(
@@ -164,12 +157,13 @@ export function registerExternalTools(server: McpServer, call: Call) {
     {
       description:
         "A thread's status, last reply and artifacts. With wait_seconds, a queued or running thread is watched until it finishes " +
-        `or the time runs out (at most ${WAIT_MAX}s); call again to keep waiting. Use read_thread for the whole conversation.`,
-      inputSchema: { thread_id: z.string(), wait_seconds: z.number().int().min(0).max(WAIT_MAX).optional() },
+        `or the time runs out (at most ${WAIT_MAX}s); call again to keep waiting. Use read_thread for the whole conversation. ` +
+        '`last_reply` is its last run\'s final message, cut at `reply_max_chars`. Pass `include_reply: false` when you only need its status.',
+      inputSchema: { thread_id: z.string(), wait_seconds: z.number().int().min(0).max(WAIT_MAX).optional(), ...replyInput },
       annotations: { readOnlyHint: true },
     },
-    async ({ thread_id, wait_seconds }, extra) => {
-      const path = `/threads/${encodeURIComponent(thread_id)}/summary`;
+    async ({ thread_id, wait_seconds, include_reply, reply_max_chars }, extra) => {
+      const path = `/threads/${encodeURIComponent(thread_id)}/summary?${replyQuery(include_reply, reply_max_chars)}`;
       const until = Date.now() + (wait_seconds ?? 0) * 1000;
       let t = await call(path);
       while (ACTIVE.has(t.status) && Date.now() + POLL_MS <= until && !extra.signal.aborted) {

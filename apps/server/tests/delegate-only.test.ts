@@ -41,8 +41,10 @@ describe('a delegate-only role', () => {
     // From its charter, the only place its rules are written (crew/conductor.md).
     expect(conductor).toContain('Answer quick asks yourself, in this thread.');
     expect(conductor).toContain('Never interview the user to answer a plain question.');
-    // A report shows in place and wakes it only with follow_up.
-    expect(conductor).toContain('a report wakes you only when you passed follow_up: true');
+    // A report shows in place and wakes it only with follow_up: the charter says it, and the prompt does not again.
+    expect(conductor).toContain('a report does not start a turn of yours to relay it');
+    expect(conductor).toContain('pass `follow_up: true` on `delegate`; then the report wakes you');
+    expect(conductor).not.toContain('a report wakes you only when you passed follow_up: true');
     expect(conductor).not.toContain('however small');
     expect(conductor).not.toContain('## Browser');
     expect(conductor).not.toContain('## Artifacts');
@@ -69,12 +71,11 @@ describe('a delegate-only role', () => {
     const name = userName();
     const conductorRole = getCrew('conductor')!;
     const conductor = buildSystemPrompt(thread, channel, conductorRole);
-    const delegation = section(conductor, 'Thread delegation');
 
-    // No rule of Omni's own beside the charter's, which could drift from it: the section starts with the ids.
-    expect(delegation).not.toContain("Delegate with Omni's delegate tool, before anything else");
-    expect(delegation).not.toMatch(/first action|instead of seating/);
-    expect(delegation.split('\n')[1]).toMatch(/^First call list_crew and list_channels/);
+    // No delegation section of Omni's own beside the charter's, which could drift from it (#1013).
+    expect(conductor).not.toContain('## Thread delegation');
+    expect(conductor).not.toContain("Delegate with Omni's delegate tool, before anything else");
+    expect(conductor).not.toMatch(/instead of seating/);
     // The charter says it once, and the prompt carries the charter.
     expect(conductor.match(/first action is/g)).toHaveLength(1);
     expect(conductor).toContain(
@@ -104,7 +105,7 @@ describe('a delegate-only role', () => {
         '## Thread delegation',
         `Use Omni's delegate tool when ${name} asks you to hand work to another agent. First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
         'delegate_team makes one thread in the channel: its lead plans on your brief, then gives each member its part, the members work at once, and the lead reports once they have all finished. An agent with two parts gets one seat. You seat agents in your own #conductor thread with seat_agents, and in a thread you delegate with delegate_team, members on delegate, or agents on message_thread. Never in any other #conductor thread.',
-        "Before you message a thread you already have, check get_thread's session.warm. A warm thread (running, or its model active within the hour) gets message_thread. A cold one you do not wake: open a new session with continue_thread on its own harness and a message that carries the follow-up, or delegate a fresh thread whose brief stands alone and links the old one, then say which thread replaced which. message_thread refuses a cold thread unless you pass wake_cold: true, which is only for when you were asked to resume that thread itself. Never wake a cold thread to ask how it went: read it with get_thread.",
+        "Before you message a thread you already have, check get_thread's session.warm (pass include_reply: false: you need its warmth, not its reply again). A warm thread (running, or its model active within the hour) gets message_thread. A cold one you do not wake: open a new session with continue_thread on its own harness and a message that carries the follow-up, or delegate a fresh thread whose brief stands alone and links the old one, then say which thread replaced which. message_thread refuses a cold thread unless you pass wake_cold: true, which is only for when you were asked to resume that thread itself. Never wake a cold thread to ask how it went: read it with get_thread.",
       ].join('\n'),
     );
   });
