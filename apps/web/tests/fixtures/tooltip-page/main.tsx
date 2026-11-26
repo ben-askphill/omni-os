@@ -50,6 +50,19 @@ function RailDisc() {
   );
 }
 
+/** Two list-panel rows with the card variant (`.rail-list` is the interest-delay hook's scope). */
+function CardRow({ id, title }: { id: string; title: string }) {
+  const { triggerProps, tip } = useTooltip(<span>{title} card</span>, { side: 'right', variant: 'card' });
+  return (
+    <>
+      <a {...triggerProps} id={id} href={`#${id}`} style={{ display: 'block', width: 120, height: 30 }}>
+        {title}
+      </a>
+      {tip}
+    </>
+  );
+}
+
 /** A menu-like layer under the tips: Escape over a tip must close the tip, not this. */
 function Menu() {
   const [open, setOpen] = useState(false);
@@ -71,6 +84,10 @@ createRoot(document.getElementById('root')!).render(
       <Link />
       <RailDisc />
       <button id="other">Other</button>
+      <div className="rail-list" style={{ width: 120 }}>
+        <CardRow id="row-a" title="Row A" />
+        <CardRow id="row-b" title="Row B" />
+      </div>
     </main>
   </StrictMode>,
 );

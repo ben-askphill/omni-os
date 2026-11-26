@@ -64,7 +64,7 @@ describe('application menu', () => {
   it('keeps the Mac shortcuts, as Cmd or Ctrl', () => {
     const t = menuTemplate(state(), actions());
     const keys = Object.fromEntries(
-      ['settings', 'new-thread', 'new-window', 'actual-size', 'zoom-in', 'zoom-in-plus', 'zoom-out', 'back', 'forward', 'home', 'go-to', 'search'].map(
+      ['settings', 'new-thread', 'new-window', 'actual-size', 'zoom-in', 'zoom-in-plus', 'zoom-out', 'toggle-list', 'back', 'forward', 'home', 'go-to', 'search'].map(
         (id) => [id, item(t, id).accelerator],
       ),
     );
@@ -76,6 +76,7 @@ describe('application menu', () => {
       'zoom-in': 'CmdOrCtrl+=',
       'zoom-in-plus': 'CmdOrCtrl+Plus',
       'zoom-out': 'CmdOrCtrl+-',
+      'toggle-list': 'CmdOrCtrl+\\',
       back: 'CmdOrCtrl+[',
       forward: 'CmdOrCtrl+]',
       home: 'Shift+CmdOrCtrl+H',
@@ -88,8 +89,8 @@ describe('application menu', () => {
   it('sends each page command', () => {
     const a = actions();
     const t = menuTemplate(state(), a);
-    for (const id of ['settings', 'new-thread', 'home', 'go-to', 'search']) click(item(t, id));
-    expect(a.commands).toEqual(['settings', 'new-thread', 'home', 'go-to', 'search']);
+    for (const id of ['settings', 'new-thread', 'home', 'go-to', 'search', 'toggle-list']) click(item(t, id));
+    expect(a.commands).toEqual(['settings', 'new-thread', 'home', 'go-to', 'search', 'toggle-list']);
     click(item(t, 'quick-prompt'));
     click(item(t, 'activity-monitor'));
     expect(a.quickPrompt).toHaveBeenCalledOnce();

@@ -4,7 +4,8 @@ import { FOLDER_NAME_MAX, drag, draftKey, useFolders } from '../../folders.tsx';
 import { closeMenu, openMenu, useMenuOpenFor } from '../ContextMenu.tsx';
 import { plural } from '../../format.ts';
 import { Icon, StatusDot } from '../ui.tsx';
-import { ChannelThreadEntry } from './SidebarRows.tsx';
+import { ChannelThreadEntry, type RowSize } from './SidebarRows.tsx';
+import { RowCard } from '../rail/RowCard.tsx';
 import { isImeEnter } from '../../ime.ts';
 import { useTooltip } from '../ui/tooltip.tsx';
 
@@ -54,11 +55,12 @@ function accepts(f: FolderWithThreads) {
  * closes it, double-click or F2 renames, Delete asks to delete, and the "…" button or a right-click opens its menu.
  * Drop a thread on it to file it; drop another folder on it to put that one just above.
  */
-export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; onNavigate?: () => void }) {
+export function FolderRow({ f, openId, tasks, onNavigate, size = 'nav', collapsed = false }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; onNavigate?: () => void; size?: RowSize; collapsed?: boolean }) {
+  const compact = size === 'compact';
   const folders = useFolders();
   const [over, setOver] = useState<'thread' | 'folder' | null>(null);
   const [all, setAll] = useState(false);
-  const editing = folders.editing === f.id;
+  const editing = folders.editing === f.id && !collapsed;
   const menuOpen = useMenuOpenFor('folder', f.id);
   const open = !f.collapsed;
   const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
@@ -69,7 +71,14 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
   const shown = all ? list : list.filter((t, i) => i < MAX_FOLDER_THREADS || t.id === openId || agents(t.id).length > 0);
   const label = `${f.name}, ${plural(f.count, 'thread')}${f.running ? `, ${f.running} running` : ''}`;
   // How to rename, on hover and on keyboard focus: a `title` alone never reached the keyboard.
-  const renameTip = useTooltip('Double-click or F2 to rename');
+  const renameTip = useTooltip(
+    compact ? (
+      <RowCard title={f.name} lines={[plural(f.count, 'thread') + (f.running ? `, ${f.running} running` : ''), ...(collapsed ? [] : ['Double-click or F2 to rename'])]} />
+    ) : (
+      'Double-click or F2 to rename'
+    ),
+    { side: compact ? 'right' : 'top', variant: compact ? 'card' : 'tip' },
+  );
 
   const onOver = (e: DragEvent) => {
     if (!accepts(f)) return;
@@ -131,17 +140,21 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
             }}
             aria-expanded={open}
             aria-label={label}
-            className="item flex h-8 min-w-0 flex-1 items-center gap-2 pr-1 pl-3 text-left text-[13px] text-fg-2 hover:text-fg md:h-7 md:text-[12.5px]"
+            className={`item flex min-w-0 flex-1 items-center text-left text-fg-2 hover:text-fg ${compact ? 'crow' : 'h-8 gap-2 pr-1 pl-3 text-[13px] md:h-7 md:text-[12.5px]'}`}
           >
-            <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
-            <span className="min-w-0 flex-1 truncate">{f.name}</span>
-            {busy && <StatusDot status="running" size={7} className="shrink-0" />}
-            <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums transition-opacity md:group-focus-within/folder:opacity-0 md:group-hover/folder:opacity-0">
+            {compact && collapsed ? (
+              <Icon name="folder" size={14} className="shrink-0 text-fg-3" />
+            ) : (
+              <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
+            )}
+            <span className={`min-w-0 flex-1 truncate ${compact ? 'crow-x' : ''}`}>{f.name}</span>
+            {busy && <StatusDot status="running" size={compact ? 8 : 7} className="shrink-0" />}
+            <span className={`shrink-0 font-num text-[11px] text-fg-3 tabular-nums transition-opacity md:group-focus-within/folder:opacity-0 md:group-hover/folder:opacity-0 ${compact ? 'crow-x' : ''}`}>
               {f.count}
             </span>
           </button>
           {renameTip.tip}
-          <button
+          {!collapsed && <button
             type="button"
             aria-label={`${f.name} actions`}
             title="Folder actions"
@@ -155,21 +168,21 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
             className="hov relative z-[2] -ml-7 grid h-6 w-6 shrink-0 place-items-center rounded-full text-fg-3 opacity-100 transition-opacity hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/folder:opacity-100 md:group-focus-within/folder:opacity-100"
           >
             <Icon name="more" size={14} />
-          </button>
+          </button>}
         </div>
       )}
       {shown.map((t) => (
-        <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
+        <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} size={size} collapsed={collapsed} />
       ))}
-      {open && !all && list.length > shown.length && (
+      {open && !collapsed && !all && list.length > shown.length && (
         <button type="button" onClick={() => setAll(true)} className="item ml-[25px] flex h-7 items-center pr-3 pl-[38px] text-[12px] text-fg-3 hover:text-fg-2">
           {list.length - shown.length} more
         </button>
       )}
-      {open && f.count > f.threads.length && all && (
+      {open && !collapsed && f.count > f.threads.length && all && (
         <span className="ml-[25px] flex h-7 items-center pr-3 pl-[38px] text-[12px] text-fg-3">{f.count - f.threads.length} older not shown</span>
       )}
-      {open && f.count === 0 && <div className="ml-[25px] truncate pr-3 pl-[38px] text-[12px] leading-7 text-fg-3">No threads yet</div>}
+      {open && !collapsed && f.count === 0 && <div className="ml-[25px] truncate pr-3 pl-[38px] text-[12px] leading-7 text-fg-3">No threads yet</div>}
     </div>
   );
 }

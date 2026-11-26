@@ -447,6 +447,10 @@ _Avoid_: Omni command (a slash command)
 The desktop column of discs for the Inbox, the Conductor and each channel, with a list panel beside it.
 _Avoid_: Sidebar (the Classic sidebar)
 
+**Collapsed list**:
+The channel rail's list panel narrowed to a strip of marks and avatars.
+_Avoid_: Mini sidebar, compact mode, icon mode
+
 **Quick-actions card**:
 The compact card a thread opens with beside its transcript, naming where and how it runs, its branch and its pull requests.
 _Avoid_: Side panel, Details tab, inspector
