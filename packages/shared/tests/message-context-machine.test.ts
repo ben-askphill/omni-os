@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newContext } from '../message-context.ts';
 import { parseContexts, readContexts } from '../message-context-kinds.ts';
-import { chipRecords, machineMention, mentionBody, mentionPieces, mentionSpans, mentionsMachine, sentContext } from '../message-context-machine.ts';
+import { chipRecords, machineMention, mentionBody, mentionPieces, mentionSpans, mentionsMachine, onlyMentionedMachine, sentContext } from '../message-context-machine.ts';
 import { agentMention, agentMentionBody } from '../message-context-agent.ts';
 
 const AT = new Date('2026-11-19T12:00:00.000Z');
@@ -45,6 +45,16 @@ describe('machine_mention', () => {
   it('knows a machine already mentioned', () => {
     expect(mentionsMachine([pro, box], 'box-1')).toBe(true);
     expect(mentionsMachine([pro], 'box-1')).toBe(false);
+  });
+
+  it('names the one machine a message mentions, and none for zero or two', () => {
+    const agent = newContext(agentMention, agentMentionBody({ id: 'researcher', name: 'Researcher' }), '', ids);
+    expect(onlyMentionedMachine([agent, pro])).toBe('mac-1');
+    expect(onlyMentionedMachine([pro, agent, { ...pro, id: 'again' }])).toBe('mac-1');
+    expect(onlyMentionedMachine([pro, box])).toBeNull();
+    expect(onlyMentionedMachine([agent])).toBeNull();
+    expect(onlyMentionedMachine(null)).toBeNull();
+    expect(onlyMentionedMachine([{ kind: 'machine_mention', body: 'nope' }])).toBeNull();
   });
 });
 

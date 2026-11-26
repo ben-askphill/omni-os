@@ -46,6 +46,7 @@ import { teamBrief, type TeamPart, type TeamRecord } from './team.ts';
 import { seatRefusal } from '../message-context/agent-mention.ts';
 import { agentName } from '../member-view.ts';
 import { mentionedAgents } from '@omni/shared/message-context-agent.ts';
+import { onlyMentionedMachine } from '@omni/shared/message-context-machine.ts';
 import { parseGoalCommand } from '@omni/shared/goal.ts';
 import { ownerName } from '@omni/shared/thread-owner.ts';
 import { userConfig } from '../user-config.ts';
@@ -612,8 +613,10 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
     if (named) {
       const blocked = turnBlocked(thread, runsHere(r.thread_id));
       if (blocked) throw refusal(blocked, 409);
-      // A new brief from the Conductor replaces the seat's pin. Ben's follow-ups keep it.
-      const device = r.source === 'conductor' && thread.channel_id === 'conductor' ? r.seat_device : undefined;
+      // A new brief from the Conductor replaces the seat's pin. So does Ben's message mentioning one machine: the agents
+      // he names there have no seat_agents or delegate to pass it on. His other follow-ups keep it.
+      const ben = r.source === 'ben' ? (onlyMentionedMachine(r.context) ?? undefined) : undefined;
+      const device = thread.channel_id !== 'conductor' ? undefined : r.source === 'conductor' ? r.seat_device : ben;
       routeNamed(r.thread_id, named, { request: r, prompt: r.prompt, source: r.source, attachments: r.attachments ?? undefined, context: r.context ?? undefined }, device);
       // A new thread's first message to other agents only: its lead has nothing to run yet, so it does not wait as queued.
       const now = threads.get(r.thread_id);
