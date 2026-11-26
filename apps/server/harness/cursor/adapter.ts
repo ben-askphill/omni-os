@@ -7,7 +7,6 @@
 import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
-import { resumeRules } from '../resume-rules.ts';
 import { mcpInput } from '../mcp-input.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
@@ -97,12 +96,13 @@ export const cursorAdapter: HarnessAdapter = {
       // A native chat may exist even if its first prompt was rejected. Include context
       // while the switched session still needs its handover, as well as on a new chat.
       const addContext = firstTurn && (!resume || ctx.handoverPending);
-      // A resumed chat had Omni's context in an earlier session: it gets again the rules that change (resume-rules.ts).
-      const rules = firstTurn && resume && !addContext ? resumeRules(ctx.replyRules) : '';
+      // A resumed chat had Omni's context in an earlier session: it gets the rules that changed since, once (resume-rules.ts).
+      const rules = firstTurn && resume && !addContext ? (ctx.chatRules?.resend() ?? '') : '';
       let prompt = m.text;
       if (m.attachments.length) prompt += `\n\n${describeAttachments(m.attachments)}`;
       if (addContext) prompt = `${ctx.systemPrompt}\n\n---\n\n${prompt}`;
       else if (rules) prompt = `${rules}\n\n---\n\n${prompt}`;
+      if (addContext || rules) ctx.chatRules?.sent();
 
       const args = ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);
