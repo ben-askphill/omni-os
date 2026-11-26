@@ -172,6 +172,13 @@ describe('a turn', () => {
     expect(promptText(calls('session/prompt', sid)[0])).not.toContain('Omni OS');
   });
 
+  it('runs Gemini 4 Neon at medium when the thread names no effort', async () => {
+    const t = await H.start('hello', agy);
+    await H.untilResults(t.id, 1);
+    const set = calls('session/set_config_option', sessionOf(t.id)).map((r) => `${r.params.configId}=${r.params.value}`);
+    expect(set).toEqual(expect.arrayContaining(['model=gemini-4-neon', 'thought_level=medium']));
+  });
+
   it('puts the context ahead of the first message when agy does not take a system prompt', async () => {
     set({ FAKE_AGY_NO_SYSTEM_PROMPT: '1' });
     const svc = await import('../harness/catalog-service.ts');
