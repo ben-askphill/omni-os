@@ -16,23 +16,38 @@ import { showsAgents } from '@omni/shared/thread-tree.ts';
 import { useJobTree, treeLabel, type JobTree } from '../../thread-tree.ts';
 import { TreeRows, TreeToggle } from '../ThreadTree.tsx';
 import { ChannelRollup } from '../ChannelStack.tsx';
+import { useTooltip } from '../ui/tooltip.tsx';
+import { RowCard } from '../rail/RowCard.tsx';
+import { ranOnLine } from '@omni/shared/ran-on.ts';
+import { RunElapsed } from '../RunElapsed.tsx';
 
-export function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId, expanded }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: (e: MouseEvent) => void; expanded?: boolean }) {
+/**
+ * A link row. `size: 'compact'` is the rail's 30px row, whose name hides when `collapsed` (the Collapsed list) and is in
+ * the card shown on hover and focus instead, with `hint` (a shortcut, say) under it.
+ */
+export function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId, expanded, size = 'nav', collapsed = false, name, hint }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: (e: MouseEvent) => void; expanded?: boolean; size?: 'nav' | 'compact'; collapsed?: boolean; name?: string; hint?: ReactNode }) {
+  const compact = size === 'compact';
+  const card = useTooltip(compact ? <RowCard title={name ?? children} lines={hint ? [hint] : []} /> : null, { side: 'right', variant: 'card', describes: !!hint });
   return (
-    <a
-      href={to}
-      data-channel-id={channelId}
-      onClick={onNavigate}
-      aria-current={active ? 'page' : undefined}
-      aria-expanded={expanded}
-      data-active={active || undefined}
-      className={`item flex h-9 items-center gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
-    >
-      {icon && <Icon name={icon} size={15} className={active ? 'text-fg' : 'text-fg-3'} />}
-      {lead}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-      {right}
-    </a>
+    <>
+      <a
+        {...card.triggerProps}
+        href={to}
+        data-channel-id={channelId}
+        onClick={onNavigate}
+        aria-current={active ? 'page' : undefined}
+        aria-expanded={expanded}
+        aria-label={compact ? name : undefined}
+        data-active={active || undefined}
+        className={`item flex items-center ${compact ? 'crow' : 'h-9 gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px]'} ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
+      >
+        {icon && <Icon name={icon} size={compact ? 14 : 15} className={active ? 'text-fg' : 'text-fg-3'} />}
+        {lead}
+        <span className={`min-w-0 flex-1 truncate ${compact ? 'crow-x' : ''}`}>{children}</span>
+        {!collapsed && right}
+      </a>
+      {card.tip}
+    </>
   );
 }
 
@@ -51,10 +66,13 @@ export function RunningBadge({ n }: { n: number }) {
  * title. `true`: under a channel or folder. `flush`: the Conductor's rows and the rail's list. `false`: the Running
  * and Pinned rows.
  */
-const TREE_AT = { true: { line: 'ml-[46px]', meta: 'ml-[63px]' }, flush: { line: 'ml-[25px]', meta: 'ml-[42px]' }, false: { line: 'ml-[21px]', meta: 'ml-[38px]' } } as const;
+const TREE_AT = { compact: { line: 'ml-[17px]', meta: 'ml-[30px]' }, true: { line: 'ml-[46px]', meta: 'ml-[63px]' }, flush: { line: 'ml-[25px]', meta: 'ml-[42px]' }, false: { line: 'ml-[21px]', meta: 'ml-[38px]' } } as const;
 
 /** A sidebar row's avatar (ADR 0021, D23): 18px in a 32px row, 8px before the title. */
 const ROW_AVATAR = 18;
+/** The rail's compact row (30px) takes a 14px avatar. */
+const COMPACT_AVATAR = 14;
+export type RowSize = 'nav' | 'compact';
 
 /**
  * A job's second line (the other channels it works in, its branch or what sits under it, and the tally that opens and
@@ -80,7 +98,9 @@ function TreeUnder({ t, tree, at, onNavigate }: { t: ThreadStub; tree: JobTree; 
  * a folder it files there; onto its channel's name, back to the ungrouped list. The 32px row leads with the thread's
  * agent (else its channel) and ends with its status mark (ADR 0021, D23), in the rail's list and the classic sidebar.
  */
-export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; indent?: boolean | 'flush'; tree?: JobTree | null }) {
+export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree, size = 'nav', collapsed = false }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; indent?: boolean | 'flush'; tree?: JobTree | null; size?: RowSize; collapsed?: boolean }) {
+  const compact = size === 'compact';
+  const now = useNow(60_000);
   const title = t.title || 'Untitled';
   // Sub-agents show only while the job is at work, as on the Inbox's Working shelf. With a tree, each thread's nest
   // under its own row there, so the job keeps only its own.
@@ -90,10 +110,34 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
   const busy = showsRunning(t) || agents > 0;
   // One mark for the row: the avatar's eyes at its start and the dot at its end draw the same.
   const row = useRowMark(t, { busy });
-  const at = TREE_AT[String(indent) as keyof typeof TREE_AT];
+  const at = TREE_AT[compact ? 'compact' : (String(indent) as keyof typeof TREE_AT)];
+  const status = agents ? `${plural(agents, 'agent')} running` : t.done_at ? 'Marked done' : threadStatusText(t);
+  const where = compact ? ranOnLine(t, now) : null;
+  const card = useTooltip(
+    compact ? (
+      <RowCard
+        title={title}
+        lines={[
+          <span key="s">{status}</span>,
+          (where?.machine || t.run_started_at) && (
+            <span key="w" className="flex min-w-0 items-center gap-1.5">
+              {where?.machine && <Icon name="monitor" size={11} className="shrink-0" />}
+              {where?.machine && <span className="min-w-0 truncate">{where.machine}</span>}
+              {where?.machine && t.run_started_at && <span aria-hidden>·</span>}
+              <RunElapsed since={t.run_started_at} />
+              {t.harness && <HarnessLogo harness={t.harness} size={11} />}
+            </span>
+          ),
+        ].filter((x): x is NonNullable<typeof x> => !!x)}
+      />
+    ) : null,
+    { side: 'right', variant: 'card' },
+  );
+  const lead = compact ? (collapsed ? 'ml-0' : indent === true ? 'ml-3' : '') : indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : '';
   return (
     <>
       <a
+        {...card.triggerProps}
         href={href.thread(t.id)}
         onClick={onNavigate}
         draggable
@@ -103,24 +147,26 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
           e.dataTransfer.setData('text/plain', title);
         }}
         onDragEnd={drag.end}
-        title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : threadStatusText(t)}`}
+        title={compact ? undefined : `${title} · ${status}`}
+        aria-label={compact ? `${title}, ${status}` : undefined}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`item group/row flex h-[var(--h-nav)] items-center gap-2 px-3 text-[13px] md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
+        className={`item group/row flex items-center ${compact ? 'crow' : 'h-[var(--h-nav)] gap-2 px-3 text-[13px] md:text-[12.5px]'} ${lead} ${
           active ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
-        <RowLead t={t} row={row} />
-        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <RowLead t={t} row={row} size={compact ? COMPACT_AVATAR : ROW_AVATAR} />
+        <span className={`min-w-0 flex-1 truncate ${compact ? 'crow-x' : ''}`}>{title}</span>
         {t.harness && (
-          <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-3 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
+          <span className={`shrink-0 ${compact ? 'crow-x' : ''} ${active ? 'text-fg-3' : 'text-fg-3 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
             <HarnessLogo harness={t.harness} size={11} />
           </span>
         )}
-        <RowEnd row={row} />
+        <RowEnd row={row} size={compact ? 8 : 7} />
       </a>
-      {tree && <TreeUnder t={t} tree={tree} at={at} onNavigate={onNavigate} />}
-      {own.map((k, i) => (
+      {card.tip}
+      {tree && !collapsed && <TreeUnder t={t} tree={tree} at={at} onNavigate={onNavigate} />}
+      {!collapsed && own.map((k, i) => (
         <AgentLink key={k.task_id} t={k} last={i === agents - 1} line={at.line} onNavigate={onNavigate} />
       ))}
     </>
@@ -132,25 +178,25 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
  * channel's avatar; a group thread whose agents run or wait on Ben draws their faces there instead (AvatarMark), with
  * the row's mark at its far end (RowEnd).
  */
-function RowLead({ t, row }: { t: ThreadStub; row: RowMark }) {
+function RowLead({ t, row, size = ROW_AVATAR }: { t: ThreadStub; row: RowMark; size?: number }) {
   const { channels } = useApp();
   const ch = channels.find((c) => c.id === t.channel_id);
   return (
-    <span className="grid shrink-0 place-items-center" style={{ minWidth: ROW_AVATAR, height: ROW_AVATAR }} data-row-lead>
+    <span className="grid shrink-0 place-items-center" style={{ minWidth: size, height: size }} data-row-lead>
       {drawsFaces(t.members) ? (
-        <AvatarMark members={t.members} size={ROW_AVATAR} facesOnly />
+        <AvatarMark members={t.members} size={size} facesOnly />
       ) : (
-        <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row.mark, { done: row.done, members: t.members })} size={ROW_AVATAR} />
+        <ThreadAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} shows={rowShows(row.mark, { done: row.done, members: t.members })} size={size} />
       )}
     </span>
   );
 }
 
 /** A sidebar row's status mark, at its far end. A group thread's too: its faces are in the avatar's slot. */
-function RowEnd({ row }: { row: RowMark }) {
+function RowEnd({ row, size = 7 }: { row: RowMark; size?: number }) {
   return (
     <span className="grid min-w-3 shrink-0 place-items-center" data-row-mark>
-      <RowDot row={row} />
+      <RowDot row={row} size={size} />
     </span>
   );
 }
@@ -160,15 +206,17 @@ function RowEnd({ row }: { row: RowMark }) {
  * under it nest below its row, and each keeps its own row in its channel too (`flush`: the Conductor's rows, which
  * sit almost flush with its name).
  */
-export function ChannelThreadEntry({ t, active, tasks, flush = false, onNavigate }: {
+export function ChannelThreadEntry({ t, active, tasks, flush = false, onNavigate, size = 'nav', collapsed = false }: {
   t: ThreadStub;
   active: boolean;
   tasks: BackgroundTask[];
   flush?: boolean;
   onNavigate?: () => void;
+  size?: RowSize;
+  collapsed?: boolean;
 }) {
   const tree = useJobTree(t, 'sidebar');
-  return <ThreadLink t={t} active={active} tasks={tasks} onNavigate={onNavigate} indent={flush ? 'flush' : true} tree={tree} />;
+  return <ThreadLink t={t} active={active} tasks={tasks} onNavigate={onNavigate} indent={flush ? 'flush' : true} tree={tree} size={size} collapsed={collapsed} />;
 }
 
 /**

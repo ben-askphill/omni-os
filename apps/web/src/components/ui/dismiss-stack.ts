@@ -161,7 +161,7 @@ export const wasTopAtPress = (layer: Layer) => press.top === layer;
 export function layerOpen(): boolean {
   if (stack.some((l) => !l.hint)) return true;
   try {
-    if (document.querySelector(':modal, :popover-open:not(.tip)')) return true;
+    if (document.querySelector(':modal, :popover-open:not(.tip, [aria-live])')) return true;
   } catch {
     // An engine without these selectors has no top layer either.
   }

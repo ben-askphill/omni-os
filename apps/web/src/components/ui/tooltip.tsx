@@ -19,13 +19,17 @@ import { supportsAnchoring, supportsPopover } from './use-anchored-popover.ts';
  * tip only repeats the trigger's own name (`describes: false`), which a screen reader would read twice.
  */
 export type TooltipSide = 'top' | 'right' | 'bottom';
+/** `tip`: the short dark tip. `card`: a wider card on the raised surface with a few lines of detail (the list panel's rows). */
+export type TooltipVariant = 'tip' | 'card';
 
 /** How long a pointer rests on the trigger before the fallback opens: about the browser's own `interest-delay`. */
 const OPEN_DELAY = 500;
 /** How long the fallback waits after the pointer leaves, so it can cross the gap onto the tip. */
 const CLOSE_DELAY = 120;
-/** Between the trigger and the tip. Matches `.tip`'s margin in index.css. */
-const GAP = 6;
+/** A card that closed this recently hands the pointer's next row its card at once: sweeping down a list swaps cards. */
+const WARM_MS = 300;
+/** Between the trigger and the tip. Matches `.tip`'s margin in index.css, and `.tip-card`'s. */
+const GAPS: Record<TooltipVariant, number> = { tip: 6, card: 8 };
 const EDGE = 8;
 
 type Mode = 'interest' | 'anchored' | 'placed' | 'plain';
@@ -46,9 +50,10 @@ function pickMode(): Mode {
 
 /** The fallback's one open tip: opening another closes it, as the browser's hint popovers do. */
 let shown: (() => void) | null = null;
+let closedAt = 0;
 
 /** Places the tip beside the trigger by script, flipped to the other side when it would leave the window. */
-function place(tip: HTMLElement, trigger: HTMLElement, side: TooltipSide) {
+function place(tip: HTMLElement, trigger: HTMLElement, side: TooltipSide, GAP: number) {
   const r = trigger.getBoundingClientRect();
   const w = tip.offsetWidth;
   const h = tip.offsetHeight;
@@ -83,7 +88,7 @@ const keyboardFocus = (el: Element) => {
  * handlers, so the trigger has none of those of its own) and render `tip` right after it.
  * `content`: the tip's text; null renders no tip. `side`: where it sits, flipped at the window's edges.
  */
-export function useTooltip(content: ReactNode, { side = 'top', describes = true }: { side?: TooltipSide; describes?: boolean } = {}) {
+export function useTooltip(content: ReactNode, { side = 'top', describes = true, variant = 'tip' }: { side?: TooltipSide; describes?: boolean; variant?: TooltipVariant } = {}) {
   const id = `tip-${useId().replace(/[^\w-]/g, '')}`;
   const anchor = `--${id}`;
   const [mode] = useState(pickMode);
@@ -127,7 +132,7 @@ export function useTooltip(content: ReactNode, { side = 'top', describes = true 
         // Already showing.
       }
     }
-    if (mode !== 'anchored') place(el, btn, side);
+    if (mode !== 'anchored') place(el, btn, side, GAPS[variant]);
     const onScroll = (e: Event) => {
       if (!el.contains(e.target as Node)) close();
     };
@@ -142,13 +147,16 @@ export function useTooltip(content: ReactNode, { side = 'top', describes = true 
     window.addEventListener('resize', close);
     document.addEventListener('pointerdown', onPress, true);
     return () => {
-      if (shown === close) shown = null;
+      if (shown === close) {
+        shown = null;
+        closedAt = Date.now();
+      }
       window.removeEventListener('scroll', onScroll, { capture: true });
       window.removeEventListener('resize', close);
       document.removeEventListener('pointerdown', onPress, true);
       if (mode !== 'plain' && el.matches(':popover-open')) el.hidePopover();
     };
-  }, [mode, open, side, close]);
+  }, [mode, open, side, variant, close]);
 
   // Interest invokers: the browser opens the tip. Follow it, for the dismiss stack.
   useEffect(() => {
@@ -183,7 +191,7 @@ export function useTooltip(content: ReactNode, { side = 'top', describes = true 
           onPointerEnter: (e: { pointerType: string }) => {
             if (e.pointerType === 'touch') return;
             muted.current = false;
-            later(show, shown ? 0 : OPEN_DELAY);
+            later(show, shown || Date.now() - closedAt < WARM_MS ? 0 : OPEN_DELAY);
           },
           onPointerLeave: () => later(close, CLOSE_DELAY),
           onFocus: (e: { currentTarget: Element }) => {
@@ -202,7 +210,7 @@ export function useTooltip(content: ReactNode, { side = 'top', describes = true 
       }}
       id={id}
       role={describes ? 'tooltip' : undefined}
-      className="tip"
+      className={variant === 'card' ? 'tip tip-card' : 'tip'}
       data-side={side}
       data-mode={mode}
       {...(mode === 'plain' ? { hidden: !open } : { popover: mode === 'interest' ? 'hint' : 'manual' })}

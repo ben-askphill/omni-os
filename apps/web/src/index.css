@@ -618,6 +618,69 @@
     }
   }
 
+  /* ---- the rail's list panel and its compact rows (components/rail/ListPanel.tsx) ----
+     264px, or 48px collapsed (the Collapsed list). Rows are one 30px line either way, so nothing moves up or down when
+     the panel collapses: collapsing only hides each row's text, which stays in the DOM for find-in-page and screen
+     readers (.crow-x). The width switches at once with reduced motion, on the rule itself. */
+  .rail-list {
+    width: 264px;
+    transition: width 0.28s var(--ease-out);
+  }
+  .rail-list[data-collapsed] {
+    width: 48px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-list {
+      transition: none;
+    }
+  }
+  .rail-scroll {
+    padding: 4px 8px 16px;
+  }
+  .rail-list[data-collapsed] .rail-scroll {
+    padding-inline: 4px;
+  }
+  .crow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.2;
+    position: relative;
+  }
+  .crow-time {
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--fg-3);
+  }
+  .rail-list[data-collapsed] .crow {
+    padding: 0 6px;
+    justify-content: center;
+  }
+  .rail-list[data-collapsed] .crow-x {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .crow-cap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 10px;
+  }
+  .rail-list[data-collapsed] .crow-cap {
+    justify-content: center;
+    padding: 0;
+  }
+
   /* ---- the thread tree (ThreadTree.tsx) ----
      Each row hangs off one vertical line from its parent's status mark; the last row's line curves into it at the
      row's middle, as the sidebar's sub-agent rows do. A row's children nest inside its node, so the line runs past them. */
@@ -1067,6 +1130,17 @@
     white-space: pre-line;
     overflow-wrap: anywhere;
   }
+  /* The card variant (the list panel's rows): detail on the raised surface, 250px wide, 8px off its row. */
+  .tip.tip-card {
+    width: 250px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--elev);
+    color: var(--fg);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+    white-space: normal;
+  }
   .tip:is(:popover-open, :not([popover], [hidden])) {
     animation: tip-in 0.14s var(--ease-out);
   }
@@ -1079,6 +1153,10 @@
   [interestfor] {
     interest-delay: 0.5s 0.12s;
   }
+  /* While one list-panel card is open, the next row's opens at once (the fallback does the same, WARM_MS). */
+  .rail-list:has(.tip-card:popover-open) [interestfor] {
+    interest-delay-start: 0s;
+  }
   @supports (position-area: block-end) {
     .tip:is([data-mode="anchored"], [data-mode="interest"]) {
       margin: 6px;
@@ -1087,6 +1165,9 @@
     }
     .tip:is([data-mode="anchored"], [data-mode="interest"])[data-side="bottom"] {
       position-area: block-end;
+    }
+    .tip.tip-card:is([data-mode="anchored"], [data-mode="interest"]) {
+      margin: 8px;
     }
     .tip:is([data-mode="anchored"], [data-mode="interest"])[data-side="right"] {
       position-area: inline-end;

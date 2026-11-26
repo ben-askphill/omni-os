@@ -127,6 +127,8 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
       },
       { id: 'zoom-out', label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', enabled: state.zoom > ZOOM_MIN, click: () => actions.zoom('out') },
       separator,
+      { id: 'toggle-list', label: 'Collapse or Expand List', accelerator: 'CmdOrCtrl+\\', click: () => actions.command('toggle-list') },
+      separator,
       { role: 'togglefullscreen', label: 'Toggle Full Screen' },
       ...(state.packaged
         ? []
@@ -188,6 +190,7 @@ export function commandRoute(command: DesktopCommand): string | null {
     case 'search':
       return '#/search?q=';
     case 'go-to':
+    case 'toggle-list':
       return null;
   }
 }

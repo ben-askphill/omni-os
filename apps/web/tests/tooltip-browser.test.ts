@@ -116,4 +116,45 @@ describe.skipIf(!executablePath)('Tooltip in Chromium', () => {
     await page.mouse.down();
     await expectOpen('#link', false);
   }, 30_000);
+
+  for (const mode of [undefined, 'fallback', 'placed'] as const) {
+    const name = mode ?? 'native';
+
+    it(`${name}: the card variant opens on hover and keyboard focus, 8px right of its row, 250px wide`, async () => {
+      await load(mode);
+      await hover('#row-a');
+      await expectOpen('#row-a');
+      const row = await box('#row-a');
+      const card = await box('#row-a + .tip-card');
+      expect(card.width).toBeCloseTo(250, 0);
+      expect(card.x - (row.x + row.width)).toBeGreaterThanOrEqual(7);
+      expect(card.x - (row.x + row.width)).toBeLessThanOrEqual(10);
+      await page.mouse.move(5, 5);
+      await expectOpen('#row-a', false);
+      await tabTo('#other');
+      await expectOpen('#row-a');
+    }, 30_000);
+
+    it(`${name}: Escape closes the card alone with a menu open under it`, async () => {
+      await load(mode);
+      await page.click('#open-menu');
+      await page.waitForSelector('#menu');
+      await hover('#row-a');
+      await expectOpen('#row-a');
+      await page.keyboard.press('Escape');
+      await expectOpen('#row-a', false);
+      expect(await page.locator('#menu').count()).toBe(1);
+    }, 30_000);
+  }
+
+  it('fallback: moving from one card row to the next swaps the card without the open delay', async () => {
+    await load('fallback');
+    await hover('#row-a');
+    await expectOpen('#row-a');
+    await hover('#row-b');
+    // Well under the 500 ms open delay: the first card closed as the next one opened.
+    await page.waitForTimeout(150);
+    expect((await tipOf('#row-b')).open).toBe(true);
+    expect((await tipOf('#row-a')).open).toBe(false);
+  }, 30_000);
 });

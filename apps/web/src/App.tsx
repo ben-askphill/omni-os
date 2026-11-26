@@ -19,7 +19,9 @@ import { desktop } from './desktop.ts';
 import { QuickPromptPage } from './pages/QuickPrompt.tsx';
 import { ChannelRail } from './components/rail/ChannelRail.tsx';
 import { ListPanel } from './components/rail/ListPanel.tsx';
-import { useLayout } from './layout-pref.ts';
+import { toggleListCollapsed, useLayout, useListCollapsed } from './layout-pref.ts';
+import { isListToggleKey } from './list-key.ts';
+import { layerOpen } from './components/ui/dismiss-stack.ts';
 import { usePullRequestLinks } from './pr-links.ts';
 import { cameFromInbox, listMode, railSelection } from './rail-model.ts';
 
@@ -89,6 +91,8 @@ function SidebarPane({ children }: { children: ReactNode }) {
   );
 }
 
+const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
 function Shell() {
   const route = useRoute();
   const [palette, setPalette] = useState(false);
@@ -109,11 +113,12 @@ function Shell() {
   }, []);
 
   const { openThread } = useApp();
-  useDesktopLayoutActions({ newThread: () => startNewThread(route, openThread), goTo: openPalette });
+  const layout = useLayout();
+  const collapsed = useListCollapsed();
+  useDesktopLayoutActions({ newThread: () => startNewThread(route, openThread), goTo: openPalette, toggleList: layout === 'rail' ? toggleListCollapsed : undefined });
   useSyncOnReturn();
   usePageTitle(route);
 
-  const layout = useLayout();
   // A thread opened from the Inbox keeps it in the panel; one opened from a channel shows that channel.
   const [lastFromInbox, setLastFromInbox] = useState(() => readPref('rail.inbox', false));
   const fromInbox = cameFromInbox(route, lastFromInbox);
@@ -125,7 +130,24 @@ function Shell() {
   const selection = railSelection(route, openThread, fromInbox);
   // With the Inbox in the rail's panel, New thread, /new and the like open Home's composer beside it, not a channel's
   // page, so the thread Ben starts opens in the Inbox too. The Classic sidebar keeps its Inbox view on any page.
+  const hasList = layout === 'rail' && listMode(selection).kind !== 'none';
   const inboxUp = layout === 'rail' && listMode(selection).kind === 'inbox';
+  // ⌘\ or Ctrl+\ collapses the list panel, only while one shows and no dialog or menu is up over it. Desktop app: the
+  // View menu owns the accelerator and sends 'toggle-list' instead.
+  useEffect(() => {
+    if (!hasList) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!isListToggleKey(e, MAC) || layerOpen()) return;
+      e.preventDefault();
+      toggleListCollapsed();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasList]);
+  useEffect(() => {
+    if (collapsed) document.documentElement.dataset.list = 'collapsed';
+    else delete document.documentElement.dataset.list;
+  }, [collapsed]);
   useEffect(() => {
     setInboxUp(inboxUp);
     return () => setInboxUp(false);

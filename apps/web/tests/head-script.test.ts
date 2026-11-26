@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readLayout } from '../src/layout-pref.ts';
+import { readLayout, readListCollapsed } from '../src/layout-pref.ts';
 import { parseHash } from '../src/router.ts';
 import { DESKTOP_QUERY, readPref } from '../src/store.tsx';
 
@@ -14,7 +14,7 @@ import { DESKTOP_QUERY, readPref } from '../src/store.tsx';
 const html = readFileSync(join(import.meta.dirname, '../index.html'), 'utf8');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 
-type Run = { layout?: string; theme?: string; scheme: string; preloads: { rel: string; as: string; type: string; crossOrigin: string; href: string }[]; queries: string[] };
+type Run = { layout?: string; list?: string; theme?: string; scheme: string; preloads: { rel: string; as: string; type: string; crossOrigin: string; href: string }[]; queries: string[] };
 
 /** Runs the head script on a stand-in document: `wide` answers the desktop query, the stored prefs are real. */
 function runHead({ wide, hash = '#/', fonts = '/assets/a-500.woff2 /assets/a-600.woff2' }: { wide: boolean; hash?: string; fonts?: string }): Run {
@@ -30,7 +30,7 @@ function runHead({ wide, hash = '#/', fonts = '/assets/a-500.woff2 /assets/a-600
   };
   const matchMedia = (q: string) => (queries.push(q), { matches: wide && q === DESKTOP_QUERY });
   runInNewContext(inline[0], { document, matchMedia, localStorage, location: { hash } });
-  return { layout: dataset.layout, theme: dataset.theme, scheme: metas['color-scheme'].content, preloads, queries };
+  return { layout: dataset.layout, list: dataset.list, theme: dataset.theme, scheme: metas['color-scheme'].content, preloads, queries };
 }
 
 /** What App.tsx renders with: the Shell's data-layout, which the phone layout and the Quick Prompt panel skip. */
@@ -61,6 +61,12 @@ describe("index.html's head script", () => {
           store('layout', raw);
           expect(runHead({ wide, hash }).layout).toBe(appLayout(wide, hash));
         });
+
+  for (const raw of [null, 'true', 'false', '"true"', 'not json'])
+    it(`sets data-list when the list panel is collapsed, as readListCollapsed says: ${raw}`, () => {
+      store('rail.listCollapsed', raw);
+      expect(runHead({ wide: true }).list).toBe(readListCollapsed() ? 'collapsed' : undefined);
+    });
 
   it('preloads the rail faces only when it draws the rail, and only with built paths', () => {
     const preload = (href: string) => ({ rel: 'preload', as: 'font', type: 'font/woff2', crossOrigin: 'anonymous', href });

@@ -44,6 +44,8 @@
         if (!matchMedia('(min-width: 768px)').matches || /^#\/*quick-prompt\/*(\?|$)/.test(location.hash)) return;
         var layout = pref('layout', 'rail') === 'classic' ? 'classic' : 'rail';
         root.dataset.layout = layout;
+        // The rail's list panel, collapsed to a strip (layout-pref.ts): set now so CSS has it before React draws.
+        if (pref('rail.listCollapsed', false) === true) root.dataset.list = 'collapsed';
         // The rail's faces, fetched beside the bundle, so the first layout has them rather than asking for them.
         var fonts = document.querySelector('meta[name="omni-rail-fonts"]').content;
         if (layout !== 'rail' || !fonts) return;

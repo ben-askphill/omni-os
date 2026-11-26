@@ -11,6 +11,8 @@ import { createSyncNudge } from '../sync-nudge.ts';
 export interface DesktopLayoutActions {
   newThread: () => void;
   goTo: () => void;
+  /** View > Collapse List: only the rail layout has a list panel to collapse. */
+  toggleList?: () => void;
 }
 
 let layout: { current: DesktopLayoutActions } | null = null;
@@ -33,6 +35,8 @@ function run(command: DesktopCommand) {
       return layout?.current.newThread();
     case 'go-to':
       return layout?.current.goTo();
+    case 'toggle-list':
+      return layout?.current.toggleList?.();
     case 'search':
       return navigate(href.search(''));
     case 'home':

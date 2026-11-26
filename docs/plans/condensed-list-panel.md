@@ -31,7 +31,7 @@ All values come from the A+C build spec. All tokens already exist in `apps/web/s
 | Header buttons | 28px | 28px |
 | Search row | 14px search icon, "Search or jump to", `⌘K` hint | icon only |
 | New thread row | 14px `--fg` tile holding a 10px plus, "New thread" | tile only |
-| Hover card | none (see Open questions) | 250px wide on `--elev` with `--shadow-menu`, 8px right of the row |
+| Hover card | 250px card too (same card, so toggling does not shift detail) | 250px wide on `--elev` with `--shadow-menu`, 8px right of the row |
 
 - The width animates over 0.28s with `--ease-out`. With reduced motion it switches at once (`@media (prefers-reduced-motion: reduce)` on the rule itself, as the W12 motion work did: no `!important`).
 - Collapsed, the list scrolls with no bar drawn (`.scroll-none`, already in `index.css`), so the scrollbar never takes width from the strip and pushes the icons off centre. Expanded keeps `.scroll-thin`. The fade from `useScrollFade` stays in both states.
@@ -95,7 +95,7 @@ The rail panel gets its own compact rows. The Classic sidebar keeps its current 
 
 - Build it on the existing `useTooltip` (`components/ui/tooltip.tsx`) with `side: 'right'`, not a new popover: it already handles interest invokers (desktop app), the anchored and placed fallbacks (Safari, Firefox), touch (no tip on touch), keyboard focus (opens at once), the 500ms open delay, the 120ms close delay so the pointer can cross onto it, and its place on the dismiss stack as a `hint` layer (Escape closes the card alone; a press or focus move belongs to the layer below).
 - Add a `variant: 'tip' | 'card'` option to `useTooltip`. `'card'` adds a `.tip-card` class in `index.css`: 250px wide, `--elev` background, `--fg` text, `--shadow-menu`, 10px radius, 10px 12px padding, `white-space: normal`, 8px gap (`GAP` becomes per variant; `.tip`'s margin too). The rest of `.tip` stays.
-- Only while collapsed. Expanded rows keep today's `title` attribute.
+- Expanded and collapsed rows both get the card (Ben's answer 1), so the detail a one-line row leaves out is one hover away in either state and nothing jumps on toggle.
 - Content per row kind:
   - Inbox row: channel (with its avatar) and the time or status word on the first line, the full title, the step line when there is one, then the machine line from `ranOnLine` with the run time (`RunElapsed`) and the harness logo. A job adds its tree tally.
   - Channel thread row: title, status text (`threadStatusText`), harness.
@@ -186,8 +186,13 @@ The rail panel gets its own compact rows. The Classic sidebar keeps its current 
 - `docs/user/entry-points.md`: add View > Collapse List.
 - `GLOSSARY.md`: the panel is already the "list panel" under **Channel rail**. Add **Collapsed list** ("The channel rail's list panel narrowed to a strip of marks and avatars; _Avoid_: mini sidebar, compact mode, icon mode") and use those words in UI labels and docs. Use **Inbox**, **Needs you**, **Overview** as defined; never "notifications".
 
-## Open questions for Ben
+## Decisions (Ben's answers)
 
-1. **Expanded rows lose detail.** A+C makes expanded Inbox rows one line too, so the channel name, the machine and run time, the step line and the job tally leave the expanded panel. This spec shows them in the hover card only when collapsed. Should expanded rows also get the hover card, or should expanded keep today's three-line cards and only collapsed use the 30px rows (which would bring back the shift on collapse A+C avoided)?
-2. **Sync or per machine.** This spec stores the collapsed state per browser and desktop app, not synced. Say if you want it to follow you across Macs.
-3. **Narrow windows.** Should the panel collapse by itself below a window width (for example under 1100px), or only when you toggle it?
+1. **Expanded rows get the hover card too.** Expanded and collapsed share the same 30px rows and cards.
+2. **Per machine.** The collapsed state is stored per browser and desktop app, never synced.
+3. **Toggle only.** No auto-collapse at narrow widths.
+
+## Built differently from this spec
+
+- The View menu item has a static label ("Collapse or Expand List"): the main process does not know the page's collapsed state, and this plan keeps `window.omniDesktop` as it is.
+- `layerOpen()` (`dismiss-stack.ts`) ignores the toasts' live-region popover (`[aria-live]`), which otherwise swallowed the shortcut while a toast showed.

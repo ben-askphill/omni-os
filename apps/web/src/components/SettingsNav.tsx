@@ -4,12 +4,18 @@ import { desktop } from '../desktop.ts';
 import { href, navigate } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
 import { isImeEnter } from '../ime.ts';
+import { useTooltip } from './ui/tooltip.tsx';
+import { RowCard } from './rail/RowCard.tsx';
 
 // Settings' nav on a desktop: a search box over the groups of sections (@omni/shared/settings-catalog.ts), the same
 // groups and order as the phone's Settings screen. Typing lists the settings that
 // match instead; picking one opens its section and scrolls to it. Links, so a section has a hash of its own.
 
-export function SettingsNav({ section }: { section: SettingsSectionId }) {
+/**
+ * `compact`: the rail's list panel, 30px rows. `collapsed` (with it): the Collapsed list, each section's icon alone with
+ * its name in the card shown on hover and focus, and no search box, which has no room.
+ */
+export function SettingsNav({ section, compact = false, collapsed = false }: { section: SettingsSectionId; compact?: boolean; collapsed?: boolean }) {
   const [q, setQ] = useState('');
   const hits = searchSettings(q, desktop ? 'desktop' : 'web', { loginItem: desktop?.loginItemSupported });
   const open = (s: SettingsSectionId, focus?: string) => {
@@ -17,8 +23,8 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
     navigate(href.settingsSection(s, focus));
   };
   return (
-    <nav aria-label="Settings sections" className="space-y-4">
-      <label className="flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-ring-within focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)]">
+    <nav aria-label="Settings sections" className={compact ? 'space-y-2' : 'space-y-4'}>
+      <label className={`items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-ring-within focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)] ${collapsed ? 'hidden' : 'flex'} ${compact ? 'h-[30px]' : 'h-9'}`}>
         <Icon name="search" size={14} />
         <input
           type="search"
@@ -48,30 +54,38 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
       ) : (
         SETTINGS_GROUPS.map((g) => (
           <div key={g.id}>
-            {g.title && <div className="caption mb-1 px-3">{g.title}</div>}
+            {g.title && !collapsed && <div className={`caption px-3 ${compact ? 'crow-cap mb-0 !px-2.5' : 'mb-1'}`}>{g.title}</div>}
+            {g.title && collapsed && <div aria-hidden className="crow-cap"><span className="block h-px w-4 bg-line-strong" /></div>}
             <ul className="space-y-0.5">
-              {sectionsIn(g.id, { desktopApp: desktop !== null }).map((d) => {
-                const current = d.id === section;
-                return (
-                  <li key={d.id}>
-                    <a
-                      href={href.settingsSection(d.id as SettingsSectionId)}
-                      aria-current={current ? 'page' : undefined}
-                      className={`flex h-8 items-center gap-2.5 rounded-[12px] px-3 text-[13px] ${current ? 'bg-surface-2 text-fg' : 'text-fg-2 hover:bg-surface hover:text-fg'}`}
-                    >
-                      {/* A fixed slot, so every label starts on one line whatever its icon draws. */}
-                      <span className="grid w-4 shrink-0 place-items-center">
-                        <Icon name={d.icon as IconName} size={15} className={current ? 'text-fg' : 'text-fg-3'} />
-                      </span>
-                      <span className="truncate">{d.title}</span>
-                    </a>
-                  </li>
-                );
-              })}
+              {sectionsIn(g.id, { desktopApp: desktop !== null }).map((d) => (
+                <SectionLink key={d.id} d={d} current={d.id === section} compact={compact} />
+              ))}
             </ul>
           </div>
         ))
       )}
     </nav>
+  );
+}
+
+function SectionLink({ d, current, compact }: { d: ReturnType<typeof sectionsIn>[number]; current: boolean; compact: boolean }) {
+  const card = useTooltip(compact ? <RowCard title={d.title} lines={[d.blurb]} /> : null, { side: 'right', variant: 'card' });
+  return (
+    <li>
+      <a
+        {...card.triggerProps}
+        href={href.settingsSection(d.id as SettingsSectionId)}
+        aria-current={current ? 'page' : undefined}
+        aria-label={compact ? d.title : undefined}
+        className={`flex items-center text-[13px] ${compact ? 'crow rounded-[9px] !font-normal' : 'h-8 gap-2.5 rounded-[12px] px-3'} ${current ? 'bg-surface-2 text-fg' : 'text-fg-2 hover:bg-surface hover:text-fg'}`}
+      >
+        {/* A fixed slot, so every label starts on one line whatever its icon draws. */}
+        <span className="grid w-4 shrink-0 place-items-center">
+          <Icon name={d.icon as IconName} size={compact ? 14 : 15} className={current ? 'text-fg' : 'text-fg-3'} />
+        </span>
+        <span className={`truncate ${compact ? 'crow-x' : ''}`}>{d.title}</span>
+      </a>
+      {card.tip}
+    </li>
   );
 }
