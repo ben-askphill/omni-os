@@ -1330,7 +1330,7 @@ server.registerTool(
   'list_automations',
   {
     description:
-      'List the automations on this machine: id, name, enabled (false when disabled), schedule (cron, timezone, next) or event trigger (on), channel, agent (role) and run defaults, ' +
+      'List the automations on this machine: id, name, enabled, its schedule (cron, timezone, next run) or event trigger (on), channel, agent (role) and run defaults, ' +
       'the start of its prompt, any error that stops it running, and its last three runs with their thread ids. Event deliveries are list_automation_deliveries.',
     inputSchema: {},
   },

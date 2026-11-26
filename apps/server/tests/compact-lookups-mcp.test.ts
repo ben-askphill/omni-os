@@ -265,15 +265,15 @@ afterAll(() => {
 const T = { timeout: 30_000 };
 
 describe('compact routine lookup tools (#1011)', () => {
-  it('list_automations omits default enabled/runs_on/source/run fields and stays within budget', T, async () => {
+  it('list_automations keeps enabled on every row, omits default runs_on/source/run fields, and stays within budget', T, async () => {
     const { raw, body } = await callOmni('list_automations');
     expect(body).toHaveLength(14);
 
-    // Disabled keeps enabled: false; enabled omits enabled.
+    // Every row keeps enabled (true and false); default runs_on and source drop.
     const disabled = body.find((a: any) => a.id === 'automation-01');
     expect(disabled.enabled).toBe(false);
     const enabled = body.find((a: any) => a.id === 'automation-02');
-    expect(enabled).not.toHaveProperty('enabled');
+    expect(enabled.enabled).toBe(true);
     expect(enabled).not.toHaveProperty('runs_on');
     expect(enabled).not.toHaveProperty('source');
     expect(enabled.next).toBe('2026-11-27T07:00Z');
@@ -286,34 +286,37 @@ describe('compact routine lookup tools (#1011)', () => {
     expect(enabled.last_runs[0]).not.toHaveProperty('status');
     expect(enabled.last_runs[2]).toMatchObject({ trigger: 'manual', status: 'failed' });
 
-    // Audit baseline 12.4K; after #1006 ~8,155 (without runs_on/source); target 35-55% below 12.4K (< 6,800).
-    expect(raw.length).toBeLessThan(6_800);
+    // Audit baseline 12.4K; after #1006 8,155 (without runs_on/source); after #1011 ~6,500 (< 6,700).
+    expect(raw.length).toBeLessThan(6_700);
   });
 
-  it('list_threads omits status: done and echoed filter fields and stays within budget', T, async () => {
+  it('list_threads keeps status on every row including done, omits echoed channel filter, and stays within budget', T, async () => {
     const { raw, body } = await callOmni('list_threads');
     expect(body).toHaveLength(20);
     expect(body[0]).toMatchObject({ id: threadsFixture[0].id, status: 'running', delegating: true, updated_at: '2026-11-26T08:00Z' });
-    expect(body[1]).not.toHaveProperty('status');
+    expect(body[1].status).toBe('done');
     expect(body[1]).not.toHaveProperty('delegating');
     expect(body[1].updated_at).toBe('2026-11-26T08:01Z');
 
-    // Filtered by channel omits the echoed channel field on every row.
+    // Filtered by channel omits the echoed channel field on every row while keeping status.
     const filtered = await callOmni('list_threads', { channel: 'channel-01' });
     expect(filtered.body.length).toBeGreaterThan(0);
-    for (const row of filtered.body) expect(row).not.toHaveProperty('channel');
+    for (const row of filtered.body) {
+      expect(row).not.toHaveProperty('channel');
+      expect(row.status).toBeTruthy();
+    }
 
-    // Audit baseline 5.9K; after #1006 4,096; target 35-55% below 5.9K (< 3,800).
-    expect(raw.length).toBeLessThan(3_800);
+    // Audit baseline 5.9K; after #1006 4,096; after #1011 3,956 unfiltered (< 4,000).
+    expect(raw.length).toBeLessThan(4_000);
   });
 
-  it('list_harnesses hoists shared efforts/notes, keeps valid delegate ids, and stays within budget', T, async () => {
+  it('list_harnesses keeps available and capability booleans, hoists shared efforts/notes, and stays within budget', T, async () => {
     const { raw, body } = await callOmni('list_harnesses');
     expect(body.map((h: any) => h.id)).toEqual(['claude-code', 'codex', 'cursor', 'antigravity', 'cursor-cloud']);
 
     const claude = body.find((h: any) => h.id === 'claude-code');
-    expect(claude).not.toHaveProperty('available');
-    expect(claude).not.toHaveProperty('capabilities');
+    expect(claude.available).toBe(true);
+    expect(claude.capabilities).toEqual({ steer: true, interrupt: true, tool_limits: true });
     expect(claude.efforts).toEqual(['low', 'medium', 'high']);
     expect(claude.default_effort).toBe('high');
     expect(claude.models.map((m: any) => m.id)).toEqual(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5']);
@@ -322,6 +325,8 @@ describe('compact routine lookup tools (#1011)', () => {
 
     // Non-redundant codename label ("GPT-6.1 Sol") stays; redundant labels drop.
     const codex = body.find((h: any) => h.id === 'codex');
+    expect(codex.available).toBe(true);
+    expect(codex).not.toHaveProperty('running');
     expect(codex.models.find((m: any) => m.id === 'gpt-6-1').label).toBe('GPT-6.1 Sol');
     expect(codex.models.find((m: any) => m.id === 'gpt-5-4-mini')).not.toHaveProperty('label');
 
@@ -335,11 +340,11 @@ describe('compact routine lookup tools (#1011)', () => {
     expect(cloud.note).toContain("Cursor's Linux cloud");
     for (const m of cloud.models) expect(m).not.toHaveProperty('note');
 
-    // Audit baseline 2.8K; even with 15 models across 5 harnesses and full billing notes, stays well under 1,750 chars.
-    expect(raw.length).toBeLessThan(1_750);
+    // 15 models across 5 harnesses with full billing notes and capabilities stays under 1,900 chars (1,834 measured).
+    expect(raw.length).toBeLessThan(1_900);
   });
 
-  it('settings drops defaults and UI hints from server_options and stays within budget', T, async () => {
+  it('settings drops defaults and UI hints, keeps analytics.enabled, and stays within budget', T, async () => {
     const { raw, body } = await callOmni('settings');
     expect(body.path).toBe('~/.omni/omni.config.json');
     expect(body.config.user).toEqual({ name: 'Ben', pronouns: 'he/him', email: 'ben@askphill.com' });
@@ -350,12 +355,12 @@ describe('compact routine lookup tools (#1011)', () => {
     expect(body.config).not.toHaveProperty('worktrees');
     expect(body.config).not.toHaveProperty('version');
     expect(body).not.toHaveProperty('env_overrides');
-    expect(body).not.toHaveProperty('analytics');
+    expect(body.analytics).toEqual({ enabled: true });
     expect(body).not.toHaveProperty('usage_panel');
     expect(body.display).toEqual({ technical: true, shopify: true });
     expect(body.server_options).toEqual([{ env: 'OMNI_MODS', value: 'On', default: 'Off' }]);
 
-    // Pretty-printed baseline ~7.2K; after #1006 ~5.6K; compacted drops to < 600 chars (~90% reduction).
-    expect(raw.length).toBeLessThan(600);
+    // Pretty-printed baseline ~7.9K; after #1006 ~5.9K; compacted drops to 432 chars (< 500).
+    expect(raw.length).toBeLessThan(500);
   });
 });
