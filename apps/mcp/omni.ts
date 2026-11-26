@@ -1,7 +1,6 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
 // so delegated threads are ordinary threads the user can open, search and continue.
 import { randomUUID } from 'node:crypto';
-import { accessLevelOf, accessSummary, connectorAccessOf } from '@omni/shared/access.ts';
 import { agentColor, agentFace, agentShape, type FaceAgent } from '@omni/shared/agent-avatar.ts';
 import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
@@ -16,11 +15,13 @@ import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/mach
 import type { MachinePick } from '@omni/shared/machine-pick.ts';
 import { compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
 import { ApiError, call, SELF, text } from './api.ts';
+import { channelDetail, channelIndexRow, LIST_CHANNELS_DESCRIPTION, listChannelsInput } from './channels.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
 import { formatSearchHits, SEARCH_DEFAULT_LIMIT, searchInput, searchPath } from './search.ts';
 import { resolveDevice } from './device-pick.ts';
 import { threadId } from './thread-id.ts';
+import { replyInput, replyQuery } from './thread-reply.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -39,10 +40,6 @@ const basePick = (base?: string) => {
   if (!name) return undefined;
   return name === 'head' || name === 'remote-default' ? { kind: name } : { kind: 'ref', ref: name };
 };
-
-/** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
-const folderSummary = (folders: any[] = []) =>
-  folders.map((f: any) => compactRow({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t: any) => t.title) }));
 
 /**
  * The folder `name` names in the channel, by id or name ignoring case. With `create` a name no folder has is fine:
@@ -63,31 +60,14 @@ async function checkFolder(channel: string, name: string, create?: boolean) {
 server.registerTool(
   'list_channels',
   {
-    description:
-      'List Omni channels (one per client or project) with repo, store, running thread count, sidebar folders and, when set, what new worktrees copy or share from the main checkout. ' +
-      'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in. ' +
-      '`access` says what agents there may do without a yes (Read only, Ask first, Full access, and any account set apart). Only the user changes it, in Channel settings.',
+    description: LIST_CHANNELS_DESCRIPTION,
+    inputSchema: listChannelsInput,
   },
-  async () => {
+  async ({ channel }) => {
+    const id = channel?.trim();
+    if (id) return text(channelDetail(await call(`/channels/${encodeURIComponent(id)}`)));
     const list = await call('/channels');
-    return text(
-      list.map((c: any) =>
-        compactRow({
-          id: c.id,
-          name: c.name,
-          kind: c.kind,
-          store: c.store_domain,
-          repo: c.github_repo,
-          running: c.running,
-          notes: c.notes,
-          // What each new worktree gets from the main checkout beyond the repo's .worktreeinclude: copied files, linked folders.
-          ...(c.worktree_include ? { copy_into_worktrees: c.worktree_include.split('\n') } : {}),
-          ...(c.worktree_shared ? { shared_directories: c.worktree_shared.split('\n') } : {}),
-          folders: folderSummary(c.folders),
-          access: accessSummary(accessLevelOf(c.access_level ?? c.access_default), connectorAccessOf(c.connector_access)),
-        }),
-      ),
-    );
+    return text(list.map(channelIndexRow));
   },
 );
 
@@ -932,10 +912,11 @@ server.registerTool(
       'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
       'its last model activity and the minutes since. `waits_for_sign_in`, when present, says which account it needs signed in before it starts. `open_items`, when present, lists what its last turn left for the user to resolve ' +
       '(questions, decisions with options, blockers), only while the Open items card setting is on. `members`, on a group thread, lists its agents: ' +
-      'the lead, the others seated in it, and each one\'s run and state. `collisions` lists files two of its agents both edited, while the flags are up. Only the user seats or removes an agent. Reading it never wakes the thread.',
-    inputSchema: { thread_id: z.string() },
+      'the lead, the others seated in it, and each one\'s run and state. `collisions` lists files two of its agents both edited, while the flags are up. Only the user seats or removes an agent. Reading it never wakes the thread. ' +
+      '`last_reply` is its last run\'s final message, cut at `reply_max_chars` (default 8,000). Pass `include_reply: false` when you only need its status or warmth.',
+    inputSchema: { thread_id: z.string(), ...replyInput },
   },
-  async ({ thread_id }) => text(await call(`/threads/${await threadId(thread_id)}/summary`)),
+  async ({ thread_id, include_reply, reply_max_chars }) => text(await call(`/threads/${await threadId(thread_id)}/summary?${replyQuery(include_reply, reply_max_chars)}`)),
 );
 
 server.registerTool(
@@ -1599,7 +1580,10 @@ server.registerTool('tool_failures', {
 server.registerTool('insights', {
   description: "The Inbox dashboard's numbers for a range: tokens and cost per harness, model and day from the local session logs (and Cursor's billing), threads marked done, busiest channels, open PRs and today's automation runs. usage.complete is false while the first log scan still runs.",
   inputSchema: { range: z.enum(['today', '7d', '30d']).default('30d') },
-}, async ({ range }) => text(await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`)));
+}, async ({ range }) => {
+  const data = await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`);
+  return text(Array.isArray(data?.channels) ? { ...data, channels: data.channels.map(({ icon: _icon, ...c }: Record<string, unknown>) => c) } : data);
+});
 
 server.registerTool('triage_tool_failure', {
   description: 'Record tool failure remediation status and safe human-written fix/replacement/avoidance guidance. Never include raw errors, arguments, private data or credentials. Does not disable tools. A later failure reopens a fixed group.',

@@ -181,6 +181,11 @@ const harnessesFixture = [
 function answer(method: string, rawUrl: string): [number, unknown] {
   const url = rawUrl.split('?')[0];
   if (method === 'GET' && url === '/api/channels') return [200, channelsFixture];
+  if (method === 'GET' && url.startsWith('/api/channels/')) {
+    const id = decodeURIComponent(url.slice('/api/channels/'.length));
+    const hit = channelsFixture.find((c) => c.id === id);
+    return hit ? [200, hit] : [404, { error: 'not found' }];
+  }
   if (method === 'GET' && url === '/api/automations') return [200, automationsFixture];
   if (method === 'GET' && url === '/api/prs') return [200, prsFixture];
   if (method === 'GET' && url === '/api/threads') return [200, threadsFixture];
@@ -298,12 +303,20 @@ describe('compact JSON across Conductor and external MCP tools (#1006)', () => {
       expect(res.raw, `${name} must equal compact JSON.stringify`).toBe(JSON.stringify(res.body));
     }
 
-    // list_channels drops null store/repo/notes and empty folders/recent arrays.
+    // list_channels returns a compact index by default (omits notes, folder trees, zero running and default access)
+    // and drops empty recent arrays on the one-channel detail path (#1007).
+    expect(channels.raw.length).toBeLessThan(3100);
     expect(channels.body[0]).not.toHaveProperty('folders');
+    expect(channels.body[0]).not.toHaveProperty('folder_count');
+    expect(channels.body[0]).not.toHaveProperty('notes');
     expect(channels.body[1]).not.toHaveProperty('store');
     expect(channels.body[1]).not.toHaveProperty('repo');
     expect(channels.body[1]).not.toHaveProperty('notes');
-    const emptyFolder = channels.body[4].folders.find((f: any) => f.threads === 0);
+    expect(channels.body[1]).not.toHaveProperty('access');
+    expect(channels.body[4].folder_count).toBe(3);
+    const channelDetail = await callOmni('list_channels', { channel: 'channel-05' });
+    expect(channelDetail.raw).toBe(JSON.stringify(channelDetail.body));
+    const emptyFolder = channelDetail.body.folders.find((f: any) => f.threads === 0);
     expect(emptyFolder).toBeDefined();
     expect(emptyFolder).not.toHaveProperty('recent');
 
