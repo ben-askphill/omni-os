@@ -18,6 +18,7 @@ import { compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
 import { ApiError, call, SELF, text } from './api.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
+import { formatSearchHits, SEARCH_DEFAULT_LIMIT, searchInput, searchPath } from './search.ts';
 import { resolveDevice } from './device-pick.ts';
 import { threadId } from './thread-id.ts';
 
@@ -1298,8 +1299,11 @@ server.registerTool(
 
 server.registerTool(
   'search_history',
-  { description: `Full-text search across every thread ${USER} has run.`, inputSchema: { query: z.string() } },
-  async ({ query }) => text(compactRows(await call(`/search?q=${encodeURIComponent(query)}`))),
+  {
+    description: `Full-text search across threads ${USER} has run. Returns at most ${SEARCH_DEFAULT_LIMIT} hits by default; pass channel or limit to narrow or widen.`,
+    inputSchema: searchInput,
+  },
+  async ({ query, channel, limit }) => text(formatSearchHits(await call(searchPath({ query, channel, limit })), limit ?? SEARCH_DEFAULT_LIMIT)),
 );
 
 /** A refused delivery action is an answer for the conductor to read, not a crash: the server says why in `error`. */

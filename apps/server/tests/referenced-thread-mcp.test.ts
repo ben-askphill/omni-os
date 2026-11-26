@@ -21,7 +21,7 @@ await once(server, 'listening');
 const port = (server.address() as AddressInfo).port;
 const { buildMcpConfig } = await import('../sandbox.ts');
 const { stampThreadReferences } = await import('../message-context/thread-reference.ts');
-const { PAGE_ROWS_MAX } = await import('../thread-history.ts');
+const { PAGE_CHARS_DEFAULT, PAGE_CHARS_MAX, PAGE_ROWS_DEFAULT, PAGE_ROWS_MAX, ROW_CHARS_DEFAULT, ROW_CHARS_MAX } = await import('../thread-history.ts');
 const clients: McpClient[] = [];
 afterAll(() => {
   for (const c of clients) c.close();
@@ -72,35 +72,64 @@ async function connect(threadId: string) {
 }
 const callTool = async (client: McpClient, args: Record<string, unknown>) => {
   const r = (await client.request('tools/call', { name: 'read_referenced_thread', arguments: args })) as { isError?: boolean; content: { type: string; text: string }[] };
-  return { isError: !!r.isError, body: JSON.parse(r.content[0].text) as any };
+  return { isError: !!r.isError, raw: r.content[0].text, body: JSON.parse(r.content[0].text) as any };
 };
 
 describe.skipIf(!hasMcpBuild)('read_referenced_thread', () => {
   const from = make('Asking');
   const to = make('A long one');
   for (let i = 0; i < 120; i++) h.db.events.add(to.id, i % 2 ? 'assistant_text' : 'user', { text: `message ${i}` });
-  const stamped = stampThreadReferences(from.id, [newContext(threadReference, referenceBody({ id: to.id, title: to.title, channel: 'scratch', channel_name: 'Scratch' }, 'scratch', new Date()), '')]);
+  const big = make('Verbose thread');
+  for (let i = 0; i < 20; i++) h.db.events.add(big.id, i % 2 ? 'assistant_text' : 'user', { text: `${i}:${'x'.repeat(10_000)}` });
+  const stamped = stampThreadReferences(from.id, [
+    newContext(threadReference, referenceBody({ id: to.id, title: to.title, channel: 'scratch', channel_name: 'Scratch' }, 'scratch', new Date()), ''),
+    newContext(threadReference, referenceBody({ id: big.id, title: big.title, channel: 'scratch', channel_name: 'Scratch' }, 'scratch', new Date()), ''),
+  ]);
   if (!stamped.ok) throw new Error(stamped.error);
   h.db.events.add(from.id, 'user', { text: 'read it', context: stamped.value });
 
   it('is the only tool the thread gets, with its limits in the description', T, async () => {
     const client = await connect(from.id);
-    const { tools } = (await client.request('tools/list')) as { tools: { name: string; description: string }[] };
+    const { tools } = (await client.request('tools/list')) as { tools: { name: string; description: string; inputSchema: { properties: Record<string, unknown> } }[] };
     expect(tools.map((t) => t.name)).toEqual(['read_referenced_thread']);
-    expect(tools[0].description).toContain('at most 100 messages and 60,000 characters');
-    expect(tools[0].description).toContain('cut at 8,000 characters');
+    expect(tools[0].description).toContain('up to 100 messages (default 15) and 60,000 characters (default 20,000)');
+    expect(tools[0].description).toContain('cut at up to 8,000 characters (default 3,000');
+    expect(Object.keys(tools[0].inputSchema.properties)).toEqual(expect.arrayContaining(['limit', 'page_chars', 'row_chars']));
   });
 
-  it('returns a bounded page and pages back with its cursor', T, async () => {
+  it('returns a bounded default page (15 rows) and pages back with explicit larger limits', T, async () => {
     const client = await connect(from.id);
     const first = await callTool(client, { thread_id: to.id });
     expect(first.isError).toBe(false);
-    expect(first.body.rows).toHaveLength(40);
+    expect(first.body.rows).toHaveLength(PAGE_ROWS_DEFAULT);
+    expect(first.body.limits).toEqual({ rows: PAGE_ROWS_DEFAULT, page_chars: PAGE_CHARS_DEFAULT, row_chars: ROW_CHARS_DEFAULT });
     expect(first.body.rows.at(-1).text).toBe('message 119');
     const older = await callTool(client, { thread_id: to.id, before: first.body.older, limit: PAGE_ROWS_MAX });
-    expect(older.body.rows.at(-1).text).toBe('message 79');
-    expect(older.body.rows).toHaveLength(80);
-    expect(older.body.older).toBeNull();
+    expect(older.body.rows.at(-1).text).toBe('message 104');
+    expect(older.body.rows).toHaveLength(PAGE_ROWS_MAX);
+    expect(older.body.limits.rows).toBe(PAGE_ROWS_MAX);
+    expect(older.body.older).not.toBeNull();
+    const oldest = await callTool(client, { thread_id: to.id, before: older.body.older, limit: PAGE_ROWS_MAX });
+    expect(oldest.body.rows).toHaveLength(5);
+    expect(oldest.body.rows[0].text).toBe('message 0');
+    expect(oldest.body.older).toBeNull();
+  });
+
+  it('defaults to 20K page chars and 3K per row, while explicit larger overrides still work', T, async () => {
+    const client = await connect(from.id);
+    const def = await callTool(client, { thread_id: big.id });
+    expect(def.isError).toBe(false);
+    expect(def.body.limits).toEqual({ rows: PAGE_ROWS_DEFAULT, page_chars: PAGE_CHARS_DEFAULT, row_chars: ROW_CHARS_DEFAULT });
+    expect(def.body.rows).toHaveLength(Math.floor(PAGE_CHARS_DEFAULT / ROW_CHARS_DEFAULT));
+    expect(def.body.rows.every((r: any) => r.text.length === ROW_CHARS_DEFAULT && r.cut_from > ROW_CHARS_DEFAULT)).toBe(true);
+    expect(def.raw.length).toBeLessThan(22_000);
+
+    const wide = await callTool(client, { thread_id: big.id, limit: 40, page_chars: PAGE_CHARS_MAX, row_chars: ROW_CHARS_MAX });
+    expect(wide.isError).toBe(false);
+    expect(wide.body.limits).toEqual({ rows: 40, page_chars: PAGE_CHARS_MAX, row_chars: ROW_CHARS_MAX });
+    expect(wide.body.rows).toHaveLength(Math.floor(PAGE_CHARS_MAX / ROW_CHARS_MAX));
+    expect(wide.body.rows.every((r: any) => r.text.length === ROW_CHARS_MAX && r.cut_from > ROW_CHARS_MAX)).toBe(true);
+    expect(wide.raw.length).toBeGreaterThan(55_000);
   });
 
   it('says unavailable, as an error, for a thread nothing referenced and for one that is gone', T, async () => {

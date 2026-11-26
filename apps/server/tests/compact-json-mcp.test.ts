@@ -326,9 +326,11 @@ describe('compact JSON across Conductor and external MCP tools (#1006)', () => {
     expect(threads.body[1]).not.toHaveProperty('role');
     expect(threads.body[1]).not.toHaveProperty('task_id');
 
-    // search_history drops event_id: null on title-only hits.
+    // search_history defaults to 10 hits, drops UI-only event_id, and ensures every hit has a non-empty snippet.
+    expect(search.body).toHaveLength(10);
     expect(search.body[0]).not.toHaveProperty('event_id');
-    expect(search.body[1].event_id).toBe(10001);
+    expect(search.body[1]).not.toHaveProperty('event_id');
+    expect(search.body.every((h: any) => typeof h.snippet === 'string' && h.snippet.length > 0)).toBe(true);
 
     // list_harnesses keeps available: false and false capabilities that default to true (steer, interrupt, tool_limits),
     // while dropping remote: false and model defaults (default: false, hidden: false, efforts: [], default_effort: null, note: null).
@@ -376,6 +378,9 @@ describe('compact JSON across Conductor and external MCP tools (#1006)', () => {
     expect(extHarnesses.body.find((h: any) => h.id === 'cursor-cloud').available).toBe(false);
     expect(extThreads.body[1]).not.toHaveProperty('pinned');
     expect(extThreads.body[1]).not.toHaveProperty('folder_id');
+    expect(extSearch.body).toHaveLength(10);
     expect(extSearch.body[0]).not.toHaveProperty('event_id');
+    expect(extSearch.body[1]).not.toHaveProperty('event_id');
+    expect(extSearch.body.every((h: any) => typeof h.snippet === 'string' && h.snippet.length > 0)).toBe(true);
   });
 });

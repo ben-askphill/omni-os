@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { shortId } from '@omni/shared/message-context-thread.ts';
 import { channels, db, threads } from './db.ts';
-import { PAGE_ROWS_MAX, readReferenced, readConversation } from './thread-history.ts';
+import { PAGE_CHARS_MAX, PAGE_ROWS_MAX, ROW_CHARS_MAX, readReferenced, readConversation } from './thread-history.ts';
 
 /** Matches in one answer. */
 export const PICK_LIMIT = 20;
@@ -87,7 +87,13 @@ threadReferencesApi.get('/', (c) => {
 
 const cursor = z.coerce.number().int().min(0);
 const pageQuery = z
-  .object({ before: cursor.optional(), after: cursor.optional(), limit: z.coerce.number().int().min(1).max(PAGE_ROWS_MAX).optional() })
+  .object({
+    before: cursor.optional(),
+    after: cursor.optional(),
+    limit: z.coerce.number().int().min(1).max(PAGE_ROWS_MAX).optional(),
+    page_chars: z.coerce.number().int().min(1).max(PAGE_CHARS_MAX).optional(),
+    row_chars: z.coerce.number().int().min(1).max(ROW_CHARS_MAX).optional(),
+  })
   .refine((q) => q.before === undefined || q.after === undefined, 'Pass before or after, not both.');
 
 export const referencedHistoryApi = new Hono();
