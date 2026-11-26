@@ -146,6 +146,20 @@ describe('/mcp: the tools', () => {
     expect(got.body.status).not.toMatch(/queued|running/);
   });
 
+  it("leaves the reply out of get_thread with include_reply: false, and cuts it at reply_max_chars", T, async () => {
+    const t = make('Wordy');
+    h.db.events.add(t.id, 'user', { text: 'go' });
+    h.db.events.add(t.id, 'assistant_text', { text: 'Looking around first.' });
+    h.db.events.add(t.id, 'tool_use', { id: 'w1', name: 'Bash', input: {} });
+    h.db.events.add(t.id, 'assistant_text', { text: 'y'.repeat(9_000) });
+    const plain = await tool('get_thread', { thread_id: t.id });
+    expect(plain.body.last_reply).toMatch(/^y{8000}\n\n\[cut: 8000 of 9000 characters shown/);
+    const warmth = await tool('get_thread', { thread_id: t.id, include_reply: false });
+    expect(warmth.body).toMatchObject({ id: t.id, status: 'done', session: { warm: expect.any(Boolean) }, still_working: false });
+    expect(warmth.body).not.toHaveProperty('last_reply');
+    expect((await tool('get_thread', { thread_id: t.id, reply_max_chars: 20_000 })).body.last_reply).toBe('y'.repeat(9_000));
+  });
+
   it('renames, pins and marks a thread done, and refuses an empty update', T, async () => {
     const t = make('Finished', 'failed');
     const r = await tool('update_thread', { thread_id: t.id, title: 'Wrapped up', pinned: true, done: true });

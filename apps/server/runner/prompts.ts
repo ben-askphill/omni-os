@@ -222,7 +222,7 @@ function profileLines(name: string) {
 
 /** Every thread that can delegate follows up on its child threads with the prompt cache in mind (session-warmth.ts). */
 const SESSION_CACHE_RULE =
-  "Before you message a thread you already have, check get_thread's session.warm. A warm thread (running, or its model active within the hour) gets message_thread. " +
+  "Before you message a thread you already have, check get_thread's session.warm (pass include_reply: false: you need its warmth, not its reply again). A warm thread (running, or its model active within the hour) gets message_thread. " +
   'A cold one you do not wake: open a new session with continue_thread on its own harness and a message that carries the follow-up, or delegate a fresh thread whose brief stands alone and links the old one, then say which thread replaced which. ' +
   'message_thread refuses a cold thread unless you pass wake_cold: true, which is only for when you were asked to resume that thread itself. Never wake a cold thread to ask how it went: read it with get_thread.';
 

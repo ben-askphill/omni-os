@@ -4,7 +4,7 @@ import { resolveDelivery } from '../delivery.ts';
 import { events, messageRequests, outbox, reportFollowUps, requestFingerprint, threads, tx, type MessageRequest, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
-import { isCrewReport, type CrewReport } from '@omni/shared/report-shape.ts';
+import { capText, isCrewReport, REPORT_MAX_CHARS, SHOWN_REPORT_MAX_CHARS, type CrewReport } from '@omni/shared/report-shape.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 import { harnessName } from '../harness/registry.ts';
 import { publishThread } from '../bus.ts';
@@ -248,11 +248,13 @@ export const reportHeld: ((threadId: string) => boolean)[] = [];
 /**
  * A report as its parent's harness reads it. A remote child's names the server it ran on. A finished run's earlier
  * messages stay out: its final message is the report. A run that failed or stopped has no final message, so they go in.
+ * Its body is cut at `max` characters with a marker; the card and get_thread still have all of it.
  */
-const reportText = (r: CrewReport) => {
+const reportText = (r: CrewReport, max = REPORT_MAX_CHARS) => {
   const notes = r.status !== 'done' ? (r.notes ?? []) : [];
   const before = notes.length ? `\n\nWhat it said before that:\n\n${notes.join('\n\n')}` : '';
-  return `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'}${r.remote ? ` on ${r.harness_name ?? r.harness} (remote)` : ''} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${r.text}${before}`;
+  const body = capText(`${r.text}${before}`, max, `get_thread on ${r.thread_id} with a higher reply_max_chars reads its final reply`);
+  return `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'}${r.remote ? ` on ${r.harness_name ?? r.harness} (remote)` : ''} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${body}`;
 };
 
 /**
@@ -298,8 +300,9 @@ function withShownReports(threadId: string, m: Msg) {
   if (m.text.trimStart().startsWith('/')) return;
   const shown = messageRequests.shown(threadId).filter((r) => r.id !== m.uuid);
   if (!shown.length) return;
-  // Only fileReport marks a row shown, and it saves the report as the row's payload.
-  const said = shown.map((r) => r.payload).filter(isCrewReport).map(reportText).join('\n\n');
+  // Only fileReport marks a row shown, and it saves the report as the row's payload. The user has read them, so each
+  // goes in as a preview.
+  const said = shown.map((r) => r.payload).filter(isCrewReport).map((r) => reportText(r, SHOWN_REPORT_MAX_CHARS)).join('\n\n');
   m.text = `Crew reports ${userName()} has seen in this thread since your last turn:\n\n${said}\n\n---\n\n${m.text}`;
   for (const r of shown) messageRequests.mark(r.id, 'delivered');
 }

@@ -125,6 +125,16 @@ describe('the Conductor crew tools', () => {
     expect(tools.find((t) => t.name === 'save_crew_role')!.description).toMatch(/^Create an agent or change one, only once .+ agreed in this thread/);
   });
 
+  it('get_thread leaves the reply out for a warmth check', T, async () => {
+    const client = await connect(conductor);
+    const child = thread('builder');
+    events.add(child, 'assistant_text', { text: 'Opened PR #3.' });
+    expect((await tool(client, 'get_thread', { thread_id: child })).body).toMatchObject({ id: child, last_reply: 'Opened PR #3.' });
+    const warmth = (await tool(client, 'get_thread', { thread_id: child, include_reply: false })).body;
+    expect(warmth).toMatchObject({ id: child, status: 'done', session: { warm: expect.any(Boolean) } });
+    expect(warmth).not.toHaveProperty('last_reply');
+  });
+
   it('create a role once Ben agreed, with no powers, which list_crew and Settings > Crew then show and sync sends', T, async () => {
     const relay = new MemoryTransport();
     const worker = sync.createSyncWorker({ transport: relay, machineId: 'mac-a' });
