@@ -14,13 +14,17 @@ export type ChannelGlyph = (typeof CHANNEL_GLYPHS)[number];
 
 export const GLYPH_PREFIX = 'icon:';
 export const SVG_PREFIX = 'svg:';
-/** The most an uploaded SVG may hold once comments and the XML prolog are gone, in characters. */
+/** The most an uploaded SVG may hold once comments, XML prolog and `<metadata>` blocks are gone, in characters. */
 export const SVG_MAX = 20_000;
 
 export type ChannelIcon =
   | { kind: 'glyph'; name: ChannelGlyph }
   | { kind: 'emoji'; text: string }
   | { kind: 'svg'; markup: string };
+
+// Embedded SVG metadata blocks (C2PA manifests, XMP/RDF blocks from Illustrator/Photoshop/Inkscape, etc.) add
+// tens of kilobytes without affecting rendering.
+const SVG_METADATA = /<\s*(?:svg:)?metadata(?:\s(?:"[^"]*"|'[^']*'|[^>"'/])*)?\s*(?:\/>|>[\s\S]*?<\s*\/\s*(?:svg:)?metadata\s*>)/gi;
 
 // Anything that could run, load from elsewhere or expand: scripts, embedded HTML, event handlers, javascript:
 // URLs, links and CSS urls that leave the file, entities. A data:image URL and a #fragment stay.
@@ -35,14 +39,15 @@ const SVG_REFUSED = [
 ];
 
 /**
- * A file's text as the `svg:` value to store, without its BOM, XML prolog and comments. Throws, with a message
- * to show, for a file that is not one SVG, is too big, or holds anything that could run or load.
+ * A file's text as the `svg:` value to store, without its BOM, XML prolog, comments and `<metadata>` blocks.
+ * Throws, with a message to show, for a file that is not one SVG, is too big, or holds anything that could run or load.
  */
 export function readSvgIcon(text: string): string {
   const markup = text
     .replace(/^\uFEFF/, '')
     .replace(/<\?xml[\s\S]*?\?>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(SVG_METADATA, '')
     .trim();
   if (!/^<svg[\s>]/i.test(markup) || !/<\/svg>$/i.test(markup)) throw new Error('That file is not an SVG.');
   if (markup.length > SVG_MAX) throw new Error(`That SVG is too big: keep it under ${SVG_MAX / 1000} KB.`);
@@ -121,7 +126,10 @@ export function scaleSvgIcon(markup: string, percent: number): string {
 export function sameIcon(a: string | null | undefined, b: string | null | undefined): boolean {
   const unsized = (v: string | null | undefined) => {
     const t = v?.trim() ?? '';
-    return t.startsWith(SVG_PREFIX) ? scaleSvgIcon(t.slice(SVG_PREFIX.length), SVG_SCALE_DEFAULT) : t;
+    if (!t.startsWith(SVG_PREFIX)) return t;
+    const parsed = parseChannelIcon(t);
+    const markup = parsed?.kind === 'svg' ? parsed.markup : t.slice(SVG_PREFIX.length);
+    return scaleSvgIcon(markup, SVG_SCALE_DEFAULT);
   };
   return unsized(a) === unsized(b);
 }

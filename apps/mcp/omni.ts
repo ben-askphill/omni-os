@@ -1,7 +1,6 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
 // so delegated threads are ordinary threads the user can open, search and continue.
 import { randomUUID } from 'node:crypto';
-import { accessLevelOf, accessSummary, connectorAccessOf } from '@omni/shared/access.ts';
 import { agentColor, agentFace, agentShape, type FaceAgent } from '@omni/shared/agent-avatar.ts';
 import { skillRows } from '@omni/shared/agent-skills.ts';
 import { AGENT_PALETTE } from '@omni/shared/avatar-color.ts';
@@ -17,6 +16,7 @@ import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/mach
 import type { MachinePick } from '@omni/shared/machine-pick.ts';
 import { compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
 import { ApiError, call, SELF, text } from './api.ts';
+import { channelDetail, channelIndexRow, LIST_CHANNELS_DESCRIPTION, listChannelsInput } from './channels.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
 import { resolveDevice } from './device-pick.ts';
@@ -41,10 +41,6 @@ const basePick = (base?: string) => {
   return name === 'head' || name === 'remote-default' ? { kind: name } : { kind: 'ref', ref: name };
 };
 
-/** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
-const folderSummary = (folders: any[] = []) =>
-  folders.map((f: any) => compactRow({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t: any) => t.title) }));
-
 /**
  * The folder `name` names in the channel, by id or name ignoring case. With `create` a name no folder has is fine:
  * the server makes it. Without it, an unknown name is refused, so a new folder only ever comes after the user agreed to it.
@@ -64,31 +60,14 @@ async function checkFolder(channel: string, name: string, create?: boolean) {
 server.registerTool(
   'list_channels',
   {
-    description:
-      'List Omni channels (one per client or project) with repo, store, running thread count, sidebar folders and, when set, what new worktrees copy or share from the main checkout. ' +
-      'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in. ' +
-      '`access` says what agents there may do without a yes (Read only, Ask first, Full access, and any account set apart). Only the user changes it, in Channel settings.',
+    description: LIST_CHANNELS_DESCRIPTION,
+    inputSchema: listChannelsInput,
   },
-  async () => {
+  async ({ channel }) => {
+    const id = channel?.trim();
+    if (id) return text(channelDetail(await call(`/channels/${encodeURIComponent(id)}`)));
     const list = await call('/channels');
-    return text(
-      list.map((c: any) =>
-        compactRow({
-          id: c.id,
-          name: c.name,
-          kind: c.kind,
-          store: c.store_domain,
-          repo: c.github_repo,
-          running: c.running,
-          notes: c.notes,
-          // What each new worktree gets from the main checkout beyond the repo's .worktreeinclude: copied files, linked folders.
-          ...(c.worktree_include ? { copy_into_worktrees: c.worktree_include.split('\n') } : {}),
-          ...(c.worktree_shared ? { shared_directories: c.worktree_shared.split('\n') } : {}),
-          folders: folderSummary(c.folders),
-          access: accessSummary(accessLevelOf(c.access_level ?? c.access_default), connectorAccessOf(c.connector_access)),
-        }),
-      ),
-    );
+    return text(list.map(channelIndexRow));
   },
 );
 
@@ -1639,7 +1618,10 @@ server.registerTool('tool_failures', {
 server.registerTool('insights', {
   description: "The Inbox dashboard's numbers for a range: tokens and cost per harness, model and day from the local session logs (and Cursor's billing), threads marked done, busiest channels, open PRs and today's automation runs. usage.complete is false while the first log scan still runs.",
   inputSchema: { range: z.enum(['today', '7d', '30d']).default('30d') },
-}, async ({ range }) => text(await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`)));
+}, async ({ range }) => {
+  const data = await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`);
+  return text(Array.isArray(data?.channels) ? { ...data, channels: data.channels.map(({ icon: _icon, ...c }: Record<string, unknown>) => c) } : data);
+});
 
 server.registerTool('triage_tool_failure', {
   description: 'Record tool failure remediation status and safe human-written fix/replacement/avoidance guidance. Call tool_failures with group_id first to read existing guidance. Never include raw errors, arguments, private data or credentials. Does not disable tools. A later failure reopens a fixed group.',

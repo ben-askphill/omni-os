@@ -8,6 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
+import { channelDetail, channelIndexRow, LIST_CHANNELS_DESCRIPTION, listChannelsInput } from '../channels.ts';
 import { prList, prListInput, PR_LIST_DESCRIPTION } from '../pull-requests.ts';
 import { isConductor } from '@omni/shared/crew-role.ts';
 import { compactJson, compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
@@ -70,24 +71,15 @@ export function registerExternalTools(server: McpServer, call: Call) {
   server.registerTool(
     'list_channels',
     {
-      description: 'List Omni channels (one per client or project) with repo, Shopify store, notes, running thread count and sidebar folders.',
+      description: LIST_CHANNELS_DESCRIPTION,
+      inputSchema: listChannelsInput,
       annotations: { readOnlyHint: true },
     },
-    async () =>
-      text(
-        (await call('/channels')).map((c: any) =>
-          compactRow({
-            id: c.id,
-            name: c.name,
-            kind: c.kind,
-            repo: c.github_repo,
-            store: c.store_domain,
-            running: c.running,
-            notes: c.notes,
-            folders: (c.folders ?? []).map((f: any) => compactRow({ id: f.id, name: f.name, threads: f.count })),
-          }),
-        ),
-      ),
+    async ({ channel }) => {
+      const id = channel?.trim();
+      if (id) return text(channelDetail(await call(`/channels/${encodeURIComponent(id)}`)));
+      return text((await call('/channels')).map(channelIndexRow));
+    },
   );
 
   server.registerTool(

@@ -25,10 +25,37 @@ describe('channel icons', () => {
     expect(parseChannelIcon(value)).toEqual({ kind: 'svg', markup: value.slice(4) });
   });
 
+  it('strips <metadata> blocks (C2PA manifests, XMP/RDF, self-closing, namespaced) before size checks', () => {
+    const c2paPayload = 'A'.repeat(SVG_MAX + 5_000);
+    const c2paSvg =
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:c2pa="http://c2pa.org/manifest" viewBox="0 0 24 24">` +
+      `<metadata id="c2pa" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><c2pa:manifest>${c2paPayload}</c2pa:manifest></metadata>` +
+      `<path d="M2 2h20v20H2z" fill="#283c62"/>` +
+      `<metadata/>` +
+      `<svg:metadata id="xmp"><rdf:RDF>xmp</rdf:RDF></svg:metadata>` +
+      `</svg>`;
+    expect(c2paSvg.length).toBeGreaterThan(SVG_MAX);
+
+    const stored = readSvgIcon(c2paSvg);
+    const expected = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:c2pa="http://c2pa.org/manifest" viewBox="0 0 24 24"><path d="M2 2h20v20H2z" fill="#283c62"/></svg>';
+    expect(stored).toBe(`svg:${expected}`);
+    expect(stored).not.toMatch(/<metadata/i);
+    expect(stored.length).toBeLessThan(300);
+    expect(parseChannelIcon(stored)).toEqual({ kind: 'svg', markup: expected });
+    expect(sameIcon(`svg:${c2paSvg}`, stored)).toBe(true);
+    expect(sameIcon(`svg:${c2paSvg}`, `svg:${scaleSvgIcon(expected, 80)}`)).toBe(true);
+
+    // Elements merely starting with "metadata-" are untouched.
+    const unrelated = '<svg viewBox="0 0 24 24"><metadata-note>ok</metadata-note><circle r="5"/></svg>';
+    expect(readSvgIcon(unrelated)).toBe(`svg:${unrelated}`);
+  });
+
   it('refuses SVGs that could run, load or are not SVGs', () => {
     const wrap = (inner: string) => `<svg xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
     const refused = [
       wrap('<script>alert(1)</script>'),
+      wrap('<scr<metadata></metadata>ipt>alert(1)</script>'),
+      wrap('<metadata><![CDATA[</metadata><script>alert(1)</script>]]></metadata>'),
       wrap('<foreignObject><div/></foreignObject>'),
       '<svg onload="alert(1)"></svg>',
       wrap('<a href="javascript:alert(1)"><circle r="1"/></a>'),
