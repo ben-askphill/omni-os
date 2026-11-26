@@ -16,6 +16,7 @@ import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/mach
 import type { MachinePick } from '@omni/shared/machine-pick.ts';
 import { compactRow, compactRows } from '@omni/shared/mcp-compact.ts';
 import { ApiError, call, SELF, text } from './api.ts';
+import { compactAutomations, compactHarnesses, compactSettings, compactThreads } from './compact-lookups.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
 import { resolveDevice } from './device-pick.ts';
@@ -584,27 +585,7 @@ server.registerTool(
   },
   async ({ channel }) => {
     const list = localHarnesses<{ id: string }>(await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses'));
-    return text(
-      list.map((h: any) =>
-        compactRow(
-          {
-            id: h.id,
-            name: h.name,
-            plan: h.plan,
-            available: h.available,
-            fix: h.available ? undefined : h.fix,
-            cap: h.cap,
-            running: h.running,
-            // What it cannot do, so a brief does not lean on it: a remote harness has no steer or tool limits, say.
-            capabilities: h.capabilities
-              ? compactRow({ steer: h.capabilities.steer, interrupt: h.capabilities.interrupt, remote: h.capabilities.remote, tool_limits: h.capabilities.toolLimits }, ['steer', 'interrupt', 'tool_limits'])
-              : undefined,
-            models: (h.models ?? []).map((m: any) => compactRow({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default, hidden: m.hidden, note: m.note })),
-          },
-          ['available'],
-        ),
-      ),
-    );
+    return text(compactHarnesses(list));
   },
 );
 
@@ -949,15 +930,7 @@ server.registerTool(
     if (status) q.set('status', status);
     q.set('limit', String(limit ?? 20));
     const list = await call(`/threads?${q}`);
-    return text(
-      list.map((t: any) =>
-        compactRow({
-          id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, delegating: t.delegating, task_id: t.task_id, updated_at: t.updated_at,
-          // A group thread's agents (ADR 0019), by name, the lead first.
-          ...(t.members?.length && { members: t.members.map((m: { name: string }) => m.name) }),
-        }),
-      ),
-    );
+    return text(compactThreads(list, { channel, status }));
   },
 );
 
@@ -1352,40 +1325,15 @@ server.registerTool(
     refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
 );
 
-/** An automation as list_automations shows it: what it runs, when, and how its last runs went. No YAML path, no deliveries. */
-const automationSummary = (a: any) =>
-  compactRow(
-    {
-      id: a.id,
-      name: a.name,
-      enabled: a.enabled,
-      ...(a.on ? { on: a.on } : { cron: a.cron, timezone: a.timezone, next: a.next ?? null }),
-      channel: a.channel,
-      // The machine its YAML names, where it runs now (a sync id, and whether that is this machine), and where its YAML comes from.
-      ...(a.machine && { machine: a.machine }),
-      ...(a.runs_on && { runs_on: a.runs_on }),
-      ...(a.source && { source: a.source }),
-      ...(a.role && { role: a.role }),
-      ...(a.harness && { harness: a.harness }),
-      ...(a.model && { model: a.model }),
-      ...(a.effort && { effort: a.effort }),
-      prompt: a.prompt.length > 200 ? `${a.prompt.slice(0, 200)}…` : a.prompt,
-      ...(a.error && { error: a.error }),
-      ...(a.poll_error && { poll_error: a.poll_error }),
-      last_runs: (a.runs ?? []).slice(0, 3).map((r: any) => compactRow({ thread_id: r.thread_id, trigger: r.trigger, at: r.created_at, status: r.status })),
-    },
-    ['enabled'],
-  );
-
 server.registerTool(
   'list_automations',
   {
     description:
-      'List the automations on this machine: id, name, enabled, its schedule (cron, timezone, next run) or event trigger (on), channel, agent (role) and run defaults, ' +
+      'List the automations on this machine: id, name, enabled (false when disabled), schedule (cron, timezone, next) or event trigger (on), channel, agent (role) and run defaults, ' +
       'the start of its prompt, any error that stops it running, and its last three runs with their thread ids. Event deliveries are list_automation_deliveries.',
     inputSchema: {},
   },
-  async () => text((await call('/automations')).map(automationSummary)),
+  async () => text(compactAutomations(await call('/automations'))),
 );
 
 server.registerTool(
@@ -1526,8 +1474,7 @@ server.registerTool('settings', {
     call('/analytics').catch(() => null),
     call('/usage-panel').catch(() => null),
   ]);
-  const { automations: _automations, ...config } = setup.config;
-  return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options, display, analytics, usage_panel: usagePanel });
+  return text(compactSettings({ setup, server, display, analytics, usagePanel }));
 });
 
 server.registerTool('signed_in_devices', {
