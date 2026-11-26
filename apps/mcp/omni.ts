@@ -1595,7 +1595,10 @@ server.registerTool('tool_failures', {
 server.registerTool('insights', {
   description: "The Inbox dashboard's numbers for a range: tokens and cost per harness, model and day from the local session logs (and Cursor's billing), threads marked done, busiest channels, open PRs and today's automation runs. usage.complete is false while the first log scan still runs.",
   inputSchema: { range: z.enum(['today', '7d', '30d']).default('30d') },
-}, async ({ range }) => text(await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`)));
+}, async ({ range }) => {
+  const data = await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`);
+  return text(Array.isArray(data?.channels) ? { ...data, channels: data.channels.map(({ icon: _icon, ...c }: Record<string, unknown>) => c) } : data);
+});
 
 server.registerTool('triage_tool_failure', {
   description: 'Record tool failure remediation status and safe human-written fix/replacement/avoidance guidance. Never include raw errors, arguments, private data or credentials. Does not disable tools. A later failure reopens a fixed group.',
