@@ -33,9 +33,11 @@ import { treeLabel } from '../../thread-tree.ts';
  * (the check on hover, or E on the selected card) moves it to Done, as Settle does in T3. `links`: the Workspace
  * links at the foot, which the classic sidebar needs and the rail has discs for. `variant`: 'card' is the classic
  * sidebar's three-line cards; 'row' is the rail's one-line 30px rows, whose detail is in the card shown on hover and
- * focus. `collapsed` (rows only): the rail's Collapsed list, marks and avatars with their text hidden.
+ * focus. `collapsed` (rows only): the rail's Collapsed list, marks and avatars with their text hidden. `head`: rows
+ * above the shelves (the rail's Search and New thread). They go inside this full-height column, not beside it in the
+ * scroll box, or the list is that much taller than its box and scrolls with nothing to show.
  */
-export function InboxView({ onNavigate, links = true, variant = 'card', collapsed = false }: { onNavigate?: () => void; links?: boolean; variant?: 'card' | 'row'; collapsed?: boolean }) {
+export function InboxView({ onNavigate, links = true, variant = 'card', collapsed = false, head }: { onNavigate?: () => void; links?: boolean; variant?: 'card' | 'row'; collapsed?: boolean; head?: ReactNode }) {
   const { channels, tasks } = useApp();
   const markDone = useMarkDone();
   const { pinned, inbox, needs, finished, working, done, loaded, openId, status } = useInbox();
@@ -59,6 +61,7 @@ export function InboxView({ onNavigate, links = true, variant = 'card', collapse
 
   return (
     <div className="flex min-h-full flex-col">
+      {head}
       {pinned.length > 0 && <div className="space-y-px pb-3">{pinned.map((t) => card(t, true))}</div>}
       {needs.length > 0 && (
         <div className="space-y-px pb-3">
