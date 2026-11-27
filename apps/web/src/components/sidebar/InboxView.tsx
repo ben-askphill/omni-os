@@ -296,9 +296,10 @@ function InboxCard({
 
 /**
  * The rail's Inbox row: one 30px line, the thread's mark, its lead avatar, its title and, at the end, the time (or the
- * status word while it runs). What the card shows beyond that, the channel, the step, the machine and run time and a
- * job's tally, is in the card shown on hover and keyboard focus, expanded and collapsed alike. Collapsed, the title and
- * time hide and the actions and the job's tree go; `E` still marks the focused row done (`data-inbox-thread`).
+ * status word while it runs). A job has its tally and chevron before the time, which open and close its tree, running
+ * or finished. What the card shows beyond that, the channel, the step, the machine and run time, is in the card shown
+ * on hover and keyboard focus, expanded and collapsed alike. Collapsed, the title and time hide and the actions and the
+ * job's tree go; `E` still marks the focused row done (`data-inbox-thread`).
  */
 function InboxRow({ t, channel, status, agents, active, pinned, onNavigate, collapsed }: { t: RowThread; channel: ChannelOf; status: RowStatus | null; agents?: BackgroundTask[]; active: boolean; pinned: boolean; onNavigate?: () => void; collapsed: boolean }) {
   const { setPinned } = useApp();
@@ -344,6 +345,10 @@ function InboxRow({ t, channel, status, agents, active, pinned, onNavigate, coll
     { side: 'right', variant: 'card' },
   );
   const cardTree = !collapsed && (tree || own.length > 0);
+  const toggle = !collapsed && tree;
+  // The toggle sits over its space in the link, before the time. A pinned row's two actions cover more than a short
+  // status word on hover, so its time holds their width and they never reach the toggle.
+  const time = `crow-time shrink-0 font-num tabular-nums ${toggle && pinned ? 'min-w-10 text-right' : ''}`;
   return (
     <div className="tree-group group/row grid grid-cols-1" data-inbox-thread={t.id}>
       <a
@@ -368,9 +373,18 @@ function InboxRow({ t, channel, status, agents, active, pinned, onNavigate, coll
         </span>
         <span className="crow-x min-w-0 flex-1 truncate">{title}</span>
         {pinned && !collapsed && <Icon name="pin" size={11} className="shrink-0 text-fg-3" />}
-        <span className="crow-x crow-time shrink-0 font-num tabular-nums md:group-focus-within/row:invisible md:group-hover/row:invisible">{when}</span>
+        {toggle && <TreeToggleSpace tree={toggle} className="h-6 px-1" />}
+        <span className={`crow-x ${time} md:group-focus-within/row:invisible md:group-hover/row:invisible`}>{when}</span>
       </a>
       {card.tip}
+      {toggle && (
+        <span className="pointer-events-none z-[2] flex items-center gap-1.5 self-center justify-self-end pr-2.5 [grid-area:1/1]">
+          <TreeToggle tree={toggle} title={title} className="pointer-events-auto h-6 px-1" />
+          <span aria-hidden className={`invisible ${time}`}>
+            {when}
+          </span>
+        </span>
+      )}
       {!collapsed && (
         <span className="z-[2] mr-1 flex items-center gap-0.5 self-center justify-self-end [grid-area:1/1] opacity-100 transition-opacity md:opacity-0 md:group-focus-within/row:opacity-100 md:group-hover/row:opacity-100">
           {pinned && <RowAction icon="pin" label={`Unpin ${title}`} onClick={() => void setPinned(t, false).catch(() => {})} />}
