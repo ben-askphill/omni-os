@@ -242,7 +242,7 @@ Requirements, each with where it is enforced:
 
 ## 13. Open questions for Ben
 
-Answered by Ben on 2026-11-27: 1 free Zen only, 2 Claude parity, 3 moot with free Zen only (no key, and Go is out), 4 yes, pin the model, 5 v2 only, 6 show it and wait (no silent move), 7 show reasoning as the thinking line, 8 just `omni`, 9 confirmed, skip the custom route. Section 17 phases 3 and 5 follow from these: Phase 5 keeps only the thinking line and `opencode serve` as optional, and no Go or key mode is planned. The questions stay below as asked.
+Answered by Ben on 2026-11-27: 1 free Zen only, 2 Claude parity, 3 moot with free Zen only (no key, and Go is out), 4 yes, pin the model, 5 v2 only, 6 show it and wait (no silent move), 7 show reasoning as the thinking line, 8 just `omni`, 9 confirmed, skip the custom route. Section 17 follows from these: the thinking line moves into Phase 2 (map `agent_thought_chunk`), Phase 5 keeps only `opencode serve` as optional, and no Go or key mode is planned. The questions stay below as asked.
 
 1. **Subscription-only runners versus a free API tier.** The rule is written down in [GLOSSARY.md](../../GLOSSARY.md) ("every local agent runs on the user's own subscriptions through an official CLI"), in the environment guard's header (it strips keys that "switch that harness off its subscription onto API billing"), and in the harnesses guide (a Codex API-key login reads as signed out). I did not find it as a dated decision, only as these. Hermes already bills an Anthropic key, so it has an exception. The free Zen tier is a third thing: no plan and no key. Which of these?
    - A. Free Zen only, no key ever, and the rule is amended to say "or a free tier that needs no account". My recommendation.
