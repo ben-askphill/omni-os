@@ -18,6 +18,7 @@ import { currentRun, pickedModelRun, shownRun, threadChoice, threadRunLabels } f
 import type { Run } from '@omni/shared/run-switch.ts';
 import { useDictation, withPhrase } from './dictation.ts';
 import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
+import { freeLimits, usePickModelRequest } from '../limits.ts';
 import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { bottomInset, MoDiff, MoRound } from './parts.tsx';
@@ -84,6 +85,12 @@ export function MoComposer({
   const accounts = useAccounts();
   const [switching, setSwitching] = useState(false);
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
+  // A gone-model or free-limit card's Switch model opens the run sheet, as `/model` does.
+  usePickModelRequest(thread.id, () => {
+    if (!harnesses || remoteLead) return;
+    reload();
+    setRunSheet(true);
+  });
   const technical = useTechnical();
   const att = useAttachments();
   const context = useDraftContext(thread.id);
@@ -340,6 +347,7 @@ export function MoComposer({
           onChange={(c, e) => void switchRun(c, e)}
           onClose={() => setRunSheet(false)}
           accounts={pickerAccounts(accounts.data, 'here')}
+          limits={freeLimits(thread)}
         />
       )}
     </div>

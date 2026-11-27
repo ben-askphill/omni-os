@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { api, errorText, type PendingMsg, type Thread } from '../../api.ts';
-import { LIMIT_ACTION as ACTION, limitView, type LimitAction } from '../../limits.ts';
+import { api, errorText, type HarnessWithRunning, type PendingMsg, type Thread } from '../../api.ts';
+import { LIMIT_ACTION as ACTION, limitView, pickModelFor, type LimitAction } from '../../limits.ts';
+import { goneModel } from '@omni/shared/model-visibility.ts';
 import { useNow } from '../../store.tsx';
 import { harnessLabel } from '../brand.tsx';
 import { Button, ErrorNote, Icon } from '../ui.tsx';
@@ -18,6 +19,8 @@ export function LimitCard({ thread, onChanged }: { thread: Thread; onChanged: (t
   const scheduled = thread.limit_state === 'scheduled';
 
   const act = async (a: LimitAction) => {
+    // Another model: the composer's picker opens, and nothing is posted until a model is picked there.
+    if (a === 'switch') return pickModelFor(thread.id);
     setBusy(a);
     setError(null);
     try {
@@ -59,6 +62,37 @@ export function LimitCard({ thread, onChanged }: { thread: Thread; onChanged: (t
         </div>
       </div>
       {error && <ErrorNote className="mx-3 mb-3">{error}</ErrorNote>}
+    </section>
+  );
+}
+
+/**
+ * The thread's model is no longer offered by its harness (OpenCode Zen's free models are free "for a limited time"):
+ * the run waits for a pick, and nothing switches on its own. Null while the model is listed.
+ */
+export function ModelGoneCard({ thread, harnesses }: { thread: Thread; harnesses: HarnessWithRunning[] | null | undefined }) {
+  const harness = harnesses?.find((h) => h.id === thread.harness);
+  const gone = goneModel(harness, thread.model);
+  if (!harness || !gone) return null;
+  const title = `${gone.label} is gone`;
+  return (
+    <section aria-label={title} role="status" className="pop-in mt-5 overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-needs">
+          <Icon name="alert" size={15} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[14px] leading-snug font-medium">{title}</h3>
+          <p className="mt-0.5 text-[12.5px] leading-[1.5] text-pretty text-fg-3">
+            {harness.name} no longer offers this model. Pick another, then send your message again. Nothing switches on its own.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <Button size="sm" variant="primary" icon="sliders" onClick={() => pickModelFor(thread.id)}>
+              Pick a model
+            </Button>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

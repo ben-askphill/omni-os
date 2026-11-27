@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { useApi, type BackgroundTask, type Channel, type HarnessWithRunning, type Thread } from '../../../api.ts';
-import { threadRunLabels } from '@omni/shared/thread-run.ts';
+import { runModel, threadRunLabels } from '@omni/shared/thread-run.ts';
+import { goneModel } from '@omni/shared/model-visibility.ts';
+import { ModelTag } from '../../model-picker/ModelList.tsx';
 import { AgentAvatar, useAgent } from '../../AgentAvatar.tsx';
 import { HarnessMark } from '../../brand.tsx';
 import { Chip, CopyButton, Icon, StatusDot } from '../../ui.tsx';
@@ -156,6 +158,9 @@ export function DetailsTab({
   // The composer's model pill reads these too, so Details names the model and effort the same way.
   const run = threadRunLabels(thread, harnesses);
   const slug = thread.model || init?.model;
+  // OpenCode's free models carry a Free tag, and one its harness dropped says Gone, as in the pickers.
+  const { harness: runHarness, model: runEntry } = runModel(thread, harnesses);
+  const modelTag = goneModel(runHarness, thread.model) ? 'Gone' : runEntry?.free ? 'Free' : null;
   // agy's and OpenCode's ACP sessions have no terminal command that opens them, so they get no card rather than Claude's.
   const terminalResume = thread.harness !== 'antigravity' && thread.harness !== 'opencode';
   const resume = runsElsewhere || !terminalResume ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
@@ -183,6 +188,7 @@ export function DetailsTab({
         </Row>
         <Row k="Model">
           {run.model}
+          {modelTag && <ModelTag className="ml-1.5">{modelTag}</ModelTag>}
           {slug && slug !== run.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">{slug}</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">({init.model})</span>}
         </Row>

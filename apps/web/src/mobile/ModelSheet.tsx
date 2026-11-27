@@ -5,7 +5,8 @@ import { Icon } from '../components/ui.tsx';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { modelOf, type ModelChoice } from '../components/ModelPicker.tsx';
 import { AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
-import { pickerModels } from '@omni/shared/model-visibility.ts';
+import { goneModel, pickerModels } from '@omni/shared/model-visibility.ts';
+import { ModelTag, modelNote, type ListedModel } from '../components/model-picker/ModelList.tsx';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 import { localHarnesses } from '@omni/shared/remote-agent.ts';
 
@@ -14,6 +15,8 @@ export function runLabel(harnesses: HarnessWithRunning[] | undefined, choice: Mo
   if (!harnesses) return 'Model';
   if (asksAuto(choice)) return 'Auto';
   const { harness, model } = modelOf(harnesses, choice);
+  const gone = model ? null : goneModel(harness, choice.model);
+  if (gone) return `${gone.label} · gone`;
   const level = effort || model?.defaultEffort;
   return [model?.label ?? harness?.name ?? choice.harness, level].filter(Boolean).join(' · ');
 }
@@ -31,6 +34,7 @@ export function ModelSheet({
   onClose,
   offerAuto = true,
   accounts,
+  limits,
 }: {
   harnesses: HarnessWithRunning[];
   choice: ModelChoice;
@@ -41,6 +45,8 @@ export function ModelSheet({
   offerAuto?: boolean;
   /** Who each harness runs as on the machine the thread runs on: named in each harness's heading. */
   accounts?: PickerAccounts | null;
+  /** A harness stopped at its free limit, by id: a line above its list, as "Free limit. Back tomorrow 01:42". */
+  limits?: Record<string, string>;
 }) {
   const { model, efforts } = modelOf(harnesses, choice);
   const title = 'Model and effort';
@@ -89,7 +95,10 @@ export function ModelSheet({
         {localHarnesses(harnesses).map((h) => {
           const account = h.available ? accounts?.byHarness[h.id] : undefined;
           // Models hidden in Settings stay out, except the one already picked.
-          const models = pickerModels(h.models, h.id === choice.harness ? choice.model : null);
+          const models: ListedModel[] = pickerModels(h.models, h.id === choice.harness ? choice.model : null);
+          // The thread's own model, gone from the list: shown so the pick is explained, never pickable.
+          const gone = h.id === choice.harness ? goneModel(h, choice.model) : null;
+          if (gone) models.push(gone);
           return (
             <MoSection
               key={h.id}
@@ -105,29 +114,48 @@ export function ModelSheet({
                 )
               }
             >
+              {h.available && limits?.[h.id] && (
+                <p className="m-0 flex items-center gap-1.5 px-1 text-[12.5px] text-fg-2">
+                  <Icon name="gauge" size={13} className="shrink-0 text-warn" />
+                  {limits[h.id]}
+                </p>
+              )}
               <MoGroup>
                 {h.available ? (
-                  models.map((m, i) => (
-                    <MoListRow
-                      key={m.id}
-                      icon={
-                        <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg">
-                          <HarnessLogo harness={h.id} size={13} />
-                        </span>
-                      }
-                      label={
-                        <>
-                          {m.label}
-                          {m.default && <span className="text-fg-3"> (default)</span>}
-                        </>
-                      }
-                      sub={m.note || undefined}
-                      right={<MoRadio on={h.id === choice.harness && m.id === choice.model} />}
-                      onClick={() => onChange({ harness: h.id, model: m.id }, '')}
-                      chevron={false}
-                      last={i === models.length - 1}
-                    />
-                  ))
+                  models.map((m, i) => {
+                    const note = modelNote(m, h.name);
+                    // At phone width the Free or Gone tag leads the note line rather than trailing the name.
+                    const tag = m.gone ? 'Gone' : m.free ? 'Free' : null;
+                    return (
+                      <MoListRow
+                        key={m.id}
+                        icon={
+                          <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg">
+                            <HarnessLogo harness={h.id} size={13} />
+                          </span>
+                        }
+                        label={
+                          <span className={m.gone ? 'text-fg-3' : undefined}>
+                            {m.label}
+                            {m.default && !m.gone && <span className="text-fg-3"> (default)</span>}
+                          </span>
+                        }
+                        sub={
+                          tag || note ? (
+                            <>
+                              {tag && <ModelTag className="mr-1.5">{tag}</ModelTag>}
+                              {note}
+                            </>
+                          ) : undefined
+                        }
+                        right={<MoRadio on={h.id === choice.harness && m.id === choice.model} />}
+                        onClick={m.gone ? undefined : () => onChange({ harness: h.id, model: m.id }, '')}
+                        disabled={m.gone}
+                        chevron={false}
+                        last={i === models.length - 1}
+                      />
+                    );
+                  })
                 ) : (
                   <MoListRow label="Not available" sub={h.fix || 'Install and log in on the machine Omni runs on'} chevron={false} last />
                 )}

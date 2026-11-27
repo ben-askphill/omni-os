@@ -1,5 +1,6 @@
 // A turn stopped at the harness's usage limit (apps/server/runner/limits.ts), from the Web UI's side: when it resets and
 // what the card offers.
+import { useEffect, useRef } from 'react';
 import { clock } from '@omni/shared/format.ts';
 import type { Thread } from './api.ts';
 
@@ -29,14 +30,57 @@ export function limitLabel(thread: Pick<Thread, 'limit_state' | 'limit_resets_at
   return `Limited · ${thread.limit_state === 'scheduled' ? 'resumes' : 'resets'} ${at}`;
 }
 
-export type LimitAction = 'schedule' | 'cancel' | 'resume';
+/** `switch` opens the thread's model picker (pickModelFor) and calls no route: the others post to the server. */
+export type LimitAction = 'schedule' | 'cancel' | 'resume' | 'switch';
 
 /** Each action's button and its route under /threads/:id/limit/. */
-export const LIMIT_ACTION: Record<LimitAction, { label: string; icon: 'clock' | 'play' | 'x'; path: string }> = {
+export const LIMIT_ACTION: Record<LimitAction, { label: string; icon: 'clock' | 'play' | 'x' | 'sliders'; path: string }> = {
   schedule: { label: 'Resume at reset', icon: 'clock', path: 'schedule' },
   cancel: { label: 'Cancel', icon: 'x', path: 'cancel' },
   resume: { label: 'Resume now', icon: 'play', path: 'resume' },
+  switch: { label: 'Switch model', icon: 'sliders', path: '' },
 };
+
+/** Ask the thread's composer to open its model picker: the free limit's Switch model, a gone model's Pick a model. */
+export const PICK_MODEL_EVENT = 'omni:pick-model';
+export function pickModelFor(threadId: string) {
+  window.dispatchEvent(new CustomEvent(PICK_MODEL_EVENT, { detail: { threadId } }));
+}
+
+/** Run `open` when a card asks this thread's composer for its model picker (pickModelFor). */
+export function usePickModelRequest(threadId: string, open: () => void) {
+  const latest = useRef(open);
+  latest.current = open;
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ threadId?: string }>).detail?.threadId === threadId) latest.current();
+    };
+    window.addEventListener(PICK_MODEL_EVENT, on);
+    return () => window.removeEventListener(PICK_MODEL_EVENT, on);
+  }, [threadId]);
+}
+
+/** Harnesses whose limit is a free tier's, not a plan's: their card offers another model first. */
+const FREE_TIER = new Set(['opencode']);
+
+/** The picker's line under a harness at its free limit: "Free limit. Back tomorrow 01:42". Null for any other stop. */
+export function freeLimitLine(thread: Pick<Thread, 'harness' | 'limit_state' | 'limit_resets_at'>, now = Date.now()): string | null {
+  if (!thread.limit_state || !FREE_TIER.has(thread.harness)) return null;
+  const at = thread.limit_resets_at ? resetLabel(thread.limit_resets_at, now) : null;
+  return at ? `Free limit. Back ${at}` : 'Free limit';
+}
+
+/** The `limits` a thread's model picker takes: its harness's free-limit line while the thread is stopped at it. */
+export function freeLimits(thread: Pick<Thread, 'harness' | 'limit_state' | 'limit_resets_at'>, now = Date.now()): Record<string, string> | undefined {
+  const line = freeLimitLine(thread, now);
+  return line ? { [thread.harness]: line } : undefined;
+}
+
+/** ", in about 15 hours" for a reset more than an hour away. */
+function inAbout(iso: string, now: number): string {
+  const h = Math.round((Date.parse(iso) - now) / 3_600_000);
+  return h > 1 ? `, in about ${h} hours` : '';
+}
 
 export interface LimitView {
   title: string;
@@ -50,7 +94,7 @@ export interface LimitView {
  * shown: that Mac ran the turn and is the one that resumes it.
  */
 export function limitView(
-  thread: Pick<Thread, 'limit_state' | 'limit_resets_at'> & { limit_elsewhere?: number },
+  thread: Pick<Thread, 'limit_state' | 'limit_resets_at'> & { limit_elsewhere?: number; harness?: string },
   harness: string,
   now = Date.now(),
 ): LimitView | null {
@@ -63,6 +107,20 @@ export function limitView(
       body: `${harness} stopped this turn at your plan's limit on your other machine. ${when} Resume it there.`,
       actions: [],
     };
+  }
+  // A free tier (OpenCode Zen) can be out for about 15 hours: another model comes first, and nothing switches by itself.
+  if (thread.harness && FREE_TIER.has(thread.harness)) {
+    if (thread.limit_state === 'scheduled' && at) {
+      return { title: `Resumes ${at}`, body: 'Omni continues this thread once the free limit resets. A new message, Stop or Archive cancels it.', actions: ['switch', 'cancel'] };
+    }
+    if (at) {
+      return {
+        title: 'Free limit reached',
+        body: `${harness}'s free tier stopped this turn. It resets ${at}${inAbout(thread.limit_resets_at!, now)}. Switch model to keep going now.`,
+        actions: ['switch', 'schedule'],
+      };
+    }
+    return { title: 'Free limit reached', body: `${harness}'s free tier stopped this turn and did not say when it resets. Switch model to keep going now.`, actions: ['switch', 'resume'] };
   }
   if (thread.limit_state === 'scheduled' && at) {
     return {

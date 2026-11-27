@@ -83,12 +83,20 @@ beforeAll(async () => {
 describe('the harness list', () => {
   it('lists OpenCode as a free Zen harness, ready, with the Zen models and the preferred one first', async () => {
     const h = await checkNow();
-    expect(h).toMatchObject({ name: 'OpenCode', plan: 'Free OpenCode Zen models', available: true });
+    expect(h).toMatchObject({ name: 'OpenCode', plan: 'Free, no account', available: true });
     expect(h.capabilities).toMatchObject({ warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'none', remote: false });
     expect(h.fix).toBeUndefined();
     const ids = h.models.map((m: { id: string }) => m.id);
     expect(ids).toContain('opencode/deepseek-v4.1-flash-free');
     expect(h.models.find((m: { id: string }) => m.id === 'opencode/deepseek-v4.1-flash-free').efforts).toEqual(expect.arrayContaining(['low', 'medium', 'high']));
+  });
+
+  it('tags the free Zen models Free and limited time, with the name OpenCode gave them less its own "Free"', async () => {
+    const h = await checkNow();
+    const deepseek = h.models.find((m: { id: string }) => m.id === 'opencode/deepseek-v4.1-flash-free');
+    expect(deepseek).toMatchObject({ free: true, limited: true, note: 'Zero retention' });
+    expect(deepseek.label).not.toMatch(/free$/i);
+    for (const m of h.models.filter((x: { id: string }) => !/-free$/.test(x.id))) expect(m.free).toBeUndefined();
   });
 
   it('hides a model from another provider until it is switched on', async () => {

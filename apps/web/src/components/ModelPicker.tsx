@@ -5,12 +5,12 @@ import type { HarnessWithRunning } from '../api.ts';
 import type { PickerAccounts } from '../accounts.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
-import { ModelList, listedChoices } from './model-picker/ModelList.tsx';
+import { ModelList, listedChoices, type ListedModel } from './model-picker/ModelList.tsx';
 import { useAnchoredPopover } from './ui/use-anchored-popover.ts';
 import { useListbox } from './ui/use-listbox.ts';
 import { useExit } from './ui/use-exit.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
-import { pickerModels } from '@omni/shared/model-visibility.ts';
+import { goneModel, pickerModels } from '@omni/shared/model-visibility.ts';
 import { localHarnesses } from '@omni/shared/remote-agent.ts';
 
 export interface ModelChoice {
@@ -45,6 +45,7 @@ export function ModelPicker({
   className = '',
   effort,
   accounts,
+  limits,
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
@@ -67,6 +68,8 @@ export function ModelPicker({
   effort?: { value: string; onChange: (v: string) => void };
   /** Who each harness runs as on the machine the thread runs on (GET /api/accounts). */
   accounts?: PickerAccounts | null;
+  /** A harness stopped at its free limit, by id: a line under its header, as "Free limit. Back tomorrow 01:42". */
+  limits?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [q, setQ] = useState('');
@@ -80,8 +83,10 @@ export function ModelPicker({
   const auto = asksAuto(value);
   const current = useMemo(() => {
     const h = harnesses.find((x) => x.id === value.harness);
-    const m = h?.models.find((x) => x.id === value.model);
-    return { h, m };
+    // A model its harness no longer offers (OpenCode Zen's free ones go without notice) still names the pill, as gone.
+    const gone = goneModel(h, value.model);
+    const m = h?.models.find((x) => x.id === value.model) ?? gone ?? undefined;
+    return { h, m, gone: !!gone };
   }, [harnesses, value]);
 
   const groups = useMemo(() => {
@@ -89,7 +94,10 @@ export function ModelPicker({
     // Remote agents' servers are not runs to pick (ADR 0020): a remote agent is picked by name, as an agent.
     return localHarnesses(harnesses).map((h) => {
       // Models hidden in Settings stay out, except the one already picked.
-      const listed = pickerModels(h.models, h.id === value.harness ? value.model : null);
+      const listed: ListedModel[] = pickerModels(h.models, h.id === value.harness ? value.model : null);
+      // The thread's own model, gone from the list: shown last so the pick is explained, never pickable.
+      const gone = h.id === value.harness ? goneModel(h, value.model) : null;
+      if (gone) listed.push(gone);
       return {
         harness: h,
         models: s ? listed.filter((m) => `${m.label} ${m.id} ${h.name} ${h.plan}`.toLowerCase().includes(s)) : listed,
@@ -157,7 +165,7 @@ export function ModelPicker({
         aria-label={
           auto
             ? 'Model: Auto'
-            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, effort ${effortShown}` : ''}`
+            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${current.gone ? ', gone, pick another' : effortShown ? `, effort ${effortShown}` : ''}`
         }
         {...pop.triggerProps}
         onClick={(e) => (pop.clickCloses() ? close() : openList(e.detail === 0))}
@@ -167,7 +175,8 @@ export function ModelPicker({
             openList(true);
           }
         }}
-        className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
+        // The thread's model is gone: the pill rings in needs, like a question waiting on you.
+        className={`press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45 ${current.gone ? 'shadow-[inset_0_0_0_1.5px_var(--needs)]' : ''}`}
       >
         {current.h ? (
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg text-fg">
@@ -179,7 +188,9 @@ export function ModelPicker({
           </span>
         )}
         <span className="min-w-0 truncate">{buttonLabel}</span>
-        {effortShown ? (
+        {current.gone ? (
+          <span className="shrink-0 text-fg-2">· gone</span>
+        ) : effortShown ? (
           <span className="shrink-0 text-fg-3">· {effortShown}</span>
         ) : (
           current.h && <span className="hidden shrink-0 text-fg-3 sm:inline">· {current.h.name}</span>
@@ -244,6 +255,7 @@ export function ModelPicker({
             cursor={list.cursor}
             onHover={list.hover}
             scroller={list.scroller}
+            limits={limits}
           />
           {levels && levels.efforts.length > 0 && (
             <div className="mt-1 border-t border-line px-2 pt-2 pb-1">

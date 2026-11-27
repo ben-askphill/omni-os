@@ -166,3 +166,26 @@ export function parseHarnessPrefs(v: unknown): HarnessModelPrefs | null {
 export function pickerModels<T extends { id: string; hidden?: boolean }>(models: readonly T[], keep?: string | null): T[] {
   return models.filter((m) => !m.hidden || m.id === keep);
 }
+
+/** Harnesses whose vendor removes models without notice: OpenCode Zen's free models are free "for a limited time". */
+const VANISHING = new Set(['opencode']);
+
+/** A removed model's name from its id alone, since the live list no longer has its label: "DeepSeek V4.1 Flash". */
+function goneLabel(id: string): string {
+  const words = id.replace(/^[^/]*\//, '').replace(/-free$/, '').split('-').filter(Boolean);
+  return words.map((w) => (w === 'deepseek' ? 'DeepSeek' : /^v\d/.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+}
+
+/**
+ * The thread's model when its harness no longer lists it: a Gone row the pickers show only while the thread names it,
+ * never pickable, and the pill says "gone". Null when it is listed, when the thread names none, or for a harness that
+ * does not remove models (a Claude model id with a suffix is not in its list either, and is not gone).
+ */
+export function goneModel(
+  harness: { id: string; available?: boolean; models: readonly { id: string }[] } | null | undefined,
+  model: string | null | undefined,
+): { id: string; label: string; gone: true; efforts: string[]; defaultEffort: string } | null {
+  if (!harness || !VANISHING.has(harness.id) || harness.available === false || !harness.models.length) return null;
+  if (!model || model === 'default' || model === 'auto' || harness.models.some((m) => m.id === model)) return null;
+  return { id: model, label: goneLabel(model), gone: true, efforts: [], defaultEffort: '' };
+}

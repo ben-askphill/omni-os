@@ -12,7 +12,7 @@
 //   makes session/resume answer an error. FAKE_OPENCODE_SESSIONS: a folder that keeps session ids across processes.
 //   FAKE_OPENCODE_DEAF=1: a session/cancel is ignored.
 // - A prompt's text carries directives: `SAY <text>`, `THINK`, `PLAN`, `CMD <command>`, `EDIT <path>`, `MCP <server>
-//   <tool> [<json>]`, `USAGE`, `NOUSAGE`, `SLOW <ms>`, `HANG`, `CRASH`, `FREELIMIT`, `NOROUTE`, `RUNFREE` (no ask), `WAITASK`.
+//   <tool> [<json>]`, `USAGE`, `NOUSAGE`, `SLOW <ms>`, `HANG`, `CRASH`, `FREELIMIT[:<retry ms>]` (an hour by default), `NOROUTE`, `RUNFREE` (no ask), `WAITASK`.
 //   Anything else is answered `ack: <text>`.
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
@@ -187,7 +187,8 @@ async function turn(s, params) {
     process.stderr.write('fake opencode: panic: planner exploded\n');
     process.exit(3);
   }
-  if (/\bFREELIMIT\b/.test(body)) throw Object.assign(new Error('x'), { rpc: [-32603, 'Internal error', { details: 'provider.free-limit: free usage limit reached {"retryAfterMs":3600000}' }] });
+  const freeLimit = /\bFREELIMIT(?::(\d+))?\b/.exec(body);
+  if (freeLimit) throw Object.assign(new Error('x'), { rpc: [-32603, 'Internal error', { details: `provider.free-limit: free usage limit reached {"retryAfterMs":${freeLimit[1] ?? 3600000}}` }] });
   if (/\bNOROUTE\b/.test(body)) throw Object.assign(new Error('x'), { rpc: [-32603, 'Internal error', { details: `provider.no-route: no route for ${s.model}` }] });
   if (/\bHANG\b/.test(body)) {
     text(s, 'working…');

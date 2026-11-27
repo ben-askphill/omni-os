@@ -111,6 +111,10 @@ export interface ModelEntry {
   default?: boolean;
   /** Listed in no picker until it is switched on under Models: it bills somewhere else (Antigravity's non-Gemini models). */
   hiddenUntilOn?: boolean;
+  /** Costs nothing (OpenCode Zen's free models): the pickers tag it Free. */
+  free?: boolean;
+  /** The vendor says it is free for a limited time: its note starts "Limited time". */
+  limited?: boolean;
   /**
    * Left out of the pickers by Ben's model visibility settings (harness/model-visibility.ts). Only GET /harnesses sets
    * it. The model still runs: anything that already names it keeps working.
@@ -162,7 +166,7 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
   hermes: { name: 'Hermes', plan: 'Anthropic API via Hermes' },
   'cursor-cloud': { name: 'Cursor Cloud', plan: 'Cursor plan' },
   antigravity: { name: 'Antigravity', plan: 'Google AI plan' },
-  opencode: { name: 'OpenCode', plan: 'Free OpenCode Zen models' },
+  opencode: { name: 'OpenCode', plan: 'Free, no account' },
 };
 
 /**

@@ -1,5 +1,6 @@
 import type { Run } from './run-switch.ts';
 import { claudeModelLabel } from './claude-model-label.ts';
+import { goneModel } from './model-visibility.ts';
 
 /** The model that asks for Auto, which picks the harness, model and effort from the prompt (apps/server/harness/auto.ts). */
 export const AUTO = 'auto';
@@ -22,6 +23,8 @@ export interface RunCatalogModel {
   /** Empty when the model has no levels. */
   defaultEffort: string;
   default?: boolean;
+  /** Costs nothing (OpenCode Zen's free models). */
+  free?: boolean;
 }
 
 export interface RunCatalogHarness {
@@ -49,7 +52,8 @@ export function threadRunLabels(
 ): ThreadRunLabels {
   const { harness, model } = runModel(thread, harnesses);
   const id = thread.model || 'default';
-  const label = model?.label || (thread.harness === 'claude-code' ? claudeModelLabel(id) : id);
+  // A model its harness dropped (OpenCode's free ones) still reads as a name, not an id.
+  const label = model?.label || (thread.harness === 'claude-code' ? claudeModelLabel(id) : (goneModel(harness, thread.model)?.label ?? id));
   return {
     model: thread.auto_reason ? `Auto · ${label}` : label,
     harnessName: harness?.name ?? '',

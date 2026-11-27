@@ -137,6 +137,8 @@ const STATE_LINE: Record<Exclude<AccountState, 'signed-in'>, string> = {
 export function accountLine(a: Pick<HarnessAccount, 'state' | 'label' | 'plan'> | null | undefined): string {
   if (!a) return 'Not checked yet';
   if (a.state === 'signed-in' && a.label) return a.plan ? `${a.label} · ${a.plan}` : a.label;
+  // A harness with nothing to sign in to can still say what it runs as: OpenCode's "Free, no account".
+  if (a.state === 'not-reported' && a.label) return a.label;
   return STATE_LINE[a.state === 'signed-in' ? 'unknown' : a.state];
 }
 
@@ -150,8 +152,8 @@ export function accountDetail(a: HarnessAccount): string | null {
 }
 
 /** StatusDot's status for an account: signed in, needs you, or grey. */
-export function accountTone(a: Pick<HarnessAccount, 'state'> | null | undefined): 'done' | 'needs' | 'idle' {
-  if (a?.state === 'signed-in') return 'done';
+export function accountTone(a: Pick<HarnessAccount, 'state'> & Partial<Pick<HarnessAccount, 'label'>> | null | undefined): 'done' | 'needs' | 'idle' {
+  if (a?.state === 'signed-in' || (a?.state === 'not-reported' && a.label)) return 'done';
   if (a?.state === 'signed-out' || a?.state === 'unknown') return 'needs';
   return 'idle';
 }

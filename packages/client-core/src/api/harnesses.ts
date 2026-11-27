@@ -28,6 +28,10 @@ export interface ModelEntry {
   default?: boolean;
   /** Left out of the pickers by the Settings choice of models to show. Still runs where a thread already uses it. */
   hidden?: boolean;
+  /** Costs nothing (OpenCode Zen's free models): tagged Free. */
+  free?: boolean;
+  /** Free for a limited time, as the vendor says. */
+  limited?: boolean;
 }
 
 /** GET /harnesses: a harness with its availability, models and cap. */

@@ -340,30 +340,45 @@ export function antigravityHarness(s: AntigravityState | null, cap: number): Har
 
 /** Before the first check, which runs at server start. */
 export const OPENCODE_UNCHECKED = 'Omni has not checked opencode on this machine yet';
-const OPENCODE_FREE_NOTE = 'Free on OpenCode Zen for a limited time, no account or key. Zen says it keeps nothing and trains on nothing. The free tier may refuse a request with a reset time, and OpenCode has no steer.';
-const OPENCODE_ZEN_NOTE = 'On OpenCode Zen. Free models need no account; the others bill Zen credits.';
+/**
+ * What OpenCode Zen says about a free model's data (opencode.ai/docs/zen), for the ones it names. The others say
+ * nothing here: their terms are on Zen's page, not in the model list.
+ */
+const OPENCODE_DATA_NOTE: Record<string, string> = {
+  'opencode/deepseek-v4.1-flash-free': 'Zero retention',
+  'opencode/seaglass-alpha-free': 'Trains on your prompts',
+};
+const OPENCODE_PAID_NOTE = 'Not marked free on Zen: may need Zen credits';
 const OPENCODE_OTHER_NOTE = 'Bills the provider whose key is in your environment, not the free Zen tier. Omni never uses it unless a thread names it.';
+/** A Zen model OpenCode marks free by its id. Zen says its free models are free for a limited time. */
+const zenFree = (id: string) => id.startsWith('opencode/') && /-free$/.test(id);
 
 /** OpenCode as the state reader last found it (opencode/state.ts). Null: not checked yet. */
 export function opencodeHarness(s: OpenCodeState | null, cap: number): HarnessInfo {
   const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = { id: 'opencode', ...HARNESS_META.opencode, capabilities: CAPABILITIES.opencode, cap };
   if (!s) return { ...base, available: false, fix: OPENCODE_UNCHECKED, models: [] };
   if (s.state !== 'ready') return { ...base, available: false, fix: s.fix, ...(s.state === 'not-installed' && { missing: true as const }), models: [] };
-  const note = (free: boolean) => (free ? OPENCODE_FREE_NOTE : OPENCODE_ZEN_NOTE) + (s.note ? ` ${s.note}.` : '');
-  if (!s.models.length) return { ...base, available: true, models: [{ id: OPENCODE_PREFERRED, label: 'DeepSeek V4.1 Flash Free', note: note(true), efforts: [], defaultEffort: '', default: true }] };
+  const extra = s.note ? `${s.note}.` : '';
+  const note = (id: string) => [OPENCODE_DATA_NOTE[id] ?? (zenFree(id) ? '' : OPENCODE_PAID_NOTE), extra].filter(Boolean).join(' · ') || undefined;
+  if (!s.models.length) return { ...base, available: true, models: [{ id: OPENCODE_PREFERRED, label: 'DeepSeek V4.1 Flash', note: note(OPENCODE_PREFERRED), efforts: [], defaultEffort: '', default: true, free: true, limited: true }] };
   const first = opencodeDefaultModel(s.models);
   return {
     ...base,
     available: true,
-    models: s.models.map((m) => ({
-      id: m.id,
-      label: m.other ? m.label : m.label.replace(/^opencode\//, ''),
-      note: m.other ? OPENCODE_OTHER_NOTE : note(/-free$/.test(m.id)),
-      efforts: m.efforts,
-      defaultEffort: m.defaultEffort,
-      ...(m.id === first && { default: true }),
-      ...(m.other && { hiddenUntilOn: true }),
-    })),
+    models: s.models.map((m) => {
+      const free = !m.other && zenFree(m.id);
+      return {
+        id: m.id,
+        // The Free tag says it, so the name drops OpenCode's own " Free" ("DeepSeek V4.1 Flash Free").
+        label: m.other ? m.label : free ? m.label.replace(/^opencode\//, '').replace(/\s*\(?free\)?$/i, '') : m.label.replace(/^opencode\//, ''),
+        note: m.other ? OPENCODE_OTHER_NOTE : note(m.id),
+        efforts: m.efforts,
+        defaultEffort: m.defaultEffort,
+        ...(m.id === first && { default: true }),
+        ...(free && { free: true, limited: true }),
+        ...(m.other && { hiddenUntilOn: true }),
+      };
+    }),
   };
 }
 

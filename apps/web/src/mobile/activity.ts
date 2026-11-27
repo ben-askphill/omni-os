@@ -57,7 +57,8 @@ function actionsOf(item: NeedsYouItem, harness: (id: string) => string, now: num
         : [{ kind: 'retry', label: 'Retry' }];
       break;
     case 'limited':
-      out = (limitView(t, harness(t.harness), now)?.actions ?? []).map((a) => ({ kind: 'limit', label: LIMIT_ACTION[a].label, action: a }));
+      // Switch model has no route: it opens the thread, whose model sheet is one tap away.
+      out = (limitView(t, harness(t.harness), now)?.actions ?? []).map((a) => (a === 'switch' ? { kind: 'open', label: LIMIT_ACTION[a].label } : { kind: 'limit', label: LIMIT_ACTION[a].label, action: a }));
       break;
     case 'recovered':
       out = [{ kind: 'resume', label: b.count > 1 ? `Resume ${b.count}` : 'Resume' }];

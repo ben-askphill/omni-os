@@ -182,10 +182,10 @@ async function readAntigravity(): Promise<HarnessAccount> {
  */
 async function readOpenCode(): Promise<HarnessAccount> {
   const s = (!recheck && opencodeState()) || (await refreshOpenCode({ env: baseEnv() }));
-  if (s.state === 'not-installed') return account('opencode', 'not-installed');
+  if (s.state === 'not-installed') return account('opencode', 'not-installed', { note: 'npm install -g @opencode/cli' });
   if (s.state === 'too-old') return account('opencode', 'unknown', { note: s.version ? `opencode ${s.version} is not supported` : 'opencode is too old' });
   if (s.state === 'not-answering') return account('opencode', 'unknown', { note: 'opencode did not answer' });
-  return account('opencode', 'not-reported', { note: 'Free OpenCode Zen models, no account' });
+  return account('opencode', 'not-reported', { label: 'Free, no account', note: 'Free models on OpenCode Zen. Nothing to sign in to or switch.' });
 }
 
 const READERS: Record<HarnessId, () => Promise<HarnessAccount>> = {

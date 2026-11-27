@@ -9,11 +9,24 @@ import type { ModelChoice } from '../ModelPicker.tsx';
 
 const AUTO_NOTE = 'Picks a model for each task';
 
-type Groups = { harness: HarnessWithRunning; models: HarnessWithRunning['models'] }[];
+/** A listed model. `gone`: the thread's model, no longer offered by its harness (goneModel): shown, never pickable. */
+export type ListedModel = HarnessWithRunning['models'][number] & { gone?: boolean };
+type Groups = { harness: HarnessWithRunning; models: ListedModel[] }[];
+
+/** The quiet tag after a model's name: Free (OpenCode Zen's free models) or Gone. Neutral: a fact, not a state. */
+export function ModelTag({ children, className = '' }: { children: string; className?: string }) {
+  return <i className={`inline-block rounded-full bg-surface-2 px-1.5 align-[1px] text-[10.5px] leading-4 font-medium text-fg-2 not-italic ${className}`}>{children}</i>;
+}
+
+/** A model's second line: "Limited time" first when the vendor says so, then its note; a gone model says to pick another. */
+export function modelNote(m: ListedModel, harnessName: string): string {
+  if (m.gone) return `Removed by ${harnessName}. Pick another.`;
+  return [m.limited && 'Limited time', m.note].filter(Boolean).join(' · ');
+}
 
 /** The pickable options in the order the list shows them: Auto, then each available harness's models. */
 export function listedChoices(groups: Groups, showAuto: boolean): ModelChoice[] {
-  const models = groups.flatMap(({ harness, models }) => (harness.available ? models.map((m) => ({ harness: harness.id, model: m.id })) : []));
+  const models = groups.flatMap(({ harness, models }) => (harness.available ? models.filter((m) => !m.gone).map((m) => ({ harness: harness.id, model: m.id })) : []));
   return showAuto ? [AUTO_CHOICE, ...models] : models;
 }
 
@@ -35,6 +48,7 @@ export function ModelList({
   cursor,
   onHover,
   scroller,
+  limits,
 }: {
   groups: Groups;
   showAuto: boolean;
@@ -51,6 +65,8 @@ export function ModelList({
   onHover: (i: number) => void;
   /** The scrolling box, kept scrolled to the cursor. */
   scroller: RefObject<HTMLDivElement | null>;
+  /** A harness stopped at its free limit, by id: one line under its header ("Free limit. Back tomorrow 01:42"). */
+  limits?: Record<string, string>;
 }) {
   const pick = onPick;
   let n = 0;
@@ -97,6 +113,12 @@ export function ModelList({
                   <span className="shrink-0 text-[11.5px] text-fg-3">{harness.available ? plan : 'Unavailable'}</span>
                 )}
               </div>
+              {harness.available && limits?.[harness.id] && (
+                <div className="flex items-center gap-1.5 px-3 pb-1.5 text-[11.5px] text-fg-2">
+                  <Icon name="gauge" size={12} className="shrink-0 text-warn" />
+                  {limits[harness.id]}
+                </div>
+              )}
               {!harness.available ? (
                 <div className="px-3 pb-2 text-[11.5px] text-fg-3">
                   {harness.fix && harness.fix.split(/\s+/).length <= 3 ? (
@@ -108,32 +130,36 @@ export function ModelList({
                   )}
                 </div>
               ) : models.length ? (
-                models.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="option"
-                    aria-selected={harness.id === value.harness && m.id === value.model}
-                    {...option()}
-                    onClick={() => pick({ harness: harness.id, model: m.id })}
-                    // Scrolled to below the sticky header, not under it.
-                    className="pik-row scroll-mt-8"
-                  >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
-                      <HarnessLogo harness={harness.id} size={13} />
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[13px] text-fg">
-                        {m.label}
-                        {m.default && <span className="text-fg-3"> (default)</span>}
+                models.map((m) => {
+                  const note = modelNote(m, harness.name);
+                  const on = harness.id === value.harness && m.id === value.model;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="option"
+                      aria-selected={on}
+                      // A gone model is listed so the thread's pick is explained, and is never picked or reached by the keys.
+                      {...(m.gone ? { 'aria-disabled': true, tabIndex: -1, 'data-gone': true } : option())}
+                      onClick={() => !m.gone && pick({ harness: harness.id, model: m.id })}
+                      // Scrolled to below the sticky header, not under it.
+                      className={`pik-row scroll-mt-8 ${m.gone ? 'cursor-default' : ''}`}
+                    >
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
+                        <HarnessLogo harness={harness.id} size={13} />
                       </span>
-                      {m.note && <span className="truncate text-[11.5px] text-fg-3">{m.note}</span>}
-                    </span>
-                    <span className="pik-mark">
-                      {harness.id === value.harness && m.id === value.model && <Icon name="check" size={12} strokeWidth={2.6} />}
-                    </span>
-                  </button>
-                ))
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className={`truncate text-[13px] ${m.gone ? 'text-fg-3' : 'text-fg'}`}>
+                          {m.label}
+                          {m.default && !m.gone && <span className="text-fg-3"> (default)</span>}
+                          {m.gone ? <ModelTag className="ml-1.5">Gone</ModelTag> : m.free && <ModelTag className="ml-1.5">Free</ModelTag>}
+                        </span>
+                        {note && <span className="truncate text-[11.5px] text-fg-3">{note}</span>}
+                      </span>
+                      <span className="pik-mark">{on && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
+                    </button>
+                  );
+                })
               ) : query.trim() ? (
                 <div className="px-3 pb-2 text-[11.5px] text-fg-3">No match</div>
               ) : null}
