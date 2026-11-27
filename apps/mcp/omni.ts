@@ -417,7 +417,7 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'Where the new worktree branch starts: "head" (default, the repo\'s current commit), "remote-default" (origin\'s default branch, fetched first) or a branch, tag or commit.',
+          'Where the new worktree branch starts: "head" (default, the repo\'s current commit), "remote-default" (origin\'s default branch, fetched first) or a branch, tag or commit. A branch only on origin resolves through origin/<branch> once this repo has fetched it.',
         ),
       device: z
         .string()

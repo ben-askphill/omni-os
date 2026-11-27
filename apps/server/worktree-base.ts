@@ -73,11 +73,23 @@ export async function baseOptions(channel: Channel): Promise<BaseOptions> {
   };
 }
 
+/**
+ * The commit a ref pick names, and the ref to call it by. A branch only on origin (pushed from another worktree, or
+ * fetched without a local branch) resolves through its remote-tracking ref, as `git checkout` would. No fetch.
+ */
+async function refCommit(repo: string, ref: string): Promise<{ sha: string; ref: string } | null> {
+  const sha = await commitOf(repo, ref);
+  if (sha) return { sha, ref };
+  const tracked = await commitOf(repo, `refs/remotes/${REMOTE}/${ref}`);
+  return tracked ? { sha: tracked, ref: `${REMOTE}/${ref}` } : null;
+}
+
 /** The refusal for a pick that names nothing in the repo, or null. Checked when the thread is made, so the draft stays in the composer. */
 export async function checkPick(repo: string, pick: BasePick): Promise<string | null> {
   if (pick.kind !== 'ref') return null;
   if (unsafeRef(pick.ref)) return `"${pick.ref}" is not a branch, tag or commit.`;
-  return (await commitOf(repo, pick.ref)) ? null : `${repo} has no branch, tag or commit named "${pick.ref}".`;
+  if (await refCommit(repo, pick.ref)) return null;
+  return `${repo} has no branch, tag or commit named "${pick.ref}". A branch only on ${REMOTE} needs a fetch first: git -C ${repo} fetch ${REMOTE} ${pick.ref}`;
 }
 
 /** Fetches into one repo at a time: two threads asking for the same branch would race for its ref lock. */
@@ -123,7 +135,7 @@ export async function resolvePick(repo: string, pick: BasePick): Promise<{ sha: 
   if (pick.kind === 'ref') {
     const refusal = await checkPick(repo, pick);
     if (refusal) throw new Error(refusal);
-    return { sha: (await commitOf(repo, pick.ref))!, ref: pick.ref };
+    return (await refCommit(repo, pick.ref))!;
   }
   const sha = await commitOf(repo, 'HEAD');
   if (!sha) throw new Error(`${repo} has no commits to start a thread from.`);

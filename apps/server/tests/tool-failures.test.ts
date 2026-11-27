@@ -3,6 +3,7 @@ import { startRunner } from './runner-boot.ts';
 import type { Live } from '../runner/state.ts';
 import { normalizeItem } from '../harness/codex/normalize.ts';
 import { normalizeCursor } from '../harness/cursor/normalize.ts';
+import { toolUse as agyToolUse } from '../harness/antigravity/normalize.ts';
 
 const h = await startRunner();
 const { toolFailures, observeToolResult, classifyFailure, safeGuidance } = await import('../tool-failures.ts');
@@ -170,6 +171,17 @@ describe('adapter failure signals', () => {
     }
     expect(normalizeCursor({ type: 'tool_call', subtype: 'failed', toolCallId: 'a', tool: 'read' }).records.at(-1)).toMatchObject({ payload: { is_error: true } });
     expect(normalizeCursor({ type: 'tool_call', subtype: 'completed', toolCallId: 'a', tool: 'mcp', result: { result: { isError: true, content: [] } } }).records.at(-1)).toMatchObject({ payload: { is_error: true } });
+  });
+  it('names an Antigravity tool of its own by the tool, not its "Run <name>" title, so its failures keep the name', async () => {
+    const named = (call: Record<string, unknown>) => (agyToolUse({ toolCallId: 'g', kind: 'other', ...call }) as any).payload.name;
+    expect(named({ name: 'manage_task', title: 'Run manage_task' })).toBe('manage_task');
+    expect(named({ title: 'Run manage_task' })).toBe('manage_task');
+    expect(named({ title: 'Searching the codebase' })).toBe('Searching the codebase');
+    const t = await h.start('hello');
+    await h.untilResults(t.id, 1);
+    const ctx = { thread_id: t.id, channel_id: 'scratch', session_id: h.thread(t.id).session_id, harness: 'antigravity' };
+    observeToolResult(ctx, { tool_use_id: 'agy-kill', text: 'task is not running', is_error: true, truncated: false }, { name: named({ title: 'Run manage_task' }) });
+    expect((toolFailures.groups('open') as any[]).find((g) => g.harness === 'antigravity')).toMatchObject({ tool: 'manage_task' });
   });
   it('does not turn Cursor success with an explicit false error into a failure', () => {
     for (const tool of ['read', 'mcp', 'custom', 'shell']) {

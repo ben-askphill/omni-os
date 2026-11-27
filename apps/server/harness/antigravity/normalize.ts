@@ -81,6 +81,16 @@ const STEP_STATUS: Record<string, 'pending' | 'in_progress' | 'completed'> = { p
 const stepTodos = (steps: unknown) =>
   (Array.isArray(steps) ? steps : []).map((s) => ({ content: str(obj(s).title), status: STEP_STATUS[str(obj(s).status)] ?? 'pending' })).filter((t) => t.content);
 
+/**
+ * The name of one of agy's own tools (kind other): the call's name, else the tool in a "Run <name>" title, as agy titles
+ * them. A row named by its title would carry a space, and Omni's tool-failure log keeps no name with one.
+ */
+const ownName = (call: AcpToolCall, title: string): string | null => {
+  const name = str(call.name);
+  if (/^[A-Za-z_][\w.-]*$/.test(name)) return name;
+  return /^Run ([A-Za-z_][\w.-]*)$/.exec(title)?.[1] ?? null;
+};
+
 /** The row a tool call opens. Null for a call that is only agy thinking out loud. `servers` names the session's MCP servers. */
 export function toolUse(call: AcpToolCall, servers: readonly string[] = []): StreamRecord | null {
   const id = str(call.toolCallId);
@@ -102,7 +112,7 @@ export function toolUse(call: AcpToolCall, servers: readonly string[] = []): Str
   if (kind === 'read') return use('Read', { file_path: pathOf(call) || title });
   if (kind === 'search') return use('Grep', { pattern: title });
   if (kind === 'fetch') return use('WebFetch', { url: str(obj(call.rawInput).url) || str(obj(call.rawInput).Url) || title });
-  return use(title || 'Tool', call.rawInput ?? {});
+  return use(ownName(call, title) ?? (title || 'Tool'), call.rawInput ?? {});
 }
 
 /** A call's output: its text content, else its raw output. */

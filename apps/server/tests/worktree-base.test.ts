@@ -99,6 +99,25 @@ describe('the base a thread starts from', () => {
     expect(git(repo, 'rev-parse', 'release')).toBe(moved);
   });
 
+  it('starts from a branch that is only on origin through its remote-tracking ref, and says to fetch one it has never seen', async () => {
+    const { repo, pusher } = remote();
+    git(pusher, 'checkout', '-q', '-b', 'integration/x');
+    const tip = commit(pusher);
+    git(pusher, 'push', '-q', 'origin', 'integration/x');
+    git(pusher, 'checkout', '-q', 'main');
+    const id = channel(repo);
+    // Not fetched yet: refused before a thread exists, with the fetch that would fix it.
+    const refused = await start(id, { kind: 'ref', ref: 'integration/x' });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/no branch, tag or commit named "integration\/x".*fetch origin integration\/x/);
+    // Fetched into refs/remotes only, as a push from another worktree leaves it: no local branch is needed.
+    git(repo, 'fetch', '-q', 'origin');
+    expect(() => git(repo, 'rev-parse', '--verify', '-q', 'refs/heads/integration/x')).toThrow();
+    const t = await ready((await start(id, { kind: 'ref', ref: 'integration/x' })).body.id);
+    expect(head(t.cwd)).toBe(tip);
+    expect(await base(t.id)).toEqual({ pick: { kind: 'ref', ref: 'integration/x' }, sha: tip, ref: 'origin/integration/x' });
+  });
+
   it('keeps the first commit when a Retry comes after the remote branch moved', async () => {
     const { repo, push } = remote();
     const first = push();
