@@ -11,6 +11,7 @@ const HARNESS: Record<string, string> = {
   hermes: 'Hermes',
   'cursor-cloud': 'Cursor Cloud',
   antigravity: 'Antigravity',
+  opencode: 'OpenCode',
 };
 
 export const harnessLabel = (harness: string): string => HARNESS[harness] ?? harness;

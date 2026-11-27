@@ -199,7 +199,7 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
     <Screen
       caption="Harnesses"
       title="The harnesses Omni can run"
-      body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex, Cursor Agent and Antigravity are optional."
+      body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex, Cursor Agent, Antigravity and OpenCode are optional."
     >
       <ul className="space-y-2">
         {(list ?? []).map((h) => (

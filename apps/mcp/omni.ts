@@ -386,7 +386,7 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'Only when asked: claude-code, codex, cursor (the local CLI), cursor-cloud (a Cursor cloud agent on Linux that opens a PR) or antigravity, from list_harnesses. ' +
+          'Only when asked: claude-code, codex, cursor (the local CLI), cursor-cloud (a Cursor cloud agent on Linux that opens a PR), antigravity or opencode (free OpenCode Zen models, no steer), from list_harnesses. ' +
             'A remote agent is a role, not a harness.',
         ),
       model: z
@@ -529,7 +529,7 @@ server.registerTool(
   'list_harnesses',
   {
     description:
-      `The local harnesses (Claude Code, Codex, Cursor, Cursor Cloud, Antigravity) with availability, fix command, models, effort levels and capabilities: the valid ids for delegate, when ${USER} asks for a harness or model. Pass channel to see them as that channel does (cursor-cloud needs its GitHub repo). Remote agents are in list_crew, not here. Auto never picks cursor-cloud, antigravity or a remote agent. A hidden model still runs when asked for.`,
+      `The local harnesses (Claude Code, Codex, Cursor, Cursor Cloud, Antigravity, OpenCode) with availability, fix command, models, effort levels and capabilities: the valid ids for delegate, when ${USER} asks for a harness or model. Pass channel to see them as that channel does (cursor-cloud needs its GitHub repo). Remote agents are in list_crew, not here. Auto never picks cursor-cloud, antigravity, opencode or a remote agent. A hidden model still runs when asked for.`,
     inputSchema: {
       channel: z.string().optional().describe('Channel id the thread would run in. Cursor Cloud is unavailable in a channel with no GitHub repo.'),
     },

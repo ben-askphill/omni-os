@@ -6,6 +6,7 @@ export const FAKE_CLAUDE = fixture('fake-claude.mjs');
 export const FAKE_CODEX = fixture('fake-codex.mjs');
 export const FAKE_CURSOR = fixture('fake-cursor.mjs');
 export const FAKE_AGY = fixture('fake-agy.mjs');
+export const FAKE_OPENCODE = fixture('fake-opencode.mjs');
 export const FAKE_TAILSCALE = fixture('fake-tailscale.mjs');
 
 /** Whether this run built omni-mcp (global-native.ts). A test that starts a thread's ask, render or threads server skips without it. */

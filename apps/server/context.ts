@@ -33,7 +33,7 @@ function rememberWindow(c: ContextUsage) {
 // The last reading of every metered thread is kept (kv syncs it). Cursor's tokens and cost are kept beside it.
 const lastKey = (threadId: string) => `context-last:${threadId}`;
 const spendKey = (threadId: string) => `cursor-spend:${threadId}`;
-const cursorReading = (c: ContextUsage) => c.source === 'cursor' || c.source === 'cursor-estimate' || c.source === 'antigravity';
+const cursorReading = (c: ContextUsage) => c.source === 'cursor' || c.source === 'cursor-estimate' || c.source === 'antigravity' || c.source === 'opencode';
 
 /** Threads whose reading moved during a turn and is not kept yet: written once when the turn ends (settleContext). */
 const unsaved = new Set<string>();

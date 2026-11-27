@@ -2,19 +2,20 @@
 // Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan) or
 // Hermes (Anthropic API on Ben's server — not his Claude, ChatGPT or Cursor plan), or
 // Cursor Cloud (a Cursor cloud agent on Cursor's own Linux machines, Cursor plan), or Antigravity (Google's `agy` over
-// the Agent Client Protocol, billing the Google account it is signed in with).
+// the Agent Client Protocol, billing the Google account it is signed in with), or OpenCode (`opencode acp`, run on
+// OpenCode's free Zen models unless a thread names another).
 // Beside these built-ins, the user can register custom harnesses: remote agents that speak the Runs API, one file each
 // in data/harnesses/ (custom.ts), with ids `custom:<slug>`.
 // See GLOSSARY.md for the domain terms.
 import { isCustomHarnessId, type CustomHarnessId } from '@omni/shared/custom-harness.ts';
 
 /** The built-in harnesses. */
-export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud' | 'antigravity';
+export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud' | 'antigravity' | 'opencode';
 
 /** A built-in or a custom harness. A thread's `harness` column holds one of these. */
 export type AnyHarnessId = HarnessId | CustomHarnessId;
 
-export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud', 'antigravity'];
+export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud', 'antigravity', 'opencode'];
 
 /**
  * Harnesses that run on a remote provider (the Hermes server, Cursor's cloud, a custom harness's server): no worktree,
@@ -88,6 +89,10 @@ export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
   // asks about through the channel's gate, but the real agy does not ask before file edits or sub-agents, so a Read only
   // level is not a promise there. That is accepted: it is selectable below Full access and for limited agents.
   antigravity: { warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'five-hour-week', ...LOCAL },
+  // One warm `opencode acp` per thread, as Antigravity has. A message mid-turn waits for the next turn (OpenCode says it
+  // can steer, which nothing has exercised). The free Zen tier has no plan window to read. Omni answers each permission
+  // request through the channel's gate: shell, MCP and tool asks were proved on 2.3.0, the tripwire covers the rest.
+  opencode: { warmProcess: true, steer: false, interrupt: true, inlineImages: true, usage: 'none', ...LOCAL },
 };
 
 /** One model a harness offers. */
@@ -157,6 +162,7 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
   hermes: { name: 'Hermes', plan: 'Anthropic API via Hermes' },
   'cursor-cloud': { name: 'Cursor Cloud', plan: 'Cursor plan' },
   antigravity: { name: 'Antigravity', plan: 'Google AI plan' },
+  opencode: { name: 'OpenCode', plan: 'Free OpenCode Zen models' },
 };
 
 /**
@@ -168,4 +174,5 @@ export const HARNESS_INSTALL: Partial<Record<HarnessId, string>> = {
   codex: 'npm install -g @openai/codex',
   cursor: 'curl https://cursor.com/install -fsS | bash',
   antigravity: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+  opencode: 'npm install -g @opencode/cli',
 };

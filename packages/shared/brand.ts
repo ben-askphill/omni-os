@@ -18,6 +18,8 @@ export const HARNESS: Record<string, { logo?: keyof typeof HARNESS_LOGOS; label:
   hermes: { label: 'Hermes' },
   'cursor-cloud': { logo: 'cursor', label: 'Cursor Cloud' },
   antigravity: { logo: 'antigravity', label: 'Antigravity' },
+  // No logo yet: the mark goes in with the design system (docs/plans/2026-11-27-opencode-harness.md section 16).
+  opencode: { label: 'OpenCode' },
 };
 
 export const MARK_TRANSFORM = 'translate(-4 3) scale(.92) skewX(-10)';

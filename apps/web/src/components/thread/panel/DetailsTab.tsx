@@ -156,8 +156,8 @@ export function DetailsTab({
   // The composer's model pill reads these too, so Details names the model and effort the same way.
   const run = threadRunLabels(thread, harnesses);
   const slug = thread.model || init?.model;
-  // agy's ACP sessions have no terminal command that opens them, so Antigravity gets no card rather than Claude's.
-  const terminalResume = thread.harness !== 'antigravity';
+  // agy's and OpenCode's ACP sessions have no terminal command that opens them, so they get no card rather than Claude's.
+  const terminalResume = thread.harness !== 'antigravity' && thread.harness !== 'opencode';
   const resume = runsElsewhere || !terminalResume ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-[var(--sp-6)] overflow-y-auto px-[var(--sp-5)] pb-[var(--sp-6)] [&>*]:shrink-0">

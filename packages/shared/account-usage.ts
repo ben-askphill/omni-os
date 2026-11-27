@@ -209,7 +209,7 @@ export const HARNESS_ROWS = [
 ] as const;
 
 /** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud, which has no usage row. */
-export const SLOT_ROWS = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }] as const;
+export const SLOT_ROWS = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }, { id: 'opencode', name: 'OpenCode' }] as const;
 
 /** How full a usage window is, whether the harness reports a fraction or a percent. */
 export function windowPct(w?: { utilization: number }): number | null {

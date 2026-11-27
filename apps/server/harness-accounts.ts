@@ -54,6 +54,7 @@ import { probeHermes } from './harness/hermes/client.ts';
 import { account, clean, parseAccountUsage, parseClaudeStatus, parseCodexAccount, parseCursorAbout, parseCursorMe, sanitize } from './harness/accounts-parse.ts';
 import { harnessEnv } from './harness/env-guard.ts';
 import { antigravityState, refreshAntigravity } from './harness/antigravity/state.ts';
+import { opencodeState, refreshOpenCode } from './harness/opencode/state.ts';
 import { HARNESS_IDS, type HarnessId } from './harness/types.ts';
 import { globalSecret } from './secrets.ts';
 import { computerName, currentRecords, deviceRecords } from './sync/devices.ts';
@@ -175,6 +176,18 @@ async function readAntigravity(): Promise<HarnessAccount> {
   return account('antigravity', 'signed-in', { label: s.email, plan: s.tier });
 }
 
+/**
+ * OpenCode's row. The free Zen models need no account and no key, so there is nothing to sign in to: a working
+ * install reads as free with no account. Omni never reads OpenCode's own credential file.
+ */
+async function readOpenCode(): Promise<HarnessAccount> {
+  const s = (!recheck && opencodeState()) || (await refreshOpenCode({ env: baseEnv() }));
+  if (s.state === 'not-installed') return account('opencode', 'not-installed');
+  if (s.state === 'too-old') return account('opencode', 'unknown', { note: s.version ? `opencode ${s.version} is not supported` : 'opencode is too old' });
+  if (s.state === 'not-answering') return account('opencode', 'unknown', { note: 'opencode did not answer' });
+  return account('opencode', 'not-reported', { note: 'Free OpenCode Zen models, no account' });
+}
+
 const READERS: Record<HarnessId, () => Promise<HarnessAccount>> = {
   'claude-code': readClaude,
   codex: readCodex,
@@ -182,6 +195,7 @@ const READERS: Record<HarnessId, () => Promise<HarnessAccount>> = {
   'cursor-cloud': readCursorCloud,
   hermes: readHermes,
   antigravity: readAntigravity,
+  opencode: readOpenCode,
 };
 
 /** One harness's reading, cleaned whatever its reader returned. A reader that throws reads as unknown. */

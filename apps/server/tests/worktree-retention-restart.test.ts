@@ -48,6 +48,7 @@ function boot(firstPassMs: number) {
       OMNI_CODEX_BIN: join(tmp, 'no-codex'),
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
       OMNI_ANTIGRAVITY_BIN: join(tmp, 'no-agy'),
+      OMNI_OPENCODE_BIN: join(tmp, 'no-opencode'),
       OMNI_BROWSER: '0',
       OMNI_BRAIN_DIR: join(tmp, 'brain'),
       OMNI_DEFAULT_MODEL: 'sonnet',

@@ -1,5 +1,5 @@
 // What a resumed chat reads again when its harness takes Omni's system prompt only as a new chat's first message
-// (local Cursor, harness/cursor/adapter.ts, and Antigravity without a system prompt field). Claude Code and Codex get
+// (local Cursor, harness/cursor/adapter.ts, and Antigravity and OpenCode, which have no system prompt field over ACP). Claude Code and Codex get
 // the whole prompt on every resume. A chat made before Omni changed the Reply block (runner/prompts.ts replyBlock),
 // which says when an answer is a page and what stays text, would otherwise keep the old one. The tool-failure policy
 // is not sent again: the chat has it from its first message, and resending it cost every resume ~500 tokens (#1013).

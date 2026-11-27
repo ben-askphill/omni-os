@@ -12,7 +12,8 @@
     "cursor": null,
     "hermes": null,
     "cursor-cloud": null,
-    "antigravity": null
+    "antigravity": null,
+    "opencode": null
   },
   "slots": {
     "claude-code": {
@@ -36,6 +37,10 @@
       "cap": 4
     },
     "antigravity": {
+      "running": 0,
+      "cap": 4
+    },
+    "opencode": {
       "running": 0,
       "cap": 4
     },
