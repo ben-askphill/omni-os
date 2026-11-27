@@ -287,7 +287,7 @@ An OpenCode thread runs `opencode acp` on your machine, on OpenCode Zen's free m
 - **A model that goes away.** Free models are free for a limited time. If the thread's model is no longer listed, the turn stops with "pick another model" and waits. Omni does not move it to another model.
 - **The free limit.** When Zen refuses a request, the thread shows a limit stop with the reset time when OpenCode gave one.
 - **Thinking.** OpenCode's reasoning shows as the thinking line, never as rows.
-- **Permissions.** Omni answers each request itself, with the same levels, cards and tripwire as Antigravity. Code Mode is switched off so MCP calls are plain tools Omni can judge. A delegate-only agent loses shell, edit, sub-agent and browser tools in OpenCode's own config as well.
+- **Permissions.** Omni answers each request itself, with the same levels, cards and tripwire as Antigravity. Code Mode is switched off so MCP calls are plain tools Omni can judge. A delegate-only agent loses shell, edit, sub-agent and browser tools in OpenCode's own config as well. Below Full access, or for a limited agent, OpenCode ignores the repo's own `opencode.json` and `.opencode` folder, so a checkout cannot add plugins, MCP servers or a provider endpoint. Its `AGENTS.md` still loads, and Omni's permission rules win over any the repo sets.
 - **No steer, no skills, no compact.** A message sent mid-turn waits for the next turn. Omni's context goes ahead of the first message, since OpenCode has no system prompt field over ACP. Auto never picks it.
 - The check opens one session in a scratch folder to read the models, then deletes it.
 

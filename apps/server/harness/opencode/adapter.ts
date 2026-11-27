@@ -111,6 +111,10 @@ export const opencodeAdapter: HarnessAdapter = {
         OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),
         OMNI_CHANNEL: thread.channel_id,
         OPENCODE_CONFIG_CONTENT: configContent({ held, delegateOnly, noEdits, readOnly }),
+        // A held thread ignores the repo's own opencode.json and .opencode folder, so a checkout cannot add plugins, MCP
+        // servers or a provider endpoint past the gate. Omni's rules already win over its permissions (they load last,
+        // probed on 2.3.0); AGENTS.md still loads with this set.
+        ...(held && { OPENCODE_DISABLE_PROJECT_CONFIG: '1' }),
       },
       ctx.secretEnv,
     );

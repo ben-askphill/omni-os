@@ -71,7 +71,7 @@ beforeAll(async () => {
     ANTHROPIC_API_KEY: 'sk-ant-must-not-leak',
     OPENAI_API_KEY: 'sk-must-not-leak',
     OPENCODE_API_KEY: 'zen-must-not-leak',
-    FAKE_OPENCODE_LOG_ENV: 'ANTHROPIC_API_KEY,OPENAI_API_KEY,OPENCODE_API_KEY,OPENCODE_DISABLE_AUTOUPDATE',
+    FAKE_OPENCODE_LOG_ENV: 'ANTHROPIC_API_KEY,OPENAI_API_KEY,OPENCODE_API_KEY,OPENCODE_DISABLE_AUTOUPDATE,OPENCODE_DISABLE_PROJECT_CONFIG',
   });
   ({ app } = await import('../app.ts'));
   svc = await import('../harness/catalog-service.ts');
@@ -301,6 +301,8 @@ describe('what OpenCode is given', () => {
     const s = spawns().at(-1);
     expect(s.argv).toEqual(['acp']);
     expect(s.envValues).toMatchObject({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null, OPENCODE_API_KEY: null, OPENCODE_DISABLE_AUTOUPDATE: '1' });
+    // Nothing is held at Full access, so the repo's own OpenCode config still loads.
+    expect(s.envValues.OPENCODE_DISABLE_PROJECT_CONFIG).toBeNull();
     expect(JSON.stringify(s.envKeys)).not.toMatch(/ANTHROPIC|OPENAI|OPENCODE_API/);
   });
 
@@ -321,5 +323,7 @@ describe('what OpenCode is given', () => {
     const rules: { action: string; effect: string }[] = JSON.parse(spawns().at(-1).config).permissions;
     // The last matching rule wins, so each denial must be the last rule for its action.
     for (const a of ['shell', 'edit', 'subagent', 'browser', 'execute']) expect(rules.filter((r) => r.action === a).at(-1)?.effect).toBe('deny');
+    // A held thread ignores the repo's opencode.json and .opencode folder: no plugin, MCP server or provider from a checkout.
+    expect(spawns().at(-1).envValues.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('1');
   });
 });
