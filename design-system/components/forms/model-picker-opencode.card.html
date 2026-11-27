@@ -1,0 +1,47 @@
+<!-- @dsCard group="09 Forms" viewport="760x1180" name="ModelPickerOpenCode" subtitle="OpenCode: free and limited-time models, free limit reached, the thread's model gone, not installed" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:28px 32px;align-items:start}.cell{display:grid;gap:8px;justify-items:start;align-content:start;min-width:0}.cell.open{padding-bottom:var(--h,300px)}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.hint{font:400 12.5px/1.4 var(--font-sans);color:var(--fg-4);max-width:340px}@media (max-width:420px){body{padding:16px}}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ ModelPicker, EffortPicker }) => {
+const E = ['low','medium','high','xhigh','max'];
+const claude = { id: 'claude-code', name: 'Claude Code', plan: 'Max plan', models: [
+  { id: 'sonnet', label: 'Sonnet 5.5', default: true, efforts: E, defaultEffort: 'high' },
+  { id: 'opus', label: 'Opus 5.5', efforts: E, defaultEffort: 'high' } ] };
+/* OpenCode on Zen's free models only. Ids from the spec (docs/plans/2026-11-27-opencode-harness.md, section 8). */
+const deepseek = { id: 'opencode/deepseek-v4.1-flash-free', label: 'DeepSeek V4.1 Flash', default: true, free: true, limited: true, note: 'Zero retention', efforts: ['low','high','max'] };
+const seaglass = { id: 'opencode/seaglass-alpha-free', label: 'Seaglass Alpha', free: true, note: 'Trains on your prompts', efforts: [] };
+const oc = (o) => ({ id: 'opencode', name: 'OpenCode', plan: 'Free, no account', models: [deepseek, seaglass], ...o });
+const ready = [claude, oc()];
+const limited = [claude, oc({ limit: 'Free limit. Back tomorrow 01:42' })];
+const gone = [claude, oc({ models: [{ ...deepseek, gone: true, default: false, limited: false }, { ...seaglass }] })];
+const missing = [claude, { id: 'opencode', name: 'OpenCode', plan: 'Free, no account', available: false, fix: 'Install it with npm i -g @opencode/cli, then Check again.', models: [] }];
+const pick = { harness: 'opencode', model: 'opencode/deepseek-v4.1-flash-free' };
+function App(){
+  const [a,setA]=React.useState(pick);
+  const [e,setE]=React.useState('high');
+  return <div className="grid">
+    <div className="cell open" style={{'--h':'290px'}}><div className="om-caption">Free models: tag, limited time, what the vendor keeps</div>
+      <div className="row"><ModelPicker harnesses={ready} value={a} onChange={setA} offerAuto={false} defaultOpen /><EffortPicker harnesses={ready} choice={a} value={e} onChange={setE} /></div></div>
+    <div className="cell open" style={{'--h':'320px'}}><div className="om-caption">Free limit reached: the header says when it is back</div>
+      <ModelPicker harnesses={limited} value={pick} offerAuto={false} defaultOpen /></div>
+    <div className="cell open" style={{'--h':'300px'}}><div className="om-caption">The thread's model is gone: pill rings in needs, row cannot be picked</div>
+      <ModelPicker harnesses={gone} value={pick} offerAuto={false} defaultOpen />
+      </div>
+    <div className="cell open" style={{'--h':'240px'}}><div className="om-caption">Not installed, from a Claude Code thread</div>
+      <ModelPicker harnesses={missing} value={{harness:'claude-code',model:'sonnet'}} offerAuto={false} defaultOpen /></div>
+    <div className="cell"><div className="om-caption">Pills, closed: picked, and gone</div>
+      <div className="row"><ModelPicker harnesses={ready} value={pick} offerAuto={false} /><ModelPicker harnesses={gone} value={pick} offerAuto={false} /></div>
+      <div className="hint">A gone model never moves the thread on its own. The run waits until you pick another.</div></div>
+  </div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

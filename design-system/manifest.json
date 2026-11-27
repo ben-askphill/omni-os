@@ -142,6 +142,7 @@
     "components/forms/inline-confirm-neutral.card.html",
     "components/forms/inline-confirm.card.html",
     "components/forms/model-picker.card.html",
+    "components/forms/model-picker-opencode.card.html",
     "components/forms/model-picker.css",
     "components/forms/picker-channel.card.html",
     "components/forms/picker-crew.card.html",

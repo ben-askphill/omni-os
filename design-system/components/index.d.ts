@@ -317,6 +317,13 @@ export interface PickerModel {
   default?: boolean;
   efforts?: string[];
   defaultEffort?: string;
+  /** Costs nothing (OpenCode Zen's free models): a neutral "Free" tag after the name. */
+  free?: boolean;
+  /** The vendor says the model is temporary ("free for a limited time"): the note starts "Limited time". */
+  limited?: boolean;
+  /** The vendor removed it. Listed only while a thread still names it; tagged Gone, never pickable. The pill on that
+   *  thread rings in needs and reads "· gone". */
+  gone?: boolean;
 }
 export interface PickerHarness {
   id: 'claude-code' | 'codex' | 'cursor' | string;
@@ -326,6 +333,8 @@ export interface PickerHarness {
   available?: boolean;
   /** The command or sentence that makes it available. */
   fix?: string;
+  /** The harness stopped at a free-tier limit: one line under its header, e.g. "Free limit. Back tomorrow 01:42". */
+  limit?: string;
   models: PickerModel[];
 }
 export interface ModelPickerProps {
@@ -490,9 +499,9 @@ export const CREW_ROLES: CrewRole[];
 // ---- components/icons/HarnessMark.d.ts
 /**
  * Harness a thread runs on, shown with the vendor's own logo (Simple Icons, monochrome, currentColor):
- * Claude Code → Claude, Codex → OpenAI, Cursor → Cursor. Logos are copied verbatim — never redrawn or colored.
+ * Claude Code → Claude, Codex → OpenAI, Cursor → Cursor, OpenCode → OpenCode. Logos are copied verbatim — never redrawn or colored.
  */
-export type Harness = 'claude-code' | 'codex' | 'cursor';
+export type Harness = 'claude-code' | 'codex' | 'cursor' | 'cursor-cloud' | 'antigravity' | 'opencode';
 export interface HarnessMarkProps {
   harness?: Harness;
   /** md = 20px disc / 13px logo, lg = 26px disc / 16px logo */

@@ -9,3 +9,15 @@
 .om-next-turn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 10px; flex: none; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--live-text); font: 600 12px/1 var(--font-sans); cursor: pointer; transition: background-color .15s var(--ease-out); }
 .om-next-turn:hover { background: var(--surface-3); }
 .om-next-turn .x { color: var(--fg-4); }
+
+/* Free models (OpenCode Zen): a quiet neutral tag after the name. Never a pop: free is a fact, not a state. */
+.om-pik-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); color: var(--fg-2); font: 500 10.5px/16px var(--font-sans); font-style: normal; vertical-align: 1px; }
+/* A model the vendor removed: listed so the thread's pick is explained, never pickable. */
+.om-pik-row[data-gone] { cursor: default; }
+.om-pik-row[data-gone] .t b { color: var(--fg-3); }
+.om-pik-row[data-gone]:hover { background: transparent; }
+/* A harness at its free limit: one line under its header, the gauge in warn like LimitCard's. */
+.om-pik-limit { display: flex; align-items: center; gap: 6px; padding: 0 12px 6px; font: 400 11.5px/1.3 var(--font-sans); color: var(--fg-2); }
+.om-pik-limit svg { color: var(--warn); flex: none; }
+/* The thread's model is gone: the pill rings in needs, like a question waiting on you. */
+.om-gone .om-pik-btn { box-shadow: inset 0 0 0 1.5px var(--needs); }

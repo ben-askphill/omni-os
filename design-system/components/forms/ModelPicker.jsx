@@ -4,7 +4,9 @@ import { HarnessLogo } from '../icons/HarnessMark.jsx';
 import { Picker } from './Picker.jsx';
 
 /* Model pill (web/src ModelPicker.tsx). Auto first, then models grouped under each harness with a sticky header naming
-   the plan, one search across all groups. A harness that is not installed or logged in shows the command that fixes it. */
+   the plan, one search across all groups. A harness that is not installed or logged in shows the command that fixes it.
+   Free models carry a Free tag and "Limited time" when the vendor says so; a model the vendor removed stays listed as
+   Gone and cannot be picked; a harness at its free limit says when it is back. */
 const AUTO = { harness: 'auto', model: '' };
 const isAuto = (v) => v && v.harness === 'auto';
 
@@ -16,6 +18,8 @@ export function ModelPicker({ harnesses = [], value = AUTO, onChange, onOpen, de
   const auto = isAuto(value);
   const h = harnesses.find((x) => x.id === value.harness);
   const m = h && h.models.find((x) => x.id === value.model);
+  /* The thread's model is gone from the harness: the pill rings in needs and says so, and the run waits for a pick. */
+  const gone = !!(m && m.gone);
   const s = q.trim().toLowerCase();
   const groups = useMemo(() => harnesses.map((x) => ({ harness: x, models: s ? x.models.filter((y) => (y.label + ' ' + y.id + ' ' + x.name + ' ' + x.plan).toLowerCase().includes(s)) : x.models })), [harnesses, s]);
   const showAuto = offerAuto && 'auto'.includes(s);
@@ -40,13 +44,13 @@ export function ModelPicker({ harnesses = [], value = AUTO, onChange, onOpen, de
   const rowDisc = (child) => <span style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, flex: 'none', borderRadius: '50%', background: 'var(--surface-2)', color: 'var(--fg)' }}>{child}</span>;
   const small = { font: '400 11.5px/1.3 var(--font-sans)', color: 'var(--fg-4)' };
   return (
-    <div ref={wrap} className={'om-pik' + (queued ? ' om-queued' : '')} title={disabled ? disabledHelp : undefined}>
+    <div ref={wrap} className={'om-pik' + (queued ? ' om-queued' : '') + (gone ? ' om-gone' : '')} title={disabled ? disabledHelp : undefined}>
       <button ref={btn} type="button" className="om-pik-btn" aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={toggle}
-        aria-label={auto ? 'Model: Auto' : 'Model: ' + (label || (m && m.label) || 'none') + (h ? ' on ' + h.name : '')}
+        aria-label={auto ? 'Model: Auto' : 'Model: ' + (label || (m && m.label) || 'none') + (h ? ' on ' + h.name : '') + (gone ? ', gone, pick another' : '')}
         onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.preventDefault(); setOpen(false); } }}>
         {h ? disc(<HarnessLogo harness={h.id} size={13} />) : <span style={{ display: 'grid', placeItems: 'center', width: 24, height: 24, color: 'var(--fg-3)' }}><Icon name="zap" size={14} /></span>}
         <span className="lbl">{label || (auto ? 'Auto' : m ? m.label : placeholder)}</span>
-        {h && <span style={{ flex: 'none', color: 'var(--fg-4)' }}>· {h.name}</span>}
+        {h && <span style={{ flex: 'none', color: gone ? 'var(--fg-2)' : 'var(--fg-4)' }}>· {gone ? 'gone' : h.name}</span>}
         <Icon name="chevronDown" size={13} className="om-pik-chev" />
       </button>
       {open && (
@@ -69,14 +73,19 @@ export function ModelPicker({ harnesses = [], value = AUTO, onChange, onOpen, de
                   <span className="om-caption" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><HarnessLogo harness={harness.id} size={12} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{harness.name}</span></span>
                   <span style={{ ...small, flex: 'none' }}>{harness.available === false ? 'Unavailable' : /plan$/.test(harness.plan) ? 'Bills your ' + harness.plan : harness.plan}</span>
                 </div>
+                {harness.available !== false && harness.limit && (
+                  <div className="om-pik-limit"><Icon name="gauge" size={12} />{harness.limit}</div>
+                )}
                 {harness.available === false ? (
                   <div style={{ ...small, padding: '0 12px 8px' }}>Not available. {harness.fix && harness.fix.split(/\s+/).length <= 3 ? <>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>{harness.fix}</code>.</> : harness.fix}</div>
                 ) : models.length ? models.map((y) => {
                   const on = harness.id === value.harness && y.id === value.model;
+                  const note = y.gone ? 'Removed by ' + harness.name + '. Pick another.' : [y.limited && 'Limited time', y.note].filter(Boolean).join(' · ');
                   return (
-                    <button key={y.id} type="button" role="option" aria-selected={on} onClick={() => pick({ harness: harness.id, model: y.id })} className="om-pik-row">
+                    <button key={y.id} type="button" role="option" aria-selected={on} aria-disabled={y.gone || undefined} data-gone={y.gone || undefined}
+                      onClick={() => !y.gone && pick({ harness: harness.id, model: y.id })} className="om-pik-row">
                       {rowDisc(<HarnessLogo harness={harness.id} size={13} />)}
-                      <span className="t"><b>{y.label}{y.default && <span style={{ color: 'var(--fg-4)', fontWeight: 400 }}> (default)</span>}</b>{y.note && <span>{y.note}</span>}</span>
+                      <span className="t"><b>{y.label}{y.default && <span style={{ color: 'var(--fg-4)', fontWeight: 400 }}> (default)</span>}{y.gone ? <i className="om-pik-tag">Gone</i> : y.free && <i className="om-pik-tag">Free</i>}</b>{note && <span>{note}</span>}</span>
                       <span className="om-pik-mark">{on && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
                     </button>
                   );

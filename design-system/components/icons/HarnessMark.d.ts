@@ -1,8 +1,8 @@
 /**
  * Harness a thread runs on, shown with the vendor's own logo (Simple Icons, monochrome, currentColor):
- * Claude Code → Claude, Codex → OpenAI, Cursor → Cursor. Logos are copied verbatim — never redrawn or colored.
+ * Claude Code → Claude, Codex → OpenAI, Cursor → Cursor, OpenCode → OpenCode. Logos are copied verbatim — never redrawn or colored.
  */
-export type Harness = 'claude-code' | 'codex' | 'cursor' | 'cursor-cloud' | 'antigravity';
+export type Harness = 'claude-code' | 'codex' | 'cursor' | 'cursor-cloud' | 'antigravity' | 'opencode';
 export interface HarnessMarkProps {
   harness?: Harness;
   /** md = 20px disc / 13px logo, lg = 26px disc / 16px logo */
