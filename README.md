@@ -28,6 +28,8 @@ Nothing extra. Omni runs each thread through the official CLI of the harness you
 > - Claude Code (Claude plan): `npm install -g @anthropic-ai/claude-code`, then run `claude` and `/login`
 > - Codex (ChatGPT plan): `npm install -g @openai/codex && codex login`. Optional. When you ask the Conductor to review a pull request Claude wrote, the review runs on Codex
 > - Cursor Agent (Cursor plan): `curl https://cursor.com/install -fsS | bash && cursor-agent login`
+> - Antigravity (Google AI plan): `curl -fsSL https://antigravity.google/cli/install.sh | bash`, then run `agy` and sign in with Google. See [Harnesses](docs/user/harnesses.md#antigravity)
+> - OpenCode (free OpenCode Zen models, no account): `npm install -g @opencode/cli`. See [Harnesses](docs/user/harnesses.md#opencode)
 > - Hermes (Anthropic API, on your own Linux server): no CLI on this machine. It joins as a remote agent, not a harness. See [Remote agents](docs/user/crew.md#remote-agents)
 > - Cursor Cloud (Cursor plan, a Cursor cloud agent on Cursor's machines): the secret `CURSOR_API_KEY`. See [Harnesses](docs/user/harnesses.md#cursor-cloud)
 
