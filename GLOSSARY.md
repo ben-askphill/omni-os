@@ -1,6 +1,6 @@
 # Omni OS
 
-A local workspace where the user hands work to agents: channels hold threads, agents lead threads and join them as members, and every local agent runs on the user's own subscriptions through an official CLI.
+A local workspace where the user hands work to agents: channels hold threads, agents lead threads and join them as members, and every local agent runs on the user's own subscriptions through an official CLI, or on a free tier that needs no account.
 
 ## Language
 
@@ -275,7 +275,7 @@ _Avoid_: Spinner, badge
 ### Runs
 
 **Harness**:
-The AI tool an agent runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent, Cursor Cloud or Antigravity. A remote agent has none for the user to pick.
+The AI tool an agent runs in, together with the plan it bills: Claude Code, Codex, Cursor Agent, Cursor Cloud, Antigravity or OpenCode. A remote agent has none for the user to pick.
 _Avoid_: Agent (who takes part in a thread), remote agent, custom harness, provider, engine, backend, runtime
 
 **Account**:

@@ -18,6 +18,7 @@ import { cursorAdapter } from '../harness/cursor/adapter.ts';
 import { hermesAdapter, runsApiAdapter } from '../harness/hermes/adapter.ts';
 import { cursorCloudAdapter } from '../harness/cursor-cloud/adapter.ts';
 import { antigravityAdapter } from '../harness/antigravity/adapter.ts';
+import { opencodeAdapter } from '../harness/opencode/adapter.ts';
 import { customHarness, customHarnesses } from '../harness/custom.ts';
 import { harnessName, missingHarness } from '../harness/registry.ts';
 import { detachedSession } from '../harness/session.ts';
@@ -33,6 +34,7 @@ const ADAPTERS: Record<string, HarnessAdapter> = {
   hermes: hermesAdapter,
   'cursor-cloud': cursorCloudAdapter,
   antigravity: antigravityAdapter,
+  opencode: opencodeAdapter,
 };
 /**
  * A harness this machine does not have: a custom harness whose file is gone or not synced here yet, or an id no build
@@ -88,6 +90,7 @@ const CAPS: Record<string, number> = {
   hermes: config.maxConcurrentHermes,
   'cursor-cloud': config.maxConcurrentCursorCloud,
   antigravity: config.maxConcurrentAntigravity,
+  opencode: config.maxConcurrentOpenCode,
 };
 /** A custom harness's cap is in its file. An id with no harness here takes the smallest, though it never starts. */
 export const capFor = (harness: string) => CAPS[harness] ?? customHarness(harness)?.cap ?? 1;

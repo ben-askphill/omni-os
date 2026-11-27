@@ -23,6 +23,13 @@ export interface PickerModel {
   default?: boolean;
   efforts?: string[];
   defaultEffort?: string;
+  /** Costs nothing (OpenCode Zen's free models): a neutral "Free" tag after the name. */
+  free?: boolean;
+  /** The vendor says the model is temporary ("free for a limited time"): the note starts "Limited time". */
+  limited?: boolean;
+  /** The vendor removed it. Listed only while a thread still names it; tagged Gone, never pickable. The pill on that
+   *  thread rings in needs and reads "· gone". */
+  gone?: boolean;
 }
 export interface PickerHarness {
   id: 'claude-code' | 'codex' | 'cursor' | string;
@@ -32,6 +39,8 @@ export interface PickerHarness {
   available?: boolean;
   /** The command or sentence that makes it available. */
   fix?: string;
+  /** The harness stopped at a free-tier limit: one line under its header, e.g. "Free limit. Back tomorrow 01:42". */
+  limit?: string;
   models: PickerModel[];
 }
 export interface ModelPickerProps {

@@ -7,6 +7,7 @@ import { Button, ErrorNote, Icon, Picker } from './ui.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
 import { BasePicker, useBasePick } from './BasePicker.tsx';
 import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
+import { usePickModelRequest } from '../limits.ts';
 import { useToast } from './Toaster.tsx';
 import { sendMessageToGrokBot } from '../grokbot.ts';
 import { GROK_BOT_NOTE, GROK_BOT_PLACEHOLDER, GROK_BOT_SENT, grokBotBlock } from '@omni/shared/thread-machine.ts';
@@ -524,6 +525,8 @@ export function ReplyComposer({
   const slash = useMemo(() => replySlash(text, list, thread.harness), [text, list, thread.harness]);
   const omni = slash.action.kind !== 'send';
   const [pillRequest, setPillRequest] = useState(0);
+  // A limit or gone-model card's Switch model opens the same list `/model` does.
+  usePickModelRequest(thread.id, () => setPillRequest((n) => n + 1));
 
   /** Clear what was sent, unless Ben typed more while it was in flight. */
   const sent = (raw: string) => {

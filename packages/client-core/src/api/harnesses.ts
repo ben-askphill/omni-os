@@ -1,6 +1,6 @@
 import { apiPath, type HttpClient } from '../http.ts';
 
-export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud' | 'antigravity';
+export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud' | 'antigravity' | 'opencode';
 
 export interface HarnessCapabilities {
   /** The process stays warm between turns. */
@@ -28,6 +28,10 @@ export interface ModelEntry {
   default?: boolean;
   /** Left out of the pickers by the Settings choice of models to show. Still runs where a thread already uses it. */
   hidden?: boolean;
+  /** Costs nothing (OpenCode Zen's free models): tagged Free. */
+  free?: boolean;
+  /** Free for a limited time, as the vendor says. */
+  limited?: boolean;
 }
 
 /** GET /harnesses: a harness with its availability, models and cap. */
@@ -56,12 +60,12 @@ export interface HarnessInfo {
 
 /**
  * Whether a follow-up on a busy thread can steer, or has to queue. The catalog is `GET /harnesses`. While it has not
- * loaded, or has no row for this harness, every harness but Cursor, Cursor Cloud and Antigravity steers.
+ * loaded, or has no row for this harness, every harness but Cursor, Cursor Cloud, Antigravity and OpenCode steers.
  */
 export function canSteer(harnessId: string, catalog: readonly Pick<HarnessInfo, 'id' | 'capabilities'>[] | null | undefined): boolean {
   const row = catalog?.find((h) => h.id === harnessId);
   if (row) return row.capabilities.steer;
-  return harnessId !== 'cursor' && harnessId !== 'cursor-cloud' && harnessId !== 'antigravity';
+  return harnessId !== 'cursor' && harnessId !== 'cursor-cloud' && harnessId !== 'antigravity' && harnessId !== 'opencode';
 }
 
 export function harnessesApi(http: HttpClient) {

@@ -64,6 +64,7 @@ export const config = {
   },
   maxConcurrentCursorCloud: Number(env.OMNI_MAX_CONCURRENT_CURSOR_CLOUD ?? 12),
   maxConcurrentAntigravity: Number(env.OMNI_MAX_CONCURRENT_ANTIGRAVITY ?? 12),
+  maxConcurrentOpenCode: Number(env.OMNI_MAX_CONCURRENT_OPENCODE ?? 12),
   /** The Cursor Cloud Agents API. Set only to point Omni at a fake for tests or QA. The key is the secret CURSOR_API_KEY. */
   cursorApiUrl: env.OMNI_CURSOR_API_URL ?? 'https://api.cursor.com',
   /** How often a running Cursor cloud agent's run is read for its status, branch and PR. */

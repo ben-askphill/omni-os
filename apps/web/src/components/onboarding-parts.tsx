@@ -123,6 +123,7 @@ export async function createChannel(name: string, repo: string, store: string) {
 /** What a harness is for, under its row, when that is more than "another place to run threads". */
 const HARNESS_NOTE: Partial<Record<string, string>> = {
   codex: 'Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.',
+  opencode: 'Optional. Free models on OpenCode Zen, no account or key. They can be removed or hit a limit without notice.',
 };
 
 /** The rows the Harnesses step lists: each harness, then the GitHub CLI the PR steps run. */
@@ -199,7 +200,7 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
     <Screen
       caption="Harnesses"
       title="The harnesses Omni can run"
-      body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex, Cursor Agent and Antigravity are optional."
+      body="Each thread runs on a CLI you are signed in to, billed to that plan. OpenCode needs no account: it runs free models. Omni needs Claude Code. The others are optional."
     >
       <ul className="space-y-2">
         {(list ?? []).map((h) => (

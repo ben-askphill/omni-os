@@ -34,6 +34,9 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
     'CLOUDSDK_CORE_PROJECT',
     'AGY_ACP_CCPA_PROJECT',
   ],
+  // OPENCODE_API_KEY moves Zen's free models onto pay-as-you-go. The rest is opencodeEnv's allow-list (opencode/env.ts):
+  // OpenCode enables a provider whenever its key is in the environment, and a list of every key would be out of date.
+  opencode: ['OPENCODE_API_KEY', 'OPENCODE_CONFIG', 'OPENCODE_CONFIG_DIR', 'OPENCODE_DB', 'OPENCODE_SERVER_PASSWORD'],
 };
 
 /**

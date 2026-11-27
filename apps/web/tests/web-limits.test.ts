@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, PendingMsg, Thread, ThreadDetail } from '../src/api.ts';
-import { limitLabel, limitView, resetLabel } from '../src/limits.ts';
+import { freeLimitLine, freeLimits, limitLabel, limitView, resetLabel } from '../src/limits.ts';
 import { reasonOf } from '../src/needs-you.ts';
 
 // The Web UI's side of a limit stop (apps/web/src/limits.ts, LimitCard), against the recorded server answers
@@ -102,5 +102,31 @@ describe('the card', () => {
     const thread = { ...fixture<ThreadDetail>('thread-limited.json').thread, limit_resets_at: at(16) };
     // The turn ended failed, but the header reads Limited, not Failed.
     expect(threadPill(thread, { now: NOW })).toEqual({ glyph: 'limited', label: 'Limited · resets 16:00', mark: 'limited' });
+  });
+});
+
+describe("OpenCode's free limit", () => {
+  const oc = (state: 'limited' | 'scheduled', resets: string | null) => ({ harness: 'opencode', limit_state: state, limit_resets_at: resets }) as Pick<Thread, 'harness' | 'limit_state' | 'limit_resets_at'>;
+
+  it('offers another model first, then Resume at reset, and never Resume now while a reset time is known', () => {
+    const v = limitView(oc('limited', at(5, 0, 1)), 'OpenCode', NOW)!;
+    expect(v.title).toBe('Free limit reached');
+    expect(v.body).toBe("OpenCode's free tier stopped this turn. It resets tomorrow 05:00, in about 15 hours. Switch model to keep going now.");
+    expect(v.actions).toEqual(['switch', 'schedule']);
+  });
+
+  it('says when it resumes once scheduled, and keeps Switch model', () => {
+    const v = limitView(oc('scheduled', at(5, 0, 1)), 'OpenCode', NOW)!;
+    expect(v).toMatchObject({ title: 'Resumes tomorrow 05:00', actions: ['switch', 'cancel'] });
+  });
+
+  it('falls back to Resume now when OpenCode gave no reset time', () => {
+    expect(limitView(oc('limited', null), 'OpenCode', NOW)!.actions).toEqual(['switch', 'resume']);
+  });
+
+  it("puts a line under OpenCode's heading in the picker while the thread is stopped, and none for a plan's limit", () => {
+    expect(freeLimitLine(oc('limited', at(5, 0, 1)), NOW)).toBe('Free limit. Back tomorrow 05:00');
+    expect(freeLimits(oc('limited', null), NOW)).toEqual({ opencode: 'Free limit' });
+    expect(freeLimits({ harness: 'claude-code', limit_state: 'limited', limit_resets_at: at(17) } as Pick<Thread, 'harness' | 'limit_state' | 'limit_resets_at'>, NOW)).toBeUndefined();
   });
 });

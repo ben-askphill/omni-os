@@ -5,6 +5,7 @@
 import type { Thread } from '../db.ts';
 import type { ThreadSkills } from '../skills.ts';
 import { antigravityProfile } from './antigravity/profile.ts';
+import { opencodeProfile } from './opencode/profile.ts';
 import { claudeProfile } from './claude/profile.ts';
 import { codexProfile } from './codex/profile.ts';
 import { cursorProfile } from './cursor/profile.ts';
@@ -101,6 +102,7 @@ const PROFILES: Record<HarnessId, HarnessProfile> = {
   hermes: hermesProfile,
   'cursor-cloud': cursorCloudProfile,
   antigravity: antigravityProfile,
+  opencode: opencodeProfile,
 };
 
 /** What a harness does, by id. A custom harness, or an id this machine does not know, gets the Runs API profile. */

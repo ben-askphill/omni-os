@@ -21,7 +21,7 @@ const STROKE: Record<ContextLevel, string> = { ok: 'var(--fg-3)', warn: 'var(--w
 const TEXT: Record<ContextLevel, string> = { ok: 'text-fg-3', warn: 'text-warn', critical: 'text-needs' };
 
 /** The harnesses that report their window. Cursor's is an estimate; the meter stays out of Hermes threads. */
-const METERED = new Set(['claude-code', 'codex', 'cursor', 'antigravity']);
+const METERED = new Set(['claude-code', 'codex', 'cursor', 'antigravity', 'opencode']);
 
 /** The newer of two readings. The stream's push wins a tie: it is the live one. */
 function newest(a: ContextUsage | null | undefined, b: ContextUsage | null | undefined) {
@@ -82,6 +82,7 @@ const SOURCE_NOTE: Record<ContextUsage['source'], string> = {
   cursor: "Estimated. From Cursor's last turn, one model call, so the total is exact; the window is read off the model's name.",
   'cursor-estimate': "Estimated. Cursor adds up every model call in a turn, so this is the average per call over the last turn's calls.",
   antigravity: "From agy's last usage update: the tokens in its window and the window's size.",
+  opencode: "From OpenCode's last usage update: the tokens in its window and the window's size.",
 };
 
 /** The thread's billed cost for the hover, once Cursor has reported it. */

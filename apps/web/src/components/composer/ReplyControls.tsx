@@ -6,6 +6,7 @@ import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Th
 import { Icon, Kbd, Loader, type IconName } from '../ui.tsx';
 import { ModelPicker } from '../ModelPicker.tsx';
 import { pickerAccounts, useAccounts } from '../../accounts.ts';
+import { freeLimits } from '../../limits.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { useAnchoredPopover } from '../ui/use-anchored-popover.ts';
@@ -205,6 +206,7 @@ export function ThreadRunPills({
         className={ring}
         onChange={(c) => pick(c)}
         effort={{ value: shown.effort, onChange: (effort) => pick({ effort }) }}
+        limits={freeLimits(thread)}
       />
     </span>
   );

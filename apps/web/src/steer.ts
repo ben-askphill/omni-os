@@ -12,7 +12,7 @@ export interface SteerCatalogRow {
  * that row's `capabilities.steer`, even when it disagrees with the fallback.
  */
 export function canSteer(harnessId: string, catalog: SteerCatalogRow[] | null | undefined): boolean {
-  const fallback = harnessId !== 'cursor' && harnessId !== 'cursor-cloud' && harnessId !== 'antigravity';
+  const fallback = harnessId !== 'cursor' && harnessId !== 'cursor-cloud' && harnessId !== 'antigravity' && harnessId !== 'opencode';
   if (catalog == null) return fallback;
   const row = catalog.find((h) => h.id === harnessId);
   if (!row) return fallback;

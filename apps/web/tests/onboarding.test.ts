@@ -132,7 +132,7 @@ describe('Harnesses step', () => {
       { id: 'codex', name: 'Codex', plan: 'ChatGPT plan', available: false, fix: 'codex login', models: [], running: 0, cap: 2 },
     ];
     const el = await render(createElement(HarnessScreen));
-    expect(text(el)).toContain('Omni needs Claude Code. Codex, Cursor Agent and Antigravity are optional.');
+    expect(text(el)).toContain('Omni needs Claude Code. The others are optional.');
     expect(text(row(el, 'codex'))).toContain('Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.');
     expect(text(el)).not.toContain('each time');
     expect(text(el)).toContain('You can add the others any time.');

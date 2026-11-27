@@ -205,6 +205,28 @@
     "install": "curl -fsSL https://antigravity.google/cli/install.sh | bash"
   },
   {
+    "id": "opencode",
+    "name": "OpenCode",
+    "plan": "Free OpenCode Zen models",
+    "capabilities": {
+      "warmProcess": true,
+      "steer": false,
+      "interrupt": true,
+      "inlineImages": true,
+      "usage": "none",
+      "remote": false,
+      "toolLimits": true,
+      "switchable": true
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "Omni found no opencode on its PATH. Install OpenCode 2 with npm install -g @opencode/cli, or set OMNI_OPENCODE_BIN to its path",
+    "missing": true,
+    "models": [],
+    "running": 0,
+    "install": "npm install -g @opencode/cli"
+  },
+  {
     "id": "custom:fixture-agent",
     "name": "Fixture agent",
     "plan": "Bills the fixture server",

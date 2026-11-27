@@ -204,6 +204,7 @@ async function harnesses(server: string | null) {
       ['codex', 'codex', 'codex login'],
       ['cursor', 'cursor-agent', 'cursor-agent login'],
       ['antigravity', 'agy', 'agy (then sign in with Google)'],
+      ['opencode', 'opencode', 'opencode (the free models need no sign-in)'],
     ];
     list = bins.map(([id, bin, fix]) => (has(bin) ? { id, name: HARNESS_META[id].name, available: true } : { id, name: HARNESS_META[id].name, available: false, missing: true, fix, install: HARNESS_INSTALL[id] }));
     say('   (Omni is not running, so this only checks the CLIs are on PATH, not that they are signed in.)');
@@ -212,7 +213,7 @@ async function harnesses(server: string | null) {
   const indent = ' '.repeat(pad + 5);
   for (const h of list) {
     // Remote harnesses are opt-in: listed once they work, never as missing. So is Antigravity until agy is installed.
-    if ((h.id === 'hermes' || h.id === 'cursor-cloud' || (h.id === 'antigravity' && h.missing)) && !h.available) continue;
+    if ((h.id === 'hermes' || h.id === 'cursor-cloud' || ((h.id === 'antigravity' || h.id === 'opencode') && h.missing)) && !h.available) continue;
     const check = harnessCheck(h);
     say(`   ${HARNESS_CHECK_LABEL[check.state].toLowerCase().padEnd(pad)}  ${h.name}`);
     if (h.id === 'codex') say(`${indent}Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.`);
@@ -230,7 +231,7 @@ async function harnesses(server: string | null) {
   if (gh.reason) say(`${indent}${gh.reason}`);
   const ghWho = githubLine(gh);
   if (ghWho) say(`${indent}${ghWho}`);
-  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex, Cursor Agent and Antigravity are optional.');
+  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex, Cursor Agent, Antigravity and OpenCode are optional.');
 }
 
 async function createChannel(server: string | null, name: string, repo: string, store: string) {

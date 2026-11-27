@@ -12,7 +12,7 @@
 <script type="text/babel">
 omReady(({ HarnessMark }) => {
 
-function App(){return <div className="cells"><div className="cell"><span className="om-caption">with label</span><span style={{display:"inline-flex",gap:12}}><HarnessMark harness="claude-code" withLabel/><HarnessMark harness="codex" withLabel/><HarnessMark harness="cursor" withLabel/><HarnessMark harness="antigravity" withLabel/></span></div><div className="cell"><span className="om-caption">lg</span><span style={{display:"inline-flex",gap:8}}><HarnessMark harness="claude-code" size="lg"/><HarnessMark harness="codex" size="lg"/><HarnessMark harness="cursor" size="lg"/><HarnessMark harness="antigravity" size="lg"/></span></div></div>}
+function App(){return <div className="cells"><div className="cell"><span className="om-caption">with label</span><span style={{display:"inline-flex",flexWrap:"wrap",gap:12}}><HarnessMark harness="claude-code" withLabel/><HarnessMark harness="codex" withLabel/><HarnessMark harness="cursor" withLabel/><HarnessMark harness="antigravity" withLabel/><HarnessMark harness="opencode" withLabel/></span></div><div className="cell"><span className="om-caption">lg</span><span style={{display:"inline-flex",gap:8}}><HarnessMark harness="claude-code" size="lg"/><HarnessMark harness="codex" size="lg"/><HarnessMark harness="cursor" size="lg"/><HarnessMark harness="antigravity" size="lg"/><HarnessMark harness="opencode" size="lg"/></span></div></div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 });
 </script>

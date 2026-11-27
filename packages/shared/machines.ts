@@ -77,7 +77,7 @@ export interface MachinesView {
 }
 
 /** The harnesses in the order the usage rows and pickers list them. */
-export const HARNESS_ORDER = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud', 'antigravity'];
+export const HARNESS_ORDER = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud', 'antigravity', 'opencode'];
 export const harnessRank = (id: string) => {
   const i = HARNESS_ORDER.indexOf(id);
   return i < 0 ? HARNESS_ORDER.length : i;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  goneModel,
   hiddenModelIds,
   latestModelIds,
   modelFamily,
@@ -113,5 +114,19 @@ describe('parseModelVisibility', () => {
       codex: { show: ['x'], newModels: 'all' },
     });
     expect(parseModelVisibility(null)).toEqual({});
+  });
+});
+
+describe('goneModel', () => {
+  const oc = { id: 'opencode', available: true, models: [{ id: 'opencode/seaglass-alpha-free' }] };
+  it('names an OpenCode model the live list dropped, from its id', () => {
+    expect(goneModel(oc, 'opencode/deepseek-v4.1-flash-free')).toMatchObject({ id: 'opencode/deepseek-v4.1-flash-free', label: 'DeepSeek V4.1 Flash', gone: true });
+  });
+  it('is null for a listed model, no model, an unchecked list or another harness', () => {
+    expect(goneModel(oc, 'opencode/seaglass-alpha-free')).toBeNull();
+    expect(goneModel(oc, '')).toBeNull();
+    expect(goneModel({ ...oc, models: [] }, 'opencode/deepseek-v4.1-flash-free')).toBeNull();
+    expect(goneModel({ ...oc, available: false }, 'opencode/deepseek-v4.1-flash-free')).toBeNull();
+    expect(goneModel({ id: 'claude-code', available: true, models: [{ id: 'sonnet' }] }, 'claude-sonnet-5-5[1m]')).toBeNull();
   });
 });

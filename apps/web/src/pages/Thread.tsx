@@ -12,7 +12,7 @@ import { OpenItemsCard } from '../components/thread/OpenItemsCard.tsx';
 import { sameSettings } from '../new-thread-preset.ts';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
-import { LimitCard } from '../components/thread/LimitCard.tsx';
+import { LimitCard, ModelGoneCard } from '../components/thread/LimitCard.tsx';
 import { GoalLine } from '../components/thread/GoalLine.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
@@ -306,6 +306,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                     setQueued(pending);
                   }}
                 />
+                <ModelGoneCard thread={thread} harnesses={harnesses} />
                 <HandoffCard thread={thread} handoff={handoff} onChanged={handedOff} />
                 <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} sessionBlocked={!!thread.resume_blocked} canSteer={canSteer(thread.harness, harnesses)} />
                 <SendingMessages threadId={id} pending={listed} />
