@@ -210,11 +210,17 @@ function InboxList({ onSearch, collapsed }: { onSearch: () => void; collapsed: b
     <>
       <PanelHeader title="Inbox" collapsed={collapsed} />
       <PanelScroll collapsed={collapsed}>
-        <div className="space-y-px pb-2">
-          <SearchRow onSearch={onSearch} />
-          <NewThreadRow />
-        </div>
-        <InboxView links={false} variant="row" collapsed={collapsed} />
+        <InboxView
+          links={false}
+          variant="row"
+          collapsed={collapsed}
+          head={
+            <div className="space-y-px pb-2">
+              <SearchRow onSearch={onSearch} />
+              <NewThreadRow />
+            </div>
+          }
+        />
       </PanelScroll>
       <PanelFoot collapsed={collapsed} />
     </>

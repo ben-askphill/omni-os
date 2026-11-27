@@ -20,7 +20,29 @@ vi.mock('../src/folders.tsx', async (orig) => ({
   ...(await orig<typeof import('../src/folders.tsx')>()),
   useFolders: () => ({ editing: null, setEditing: () => {} }),
 }));
+// The Inbox's foot reads the live feed: nothing it shows matters here.
+vi.mock('../src/components/UpdateNotice.tsx', () => ({ UpdateNotice: () => null }));
+vi.mock('../src/components/DiskNotice.tsx', () => ({ DiskNotice: () => null }));
+vi.mock('../src/components/AccountNotice.tsx', () => ({ AccountNotice: () => null }));
+vi.mock('../src/components/sidebar/UsageCard.tsx', () => ({ UsageCard: () => null }));
+vi.mock('../src/app/useInbox.ts', () => {
+  const shelf = { rows: [], count: 0, more: 0, open: false, toggle: () => {} };
+  return {
+    useInbox: () => ({
+      pinned: [],
+      inbox: [],
+      needs: [],
+      finished: [],
+      working: { ...shelf, threads: [] },
+      done: { ...shelf, count: 95, showMore: () => {} },
+      loaded: true,
+      openId: null,
+      status: () => null,
+    }),
+  };
+});
 
+import { Window } from 'happy-dom';
 import { ListPanel } from '../src/components/rail/ListPanel.tsx';
 
 const render = (collapsed: boolean) => {
@@ -62,5 +84,20 @@ describe('ListPanel', () => {
     const open = render(false);
     expect(open).toContain('class="flex items-center text-[13px] crow');
     expect(open).toMatch(/class="tip tip-card"/);
+  });
+
+  // The Inbox's column is min-h-full, so Done sits at the foot. Search and New thread beside it made the list 70px
+  // taller than its box, so a scrollbar showed with nothing to scroll and Done hid under the fold.
+  it("keeps Search and New thread inside the Inbox's full-height column, so a list that fits does not scroll", () => {
+    state.prefs['rail.listCollapsed'] = false;
+    const html = renderToStaticMarkup(createElement(ListPanel, { mode: { kind: 'inbox' }, onSearch: () => {} }));
+    const doc = new new Window().DOMParser().parseFromString(html, 'text/html');
+    const scroll = doc.getElementById('rail-list-body')!;
+    expect(scroll.children).toHaveLength(1);
+    const column = scroll.children[0]!;
+    expect(column.className.split(' ')).toContain('min-h-full');
+    expect(column.querySelector('[aria-label="Search or jump to"]')).toBeTruthy();
+    expect(column.querySelector('[aria-label="New thread"]')).toBeTruthy();
+    expect(column.textContent).toContain('Nothing is waiting on you.');
   });
 });
